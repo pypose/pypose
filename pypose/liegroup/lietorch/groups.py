@@ -1,81 +1,86 @@
 import torch
 import numpy as np
-
-# group operations implemented in cuda
-from .group_ops import Exp, Log, Inv, Mul, Adj, AdjT, Jinv, Act3, Act4, ToMatrix, ToVec, FromVec
+from torch import nn
+from .types import SO3_type, so3_type, SE3_type, se3_type
 from .broadcasting import broadcast_inputs
+from .group_ops import exp, log, inv, mul, adj
+from .group_ops import adjT, jinv, act3, act4, toMatrix, toVec, fromVec
 
 
-class LieGroupParameter(torch.Tensor):
-    """ Wrapper class for LieGroup """
+def SO3(data, **kwargs):
+    assert data.shape[-1] == SO3_type.dim, 'Init Dimension Invalid.'
+    return LieGroup(data, gtype=SO3_type, **kwargs)
 
-    from torch._C import _disabled_torch_function_impl
-    __torch_function__ = _disabled_torch_function_impl
+def so3(data, **kwargs):
+    assert data.shape[-1] == so3_type.dim, 'Init Dimension Invalid.'
+    return LieGroup(data, gtype=so3_type, **kwargs)
 
-    def __new__(cls, group, requires_grad=True):
-        data = torch.zeros(group.tangent_shape, 
-                           device=group.data.device, 
-                           dtype=group.data.dtype, 
-                           requires_grad=True)
+def SE3(data, **kwargs):
+    assert data.shape[-1] == SE3_type.dim, 'Init Dimension Invalid.'
+    return LieGroup(data, gtype=SE3_type, **kwargs)
 
-        return torch.Tensor._make_subclass(cls, data, requires_grad)
+def se3(data, **kwargs):
+    assert data.shape[-1] == se3_type.dim, 'Init Dimension Invalid.'
+    return LieGroup(data, gtype=se3_type, **kwargs)
 
-    def __init__(self, group):
-        self.group = group
+def Exp(x):
+    assert isinstance(x, LieGroup), "Not a LieGroup Instance"
+    assert x.gtype.is_manifold is True, "Manifold space has no Exp operation"
+    out = exp.apply(x.gtype.group_id, x.view(-1, x.gtype.dim))
+    return SO3(out.view(*(x.gshape), x.gtype.embedded_dim))
 
-    def retr(self):
-        return self.group.retr(self)
+def Log(x):
+    assert isinstance(x, LieGroup), "Not a LieGroup Instance"
+    assert x.gtype.is_manifold is False, "Embedded space has no Log operation"
+    inputs, out_shape = broadcast_inputs(x, None)
+    out = log.apply(x.gtype.group_id, *inputs)
+    return so3(out.view(*(x.gshape), x.gtype.manifold_dim))
 
-    def log(self):
-        return self.retr().log()
+def randn_so3(*args, requires_grad=False, **kwargs):
+    data = torch.randn(*(list(args)+[so3_type.dim]), **kwargs).detach()
+    return so3(data, **kwargs).requires_grad_(requires_grad)
 
-    def inv(self):
-        return self.retr().inv()
+def randn_SO3(*args, requires_grad=False, **kwargs):
+    data = Exp(randn_so3(*args, **kwargs)).detach()
+    return SO3(data, **kwargs).requires_grad_(requires_grad)
 
-    def adj(self, a):
-        return self.retr().adj(a)
+def randn_se3(*args, **kwargs):
+    data = torch.randn(*(list(args)+[se3_type.dim]), **kwargs)
+    return se3(data, **kwargs)
 
-    def __mul__(self, other):
-        if isinstance(other, LieGroupParameter):
-            return self.retr() * other.retr()
-        else:
-            return self.retr() * other
-
-    def add_(self, update, alpha):
-        self.group = self.group.exp(alpha*update) * self.group
-
-    def __getitem__(self, index):
-        return self.retr().__getitem__(index)
+def randn_SE3(*args, **kwargs):
+    return SE3(Exp(randn_se3(*args, **kwargs)))
 
 
-class LieGroup:
-    """ Base class for Lie Group """
+class LieGroup(torch.Tensor):
+    """ Lie Group """
+    def __init__(self, data, gtype=None, **kwargs):
+        self.gtype = gtype
 
-    def __init__(self, data):
-        self.data = data
+    def __new__(cls, data=None, **kwargs):
+        return torch.Tensor.as_subclass(data, LieGroup) 
 
     def __repr__(self):
-        return "{}: size={}, device={}, dtype={}".format(
-            self.group_name, self.shape, self.device, self.dtype)
+        return self.gtype.__class__.__name__ + " Group:\n" + super().__repr__()
 
     @property
-    def shape(self):
-        return self.data.shape[:-1]
+    def gtype(self):
+        return self.__gtype
+
+    @gtype.setter
+    def gtype(self, val):
+        self.__gtype = val
 
     @property
-    def device(self):
-        return self.data.device
+    def gshape(self):
+        return super().shape[:-1]
 
-    @property
-    def dtype(self):
-        return self.data.dtype
+#    def vec(self):
+#        return self.apply_op(ToVec, self.data)
 
-    def vec(self):
-        return self.apply_op(ToVec, self.data)
-
-    @property
-    def tangent_shape(self):
-        return self.data.shape[:-1] + (self.manifold_dim,)
+#    @property
+#    def tangent_shape(self):
+#        return self.data.shape[:-1] + (self.manifold_dim,)
 
     @classmethod
     def Identity(cls, *batch_shape, **kwargs):
@@ -129,44 +134,42 @@ class LieGroup:
         data = op.apply(cls.group_id, *inputs)
         return data.view(out_shape + (-1,))
 
-    @classmethod
-    def exp(cls, x):
-        """ exponential map: x -> X """
-        return cls(cls.apply_op(Exp, x))
+    def Exp(self):
+        return Exp(self)
 
     def quaternion(self):
         """ extract quaternion """
         return self.apply_op(Quat, self.data)
 
-    def log(self):
+    def Log(self):
         """ logarithm map """
-        return self.apply_op(Log, self.data)
+        return Log(self)
 
-    def inv(self):
+    def Inv(self):
         """ group inverse """
         return self.__class__(self.apply_op(Inv, self.data))
 
-    def mul(self, other):
+    def Mul(self, other):
         """ group multiplication """
         return self.__class__(self.apply_op(Mul, self.data, other.data))
 
-    def retr(self, a):
+    def Retr(self, a):
         """ retraction: Exp(a) * X """
         dX = self.__class__.apply_op(Exp, a)
         return self.__class__(self.apply_op(Mul, dX, self.data))
 
-    def adj(self, a):
+    def Adj(self, a):
         """ adjoint operator: b = A(X) * a """
         return self.apply_op(Adj, self.data, a)
 
-    def adjT(self, a):
+    def AdjT(self, a):
         """ transposed adjoint operator: b = a * A(X) """
         return self.apply_op(AdjT, self.data, a)
 
     def Jinv(self, a):
         return self.apply_op(Jinv, self.data, a)
 
-    def act(self, p):
+    def Act(self, p):
         """ action on a point cloud """
         
         # action on point
@@ -189,125 +192,20 @@ class LieGroup:
         p = p.view([1] * (len(self.data.shape) - 1) + [4,])
         return self.apply_op(Act4, self.data, p)
 
-    def detach(self):
-        return self.__class__(self.data.detach())
+#    def detach(self):
+#        return self.__class__(self.data.detach())
 
-    def view(self, dims):
-        data_reshaped = self.data.view(dims + (self.embedded_dim,))
-        return self.__class__(data_reshaped)
-
-    def __mul__(self, other):
+#    def __mul__(self, other):
         # group multiplication
-        if isinstance(other, LieGroup):
-            return self.mul(other)
+#        if isinstance(other, LieGroup):
+#            return self.mul(other)
 
-        # action on point
-        elif isinstance(other, torch.Tensor):
-            return self.act(other)
-
-    def __getitem__(self, index):
-        return self.__class__(self.data[index])
-
-    def __setitem__(self, index, item):
-        self.data[index] = item.data
-
-    def to(self, *args, **kwargs):
-        return self.__class__(self.data.to(*args, **kwargs))
-
-    def cpu(self):
-        return self.__class__(self.data.cpu())
-
-    def cuda(self):
-        return self.__class__(self.data.cuda())
-
-    def float(self, device):
-        return self.__class__(self.data.float())
-
-    def double(self, device):
-        return self.__class__(self.data.double())
-
-    def unbind(self, dim=0):
-        return [self.__class__(x) for x in self.data.unbind(dim=dim)]
-        
-
-class SO3(LieGroup):
-    group_name = 'SO3'
-    group_id = 1
-    manifold_dim = 3
-    embedded_dim = 4
-    
-    # unit quaternion
-    id_elem = torch.as_tensor([0.0, 0.0, 0.0, 1.0])
-
-    def __init__(self, data):
-        if isinstance(data, SE3):
-            data = data.data[..., 3:7]
-
-        super(SO3, self).__init__(data)
+#        elif isinstance(other, torch.Tensor):
+#            return self.act(other)
 
 
-class RxSO3(LieGroup):
-    group_name = 'RxSO3'
-    group_id = 2
-    manifold_dim = 4
-    embedded_dim = 5
-    
-    # unit quaternion
-    id_elem = torch.as_tensor([0.0, 0.0, 0.0, 1.0, 1.0])
-
-    def __init__(self, data):
-        if isinstance(data, Sim3):
-            data = data.data[..., 3:8]
-
-        super(RxSO3, self).__init__(data)
-
-
-class SE3(LieGroup):
-    group_name = 'SE3'
-    group_id = 3
-    manifold_dim = 6
-    embedded_dim = 7
-
-    # translation, unit quaternion
-    id_elem = torch.as_tensor([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
-
-    def __init__(self, data):
-        if isinstance(data, SO3):
-            translation = torch.zeros_like(data.data[...,:3])
-            data = torch.cat([translation, data.data], -1)
-
-        super(SE3, self).__init__(data)
-
-    def scale(self, s):
-        t, q = self.data.split([3,4], -1)
-        t = t * s.unsqueeze(-1)
-        return SE3(torch.cat([t, q], dim=-1))
-
-
-class Sim3(LieGroup):
-    group_name = 'Sim3'
-    group_id = 4
-    manifold_dim = 7
-    embedded_dim = 8
-
-    # translation, unit quaternion, scale
-    id_elem = torch.as_tensor([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0])
-
-    def __init__(self, data):
-
-        if isinstance(data, SO3):
-            scale = torch.ones_like(SO3.data[...,:1])
-            translation = torch.zeros_like(SO3.data[...,:3])
-            data = torch.cat([translation, SO3.data, scale], -1)
-
-        elif isinstance(data, SE3):
-            scale = torch.ones_like(data.data[...,:1])
-            data = torch.cat([data.data, scale], -1)
-
-        elif isinstance(data, Sim3):
-            data = data.data
-
-        super(Sim3, self).__init__(data)
+class Parameter(nn.Parameter, LieGroup):
+    pass
 
 
 def cat(group_list, dim):

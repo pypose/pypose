@@ -3,7 +3,6 @@ import torch
 import torch.nn.functional as F
 
 
-
 class GroupOp(torch.autograd.Function):
     """ group operation base class """
 
@@ -24,53 +23,49 @@ class GroupOp(torch.autograd.Function):
         grad_inputs = cls.backward_op(ctx.group_id, grad, *inputs)
         return (None, ) + tuple(grad_inputs)
         
-
-class Exp(GroupOp):
+class exp(GroupOp):
     """ exponential map """
     forward_op, backward_op = lietorch_backends.expm, lietorch_backends.expm_backward
 
-class Log(GroupOp):
+class log(GroupOp):
     """ logarithm map """
     forward_op, backward_op = lietorch_backends.logm, lietorch_backends.logm_backward
 
-class Inv(GroupOp):
+class inv(GroupOp):
     """ group inverse """
     forward_op, backward_op = lietorch_backends.inv, lietorch_backends.inv_backward
 
-class Mul(GroupOp):
+class mul(GroupOp):
     """ group multiplication """
     forward_op, backward_op = lietorch_backends.mul, lietorch_backends.mul_backward
 
-class Adj(GroupOp):
+class adj(GroupOp):
     """ adjoint operator """
     forward_op, backward_op = lietorch_backends.adj, lietorch_backends.adj_backward
 
-class AdjT(GroupOp):
+class adjT(GroupOp):
     """ adjoint operator """
     forward_op, backward_op = lietorch_backends.adjT, lietorch_backends.adjT_backward
 
-class Act3(GroupOp):
+class act3(GroupOp):
     """ action on point """
     forward_op, backward_op = lietorch_backends.act, lietorch_backends.act_backward
 
-class Act4(GroupOp):
+class act4(GroupOp):
     """ action on point """
     forward_op, backward_op = lietorch_backends.act4, lietorch_backends.act4_backward
 
-class Jinv(GroupOp):
+class jinv(GroupOp):
     """ adjoint operator """
     forward_op, backward_op = lietorch_backends.Jinv, None
 
-class ToMatrix(GroupOp):
+class toMatrix(GroupOp):
     """ convert to matrix representation """
     forward_op, backward_op = lietorch_backends.as_matrix, None
 
-
-
-
 ### conversion operations to/from Euclidean embeddings ###
 
-class FromVec(torch.autograd.Function):
+class fromVec(torch.autograd.Function):
     """ convert vector into group object """
 
     @classmethod
@@ -85,7 +80,7 @@ class FromVec(torch.autograd.Function):
         J = lietorch_backends.projector(ctx.group_id, *inputs)
         return None, torch.matmul(grad.unsqueeze(-2), torch.linalg.pinv(J)).squeeze(-2)
 
-class ToVec(torch.autograd.Function):
+class toVec(torch.autograd.Function):
     """ convert group object to vector """
 
     @classmethod
