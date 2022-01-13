@@ -26,15 +26,16 @@ def se3(data, **kwargs):
 def Exp(x):
     assert isinstance(x, LieGroup), "Not a LieGroup Instance"
     assert x.gtype.is_manifold is True, "Manifold space has no Exp operation"
-    out = exp.apply(x.gtype.group_id, x.view(-1, x.gtype.dim))
-    return SO3(out.view(*(x.gshape), x.gtype.embedded_dim))
+    inputs, out_shape = broadcast_inputs(x, None)
+    out = exp.apply(x.gtype.group_id, *inputs)
+    return LieGroup(out.view(out_shape + (-1,)), gtype=x.gtype.mapping_type, requires_grad=x.requires_grad)
 
 def Log(x):
     assert isinstance(x, LieGroup), "Not a LieGroup Instance"
     assert x.gtype.is_manifold is False, "Embedded space has no Log operation"
     inputs, out_shape = broadcast_inputs(x, None)
     out = log.apply(x.gtype.group_id, *inputs)
-    return so3(out.view(*(x.gshape), x.gtype.manifold_dim))
+    return LieGroup(out.view(out_shape + (-1,)), gtype=x.gtype.mapping_type, requires_grad=x.requires_grad)
 
 def randn_so3(*args, requires_grad=False, **kwargs):
     data = torch.randn(*(list(args)+[so3_type.dim]), **kwargs).detach()
@@ -44,16 +45,21 @@ def randn_SO3(*args, requires_grad=False, **kwargs):
     data = Exp(randn_so3(*args, **kwargs)).detach()
     return SO3(data, **kwargs).requires_grad_(requires_grad)
 
-def randn_se3(*args, **kwargs):
-    data = torch.randn(*(list(args)+[se3_type.dim]), **kwargs)
-    return se3(data, **kwargs)
+def randn_se3(*args, requires_grad=False, **kwargs):
+    data = torch.randn(*(list(args)+[se3_type.dim]), **kwargs).detach()
+    return se3(data, **kwargs).requires_grad_(requires_grad)
 
-def randn_SE3(*args, **kwargs):
-    return SE3(Exp(randn_se3(*args, **kwargs)))
+def randn_SE3(*args, requires_grad=False, **kwargs):
+    data = Exp(randn_se3(*args, **kwargs)).detach()
+    return SE3(data, **kwargs).requires_grad_(requires_grad)
 
 
 class LieGroup(torch.Tensor):
     """ Lie Group """
+
+    from torch._C import _disabled_torch_function_impl
+    __torch_function__ = _disabled_torch_function_impl
+
     def __init__(self, data, gtype=None, **kwargs):
         self.gtype = gtype
 
@@ -73,14 +79,10 @@ class LieGroup(torch.Tensor):
 
     @property
     def gshape(self):
-        return super().shape[:-1]
+        return self.shape[:-1]
 
 #    def vec(self):
 #        return self.apply_op(ToVec, self.data)
-
-#    @property
-#    def tangent_shape(self):
-#        return self.data.shape[:-1] + (self.manifold_dim,)
 
     @classmethod
     def Identity(cls, *batch_shape, **kwargs):
@@ -137,7 +139,7 @@ class LieGroup(torch.Tensor):
     def Exp(self):
         return Exp(self)
 
-    def quaternion(self):
+    def Quaternion(self):
         """ extract quaternion """
         return self.apply_op(Quat, self.data)
 
@@ -192,9 +194,6 @@ class LieGroup(torch.Tensor):
         p = p.view([1] * (len(self.data.shape) - 1) + [4,])
         return self.apply_op(Act4, self.data, p)
 
-#    def detach(self):
-#        return self.__class__(self.data.detach())
-
 #    def __mul__(self, other):
         # group multiplication
 #        if isinstance(other, LieGroup):
@@ -206,14 +205,3 @@ class LieGroup(torch.Tensor):
 
 class Parameter(nn.Parameter, LieGroup):
     pass
-
-
-def cat(group_list, dim):
-    """ Concatenate groups along dimension """
-    data = torch.cat([X.data for X in group_list], dim=dim)
-    return group_list[0].__class__(data)
-
-def stack(group_list, dim):
-    """ Concatenate groups along dimension """
-    data = torch.stack([X.data for X in group_list], dim=dim)
-    return group_list[0].__class__(data)

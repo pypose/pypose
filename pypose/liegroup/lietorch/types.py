@@ -76,7 +76,7 @@ class SE3Type(GroupType):
         self.manifold_dim = 6
         self.embedded_dim = 7
 
-class se3Type(GroupType):
+class se3Type(SE3Type):
     def __init__(self):
         super().__init__()
         self.is_manifold = True
@@ -86,3 +86,8 @@ SO3_type = SO3Type()
 so3_type = so3Type()
 se3_type = se3Type()
 SE3_type = SE3Type()
+
+SO3_type.mapping_type = so3_type
+so3_type.mapping_type = SO3_type
+SE3_type.mapping_type = se3_type
+se3_type.mapping_type = SE3_type
