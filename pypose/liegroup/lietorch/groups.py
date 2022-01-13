@@ -203,5 +203,8 @@ class LieGroup(torch.Tensor):
 #            return self.act(other)
 
 
-class Parameter(nn.Parameter, LieGroup):
-    pass
+class Parameter(LieGroup, nn.Parameter):
+    def __new__(cls, data=None, gtype=None, requires_grad=True):
+            if data is None:
+                data = torch.tensor([])
+            return LieGroup._make_subclass(cls, data, requires_grad)
