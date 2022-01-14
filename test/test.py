@@ -5,10 +5,10 @@ import pypose as pp
 torch.manual_seed(0)
 torch.cuda.manual_seed(0)
 
-x = pp.randn_SO3(6, sigma=0.01, requires_grad=True)
-y = pp.randn_so3(6, sigma=0.1, dtype=torch.float64, requires_grad=True, device="cuda")
-a = pp.randn_se3(2, sigma=0.1, requires_grad=True)
-b = pp.randn_SE3(1, sigma=0.1, requires_grad=True)
+x = pp.so3(torch.randn(3,3), sigma=0.01, requires_grad=True)
+y = pp.randn_so3(3, sigma=0.1, dtype=torch.float64, requires_grad=True, device="cuda")
+a = pp.randn_se3(3, sigma=0.1, requires_grad=True)
+b = pp.SE3_type.randn(3, sigma=0.1, requires_grad=True)
 
 assert y.is_leaf and x.is_leaf and a.is_leaf and b.is_leaf
 
@@ -59,4 +59,3 @@ print(so3I)
 print(SE3I)
 print(se3I)
 
-so3x = pp.SO3(torch.randn(4,4), dtype=torch.float64, requires_grad=True, device="cuda")

@@ -135,10 +135,6 @@ class LieGroup(torch.Tensor):
     def tensor(self):
         return self.data
 
-    # @staticmethod
-    # def randn(*args, gtype, sigma=1, requires_grad=False, **kwargs):
-    #     return gtype.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
-
     def Exp(self):
         return self.gtype.Exp(self)
 
