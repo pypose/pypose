@@ -43,12 +43,11 @@ for i in range(epoch):
 
 print("Parameter:", count_parameters(net))
 
-
 SO3I = pp.identity_SO3(1, 3, device="cuda", dtype=torch.float64)
 so3I = pp.identity_so3(2, 1, device="cuda", requires_grad=True)
 
-SE3I = pp.identity_SE3(2, device="cuda", dtype=torch.float64)
-se3I = pp.identity_se3(1)
+SE3I = pp.identity_SE3(3, device="cuda", dtype=torch.float64)
+se3I = pp.identity_se3(2)
 
 print(SO3I)
 print(so3I)

@@ -4,6 +4,7 @@ from .broadcasting import broadcast_inputs
 from .group_ops import exp, log, inv, mul, adj
 from .group_ops import adjT, jinv, act3, act4, toMatrix, toVec, fromVec
 
+
 class GroupType:
     '''Lie Group Type Base Class'''
     def __init__(self, groud,  dimension, embedding, manifold):
@@ -17,6 +18,9 @@ class GroupType:
     
     def Exp(self, x):
         raise NotImplementedError("Instance has no Exp attribute.")
+
+    def identity(cls, *args, **kwargs):
+        raise NotImplementedError("Instance has no identity.")
 
 
 class SO3Type(GroupType):
@@ -48,9 +52,7 @@ class so3Type(GroupType):
 
     @classmethod
     def identity(cls, *args, **kwargs):
-        data = torch.tensor([0., 0., 0.], **kwargs)
-        return LieGroup(data.expand(args+(-1,)),
-                gtype=so3_type, requires_grad=data.requires_grad)
+        return SO3_type.Log(SO3_type.identity(*args, **kwargs))
 
 
 class SE3Type(GroupType):
@@ -82,9 +84,7 @@ class se3Type(GroupType):
 
     @classmethod
     def identity(cls, *args, **kwargs):
-        data = torch.tensor([0., 0., 0., 0., 0., 0.], **kwargs)
-        return LieGroup(data.expand(args+(-1,)),
-                gtype=se3_type, requires_grad=data.requires_grad)
+        return SE3_type.Log(SE3_type.identity(*args, **kwargs))
 
 
 SO3_type, so3_type = SO3Type(), so3Type()
