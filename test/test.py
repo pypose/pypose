@@ -5,7 +5,12 @@ import pypose as pp
 torch.manual_seed(0)
 torch.cuda.manual_seed(0)
 
+x = pp.randn_SO3(6, sigma=0.01, requires_grad=True)
 y = pp.randn_so3(6, sigma=0.1, dtype=torch.float64, requires_grad=True, device="cuda")
+a = pp.randn_se3(2, sigma=0.1, requires_grad=True)
+b = pp.randn_SE3(1, sigma=0.1, requires_grad=True)
+
+assert y.is_leaf and x.is_leaf and a.is_leaf and b.is_leaf
 
 (pp.Log(y.Exp())**2).sin().sum().backward()
 

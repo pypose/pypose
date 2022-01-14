@@ -19,8 +19,12 @@ class GroupType:
     def Exp(self, x):
         raise NotImplementedError("Instance has no Exp attribute.")
 
+    @classmethod
     def identity(cls, *args, **kwargs):
         raise NotImplementedError("Instance has no identity.")
+
+    def randn(self, *args, sigma=1., **kwargs):
+        return sigma * torch.randn(*(list(args)+[self.manifold]), **kwargs)
 
 
 class SO3Type(GroupType):
@@ -39,6 +43,10 @@ class SO3Type(GroupType):
         return LieGroup(data.expand(args+(-1,)),
                 gtype=SO3_type, requires_grad=data.requires_grad)
 
+    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
+        data = so3_type.Exp(so3_type.randn(*args, sigma=sigma, **kwargs)).detach()
+        return LieGroup(data, gtype=SO3_type).requires_grad_(requires_grad)
+
 
 class so3Type(GroupType):
     def __init__(self):
@@ -53,6 +61,10 @@ class so3Type(GroupType):
     @classmethod
     def identity(cls, *args, **kwargs):
         return SO3_type.Log(SO3_type.identity(*args, **kwargs))
+
+    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
+        data = super().randn(*args, sigma=sigma, **kwargs).detach()
+        return LieGroup(data, gtype=so3_type).requires_grad_(requires_grad)
 
 
 class SE3Type(GroupType):
@@ -71,6 +83,10 @@ class SE3Type(GroupType):
         return LieGroup(data.expand(args+(-1,)),
                 gtype=SE3_type, requires_grad=data.requires_grad)
 
+    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
+        data = se3_type.Exp(se3_type.randn(*args, sigma=sigma, **kwargs)).detach()
+        return LieGroup(data, gtype=SE3_type).requires_grad_(requires_grad)
+
 
 class se3Type(GroupType):
     def __init__(self):
@@ -85,6 +101,10 @@ class se3Type(GroupType):
     @classmethod
     def identity(cls, *args, **kwargs):
         return SE3_type.Log(SE3_type.identity(*args, **kwargs))
+
+    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
+        data = super().randn(*args, sigma=sigma, **kwargs).detach()
+        return LieGroup(data, gtype=se3_type).requires_grad_(requires_grad)
 
 
 SO3_type, so3_type = SO3Type(), so3Type()

@@ -23,23 +23,19 @@ def se3(data, **kwargs):
 
 
 def randn_so3(*args, sigma=1, requires_grad=False, **kwargs):
-    data = torch.randn(*(list(args)+[so3_type.dimension]), **kwargs).detach()
-    return so3(data*sigma, **kwargs).requires_grad_(requires_grad)
+    return so3_type.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
 
 
 def randn_SO3(*args, sigma=1, requires_grad=False, **kwargs):
-    data = Exp(randn_so3(*args, sigma=sigma, **kwargs)).detach()
-    return SO3(data, **kwargs).requires_grad_(requires_grad)
+    return SO3_type.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
 
 
 def randn_se3(*args, sigma=1, requires_grad=False, **kwargs):
-    data = torch.randn(*(list(args)+[se3_type.dimension]), **kwargs).detach()
-    return se3(data*sigma, **kwargs).requires_grad_(requires_grad)
+    return se3_type.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
 
 
 def randn_SE3(*args, sigma=1, requires_grad=False, **kwargs):
-    data = Exp(randn_se3(*args, sigma=sigma, **kwargs)).detach()
-    return SE3(data, **kwargs).requires_grad_(requires_grad)
+    return SE3_type.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
 
 
 def identity_SO3(*args, **kwargs):
