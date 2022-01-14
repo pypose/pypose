@@ -58,3 +58,5 @@ print(SO3I)
 print(so3I)
 print(SE3I)
 print(se3I)
+
+so3x = pp.SO3(torch.randn(4,4), dtype=torch.float64, requires_grad=True, device="cuda")

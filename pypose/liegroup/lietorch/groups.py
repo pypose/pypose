@@ -96,7 +96,7 @@ class se3Type(GroupType):
         inputs, out_shape = broadcast_inputs(x, None)
         out = exp.apply(self.group, *inputs)
         return LieGroup(out.view(out_shape + (-1,)),
-                gtype=SO3_type, requires_grad=x.requires_grad)
+                gtype=SE3_type, requires_grad=x.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -117,9 +117,12 @@ class LieGroup(torch.Tensor):
     __torch_function__ = _disabled_torch_function_impl
 
     def __init__(self, data, gtype=None, **kwargs):
+        assert data.shape[-1] == gtype.dimension, 'Dimension Invalid.'
         self.gtype = gtype
 
     def __new__(cls, data=None, **kwargs):
+        if data is None:
+            data = torch.tensor([])
         return torch.Tensor.as_subclass(data, LieGroup) 
 
     def __repr__(self):
@@ -131,6 +134,10 @@ class LieGroup(torch.Tensor):
     
     def tensor(self):
         return self.data
+
+    # @staticmethod
+    # def randn(*args, gtype, sigma=1, requires_grad=False, **kwargs):
+    #     return gtype.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
 
     def Exp(self):
         return self.gtype.Exp(self)
