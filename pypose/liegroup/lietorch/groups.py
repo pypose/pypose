@@ -1,57 +1,69 @@
 import torch
-import numpy as np
 from torch import nn
-from .types import SO3_type, so3_type, SE3_type, se3_type
 from .broadcasting import broadcast_inputs
 from .group_ops import exp, log, inv, mul, adj
 from .group_ops import adjT, jinv, act3, act4, toMatrix, toVec, fromVec
 
+class GroupType:
+    '''Lie Group Type Base Class'''
+    def __init__(self, groud,  dimension, embedding, manifold):
+        self.group     = groud     # Group ID
+        self.dimension = dimension # Data dimension
+        self.embedding = embedding # Embedding dimension
+        self.manifold  = manifold  # Manifold dimension
 
-def SO3(data, **kwargs):
-    assert data.shape[-1] == SO3_type.dim, 'Init Dimension Invalid.'
-    return LieGroup(data, gtype=SO3_type, **kwargs)
+    def Log(self, x):
+        raise NotImplementedError("Instance has no Log attribute.")
+    
+    def Exp(self, x):
+        raise NotImplementedError("Instance has no Exp attribute.")
 
-def so3(data, **kwargs):
-    assert data.shape[-1] == so3_type.dim, 'Init Dimension Invalid.'
-    return LieGroup(data, gtype=so3_type, **kwargs)
 
-def SE3(data, **kwargs):
-    assert data.shape[-1] == SE3_type.dim, 'Init Dimension Invalid.'
-    return LieGroup(data, gtype=SE3_type, **kwargs)
+class SO3Type(GroupType):
+    def __init__(self):
+        super().__init__(1, 4, 4, 3)
 
-def se3(data, **kwargs):
-    assert data.shape[-1] == se3_type.dim, 'Init Dimension Invalid.'
-    return LieGroup(data, gtype=se3_type, **kwargs)
+    def Log(self, x):
+        inputs, out_shape = broadcast_inputs(x, None)
+        out = log.apply(self.group, *inputs)
+        return LieGroup(out.view(out_shape + (-1,)),
+                gtype=so3_type, requires_grad=x.requires_grad)
 
-def Exp(x):
-    assert isinstance(x, LieGroup), "Not a LieGroup Instance"
-    assert x.gtype.is_manifold is True, "Manifold space has no Exp operation"
-    inputs, out_shape = broadcast_inputs(x, None)
-    out = exp.apply(x.gtype.group_id, *inputs)
-    return LieGroup(out.view(out_shape + (-1,)), gtype=x.gtype.mapping_type, requires_grad=x.requires_grad)
 
-def Log(x):
-    assert isinstance(x, LieGroup), "Not a LieGroup Instance"
-    assert x.gtype.is_manifold is False, "Embedded space has no Log operation"
-    inputs, out_shape = broadcast_inputs(x, None)
-    out = log.apply(x.gtype.group_id, *inputs)
-    return LieGroup(out.view(out_shape + (-1,)), gtype=x.gtype.mapping_type, requires_grad=x.requires_grad)
+class so3Type(GroupType):
+    def __init__(self):
+        super().__init__(1, 3, 4, 3)
 
-def randn_so3(*args, requires_grad=False, **kwargs):
-    data = torch.randn(*(list(args)+[so3_type.dim]), **kwargs).detach()
-    return so3(data, **kwargs).requires_grad_(requires_grad)
+    def Exp(self, x):
+        inputs, out_shape = broadcast_inputs(x, None)
+        out = exp.apply(self.group, *inputs)
+        return LieGroup(out.view(out_shape + (-1,)),
+                gtype=SO3_type, requires_grad=x.requires_grad)
 
-def randn_SO3(*args, requires_grad=False, **kwargs):
-    data = Exp(randn_so3(*args, **kwargs)).detach()
-    return SO3(data, **kwargs).requires_grad_(requires_grad)
 
-def randn_se3(*args, requires_grad=False, **kwargs):
-    data = torch.randn(*(list(args)+[se3_type.dim]), **kwargs).detach()
-    return se3(data, **kwargs).requires_grad_(requires_grad)
+class SE3Type(GroupType):
+    def __init__(self):
+        super().__init__(3, 7, 7, 6)
 
-def randn_SE3(*args, requires_grad=False, **kwargs):
-    data = Exp(randn_se3(*args, **kwargs)).detach()
-    return SE3(data, **kwargs).requires_grad_(requires_grad)
+    def Log(self, x):
+        inputs, out_shape = broadcast_inputs(x, None)
+        out = log.apply(self.group, *inputs)
+        return LieGroup(out.view(out_shape + (-1,)),
+                gtype=se3_type, requires_grad=x.requires_grad)
+
+
+class se3Type(GroupType):
+    def __init__(self):
+        super().__init__(3, 6, 7, 6)
+
+    def Exp(self, x):
+        inputs, out_shape = broadcast_inputs(x, None)
+        out = exp.apply(self.group, *inputs)
+        return LieGroup(out.view(out_shape + (-1,)), gtype=SO3_type, requires_grad=x.requires_grad)
+
+
+SO3_type, so3_type = SO3Type(), so3Type()
+SE3_type, se3_type = SE3Type(), se3Type()
 
 
 class LieGroup(torch.Tensor):
@@ -70,16 +82,17 @@ class LieGroup(torch.Tensor):
         return self.gtype.__class__.__name__ + " Group:\n" + super().__repr__()
 
     @property
-    def gtype(self):
-        return self.__gtype
-
-    @gtype.setter
-    def gtype(self, val):
-        self.__gtype = val
-
-    @property
     def gshape(self):
         return self.shape[:-1]
+    
+    def tensor(self):
+        return self.data
+
+    def Exp(self):
+        return self.gtype.Exp(self)
+
+    def Log(self):
+        return self.gtype.Log(self)
 
 #    def vec(self):
 #        return self.apply_op(ToVec, self.data)
@@ -120,10 +133,10 @@ class LieGroup(torch.Tensor):
 
         if isinstance(batch_shape[0], tuple):
             batch_shape = batch_shape[0]
-        
+
         elif isinstance(batch_shape[0], list):
             batch_shape = tuple(batch_shape[0])
-        
+
         tangent_shape = batch_shape + (cls.manifold_dim,)
         xi = torch.randn(tangent_shape, **kwargs)
         return cls.exp(sigma * xi)
@@ -132,20 +145,12 @@ class LieGroup(torch.Tensor):
     def apply_op(cls, op, x, y=None):
         """ Apply group operator """
         inputs, out_shape = broadcast_inputs(x, y)
-
         data = op.apply(cls.group_id, *inputs)
         return data.view(out_shape + (-1,))
-
-    def Exp(self):
-        return Exp(self)
 
     def Quaternion(self):
         """ extract quaternion """
         return self.apply_op(Quat, self.data)
-
-    def Log(self):
-        """ logarithm map """
-        return Log(self)
 
     def Inv(self):
         """ group inverse """
@@ -173,11 +178,11 @@ class LieGroup(torch.Tensor):
 
     def Act(self, p):
         """ action on a point cloud """
-        
+
         # action on point
         if p.shape[-1] == 3:
             return self.apply_op(Act3, self.data, p)
-        
+
         # action on homogeneous point
         elif p.shape[-1] == 4:
             return self.apply_op(Act4, self.data, p)
@@ -205,6 +210,6 @@ class LieGroup(torch.Tensor):
 
 class Parameter(LieGroup, nn.Parameter):
     def __new__(cls, data=None, gtype=None, requires_grad=True):
-            if data is None:
-                data = torch.tensor([])
-            return LieGroup._make_subclass(cls, data, requires_grad)
+        if data is None:
+            data = torch.tensor([])
+        return LieGroup._make_subclass(cls, data, requires_grad)
