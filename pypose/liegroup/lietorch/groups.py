@@ -29,6 +29,12 @@ class SO3Type(GroupType):
         return LieGroup(out.view(out_shape + (-1,)),
                 gtype=so3_type, requires_grad=x.requires_grad)
 
+    @classmethod
+    def identity(cls, *args, **kwargs):
+        data = torch.tensor([0., 0., 0., 1.], **kwargs)
+        return LieGroup(data.expand(args+(-1,)),
+                gtype=SO3_type, requires_grad=data.requires_grad)
+
 
 class so3Type(GroupType):
     def __init__(self):
@@ -39,6 +45,12 @@ class so3Type(GroupType):
         out = exp.apply(self.group, *inputs)
         return LieGroup(out.view(out_shape + (-1,)),
                 gtype=SO3_type, requires_grad=x.requires_grad)
+
+    @classmethod
+    def identity(cls, *args, **kwargs):
+        data = torch.tensor([0., 0., 0.], **kwargs)
+        return LieGroup(data.expand(args+(-1,)),
+                gtype=so3_type, requires_grad=data.requires_grad)
 
 
 class SE3Type(GroupType):
@@ -51,6 +63,12 @@ class SE3Type(GroupType):
         return LieGroup(out.view(out_shape + (-1,)),
                 gtype=se3_type, requires_grad=x.requires_grad)
 
+    @classmethod
+    def identity(cls, *args, **kwargs):
+        data = torch.tensor([0., 0., 0., 0., 0., 0., 1.], **kwargs)
+        return LieGroup(data.expand(args+(-1,)),
+                gtype=SE3_type, requires_grad=data.requires_grad)
+
 
 class se3Type(GroupType):
     def __init__(self):
@@ -59,7 +77,14 @@ class se3Type(GroupType):
     def Exp(self, x):
         inputs, out_shape = broadcast_inputs(x, None)
         out = exp.apply(self.group, *inputs)
-        return LieGroup(out.view(out_shape + (-1,)), gtype=SO3_type, requires_grad=x.requires_grad)
+        return LieGroup(out.view(out_shape + (-1,)),
+                gtype=SO3_type, requires_grad=x.requires_grad)
+
+    @classmethod
+    def identity(cls, *args, **kwargs):
+        data = torch.tensor([0., 0., 0., 0., 0., 0.], **kwargs)
+        return LieGroup(data.expand(args+(-1,)),
+                gtype=se3_type, requires_grad=data.requires_grad)
 
 
 SO3_type, so3_type = SO3Type(), so3Type()
@@ -68,7 +93,6 @@ SE3_type, se3_type = SE3Type(), se3Type()
 
 class LieGroup(torch.Tensor):
     """ Lie Group """
-
     from torch._C import _disabled_torch_function_impl
     __torch_function__ = _disabled_torch_function_impl
 
@@ -98,48 +122,12 @@ class LieGroup(torch.Tensor):
 #        return self.apply_op(ToVec, self.data)
 
     @classmethod
-    def Identity(cls, *batch_shape, **kwargs):
-        """ Construct identity element with batch shape """
-        
-        if isinstance(batch_shape[0], tuple):
-            batch_shape = batch_shape[0]
-        
-        elif isinstance(batch_shape[0], list):
-            batch_shape = tuple(batch_shape[0])
-
-        numel = np.prod(batch_shape)
-        data = cls.id_elem.reshape(1,-1)
-
-        if 'device' in kwargs:
-            data = data.to(kwargs['device'])
-
-        if 'dtype' in kwargs:
-            data = data.type(kwargs['dtype'])
-
-        data = data.repeat(numel, 1)
-        return cls(data).view(batch_shape)
-
-    @classmethod
     def IdentityLike(cls, G):
         return cls.Identity(G.shape, device=G.data.device, dtype=G.data.dtype)
 
     @classmethod
     def InitFromVec(cls, data):
         return cls(cls.apply_op(FromVec, data))
-
-    @classmethod
-    def Random(cls, *batch_shape, sigma=1.0, **kwargs):
-        """ Construct random element with batch_shape by random sampling in tangent space"""
-
-        if isinstance(batch_shape[0], tuple):
-            batch_shape = batch_shape[0]
-
-        elif isinstance(batch_shape[0], list):
-            batch_shape = tuple(batch_shape[0])
-
-        tangent_shape = batch_shape + (cls.manifold_dim,)
-        xi = torch.randn(tangent_shape, **kwargs)
-        return cls.exp(sigma * xi)
 
     @classmethod
     def apply_op(cls, op, x, y=None):

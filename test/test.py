@@ -5,10 +5,11 @@ import pypose as pp
 torch.manual_seed(0)
 torch.cuda.manual_seed(0)
 
-y = pp.randn_se3(6, dtype=torch.float64, requires_grad=True)
+y = pp.randn_so3(6, sigma=0.1, dtype=torch.float64, requires_grad=True, device="cuda")
 
-(y.Exp().Log()**2).sin().sum().backward()
+(pp.Log(y.Exp())**2).sin().sum().backward()
 
+print(y)
 print(y.shape)
 print(y.grad)
 
@@ -41,3 +42,15 @@ for i in range(epoch):
     print(loss)
 
 print("Parameter:", count_parameters(net))
+
+
+SO3I = pp.identity_SO3(1, 3, device="cuda", dtype=torch.float64)
+so3I = pp.identity_so3(2, 1, device="cuda", requires_grad=True)
+
+SE3I = pp.identity_SE3(2, device="cuda", dtype=torch.float64)
+se3I = pp.identity_se3(1)
+
+print(SO3I)
+print(so3I)
+print(SE3I)
+print(se3I)
