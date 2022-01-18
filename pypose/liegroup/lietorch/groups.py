@@ -23,6 +23,13 @@ class GroupType:
     def identity(cls, *args, **kwargs):
         raise NotImplementedError("Instance has no identity.")
 
+    @classmethod
+    def identity_like(cls, *args, **kwargs):
+        return cls.identity(*args, **kwargs)
+
+    def randn_like(self, *args, sigma=1, **kwargs):
+        return self.randn(*args, sigma=1, **kwargs)
+
     def randn(self, *args, sigma=1., **kwargs):
         return sigma * torch.randn(*(list(args)+[self.manifold]), **kwargs)
 
@@ -140,24 +147,6 @@ class LieGroup(torch.Tensor):
 
     def Log(self):
         return self.gtype.Log(self)
-
-#    def vec(self):
-#        return self.apply_op(ToVec, self.data)
-
-    @classmethod
-    def IdentityLike(cls, G):
-        return cls.Identity(G.shape, device=G.data.device, dtype=G.data.dtype)
-
-    @classmethod
-    def InitFromVec(cls, data):
-        return cls(cls.apply_op(FromVec, data))
-
-    @classmethod
-    def apply_op(cls, op, x, y=None):
-        """ Apply group operator """
-        inputs, out_shape = broadcast_inputs(x, y)
-        data = op.apply(cls.group_id, *inputs)
-        return data.view(out_shape + (-1,))
 
     def Quaternion(self):
         """ extract quaternion """

@@ -59,3 +59,10 @@ print(so3I)
 print(SE3I)
 print(se3I)
 
+idl1 = pp.identity_like(x)
+idl2 = pp.identity_like(a, requires_grad=True)
+
+rdl1 = pp.randn_like(x)
+rdl2 = pp.randn_like(a, sigma=0.1, requires_grad=True, device='cuda')
+
+print(rdl1, '\n', rdl2)
