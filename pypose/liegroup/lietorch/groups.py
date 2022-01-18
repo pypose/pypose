@@ -8,16 +8,32 @@ from .group_ops import adjT, jinv, act3, act4, toMatrix, toVec, fromVec
 class GroupType:
     '''Lie Group Type Base Class'''
     def __init__(self, groud,  dimension, embedding, manifold):
-        self.group     = groud     # Group ID
-        self.dimension = dimension # Data dimension
-        self.embedding = embedding # Embedding dimension
-        self.manifold  = manifold  # Manifold dimension
+        self.group       = groud     # Group ID
+        self.dimension   = dimension # Data dimension
+        self.embedding   = embedding # Embedding dimension
+        self.manifold    = manifold  # Manifold dimension
+
+    @property
+    def on_manifold(self):
+        return self.dimension == self.manifold
 
     def Log(self, x):
+        if self.on_manifold:
+            raise AttributeError("Manifold Type has no Log attribute")
         raise NotImplementedError("Instance has no Log attribute.")
     
     def Exp(self, x):
+        if not self.on_manifold:
+            raise AttributeError("Embedding Type has no Exp attribute")
         raise NotImplementedError("Instance has no Exp attribute.")
+
+    def Inv(self, x):
+        if self.on_manifold:
+            return LieGroup(-x, gtype=x.gtype, requires_grad=x.requires_grad)
+        inputs, out_shape = broadcast_inputs(x, None)
+        out = inv.apply(self.group, *inputs)
+        return LieGroup(out.view(out_shape + (-1,)),
+                gtype=x.gtype, requires_grad=x.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -148,13 +164,8 @@ class LieGroup(torch.Tensor):
     def Log(self):
         return self.gtype.Log(self)
 
-    def Quaternion(self):
-        """ extract quaternion """
-        return self.apply_op(Quat, self.data)
-
     def Inv(self):
-        """ group inverse """
-        return self.__class__(self.apply_op(Inv, self.data))
+        return self.gtype.Inv(self)
 
     def Mul(self, other):
         """ group multiplication """
