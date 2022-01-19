@@ -21,7 +21,7 @@ class GroupType:
         if self.on_manifold:
             raise AttributeError("Manifold Type has no Log attribute")
         raise NotImplementedError("Instance has no Log attribute.")
-    
+
     def Exp(self, x):
         if not self.on_manifold:
             raise AttributeError("Embedding Type has no Exp attribute")
@@ -34,6 +34,19 @@ class GroupType:
         out = inv.apply(self.group, *inputs)
         return LieGroup(out.view(out_shape + (-1,)),
                 gtype=x.gtype, requires_grad=x.requires_grad)
+
+    def Mul(self, x, y):
+        # Only Valid for (x, y are liegroups and not on manifold) Or (x is on manifold and y is scalar)
+        if isinstance(y, LieGroup) and not self.on_manifold and not y.gtype.on_manifold:
+            inputs, out_shape = broadcast_inputs(x, y)
+            out = mul.apply(self.group, *inputs)
+            return LieGroup(out.view(out_shape + (-1,)),
+                    gtype=x.gtype, requires_grad=x.requires_grad)
+        if self.on_manifold:
+            if isinstance(y, torch.Tensor):
+                assert y.dim()==0 or y.shape[-1] ==1, "Tensor Dimension Invalid"
+            return torch.mul(x, y)
+        raise NotImplementedError('Invalid __mul__ operation')
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -167,9 +180,8 @@ class LieGroup(torch.Tensor):
     def Inv(self):
         return self.gtype.Inv(self)
 
-    def Mul(self, other):
-        """ group multiplication """
-        return self.__class__(self.apply_op(Mul, self.data, other.data))
+    def __mul__(self, other):
+        return self.gtype.Mul(self, other)
 
     def Retr(self, a):
         """ retraction: Exp(a) * X """
@@ -210,13 +222,7 @@ class LieGroup(torch.Tensor):
         p = p.view([1] * (len(self.data.shape) - 1) + [4,])
         return self.apply_op(Act4, self.data, p)
 
-#    def __mul__(self, other):
-        # group multiplication
-#        if isinstance(other, LieGroup):
-#            return self.mul(other)
 
-#        elif isinstance(other, torch.Tensor):
-#            return self.act(other)
 
 
 class Parameter(LieGroup, nn.Parameter):

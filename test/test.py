@@ -27,7 +27,7 @@ class SO3Layer(nn.Module):
         self.weight = pp.Parameter(pp.randn_so3(n, requires_grad=True), pp.so3_type)
 
     def forward(self, x):
-        return self.weight.Exp() * x
+        return self.weight * x
 
 n = 4
 epoch = 10
@@ -40,7 +40,7 @@ for i in range(epoch):
     optimizer.step()
     scheduler.step()
     optimizer.zero_grad()
-    inputs = torch.randn(n, 4).to('cuda')
+    inputs = torch.randn(n, 4, device="cuda").sum()
     outputs = net(inputs)
     loss = outputs.abs().sum()
     loss.backward()
@@ -70,3 +70,19 @@ print(rdl1, '\n', rdl2)
 b.Inv()
 print(b,'\n', b.Inv())
 print(x,'\n', x.Inv())
+
+print(pp.Inv(b))
+
+a = pp.randn_SE3(1,5)
+b = pp.randn_SE3(5,1)
+c = pp.randn_SO3(1,5)
+
+e = a * b
+f = a * c
+
+g = pp.randn_so3(1,5)
+g * 0.1
+
+pp.Mul(a, b)
+
+print(c)

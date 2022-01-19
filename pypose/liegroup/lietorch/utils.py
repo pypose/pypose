@@ -59,3 +59,7 @@ def Log(x):
 
 def Inv(x):
     return x.Inv()
+
+
+def Mul(x, y):
+    return x * y
