@@ -55,3 +55,7 @@ def Exp(x):
 
 def Log(x):
     return x.Log()
+
+
+def Inv(x):
+    return x.Inv()
