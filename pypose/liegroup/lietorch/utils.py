@@ -67,3 +67,7 @@ def Mul(x, y):
 
 def Retr(X, a):
     return X.Retr(a)
+
+
+def Act(X, p):
+    return X.Act(p)

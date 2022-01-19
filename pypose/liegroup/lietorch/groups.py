@@ -33,17 +33,22 @@ class GroupType:
         out = self.__op__(self.group, inv, x)
         return LieGroup(out, gtype=x.gtype, requires_grad=x.requires_grad)
 
+    def Act(self, x, p):
+        """ action on a points tensor(*, 3[4]) (homogeneous)"""
+        assert not self.on_manifold and isinstance(p, torch.Tensor)
+        assert p.shape[-1]==3 or p.shape==4, "Invalid Tensor Dimension"
+        act = act3 if p.shape[-1]==3 else act4
+        return self.__op__(self.group, act, x, p)
+
     def Mul(self, x, y):
-        # x, y are liegroups and not on manifold -> transform on transform
+        # Transform on transform
         if not self.on_manifold and isinstance(y, LieGroup) and not y.gtype.on_manifold:
             out = self.__op__(self.group, mul, x, y)
             return LieGroup(out, gtype=x.gtype, requires_grad=x.requires_grad)
-        # x is not on manifold and y are tensor(*, 3[4]) points -> transform on points
+        # Transform on points
         if not self.on_manifold and isinstance(y, torch.Tensor):
-            assert y.shape[-1]==3 or y.shape==4, "Invalid Tensor Dimension"
-            act = act3 if y.shape[-1]==3 else act4
-            return self.__op__(self.group, act, x, y)
-        # x is on manifold and y is scalar or tensor(*, 1) -> scalar * manifold
+            return self.Act(x, y)
+        # scalar * manifold
         if self.on_manifold:
             if isinstance(y, torch.Tensor):
                 assert y.dim()==0 or y.shape[-1] ==1, "Tensor Dimension Invalid"
@@ -183,6 +188,9 @@ class LieGroup(torch.Tensor):
     def Inv(self):
         return self.gtype.Inv(self)
 
+    def Act(self, p):
+        return self.gtype.Act(self, p)
+
     def __mul__(self, other):
         return self.gtype.Mul(self, other)
 
@@ -199,17 +207,6 @@ class LieGroup(torch.Tensor):
 
     def Jinv(self, a):
         return self.apply_op(Jinv, self.data, a)
-
-    def Act(self, p):
-        """ action on a point cloud """
-
-        # action on point
-        if p.shape[-1] == 3:
-            return self.apply_op(Act3, self.data, p)
-
-        # action on homogeneous point
-        elif p.shape[-1] == 4:
-            return self.apply_op(Act4, self.data, p)
 
     def matrix(self):
         """ convert element to 4x4 matrix """

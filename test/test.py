@@ -98,4 +98,7 @@ t = I.Retr(a)
 I = pp.identity_SE3(3)
 t = I.Retr(a)
 
-pp.Retr(I, a)
+r = pp.Retr(I, a)
+p = I.Act(a)
+
+print(r, p)
