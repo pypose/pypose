@@ -76,10 +76,8 @@ class SO3Type(GroupType):
         super().__init__(1, 4, 4, 3)
 
     def Log(self, x):
-        inputs, out_shape = broadcast_inputs(x, None)
-        out = log.apply(self.group, *inputs)
-        return LieGroup(out.view(out_shape + (-1,)),
-                gtype=so3_type, requires_grad=x.requires_grad)
+        out = self.__op__(self.group, log, x)
+        return LieGroup(out, gtype=so3_type, requires_grad=x.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -97,10 +95,8 @@ class so3Type(GroupType):
         super().__init__(1, 3, 4, 3)
 
     def Exp(self, x):
-        inputs, out_shape = broadcast_inputs(x, None)
-        out = exp.apply(self.group, *inputs)
-        return LieGroup(out.view(out_shape + (-1,)),
-                gtype=SO3_type, requires_grad=x.requires_grad)
+        out = self.__op__(self.group, exp, x)
+        return LieGroup(out, gtype=SO3_type, requires_grad=x.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -116,10 +112,8 @@ class SE3Type(GroupType):
         super().__init__(3, 7, 7, 6)
 
     def Log(self, x):
-        inputs, out_shape = broadcast_inputs(x, None)
-        out = log.apply(self.group, *inputs)
-        return LieGroup(out.view(out_shape + (-1,)),
-                gtype=se3_type, requires_grad=x.requires_grad)
+        out = self.__op__(self.group, log, x)
+        return LieGroup(out, gtype=se3_type, requires_grad=x.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -137,10 +131,8 @@ class se3Type(GroupType):
         super().__init__(3, 6, 7, 6)
 
     def Exp(self, x):
-        inputs, out_shape = broadcast_inputs(x, None)
-        out = exp.apply(self.group, *inputs)
-        return LieGroup(out.view(out_shape + (-1,)),
-                gtype=SE3_type, requires_grad=x.requires_grad)
+        out = self.__op__(self.group, exp, x)
+        return LieGroup(out, gtype=SE3_type, requires_grad=x.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -229,8 +221,6 @@ class LieGroup(torch.Tensor):
         p = torch.as_tensor([0.0, 0.0, 0.0, 1.0], dtype=self.dtype, device=self.device)
         p = p.view([1] * (len(self.data.shape) - 1) + [4,])
         return self.apply_op(Act4, self.data, p)
-
-
 
 
 class Parameter(LieGroup, nn.Parameter):
