@@ -85,4 +85,8 @@ g * 0.1
 
 pp.Mul(a, b)
 
-print(c)
+points = torch.randn(2,5,3)
+
+pt = a * points
+
+print(pt.shape)

@@ -30,18 +30,20 @@ class GroupType:
     def Inv(self, x):
         if self.on_manifold:
             return LieGroup(-x, gtype=x.gtype, requires_grad=x.requires_grad)
-        inputs, out_shape = broadcast_inputs(x, None)
-        out = inv.apply(self.group, *inputs)
-        return LieGroup(out.view(out_shape + (-1,)),
-                gtype=x.gtype, requires_grad=x.requires_grad)
+        out = self.__op__(self.group, inv, x)
+        return LieGroup(out, gtype=x.gtype, requires_grad=x.requires_grad)
 
     def Mul(self, x, y):
-        # Only Valid for (x, y are liegroups and not on manifold) Or (x is on manifold and y is scalar)
-        if isinstance(y, LieGroup) and not self.on_manifold and not y.gtype.on_manifold:
-            inputs, out_shape = broadcast_inputs(x, y)
-            out = mul.apply(self.group, *inputs)
-            return LieGroup(out.view(out_shape + (-1,)),
-                    gtype=x.gtype, requires_grad=x.requires_grad)
+        # x, y are liegroups and not on manifold -> transform on transform
+        if not self.on_manifold and isinstance(y, LieGroup) and not y.gtype.on_manifold:
+            out = self.__op__(self.group, mul, x, y)
+            return LieGroup(out, gtype=x.gtype, requires_grad=x.requires_grad)
+        # x is not on manifold and y are tensor(*, 3[4]) points -> transform on points
+        if not self.on_manifold and isinstance(y, torch.Tensor):
+            assert y.shape[-1]==3 or y.shape==4, "Invalid Tensor Dimension"
+            act = act3 if y.shape[-1]==3 else act4
+            return self.__op__(self.group, act, x, y)
+        # x is on manifold and y is scalar or tensor(*, 1) -> scalar * manifold
         if self.on_manifold:
             if isinstance(y, torch.Tensor):
                 assert y.dim()==0 or y.shape[-1] ==1, "Tensor Dimension Invalid"
@@ -61,6 +63,12 @@ class GroupType:
 
     def randn(self, *args, sigma=1., **kwargs):
         return sigma * torch.randn(*(list(args)+[self.manifold]), **kwargs)
+
+    @classmethod
+    def __op__(cls, group, op, x, y=None):
+        inputs, out_shape = broadcast_inputs(x, y)
+        out = op.apply(group, *inputs)
+        return out.view(out_shape + (-1,))
 
 
 class SO3Type(GroupType):
