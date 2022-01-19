@@ -90,3 +90,12 @@ points = torch.randn(2,5,3)
 pt = a * points
 
 print(pt.shape)
+
+a = pp.randn_so3(3)
+I = pp.identity_SO3(3)
+t = I.Retr(a)
+
+I = pp.identity_SE3(3)
+t = I.Retr(a)
+
+pp.Retr(I, a)

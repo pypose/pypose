@@ -1,5 +1,5 @@
-import lietorch_backends
 import torch
+import lietorch_backends
 import torch.nn.functional as F
 
 
@@ -22,7 +22,7 @@ class GroupOp(torch.autograd.Function):
         grad = grad.contiguous()
         grad_inputs = cls.backward_op(ctx.group_id, grad, *inputs)
         return (None, ) + tuple(grad_inputs)
-        
+
 class exp(GroupOp):
     """ exponential map """
     forward_op, backward_op = lietorch_backends.expm, lietorch_backends.expm_backward
@@ -62,36 +62,3 @@ class jinv(GroupOp):
 class toMatrix(GroupOp):
     """ convert to matrix representation """
     forward_op, backward_op = lietorch_backends.as_matrix, None
-
-### conversion operations to/from Euclidean embeddings ###
-
-class fromVec(torch.autograd.Function):
-    """ convert vector into group object """
-
-    @classmethod
-    def forward(cls, ctx, group_id, *inputs):
-        ctx.group_id = group_id
-        ctx.save_for_backward(*inputs)
-        return inputs[0]
-
-    @classmethod
-    def backward(cls, ctx, grad):
-        inputs = ctx.saved_tensors
-        J = lietorch_backends.projector(ctx.group_id, *inputs)
-        return None, torch.matmul(grad.unsqueeze(-2), torch.linalg.pinv(J)).squeeze(-2)
-
-class toVec(torch.autograd.Function):
-    """ convert group object to vector """
-
-    @classmethod
-    def forward(cls, ctx, group_id, *inputs):
-        ctx.group_id = group_id
-        ctx.save_for_backward(*inputs)
-        return inputs[0]
-
-    @classmethod
-    def backward(cls, ctx, grad):
-        inputs = ctx.saved_tensors
-        J = lietorch_backends.projector(ctx.group_id, *inputs)
-        return None, torch.matmul(grad.unsqueeze(-2), J).squeeze(-2)
-

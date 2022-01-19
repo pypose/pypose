@@ -63,3 +63,7 @@ def Inv(x):
 
 def Mul(x, y):
     return x * y
+
+
+def Retr(X, a):
+    return X.Retr(a)

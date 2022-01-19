@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from .broadcasting import broadcast_inputs
 from .group_ops import exp, log, inv, mul, adj
-from .group_ops import adjT, jinv, act3, act4, toMatrix, toVec, fromVec
+from .group_ops import adjT, jinv, act3, act4, toMatrix
 
 
 class GroupType:
@@ -50,6 +50,9 @@ class GroupType:
             return torch.mul(x, y)
         raise NotImplementedError('Invalid __mul__ operation')
 
+    def Retr(self, x, a):
+        return a.Exp() * x
+
     @classmethod
     def identity(cls, *args, **kwargs):
         raise NotImplementedError("Instance has no identity.")
@@ -75,9 +78,9 @@ class SO3Type(GroupType):
     def __init__(self):
         super().__init__(1, 4, 4, 3)
 
-    def Log(self, x):
-        out = self.__op__(self.group, log, x)
-        return LieGroup(out, gtype=so3_type, requires_grad=x.requires_grad)
+    def Log(self, X):
+        x = self.__op__(self.group, log, X)
+        return LieGroup(x, gtype=so3_type, requires_grad=x.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -95,8 +98,8 @@ class so3Type(GroupType):
         super().__init__(1, 3, 4, 3)
 
     def Exp(self, x):
-        out = self.__op__(self.group, exp, x)
-        return LieGroup(out, gtype=SO3_type, requires_grad=x.requires_grad)
+        X = self.__op__(self.group, exp, x)
+        return LieGroup(X, gtype=SO3_type, requires_grad=x.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -131,8 +134,8 @@ class se3Type(GroupType):
         super().__init__(3, 6, 7, 6)
 
     def Exp(self, x):
-        out = self.__op__(self.group, exp, x)
-        return LieGroup(out, gtype=SE3_type, requires_grad=x.requires_grad)
+        X = self.__op__(self.group, exp, x)
+        return LieGroup(X, gtype=SE3_type, requires_grad=x.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -184,9 +187,7 @@ class LieGroup(torch.Tensor):
         return self.gtype.Mul(self, other)
 
     def Retr(self, a):
-        """ retraction: Exp(a) * X """
-        dX = self.__class__.apply_op(Exp, a)
-        return self.__class__(self.apply_op(Mul, dX, self.data))
+        return self.gtype.Retr(self, a)
 
     def Adj(self, a):
         """ adjoint operator: b = A(X) * a """
