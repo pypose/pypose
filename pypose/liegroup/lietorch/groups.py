@@ -8,10 +8,10 @@ from .group_ops import adjT, jinv, act3, act4, toMatrix
 class GroupType:
     '''Lie Group Type Base Class'''
     def __init__(self, groud,  dimension, embedding, manifold):
-        self._group       = groud     # Group ID
-        self._dimension   = dimension # Data dimension
-        self._embedding   = embedding # Embedding dimension
-        self._manifold    = manifold  # Manifold dimension
+        self._group     = groud     # Group ID
+        self._dimension = dimension # Data dimension
+        self._embedding = embedding # Embedding dimension
+        self._manifold  = manifold  # Manifold dimension
 
     @property
     def group(self):

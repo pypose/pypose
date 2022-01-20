@@ -49,37 +49,54 @@ def identity_se3(*args, **kwargs):
     return se3_type.identity(*args, **kwargs)
 
 
+def assert_gtype(func):
+    def checker(*args, **kwargs):
+        assert isinstance(args[0], LieGroup)
+        out = func(*args, **kwargs)
+        return out
+    return checker
+
+
+@assert_gtype
 def Exp(x):
     return x.Exp()
 
 
+@assert_gtype
 def Log(x):
     return x.Log()
 
 
+@assert_gtype
 def Inv(x):
     return x.Inv()
 
 
+@assert_gtype
 def Mul(x, y):
     return x * y
 
 
+@assert_gtype
 def Retr(X, a):
     return X.Retr(a)
 
 
+@assert_gtype
 def Act(X, p):
     return X.Act(p)
 
 
+@assert_gtype
 def Adj(X, a):
     return X.Adj(a)
 
 
+@assert_gtype
 def AdjT(X, a):
     return X.AdjT(a)
 
 
+@assert_gtype
 def Jinv(X, a):
     return X.Jinv(a)
