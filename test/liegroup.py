@@ -133,5 +133,8 @@ assert (b.Exp() * X - X * a.Exp()).abs().mean() < 1e-7
 X = pp.randn_Sim3(6, requires_grad=True, dtype=torch.double)
 a = pp.randn_sim3(6, dtype=torch.double)
 b = X.AdjT(a)
-assert (X * b.Exp() - a.Exp() * X).abs().mean() < 1e-7
+print((X * b.Exp() - a.Exp() * X).abs().mean())
 
+S = pp.randn_RxSO3(6)
+s = pp.randn_rxso3(6)
+s.Exp() * S
