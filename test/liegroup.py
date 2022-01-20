@@ -138,3 +138,10 @@ print((X * b.Exp() - a.Exp() * X).abs().mean())
 S = pp.randn_RxSO3(6)
 s = pp.randn_rxso3(6)
 s.Exp() * S
+
+X = pp.randn_SE3(8, requires_grad=True, dtype=torch.double)
+print(X.matrix())
+print(X.translation())
+assert hasattr(X.view(2,4,7), 'gtype')
+X.gview(2,4)
+print(X)
