@@ -40,7 +40,7 @@ class SO3 {
       unit_quaternion = Quaternion::Identity();
     }
 
-    EIGEN_DEVICE_FUNC SO3<Scalar> inv() {
+    EIGEN_DEVICE_FUNC SO3<Scalar> inv() const {
       return SO3<Scalar>(unit_quaternion.conjugate());
     }
 
@@ -95,7 +95,7 @@ class SO3 {
     }
 
     EIGEN_DEVICE_FUNC Tangent AdjT(Tangent const& a) const {
-      return Adj().transpose() * a;
+      return inv().Adj() * a;
     }
 
     EIGEN_DEVICE_FUNC static Transformation hat(Tangent const& phi) {
