@@ -7,7 +7,7 @@ from .group_ops import adjT, jinv, act3, act4, toMatrix
 
 class GroupType:
     '''Lie Group Type Base Class'''
-    def __init__(self, groud,  dimension, embedding, manifold):
+    def __init__(self, groud, dimension, embedding, manifold):
         self._group     = groud     # Group ID
         self._dimension = dimension # Data dimension
         self._embedding = embedding # Embedding dimension
@@ -192,8 +192,45 @@ class se3Type(GroupType):
         return LieGroup(data, gtype=se3_type).requires_grad_(requires_grad)
 
 
-SO3_type, so3_type = SO3Type(), so3Type()
-SE3_type, se3_type = SE3Type(), se3Type()
+class Sim3Type(GroupType):
+    def __init__(self):
+        super().__init__(4, 8, 8, 7)
+
+    def Log(self, X):
+        x = self.__op__(self.group, log, X)
+        return LieGroup(x, gtype=sim3_type, requires_grad=X.requires_grad)
+
+    @classmethod
+    def identity(cls, *args, **kwargs):
+        data = torch.tensor([0., 0., 0., 0., 0., 0., 1., 1.], **kwargs)
+        return LieGroup(data.expand(args+(-1,)),
+                gtype=Sim3_type, requires_grad=data.requires_grad)
+
+    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
+        data = sim3_type.Exp(sim3_type.randn(*args, sigma=sigma, **kwargs)).detach()
+        return LieGroup(data, gtype=Sim3_type).requires_grad_(requires_grad)
+
+
+class sim3Type(GroupType):
+    def __init__(self):
+        super().__init__(4, 7, 8, 7)
+
+    def Exp(self, x):
+        X = self.__op__(self.group, exp, x)
+        return LieGroup(X, gtype=Sim3_type, requires_grad=x.requires_grad)
+
+    @classmethod
+    def identity(cls, *args, **kwargs):
+        return Sim3_type.Log(Sim3_type.identity(*args, **kwargs))
+
+    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
+        data = super().randn(*args, sigma=sigma, **kwargs).detach()
+        return LieGroup(data, gtype=sim3_type).requires_grad_(requires_grad)
+
+
+SO3_type,  so3_type  = SO3Type(),  so3Type()
+SE3_type,  se3_type  = SE3Type(),  se3Type()
+Sim3_type, sim3_type = Sim3Type(), sim3Type()
 
 
 class LieGroup(torch.Tensor):
