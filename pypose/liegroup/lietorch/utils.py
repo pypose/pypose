@@ -71,3 +71,15 @@ def Retr(X, a):
 
 def Act(X, p):
     return X.Act(p)
+
+
+def Adj(X, a):
+    return X.Adj(a)
+
+
+def AdjT(X, a):
+    return X.AdjT(a)
+
+
+def Jinv(X, a):
+    return X.Jinv(a)

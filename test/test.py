@@ -102,3 +102,16 @@ r = pp.Retr(I, a)
 p = I.Act(a)
 
 print(r, p)
+
+X = pp.randn_SE3(8, requires_grad=True)
+a = pp.randn_se3(8)
+b = X.Adj(a)
+assert (b.Exp() * X - X * a.Exp()).abs().mean() < 1e-7
+
+X = pp.randn_SO3(6, requires_grad=True)
+a = pp.randn_so3(6)
+b = X.AdjT(a)
+assert (X * b.Exp() - a.Exp() * X).abs().mean() < 1e-7
+
+# a.gtype.group=1
+# a.gtype._group = 1

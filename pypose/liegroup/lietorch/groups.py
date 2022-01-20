@@ -8,16 +8,32 @@ from .group_ops import adjT, jinv, act3, act4, toMatrix
 class GroupType:
     '''Lie Group Type Base Class'''
     def __init__(self, groud,  dimension, embedding, manifold):
-        self.group       = groud     # Group ID
-        self.dimension   = dimension # Data dimension
-        self.embedding   = embedding # Embedding dimension
-        self.manifold    = manifold  # Manifold dimension
+        self._group       = groud     # Group ID
+        self._dimension   = dimension # Data dimension
+        self._embedding   = embedding # Embedding dimension
+        self._manifold    = manifold  # Manifold dimension
+
+    @property
+    def group(self):
+        return self._group
+
+    @property
+    def dimension(self):
+        return self._dimension
+
+    @property
+    def embedding(self):
+        return self._embedding
+
+    @property
+    def manifold(self):
+        return self._manifold
 
     @property
     def on_manifold(self):
         return self.dimension == self.manifold
 
-    def Log(self, x):
+    def Log(self, X):
         if self.on_manifold:
             raise AttributeError("Manifold Type has no Log attribute")
         raise NotImplementedError("Instance has no Log attribute.")
@@ -55,8 +71,33 @@ class GroupType:
             return torch.mul(x, y)
         raise NotImplementedError('Invalid __mul__ operation')
 
-    def Retr(self, x, a):
-        return a.Exp() * x
+    def Retr(self, X, a):
+        if self.on_manifold:
+            raise AttributeError("Gtype has no Retr attribute")
+        return a.Exp() * X
+
+    def Adj(self, X, a):
+        ''' X * Exp(a) = Exp(Adj) * X '''
+        if self.on_manifold:
+            raise AttributeError("Gtype has no Adj attribute")
+        assert not X.gtype.on_manifold and a.gtype.on_manifold
+        assert X.gtype.group == a.gtype.group
+        out = self.__op__(self.group, adj, X, a)
+        return LieGroup(out, gtype=a.gtype, requires_grad=a.requires_grad or X.requires_grad)
+
+    def AdjT(self, X, a): # It seems that only works for SO3, but not SE3
+        ''' Exp(a) * X = X * Exp(AdjT) '''
+        if self.on_manifold:
+            raise AttributeError("Gtype has no AdjT attribute")
+        assert not X.gtype.on_manifold and a.gtype.on_manifold, "Gtype Invalid"
+        assert X.gtype.group == a.gtype.group, "Gtype Invalid"
+        out = self.__op__(self.group, adjT, X, a)
+        return LieGroup(out, gtype=a.gtype, requires_grad=a.requires_grad or X.requires_grad)
+
+    def Jinv(self, X, a):
+        if self.on_manifold:
+            raise AttributeError("Gtype has no Jinv attribute")
+        return self.__op__(self.group, jinv, X, a)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -85,7 +126,7 @@ class SO3Type(GroupType):
 
     def Log(self, X):
         x = self.__op__(self.group, log, X)
-        return LieGroup(x, gtype=so3_type, requires_grad=x.requires_grad)
+        return LieGroup(x, gtype=so3_type, requires_grad=X.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -119,9 +160,9 @@ class SE3Type(GroupType):
     def __init__(self):
         super().__init__(3, 7, 7, 6)
 
-    def Log(self, x):
-        out = self.__op__(self.group, log, x)
-        return LieGroup(out, gtype=se3_type, requires_grad=x.requires_grad)
+    def Log(self, X):
+        x = self.__op__(self.group, log, X)
+        return LieGroup(x, gtype=se3_type, requires_grad=X.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -198,15 +239,13 @@ class LieGroup(torch.Tensor):
         return self.gtype.Retr(self, a)
 
     def Adj(self, a):
-        """ adjoint operator: b = A(X) * a """
-        return self.apply_op(Adj, self.data, a)
+        return self.gtype.Adj(self, a)
 
     def AdjT(self, a):
-        """ transposed adjoint operator: b = a * A(X) """
-        return self.apply_op(AdjT, self.data, a)
+        return self.gtype.AdjT(self, a)
 
     def Jinv(self, a):
-        return self.apply_op(Jinv, self.data, a)
+        return self.gtype.Jinv(self, a)
 
     def matrix(self):
         """ convert element to 4x4 matrix """
