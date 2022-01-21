@@ -24,28 +24,30 @@ def count_parameters(model):
 class SO3Layer(nn.Module):
     def __init__(self, n):
         super().__init__()
-        self.weight = pp.Parameter(pp.randn_so3(n, requires_grad=True), pp.so3_type)
+        self.weight = pp.Parameter(pp.randn_so3(n))
 
     def forward(self, x):
-        return self.weight * x
+        return self.weight.Exp() * x
 
 n = 4
-epoch = 10
+epoch = 3
 net = SO3Layer(n).cuda()
-
+print(net.weight)
+net.weight.data.add_(0.1)
+print(net.weight)
 optimizer = torch.optim.SGD(net.parameters(), lr = 0.1, momentum=0.9)
 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10,15], gamma=0.1)
-
+print(net.weight)
 for i in range(epoch):
-    optimizer.step()
-    scheduler.step()
     optimizer.zero_grad()
-    inputs = torch.randn(n, 4, device="cuda").sum()
+    inputs = pp.randn_SO3(n, device="cuda")
     outputs = net(inputs)
     loss = outputs.abs().sum()
     loss.backward()
+    optimizer.step()
+    scheduler.step()
     print(loss)
-
+print(net.weight)
 print("Parameter:", count_parameters(net))
 
 SO3I = pp.identity_SO3(1, 3, device="cuda", dtype=torch.float64)
@@ -164,3 +166,8 @@ assert not isinstance(torch.randn(4), pp.LieGroup)
 
 a, b = Z.tensor_split(2)
 assert isinstance(a, pp.LieGroup) and isinstance(b, pp.LieGroup)
+
+x = pp.randn_SO3(n)
+y = x.cuda()
+print(x, y)
+print(x.to("cuda"))

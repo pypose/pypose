@@ -5,8 +5,13 @@ from .group_ops import exp, log, inv, mul, adj
 from .group_ops import adjT, jinv, act3, act4, toMatrix
 
 
-HANDLED_FUNCTIONS = ['view', 'view_as', 'squeeze', 'unsqueeze', 'cat', 'stack',
-                     'split', 'hsplit', 'dsplit', 'vsplit', 'tensor_split']
+HANDLED_FUNCTIONS = ['to', 'cuda', 'view', 'view_as', 'squeeze', 'unsqueeze', 'cat',
+                     'stack', 'split', 'hsplit', 'dsplit', 'vsplit', 'tensor_split',
+                     'chunk', 'concat', 'column_stack', 'dstack', 'vstack', 'hstack',
+                     'index_select', 'masked_select', 'movedim', 'moveaxis', 'narrow',
+                     'permute', 'reshape', 'row_stack', 'scatter', 'scatter_add',
+                     'swapaxes', 'swapdims', 'take', 'take_along_dim', 'tile',
+                     'transpose', 'unbind', 'gather', 'repeat', 'expand', 'expand_as']
 
 
 class GroupType:
@@ -315,8 +320,8 @@ class LieGroup(torch.Tensor):
             while not isinstance(liegroup, LieGroup):
                 liegroup = liegroup[0]
             if isinstance(data, tuple):
-                return (cls(item, gtype=liegroup.gtype) for item in data)
-            return cls(data, gtype=liegroup.gtype)
+                return (LieGroup(item, gtype=liegroup.gtype) for item in data)
+            return LieGroup(data, gtype=liegroup.gtype)
         return super().__torch_function__(func, types, *args, **kwargs)
 
     @property
@@ -367,6 +372,9 @@ class LieGroup(torch.Tensor):
 
 
 class Parameter(LieGroup, nn.Parameter):
+    def __init__(self, data, gtype=None, **kwargs):
+        self.gtype = data.gtype
+
     def __new__(cls, data=None, gtype=None, requires_grad=True):
         if data is None:
             data = torch.tensor([])
