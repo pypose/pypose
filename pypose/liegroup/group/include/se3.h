@@ -33,7 +33,7 @@ class SE3 {
 
     EIGEN_DEVICE_FUNC SE3(const Scalar *data) :  translation(data), so3(data+3) {};
 
-    EIGEN_DEVICE_FUNC SE3<Scalar> inv() {
+    EIGEN_DEVICE_FUNC SE3<Scalar> inv() const {
       return SE3(so3.inv(), -(so3.inv()*translation));
     }
 
@@ -82,7 +82,7 @@ class SE3 {
     }
 
     EIGEN_DEVICE_FUNC Tangent AdjT(Tangent const& a) const {
-      return Adj().transpose() * a;
+      return inv().Adj() * a;
     }
 
 

@@ -89,7 +89,7 @@ class GroupType:
         out = self.__op__(self.group, adj, X, a)
         return LieGroup(out, gtype=a.gtype, requires_grad=a.requires_grad or X.requires_grad)
 
-    def AdjT(self, X, a): # It seems that only works for SO3, but not SE3
+    def AdjT(self, X, a):
         ''' Exp(a) * X = X * Exp(AdjT) '''
         if self.on_manifold:
             raise AttributeError("Gtype has no AdjT attribute")

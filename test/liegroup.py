@@ -110,10 +110,10 @@ assert (b.Exp() * X - X * a.Exp()).abs().mean() < 1e-7
 J = X.Jinv(a)
 print(J)
 
-X = pp.randn_SO3(6, requires_grad=True, dtype=torch.double)
-a = pp.randn_so3(6, dtype=torch.double)
+X = pp.randn_SE3(6, requires_grad=True)
+a = pp.randn_se3(6)
 b = X.AdjT(a)
-assert (X * b.Exp() - a.Exp() * X).abs().mean() < 1e-7
+assert (X * b.Exp() - a.Exp() * X).abs().mean() < 1e-6
 
 J = pp.Jinv(X, a)
 print(J)
@@ -133,7 +133,7 @@ assert (b.Exp() * X - X * a.Exp()).abs().mean() < 1e-7
 X = pp.randn_Sim3(6, requires_grad=True, dtype=torch.double)
 a = pp.randn_sim3(6, dtype=torch.double)
 b = X.AdjT(a)
-print((X * b.Exp() - a.Exp() * X).abs().mean())
+assert (X * b.Exp() - a.Exp() * X).abs().mean() < 1e-7
 
 S = pp.randn_RxSO3(6)
 s = pp.randn_rxso3(6)

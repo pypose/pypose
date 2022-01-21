@@ -43,7 +43,7 @@ class RxSO3 {
       scale = Scalar(1.0);
     }
 
-    EIGEN_DEVICE_FUNC RxSO3<Scalar> inv() {
+    EIGEN_DEVICE_FUNC RxSO3<Scalar> inv() const {
       return RxSO3<Scalar>(unit_quaternion.conjugate(), 1.0/scale);
     }
 
@@ -110,7 +110,7 @@ class RxSO3 {
     }
 
     EIGEN_DEVICE_FUNC Tangent AdjT(Tangent const& a) const {
-      return Adj().transpose() * a;
+      return inv().Adj() * a;
     }
 
     EIGEN_DEVICE_FUNC static Transformation hat(Tangent const& phi_sigma) {

@@ -40,7 +40,7 @@ class Sim3 {
     EIGEN_DEVICE_FUNC Sim3(const Scalar *data) 
       : translation(data), rxso3(data+3)  {};
 
-    EIGEN_DEVICE_FUNC Sim3<Scalar> inv() {
+    EIGEN_DEVICE_FUNC Sim3<Scalar> inv() const {
       return Sim3<Scalar>(rxso3.inv(), -(rxso3.inv() * translation));
     }
 
@@ -105,7 +105,7 @@ class Sim3 {
     }
 
     EIGEN_DEVICE_FUNC Tangent AdjT(Tangent const& a) const {
-      return Adj().transpose() * a;
+      return inv().Adj() * a;
     }
 
     EIGEN_DEVICE_FUNC static Transformation hat(Tangent const& tau_phi_sigma) {
