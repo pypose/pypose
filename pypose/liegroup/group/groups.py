@@ -5,8 +5,13 @@ from .group_ops import exp, log, inv, mul, adj
 from .group_ops import adjT, jinv, act3, act4, toMatrix
 
 
-HANDLED_FUNCTIONS = ['view', 'view_as', 'squeeze', 'unsqueeze', 'cat', 'stack',
-                     'split', 'hsplit', 'dsplit', 'vsplit', 'tensor_split', 'to']
+HANDLED_FUNCTIONS = ['to', 'cuda', 'view', 'view_as', 'squeeze', 'unsqueeze', 'cat',
+                     'stack', 'split', 'hsplit', 'dsplit', 'vsplit', 'tensor_split',
+                     'chunk', 'concat', 'column_stack', 'dstack', 'vstack', 'hstack',
+                     'index_select', 'masked_select', 'movedim', 'moveaxis', 'narrow',
+                     'permute', 'reshape', 'row_stack', 'scatter', 'scatter_add',
+                     'swapaxes', 'swapdims', 'take', 'take_along_dim', 'tile',
+                     'transpose', 'unbind', 'gather', 'repeat', 'expand', 'expand_as']
 
 
 class GroupType:

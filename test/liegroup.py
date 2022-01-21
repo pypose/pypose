@@ -166,3 +166,8 @@ assert not isinstance(torch.randn(4), pp.LieGroup)
 
 a, b = Z.tensor_split(2)
 assert isinstance(a, pp.LieGroup) and isinstance(b, pp.LieGroup)
+
+x = pp.randn_SO3(n)
+y = x.cuda()
+print(x, y)
+print(x.to("cuda"))
