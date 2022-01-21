@@ -5,7 +5,8 @@ from .group_ops import exp, log, inv, mul, adj
 from .group_ops import adjT, jinv, act3, act4, toMatrix
 
 
-HANDLED_FUNCTIONS = ['view', 'view_as', 'squeeze', 'unsqueeze']
+HANDLED_FUNCTIONS = ['view', 'view_as', 'squeeze', 'unsqueeze', 'cat', 'stack',
+                     'split', 'hsplit', 'dsplit', 'vsplit', 'tensor_split']
 
 
 class GroupType:
@@ -291,7 +292,7 @@ RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
 
 class LieGroup(torch.Tensor):
     """ Lie Group """
-    def __init__(self, data, gtype=None, **kwargs):
+    def __init__(self, data, gtype, **kwargs):
         assert data.shape[-1] == gtype.dimension, 'Dimension Invalid.'
         self.gtype = gtype
 
@@ -308,9 +309,14 @@ class LieGroup(torch.Tensor):
 
     @classmethod
     def __torch_function__(cls, func, types, *args, **kwargs):
-        if func.__name__ in HANDLED_FUNCTIONS and hasattr(args[0][0], 'gtype'):
+        if func.__name__ in HANDLED_FUNCTIONS:
             data = super().__torch_function__(func, types, *args, **kwargs)
-            return cls(data, gtype=args[0][0].gtype)
+            liegroup = args
+            while not isinstance(liegroup, LieGroup):
+                liegroup = liegroup[0]
+            if isinstance(data, tuple):
+                return (cls(item, gtype=liegroup.gtype) for item in data)
+            return cls(data, gtype=liegroup.gtype)
         return super().__torch_function__(func, types, *args, **kwargs)
 
     @property

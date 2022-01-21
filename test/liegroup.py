@@ -145,3 +145,22 @@ print(X.translation())
 assert hasattr(X.view(2,4,7), 'gtype')
 X.gview(2,4)
 print(X)
+
+
+X = pp.randn_SE3(2, requires_grad=True, dtype=torch.double)
+Y = pp.randn_SE3(2, requires_grad=True, dtype=torch.double)
+from torch.overrides import get_overridable_functions
+func_dict = get_overridable_functions()
+
+Z = torch.cat([X,Y], dim=0)
+assert isinstance(Z, pp.LieGroup)
+assert isinstance(torch.stack([X,Y], dim=0), pp.LieGroup)
+
+print(torch.stack([X,Y], dim=0))
+Z1, Z2 = Z.split([2,2], dim=0)
+assert isinstance(Z1, pp.LieGroup)
+assert isinstance(Z2, pp.LieGroup)
+assert not isinstance(torch.randn(4), pp.LieGroup)
+
+a, b = Z.tensor_split(2)
+assert isinstance(a, pp.LieGroup) and isinstance(b, pp.LieGroup)
