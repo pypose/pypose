@@ -103,8 +103,8 @@ p = I.Act(a)
 
 print(r, p)
 
-X = pp.randn_SE3(8, requires_grad=True)
-a = pp.randn_se3(8)
+X = pp.randn_SE3(8, requires_grad=True, dtype=torch.double)
+a = pp.randn_se3(8, dtype=torch.double)
 b = X.Adj(a)
 assert (b.Exp() * X - X * a.Exp()).abs().mean() < 1e-7
 J = X.Jinv(a)
@@ -117,3 +117,50 @@ assert (X * b.Exp() - a.Exp() * X).abs().mean() < 1e-6
 
 J = pp.Jinv(X, a)
 print(J)
+
+
+S = pp.randn_Sim3(4)
+S.Log().Exp()
+
+s = pp.randn_sim3(4)
+s.Exp().Log()
+
+X = pp.randn_Sim3(8, requires_grad=True, dtype=torch.double)
+a = pp.randn_sim3(8, dtype=torch.double)
+b = X.Adj(a)
+assert (b.Exp() * X - X * a.Exp()).abs().mean() < 1e-7
+
+X = pp.randn_Sim3(6, requires_grad=True, dtype=torch.double)
+a = pp.randn_sim3(6, dtype=torch.double)
+b = X.AdjT(a)
+assert (X * b.Exp() - a.Exp() * X).abs().mean() < 1e-7
+
+S = pp.randn_RxSO3(6)
+s = pp.randn_rxso3(6)
+s.Exp() * S
+
+X = pp.randn_SE3(8, requires_grad=True, dtype=torch.double)
+print(X.matrix())
+print(X.translation())
+assert hasattr(X.view(2,4,7), 'gtype')
+X.gview(2,4)
+print(X)
+
+
+X = pp.randn_SE3(2, requires_grad=True, dtype=torch.double)
+Y = pp.randn_SE3(2, requires_grad=True, dtype=torch.double)
+from torch.overrides import get_overridable_functions
+func_dict = get_overridable_functions()
+
+Z = torch.cat([X,Y], dim=0)
+assert isinstance(Z, pp.LieGroup)
+assert isinstance(torch.stack([X,Y], dim=0), pp.LieGroup)
+
+print(torch.stack([X,Y], dim=0))
+Z1, Z2 = Z.split([2,2], dim=0)
+assert isinstance(Z1, pp.LieGroup)
+assert isinstance(Z2, pp.LieGroup)
+assert not isinstance(torch.randn(4), pp.LieGroup)
+
+a, b = Z.tensor_split(2)
+assert isinstance(a, pp.LieGroup) and isinstance(b, pp.LieGroup)

@@ -5,9 +5,13 @@ from .group_ops import exp, log, inv, mul, adj
 from .group_ops import adjT, jinv, act3, act4, toMatrix
 
 
+HANDLED_FUNCTIONS = ['view', 'view_as', 'squeeze', 'unsqueeze', 'cat', 'stack',
+                     'split', 'hsplit', 'dsplit', 'vsplit', 'tensor_split']
+
+
 class GroupType:
     '''Lie Group Type Base Class'''
-    def __init__(self, groud,  dimension, embedding, manifold):
+    def __init__(self, groud, dimension, embedding, manifold):
         self._group     = groud     # Group ID
         self._dimension = dimension # Data dimension
         self._embedding = embedding # Embedding dimension
@@ -52,7 +56,7 @@ class GroupType:
     def Act(self, x, p):
         """ action on a points tensor(*, 3[4]) (homogeneous)"""
         assert not self.on_manifold and isinstance(p, torch.Tensor)
-        assert p.shape[-1]==3 or p.shape==4, "Invalid Tensor Dimension"
+        assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
         act = act3 if p.shape[-1]==3 else act4
         return self.__op__(self.group, act, x, p)
 
@@ -67,7 +71,7 @@ class GroupType:
         # scalar * manifold
         if self.on_manifold:
             if isinstance(y, torch.Tensor):
-                assert y.dim()==0 or y.shape[-1] ==1, "Tensor Dimension Invalid"
+                assert y.dim()==0 or y.shape[-1]==1, "Tensor Dimension Invalid"
             return torch.mul(x, y)
         raise NotImplementedError('Invalid __mul__ operation')
 
@@ -85,7 +89,7 @@ class GroupType:
         out = self.__op__(self.group, adj, X, a)
         return LieGroup(out, gtype=a.gtype, requires_grad=a.requires_grad or X.requires_grad)
 
-    def AdjT(self, X, a): # It seems that only works for SO3, but not SE3
+    def AdjT(self, X, a):
         ''' Exp(a) * X = X * Exp(AdjT) '''
         if self.on_manifold:
             raise AttributeError("Gtype has no AdjT attribute")
@@ -98,6 +102,22 @@ class GroupType:
         if self.on_manifold:
             raise AttributeError("Gtype has no Jinv attribute")
         return self.__op__(self.group, jinv, X, a)
+
+    def matrix(self, gtensor):
+        """ To 4x4 matrix """
+        X = gtensor.Exp() if self.on_manifold else gtensor
+        I = torch.eye(4, dtype=X.dtype, device=X.device)
+        I = I.view([1] * (X.dim() - 1) + [4, 4])
+        return X.unsqueeze(-2).Act(I).transpose(-1,-2)
+
+    def translation(self, gtensor):
+        """ To translation """
+        X = gtensor.Exp() if self.on_manifold else gtensor
+        p = torch.tensor([0., 0., 0.], dtype=X.dtype, device=X.device)
+        return X.Act(p.view([1] * (X.dim() - 1) + [3,]))
+
+    def quaternion(self, gtensor):
+        raise NotImplementedError('quaternion not implemented yet')
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -192,16 +212,87 @@ class se3Type(GroupType):
         return LieGroup(data, gtype=se3_type).requires_grad_(requires_grad)
 
 
+class Sim3Type(GroupType):
+    def __init__(self):
+        super().__init__(4, 8, 8, 7)
+
+    def Log(self, X):
+        x = self.__op__(self.group, log, X)
+        return LieGroup(x, gtype=sim3_type, requires_grad=X.requires_grad)
+
+    @classmethod
+    def identity(cls, *args, **kwargs):
+        data = torch.tensor([0., 0., 0., 0., 0., 0., 1., 1.], **kwargs)
+        return LieGroup(data.expand(args+(-1,)),
+                gtype=Sim3_type, requires_grad=data.requires_grad)
+
+    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
+        data = sim3_type.Exp(sim3_type.randn(*args, sigma=sigma, **kwargs)).detach()
+        return LieGroup(data, gtype=Sim3_type).requires_grad_(requires_grad)
+
+
+class sim3Type(GroupType):
+    def __init__(self):
+        super().__init__(4, 7, 8, 7)
+
+    def Exp(self, x):
+        X = self.__op__(self.group, exp, x)
+        return LieGroup(X, gtype=Sim3_type, requires_grad=x.requires_grad)
+
+    @classmethod
+    def identity(cls, *args, **kwargs):
+        return Sim3_type.Log(Sim3_type.identity(*args, **kwargs))
+
+    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
+        data = super().randn(*args, sigma=sigma, **kwargs).detach()
+        return LieGroup(data, gtype=sim3_type).requires_grad_(requires_grad)
+
+
+class RxSO3Type(GroupType):
+    def __init__(self):
+        super().__init__(2, 5, 5, 4)
+
+    def Log(self, X):
+        x = self.__op__(self.group, log, X)
+        return LieGroup(x, gtype=rxso3_type, requires_grad=X.requires_grad)
+
+    @classmethod
+    def identity(cls, *args, **kwargs):
+        data = torch.tensor([0., 0., 0., 1., 1.], **kwargs)
+        return LieGroup(data.expand(args+(-1,)),
+                gtype=rxso3_type, requires_grad=data.requires_grad)
+
+    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
+        data = rxso3_type.Exp(rxso3_type.randn(*args, sigma=sigma, **kwargs)).detach()
+        return LieGroup(data, gtype=RxSO3_type).requires_grad_(requires_grad)
+
+
+class rxso3Type(GroupType):
+    def __init__(self):
+        super().__init__(2, 4, 5, 4)
+
+    def Exp(self, x):
+        X = self.__op__(self.group, exp, x)
+        return LieGroup(X, gtype=RxSO3_type, requires_grad=x.requires_grad)
+
+    @classmethod
+    def identity(cls, *args, **kwargs):
+        return RxSO3_type.Log(RxSO3_type.identity(*args, **kwargs))
+
+    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
+        data = super().randn(*args, sigma=sigma, **kwargs).detach()
+        return LieGroup(data, gtype=rxso3_type).requires_grad_(requires_grad)
+
+
 SO3_type, so3_type = SO3Type(), so3Type()
 SE3_type, se3_type = SE3Type(), se3Type()
+Sim3_type, sim3_type = Sim3Type(), sim3Type()
+RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
 
 
 class LieGroup(torch.Tensor):
     """ Lie Group """
-    from torch._C import _disabled_torch_function_impl
-    __torch_function__ = _disabled_torch_function_impl
-
-    def __init__(self, data, gtype=None, **kwargs):
+    def __init__(self, data, gtype, **kwargs):
         assert data.shape[-1] == gtype.dimension, 'Dimension Invalid.'
         self.gtype = gtype
 
@@ -211,14 +302,29 @@ class LieGroup(torch.Tensor):
         return torch.Tensor.as_subclass(data, LieGroup) 
 
     def __repr__(self):
-        return self.gtype.__class__.__name__ + " Group:\n" + super().__repr__()
+        if hasattr(self, 'gtype'):
+            return self.gtype.__class__.__name__ + " Group:\n" + super().__repr__()
+        else:
+            return super().__repr__()
+
+    @classmethod
+    def __torch_function__(cls, func, types, *args, **kwargs):
+        if func.__name__ in HANDLED_FUNCTIONS:
+            data = super().__torch_function__(func, types, *args, **kwargs)
+            liegroup = args
+            while not isinstance(liegroup, LieGroup):
+                liegroup = liegroup[0]
+            if isinstance(data, tuple):
+                return (cls(item, gtype=liegroup.gtype) for item in data)
+            return cls(data, gtype=liegroup.gtype)
+        return super().__torch_function__(func, types, *args, **kwargs)
 
     @property
     def gshape(self):
         return self.shape[:-1]
-    
-    def tensor(self):
-        return self.data
+
+    def gview(self, *shape):
+        return self.view(*shape+(self.gtype.dimension,))
 
     def Exp(self):
         return self.gtype.Exp(self)
@@ -247,17 +353,17 @@ class LieGroup(torch.Tensor):
     def Jinv(self, a):
         return self.gtype.Jinv(self, a)
 
+    def tensor(self):
+        return self.data
+
     def matrix(self):
-        """ convert element to 4x4 matrix """
-        I = torch.eye(4, dtype=self.dtype, device=self.device)
-        I = I.view([1] * (len(self.data.shape) - 1) + [4, 4])
-        return self.__class__(self.data[...,None,:]).act(I).transpose(-1,-2)
+        return self.gtype.matrix(self)
 
     def translation(self):
-        """ extract translation component """
-        p = torch.as_tensor([0.0, 0.0, 0.0, 1.0], dtype=self.dtype, device=self.device)
-        p = p.view([1] * (len(self.data.shape) - 1) + [4,])
-        return self.apply_op(Act4, self.data, p)
+        return self.gtype.translation(self)
+
+    def quaternion(self):
+        return self.gtype.quaternion(self)
 
 
 class Parameter(LieGroup, nn.Parameter):
