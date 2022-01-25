@@ -11,7 +11,7 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
                      'chunk', 'concat', 'column_stack', 'dstack', 'vstack', 'hstack',
                      'index_select', 'masked_select', 'movedim', 'moveaxis', 'narrow',
                      'permute', 'reshape', 'row_stack', 'scatter', 'scatter_add',
-                     'swapaxes', 'swapdims', 'take', 'take_along_dim', 'tile',
+                     'swapaxes', 'swapdims', 'take', 'take_along_dim', 'tile', 'copy',
                      'transpose', 'unbind', 'gather', 'repeat', 'expand', 'expand_as']
 
 
@@ -302,10 +302,8 @@ class LieGroup(torch.Tensor):
         assert data.shape[-1] == gtype.dimension, 'Dimension Invalid.'
         self.gtype = gtype
 
-    def __new__(cls, data=None, **kwargs):
-        if data is None:
-            data = torch.tensor([])
-        return torch.Tensor.as_subclass(data, LieGroup) 
+    def __new__(cls, data, **kwargs):
+        return torch.Tensor.as_subclass(data, LieGroup)
 
     def __repr__(self):
         if hasattr(self, 'gtype'):
@@ -314,13 +312,14 @@ class LieGroup(torch.Tensor):
             return super().__repr__()
 
     @classmethod
-    def __torch_function__(cls, func, types, *args, **kwargs):
-        data = super().__torch_function__(func, types, *args, **kwargs)
+    def __torch_function__(cls, func, types, args=(), kwargs={}):
+        gtypes = (torch.Tensor if t is LieGroup or Parameter else t for t in types)
+        data = torch.Tensor.__torch_function__(func, gtypes, args, kwargs)
         if data is not None and func.__name__ in HANDLED_FUNCTIONS:
             liegroup = args
             while not isinstance(liegroup, LieGroup):
                 liegroup = liegroup[0]
-            if isinstance(data, tuple):
+            if isinstance(data, (tuple, list)):
                 return (LieGroup(item, gtype=liegroup.gtype)
                         if isinstance(item, torch.Tensor) else item for item in data)
             return LieGroup(data, gtype=liegroup.gtype)

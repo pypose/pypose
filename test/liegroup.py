@@ -174,3 +174,15 @@ print(x)
 y = x.cuda()
 print(x, y)
 print(x.to("cuda"))
+
+a = pp.randn_SE3()
+y = a.sin()
+print(type(a.sin().as_subclass(torch.Tensor))) # <class 'pypose.liegroup.group.groups.LieGroup'>
+print(type(y))
+print(y)
+
+a = pp.randn_SE3(requires_grad=True)
+b = a.sin()
+print(type(b)) # <class 'pypose.liegroup.group.groups.LieGroup'>
+c = torch.autograd.grad(b.sum(), a)
+print(type(c[0])) #
