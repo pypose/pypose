@@ -186,3 +186,4 @@ b = a.sin()
 print(type(b)) # <class 'pypose.liegroup.group.groups.LieGroup'>
 c = torch.autograd.grad(b.sum(), a)
 print(type(c[0])) #
+print(type(a.tensor()))
