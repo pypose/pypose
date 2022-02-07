@@ -333,6 +333,15 @@ class LieGroup(torch.Tensor):
         return self.view(*shape+(self.gtype.dimension,))
 
     def Exp(self):
+        r"""The exponential map.
+        
+        .. math::
+            \exp: \mathfrak{g} \mapsto G
+
+        Returns:
+            LieGroup: The Lie group element
+
+        """
         return self.gtype.Exp(self)
 
     def Log(self):

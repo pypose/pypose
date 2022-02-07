@@ -1,0 +1,3 @@
+sphinx
+sphinxcontrib.katex
+sphinx_rtd_theme
