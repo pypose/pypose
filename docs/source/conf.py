@@ -13,7 +13,7 @@
 import os
 import sys
 
-proj_root = os.path.abspath(os.path.join(__file__, "..", ".."))
+proj_root = os.path.abspath(os.path.join(__file__, "..", "..", ".."))
 sys.path.insert(0, proj_root)
 
 
