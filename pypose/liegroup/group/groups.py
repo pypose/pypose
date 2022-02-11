@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from .broadcasting import broadcast_inputs
 from .group_ops import exp, log, inv, mul, adj
 from .group_ops import adjT, jinv, act3, act4, toMatrix
 
@@ -10,7 +9,7 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
                      'stack', 'split', 'hsplit', 'dsplit', 'vsplit', 'tensor_split',
                      'chunk', 'concat', 'column_stack', 'dstack', 'vstack', 'hstack',
                      'index_select', 'masked_select', 'movedim', 'moveaxis', 'narrow',
-                     'permute', 'reshape', 'row_stack', 'scatter', 'scatter_add',
+                     'permute', 'reshape', 'row_stack', 'scatter', 'scatter_add', 'clone',
                      'swapaxes', 'swapdims', 'take', 'take_along_dim', 'tile', 'copy',
                      'transpose', 'unbind', 'gather', 'repeat', 'expand', 'expand_as']
 
@@ -141,9 +140,21 @@ class GroupType:
 
     @classmethod
     def __op__(cls, group, op, x, y=None):
-        inputs, out_shape = broadcast_inputs(x, y)
+        inputs, out_shape = cls.__broadcast_inputs(x, y)
         out = op.apply(group, *inputs)
         return out.view(out_shape + (-1,))
+
+    @classmethod
+    def __broadcast_inputs(self, x, y):
+        """ Automatic broadcasting of missing dimensions """
+        if y is None:
+            xs, xd = x.shape[:-1], x.shape[-1]
+            return (x.view(-1, xd).contiguous(), ), x.shape[:-1]
+        out_shape = torch.broadcast_shapes(x.shape[:-1], y.shape[:-1])
+        shape = out_shape if out_shape != torch.Size([]) else (1,)
+        x = x.expand(shape+(x.shape[-1],)).contiguous()
+        y = y.expand(shape+(y.shape[-1],)).contiguous()
+        return (x, y), tuple(out_shape)
 
 
 class SO3Type(GroupType):
@@ -164,6 +175,12 @@ class SO3Type(GroupType):
         data = so3_type.Exp(so3_type.randn(*args, sigma=sigma, **kwargs)).detach()
         return LieGroup(data, gtype=SO3_type).requires_grad_(requires_grad)
 
+    def matrix(self, X):
+        """ To 3x3 matrix """
+        I = torch.eye(3, dtype=X.dtype, device=X.device)
+        I = I.view([1] * (X.dim() - 1) + [3, 3])
+        return X.unsqueeze(-2).Act(I).transpose(-1,-2)
+
 
 class so3Type(GroupType):
     def __init__(self):
@@ -180,6 +197,37 @@ class so3Type(GroupType):
     def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
         data = super().randn(*args, sigma=sigma, **kwargs).detach()
         return LieGroup(data, gtype=so3_type).requires_grad_(requires_grad)
+
+    def matrix(self, gtensor):
+        """ To 3x3 matrix """
+        X = gtensor.Exp()
+        I = torch.eye(3, dtype=X.dtype, device=X.device)
+        I = I.view([1] * (X.dim() - 1) + [3, 3])
+        return X.unsqueeze(-2).Act(I).transpose(-1,-2)
+
+    def JacobianR(self, x):
+        """
+        Right jacobian of SO(3)
+        The code is taken from the Sophus codebase :
+        https://github.com/XueLianjie/BA_schur/blob/3af9a94248d4a272c53cfc7acccea4d0208b77f7/thirdparty/Sophus/sophus/so3.hpp#L113
+        """
+        I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.shape[:-1]+(3,3))
+        theta = torch.linalg.norm(x)
+        if theta < 1e-5:
+            return I
+        K = self.Hat(torch.nn.functional.normalize(x, dim=-1))
+        return I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/torch.linalg.norm(x**3) * K@K
+
+    @classmethod
+    def Hat(self, v):
+        """Skew Matrix Batch"""
+        assert v.shape[-1] == 3, "Last dim should be 3"
+        shape, v = v.shape, v.view(-1,3)
+        S = torch.zeros(v.shape[:-1]+(3,3), device=v.device, dtype=v.dtype)
+        S[:,0,1], S[:,0,2] = -v[:,2],  v[:,1]
+        S[:,1,0], S[:,1,2] =  v[:,2], -v[:,0]
+        S[:,2,0], S[:,2,1] = -v[:,1],  v[:,0]
+        return S.view(shape[:-1]+(3,3))
 
 
 class SE3Type(GroupType):
@@ -356,6 +404,12 @@ class LieGroup(torch.Tensor):
     def __mul__(self, other):
         return self.gtype.Mul(self, other)
 
+    def __matmul__(self, other):
+        if isinstance(other, LieGroup):
+            return self.gtype.Mul(self, other)
+        else: # Same with: self.gtype.matrix(self) @ other
+            return self.Act(other)
+
     def Retr(self, a):
         return self.gtype.Retr(self, a)
 
@@ -367,6 +421,12 @@ class LieGroup(torch.Tensor):
 
     def Jinv(self, a):
         return self.gtype.Jinv(self, a)
+
+    def JacobianR(self):
+        return self.gtype.JacobianR(self)
+
+    def Hat(self):
+        return self.gtype.Hat(self)
 
     def tensor(self):
         return self.data
