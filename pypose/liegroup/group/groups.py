@@ -181,6 +181,10 @@ class SO3Type(GroupType):
         I = I.view([1] * (X.dim() - 1) + [3, 3])
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
 
+    def identity_(self, X):
+        X.fill_(0)
+        X.index_fill_(dim=-1, index=torch.tensor([-1], device=X.device), value=1)
+
 
 class so3Type(GroupType):
     def __init__(self):
@@ -439,6 +443,9 @@ class LieGroup(torch.Tensor):
 
     def quaternion(self):
         return self.gtype.quaternion(self)
+
+    def identity_(self):
+        self.gtype.identity_(self)
 
 
 class Parameter(LieGroup, nn.Parameter):

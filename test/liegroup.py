@@ -193,5 +193,11 @@ b = pp.randn_SO3(2,2)
 print(a.shape, b.shape)
 print((a*b).shape)
 
+
 x = pp.randn_so3()
-print(x.shape)
+print(x)
+
+X = pp.randn_SO3(3,2).cuda()
+print(X)
+X.identity_()
+print(X)
