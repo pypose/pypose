@@ -20,8 +20,7 @@ def mat2SO3(rotation_matrix, **kwargs):
         >>> output = pp.mat2SO3(input)  # Nx4
     """
     if not torch.is_tensor(rotation_matrix):
-        raise TypeError("Input type is not a torch.Tensor. Got {}".format(
-            type(rotation_matrix)))
+        rotation_matrix = torch.tensor(rotation_matrix)
 
     if len(rotation_matrix.shape) > 3:
         raise ValueError(
@@ -81,3 +80,21 @@ def mat2SO3(rotation_matrix, **kwargs):
     q = q.index_select(-1, torch.tensor([1,2,3,0])) # wxyz -> xyzw
 
     return SO3(q, **kwargs)
+
+
+def euler2SO3(euler:torch.Tensor, **kwargs):
+    # euler: (*, 3) in sequence of roll, pitch, yaw
+    if not torch.is_tensor(euler):
+        euler = torch.tensor(euler)
+    assert euler.shape[-1] == 3
+    shape, euler = euler.shape, euler.view(-1, 3)
+    roll, pitch, yaw = euler[:,0], euler[:,1], euler[:,2]
+    cy, sy = (yaw * 0.5).cos(), (yaw * 0.5).sin()
+    cp, sp = (pitch * 0.5).cos(), (pitch * 0.5).sin()
+    cr, sr = (roll * 0.5).cos(), (roll * 0.5).sin()
+
+    q = torch.stack([sr * cp * cy - cr * sp * sy,
+                     cr * sp * cy + sr * cp * sy,
+                     cr * cp * sy - sr * sp * cy,
+                     cr * cp * cy + sr * sp * sy], dim=-1)
+    return SO3(q, **kwargs).gview(*shape[:-1])

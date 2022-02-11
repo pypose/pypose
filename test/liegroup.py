@@ -201,3 +201,7 @@ X = pp.randn_SO3(3,2).cuda()
 print(X)
 X.identity_()
 print(X)
+
+euler = torch.randn(5,3).cuda()
+X = pp.euler2SO3(euler)
+print(X)

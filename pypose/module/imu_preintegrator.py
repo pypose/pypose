@@ -22,11 +22,11 @@ class IMUPreintegrator(nn.Module):
         self._dr.identity_()
         self._dt.zero_()
 
-    def forward(self, dt, ang, acc, rotation:pp.SO3=None):
+    def update(self, dt, ang, acc, rotation:pp.SO3=None):
         """
-        IMU Preintegration from angular rate (ang), linear acclearation (acc), duration (dt)
+        IMU Preintegration from duration (dt), angular rate (ang), linear acclearation (acc)
+        Known IMU rotation (estimation) can be provided for better precisioin
         See Eq. A9, A10 in https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf
-        Known IMU rotation can be provided for better precisioin
         """
         dr = pp.so3(ang*dt).Exp()
         if isinstance(rotation, pp.LieGroup):
@@ -37,9 +37,8 @@ class IMUPreintegrator(nn.Module):
         self._dv = self._dv + self._dr @ a * dt
         self._dr = self._dr * dr
         self._dt = self._dt + dt
-        return self.predict()
 
-    def predict(self):
+    def forward(self, reset=True):
         """
         Propagated IMU status.
         See Eq. 38 in http://rpg.ifi.uzh.ch/docs/TRO16_forster.pdf
@@ -47,5 +46,6 @@ class IMUPreintegrator(nn.Module):
         self.position = self.position + self.rotation @ self._dp + self.velocity * self._dt
         self.velocity = self.velocity + self.rotation @ self._dv
         self.rotation = self.rotation * self._dr
-        self.reset()
+        if reset is True:
+            self.reset()
         return self.position.clone(), self.rotation.clone(), self.velocity.clone()
