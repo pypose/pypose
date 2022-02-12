@@ -1,5 +1,4 @@
 import os
-import wget
 import torch
 import pykitti
 import datetime
@@ -7,7 +6,6 @@ import argparse
 import pypose as pp
 import matplotlib.pyplot as plt
 import torch.utils.data as Data
-torch.set_default_tensor_type(torch.DoubleTensor)
 
 
 class KITTI_IMU(Data.Dataset):
@@ -48,6 +46,7 @@ if __name__ == '__main__':
     parser.set_defaults(plot3d=False)
     args = parser.parse_args(); print(args)
     os.makedirs(os.path.join(args.save), exist_ok=True)
+    torch.set_default_tensor_type(torch.DoubleTensor)
 
     for drive in args.datadrive:
         dataset = KITTI_IMU(args.dataroot, args.dataname, drive)
@@ -65,7 +64,7 @@ if __name__ == '__main__':
 
         poses = torch.cat(poses).cpu().numpy()
         poses_gt = torch.cat(poses_gt).cpu().numpy()
-        fig = plt.figure(figsize=(10, 10))
+        fig = plt.figure(figsize=(4, 4))
 
         if args.plot3d:
             ax = plt.axes(projection='3d')
