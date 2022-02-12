@@ -25,7 +25,7 @@ class IMUPreintegrator(nn.Module):
     def update(self, dt, ang, acc, rotation:pp.SO3=None):
         """
         IMU Preintegration from duration (dt), angular rate (ang), linear acclearation (acc)
-        Known IMU rotation (estimation) can be provided for better precisioin
+        Known IMU rotation (estimation) can be provided for better precision
         See Eq. A9, A10 in https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf
         """
         dr = pp.so3(ang*dt).Exp()

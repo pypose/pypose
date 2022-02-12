@@ -1,0 +1,82 @@
+import os
+import wget
+import torch
+import pykitti
+import datetime
+import argparse
+import pypose as pp
+import matplotlib.pyplot as plt
+import torch.utils.data as Data
+torch.set_default_tensor_type(torch.DoubleTensor)
+
+
+class KITTI_IMU(Data.Dataset):
+    def __init__(self, root, dataname, drive):
+        super().__init__()
+        self.data = pykitti.raw(root, dataname, drive)
+
+    def __len__(self):
+        return len(self.data.timestamps) - 1
+
+    def __getitem__(self, i):
+        dt = datetime.datetime.timestamp(self.data.timestamps[i+1]) - datetime.datetime.timestamp(self.data.timestamps[i])
+        ang = torch.tensor([self.data.oxts[i].packet.wx, self.data.oxts[i].packet.wy, self.data.oxts[i].packet.wz])
+        acc = torch.tensor([self.data.oxts[i].packet.ax, self.data.oxts[i].packet.ay, self.data.oxts[i].packet.az])
+        vel = torch.tensor([self.data.oxts[i].packet.vf, self.data.oxts[i].packet.vl, self.data.oxts[i].packet.vu])
+        rot = pp.euler2SO3([self.data.oxts[i].packet.roll, self.data.oxts[i].packet.pitch, self.data.oxts[i].packet.yaw])
+        pos_gt = self.data.oxts[i].T_w_imu[0:3,3]
+        return dt, ang, acc, vel, rot, pos_gt
+
+    def init_value(self):
+        P = torch.tensor(self.data.oxts[0].T_w_imu[:3,3])
+        R = pp.mat2SO3(torch.tensor(self.data.oxts[0].T_w_imu[:3,:3]))
+        V = R @ torch.tensor([self.data.oxts[0].packet.vf, self.data.oxts[0].packet.vl, self.data.oxts[0].packet.vu])
+        return P, R, V
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='IMU Preintegration')
+    parser.add_argument("--device", type=str, default='cuda:0', help="cuda or cpu")
+    parser.add_argument("--batch-size", type=int, default=1, help="minibatch size")
+    parser.add_argument("--save", type=str, default='./examples/imu/save/', help="location of png files to save")
+    parser.add_argument("--dataroot", type=str, default='./examples/imu/', help="dataset location downloaded")
+    parser.add_argument("--dataname", type=str, default='2011_09_26', help="dataset name")
+    parser.add_argument("--datadrive", nargs='+', type=str, default=["0001","0002","0005","0009","0011",
+    "0013","0014","0015","0017","0018","0019","0020","0022","0005"], help="data sequences")
+    parser.add_argument('--plot3d', dest='plot3d', action='store_true', help="plot in 3D space, default: False")
+    parser.set_defaults(plot3d=False)
+    args = parser.parse_args(); print(args)
+    os.makedirs(os.path.join(args.save), exist_ok=True)
+
+    for drive in args.datadrive:
+        dataset = KITTI_IMU(args.dataroot, args.dataname, drive)
+        p, r, v = dataset.init_value()
+        integrator = pp.IMUPreintegrator(p, r, v).to(args.device)
+        loader = Data.DataLoader(dataset=dataset, batch_size=args.batch_size)
+        poses, poses_gt = [p.view(1,-1).to(args.device)], [p.view(1,-1).to(args.device)]
+        for idx, (dt, ang, acc, vel, rot, pos_gt) in enumerate(loader):
+            dt,  ang = dt.to(args.device),  ang.to(args.device)
+            acc, rot = acc.to(args.device), rot.to(args.device)
+            integrator.update(dt, ang, acc, rot)
+            pos, rot, vel = integrator()
+            poses.append(pos)
+            poses_gt.append(pos_gt.to(args.device))
+
+        poses = torch.cat(poses).cpu().numpy()
+        poses_gt = torch.cat(poses_gt).cpu().numpy()
+        fig = plt.figure(figsize=(10, 10))
+
+        if args.plot3d:
+            ax = plt.axes(projection='3d')
+            ax.plot3D(poses[:,0], poses[:,1], poses[:,2], 'b')
+            ax.plot3D(poses_gt[:,0], poses_gt[:,1], poses_gt[:,2], 'r')
+        else:
+            ax = plt.axes()
+            ax.plot(poses[:,0], poses[:,1], 'b')
+            ax.plot(poses_gt[:,0], poses_gt[:,1], 'r')
+        plt.legend(["pypose", "ground_truth"])
+        figure = os.path.join(args.save, drive +'.png')
+        print("Saving to", figure)
+        plt.savefig(figure)
+        print("Done")
