@@ -1,11 +1,13 @@
-## TO run the IMU_preintegration module:
+# IMU preintegration
 
-    pip install wget
+An example for IMU Preintegration
+
+## Installation
+
     pip install pykitti
     python -m pip install -U matplotlib
 
-
-## To run the IMU preintegration on Kitti Dataset:
+## Prepare Dataset
 
 * Download KITTI IMU sample data [2011_09_26.zip](https://github.com/pypose/IMU_preintegration/releases/download/Kitti/2011_09_26.zip).
 * Extract the file to a folder [DATAROOT], so that it looks like:
@@ -25,7 +27,7 @@
                 ├── calib_imu_to_velo.txt
                 └── calib_velo_to_cam.txt
 
-* Run:
+## Run:
 
         python imu_preint.py --dataroot DATAROOT --datadrive 0018 0022
 
