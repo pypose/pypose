@@ -1,9 +1,9 @@
 import os
 import torch
 import pykitti
-import datetime
 import argparse
 import pypose as pp
+from datetime import datetime
 import matplotlib.pyplot as plt
 import torch.utils.data as Data
 
@@ -17,12 +17,12 @@ class KITTI_IMU(Data.Dataset):
         return len(self.data.timestamps) - 1
 
     def __getitem__(self, i):
-        dt = datetime.datetime.timestamp(self.data.timestamps[i+1]) - datetime.datetime.timestamp(self.data.timestamps[i])
+        dt = datetime.timestamp(self.data.timestamps[i+1]) - datetime.timestamp(self.data.timestamps[i])
         ang = torch.tensor([self.data.oxts[i].packet.wx, self.data.oxts[i].packet.wy, self.data.oxts[i].packet.wz])
         acc = torch.tensor([self.data.oxts[i].packet.ax, self.data.oxts[i].packet.ay, self.data.oxts[i].packet.az])
         vel = torch.tensor([self.data.oxts[i].packet.vf, self.data.oxts[i].packet.vl, self.data.oxts[i].packet.vu])
         rot = pp.euler2SO3([self.data.oxts[i].packet.roll, self.data.oxts[i].packet.pitch, self.data.oxts[i].packet.yaw])
-        pos_gt = self.data.oxts[i].T_w_imu[0:3,3]
+        pos_gt = self.data.oxts[i].T_w_imu[0:3, 3]
         return dt, ang, acc, vel, rot, pos_gt
 
     def init_value(self):
@@ -41,7 +41,7 @@ if __name__ == '__main__':
     parser.add_argument("--dataroot", type=str, default='./examples/imu/', help="dataset location downloaded")
     parser.add_argument("--dataname", type=str, default='2011_09_26', help="dataset name")
     parser.add_argument("--datadrive", nargs='+', type=str, default=["0001","0002","0005","0009","0011",
-    "0013","0014","0015","0017","0018","0019","0020","0022","0005"], help="data sequences")
+                        "0013","0014","0015","0017","0018","0019","0020","0022","0005"], help="data sequences")
     parser.add_argument('--plot3d', dest='plot3d', action='store_true', help="plot in 3D space, default: False")
     parser.set_defaults(plot3d=False)
     args = parser.parse_args(); print(args)
@@ -57,15 +57,15 @@ if __name__ == '__main__':
         for idx, (dt, ang, acc, vel, rot, pos_gt) in enumerate(loader):
             dt,  ang = dt.to(args.device),  ang.to(args.device)
             acc, rot = acc.to(args.device), rot.to(args.device)
+            pos_gt = pos_gt.to(args.device)
             integrator.update(dt, ang, acc, rot)
             pos, rot, vel = integrator()
+            poses_gt.append(pos_gt)
             poses.append(pos)
-            poses_gt.append(pos_gt.to(args.device))
-
         poses = torch.cat(poses).cpu().numpy()
         poses_gt = torch.cat(poses_gt).cpu().numpy()
-        fig = plt.figure(figsize=(4, 4))
 
+        plt.figure(figsize=(3, 3))
         if args.plot3d:
             ax = plt.axes(projection='3d')
             ax.plot3D(poses[:,0], poses[:,1], poses[:,2], 'b')
@@ -74,8 +74,8 @@ if __name__ == '__main__':
             ax = plt.axes()
             ax.plot(poses[:,0], poses[:,1], 'b')
             ax.plot(poses_gt[:,0], poses_gt[:,1], 'r')
-        plt.legend(["pypose", "ground_truth"])
-        figure = os.path.join(args.save, drive +'.png')
-        print("Saving to", figure)
+        plt.title("PyPose IMU Integrator")
+        plt.legend(["PyPose", "Ground Truth"])
+        figure = os.path.join(args.save, args.dataname+'_'+drive+'.png')
         plt.savefig(figure)
-        print("Done")
+        print("Saved to", figure)
