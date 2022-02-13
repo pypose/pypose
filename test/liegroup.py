@@ -187,3 +187,21 @@ print(type(b)) # <class 'pypose.liegroup.group.groups.LieGroup'>
 c = torch.autograd.grad(b.sum(), a)
 print(type(c[0])) #
 print(type(a.tensor()))
+
+a = pp.mat2SO3(torch.eye(3,3))
+b = pp.randn_SO3(2,2)
+print(a.shape, b.shape)
+print((a*b).shape)
+
+
+x = pp.randn_so3()
+print(x)
+
+X = pp.randn_SO3(3,2).cuda()
+print(X)
+X.identity_()
+print(X)
+
+euler = torch.randn(5,3).cuda()
+X = pp.euler2SO3(euler)
+print(X)
