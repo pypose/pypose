@@ -43,7 +43,7 @@ An example for IMU Preintegration
         -h, --help            show this help message and exit
         --device DEVICE       cuda or cpu
         --batch-size BATCH_SIZE
-                                minibatch size
+                                minibatch size (currently only support 1)
         --save SAVE           location of png files to save
         --dataroot DATAROOT   dataset location downloaded
         --dataname DATANAME   dataset name
