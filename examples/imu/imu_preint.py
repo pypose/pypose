@@ -17,7 +17,7 @@ class KITTI_IMU(Data.Dataset):
         return len(self.data.timestamps) - 1
 
     def __getitem__(self, i):
-        dt = datetime.timestamp(self.data.timestamps[i+1]) - datetime.timestamp(self.data.timestamps[i])
+        dt = torch.tensor([datetime.timestamp(self.data.timestamps[i+1]) - datetime.timestamp(self.data.timestamps[i])])
         ang = torch.tensor([self.data.oxts[i].packet.wx, self.data.oxts[i].packet.wy, self.data.oxts[i].packet.wz])
         acc = torch.tensor([self.data.oxts[i].packet.ax, self.data.oxts[i].packet.ay, self.data.oxts[i].packet.az])
         vel = torch.tensor([self.data.oxts[i].packet.vf, self.data.oxts[i].packet.vl, self.data.oxts[i].packet.vu])
@@ -29,14 +29,14 @@ class KITTI_IMU(Data.Dataset):
         P = torch.tensor(self.data.oxts[0].T_w_imu[:3,3])
         R = pp.mat2SO3(torch.tensor(self.data.oxts[0].T_w_imu[:3,:3]))
         V = R @ torch.tensor([self.data.oxts[0].packet.vf, self.data.oxts[0].packet.vl, self.data.oxts[0].packet.vu])
-        return P, R, V
+        return P.unsqueeze(0), R.unsqueeze(0), V.unsqueeze(0)
 
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='IMU Preintegration')
     parser.add_argument("--device", type=str, default='cuda:0', help="cuda or cpu")
-    parser.add_argument("--batch-size", type=int, default=1, help="minibatch size")
+    parser.add_argument("--batch-size", type=int, default=1, help="batch size, only support 1 now")
     parser.add_argument("--save", type=str, default='./examples/imu/save/', help="location of png files to save")
     parser.add_argument("--dataroot", type=str, default='./examples/imu/', help="dataset location downloaded")
     parser.add_argument("--dataname", type=str, default='2011_09_26', help="dataset name")
@@ -53,7 +53,7 @@ if __name__ == '__main__':
         p, r, v = dataset.init_value()
         integrator = pp.IMUPreintegrator(p, r, v).to(args.device)
         loader = Data.DataLoader(dataset=dataset, batch_size=args.batch_size)
-        poses, poses_gt = [p.view(1,-1).to(args.device)], [p.view(1,-1).to(args.device)]
+        poses, poses_gt = [p.to(args.device)], [p.to(args.device)]
         for idx, (dt, ang, acc, vel, rot, pos_gt) in enumerate(loader):
             dt,  ang = dt.to(args.device),  ang.to(args.device)
             acc, rot = acc.to(args.device), rot.to(args.device)
