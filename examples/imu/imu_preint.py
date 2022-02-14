@@ -36,6 +36,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='IMU Preintegration')
     parser.add_argument("--device", type=str, default='cuda:0', help="cuda or cpu")
+    parser.add_argument("--integrating-step", type=int, default=5, help="number of integrated steps")
     parser.add_argument("--batch-size", type=int, default=1, help="batch size, only support 1 now")
     parser.add_argument("--save", type=str, default='./examples/imu/save/', help="location of png files to save")
     parser.add_argument("--dataroot", type=str, default='./examples/imu/', help="dataset location downloaded")
@@ -57,11 +58,11 @@ if __name__ == '__main__':
         for idx, (dt, ang, acc, vel, rot, pos_gt) in enumerate(loader):
             dt,  ang = dt.to(args.device),  ang.to(args.device)
             acc, rot = acc.to(args.device), rot.to(args.device)
-            pos_gt = pos_gt.to(args.device)
+            poses_gt.append(pos_gt.to(args.device))
             integrator.update(dt, ang, acc, rot)
-            pos, rot, vel = integrator()
-            poses_gt.append(pos_gt)
-            poses.append(pos)
+            if idx % args.integrating_step == 0:
+                pos, rot, vel = integrator()
+                poses.append(pos)
         poses = torch.cat(poses).cpu().numpy()
         poses_gt = torch.cat(poses_gt).cpu().numpy()
 
