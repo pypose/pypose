@@ -47,6 +47,7 @@ jobs:
     steps:
       - setup_env
       - checkout
+      - run: git submodule sync && git submodule update --init
       - run:
           name: Build PyPose wheel
           no_output_timeout: 5m
