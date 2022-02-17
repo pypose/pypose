@@ -46,7 +46,7 @@ jobs:
     docker:
       # - image: nvidia/cuda:<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel-ubuntu20.04
       - image: pytorch/pytorch:<< parameters.torch_version >>-cuda<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel
-        
+    resource_class: 2xlarge+
     steps:
       - setup_env
       - checkout
