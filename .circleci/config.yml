@@ -35,6 +35,7 @@ commands:
           command: |
             apt-get update -y
             apt-get install -y ninja-build
+            pip3 install --progress-bar off torch==${TORCH_VERSION}+cu$(echo $CUDA_VERSION | sed -E 's/([0-9]+)\.([0-9]+).*/\1\2/')
 
 ##############################################################################
 # Job specs
@@ -43,7 +44,7 @@ jobs:
   linux_build_wheel:
     <<: *build_binary_params
     docker:
-      - image: pytorch/pytorch:<< parameters.torch_version >>-cuda<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel
+      - image: nvidia/cuda:<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel-ubuntu20.04
     steps:
       - setup_env
       - checkout
@@ -61,5 +62,5 @@ workflows:
   build:
     jobs:
       - linux_build_wheel:
-          cuda_version: "11.3"
+          cuda_version: "11.3.1"
           torch_version: "1.10.0"
