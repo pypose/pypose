@@ -43,7 +43,7 @@ jobs:
   linux_build_wheel:
     <<: *build_binary_params
     machine:
-      image: pytorch/<< parameters.torch_version >>-cuda<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel
+      image: pytorch/pytorch:<< parameters.torch_version >>-cuda<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel
     steps:
       - setup_env
       - checkout
