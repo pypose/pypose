@@ -60,5 +60,5 @@ workflows:
   build:
     jobs:
       - linux_build_wheel:
-          cuda_version: "11.0"
+          cuda_version: "11.3"
           torch_version: "1.10.0"
