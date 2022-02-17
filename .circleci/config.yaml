@@ -1,0 +1,63 @@
+version: 2.1
+
+##############################################################################
+# Reusables
+##############################################################################
+build_binary_params: &build_binary_params
+  parameters:
+    docker_image:
+      type: string
+      default: "ubuntu-2004:202104-01"
+    cuda_version:
+      type: string
+      default: ""
+    cudnn_version:
+      type: string
+      default: "8"
+    python_version:
+      type: string
+      default: ""
+    torch_version:
+      type: string
+      default: ""
+  environment:
+    DOCKER_IMAGE: << parameters.docker_image >>
+    CUDA_VERSION: << parameters.cuda_version >>
+    CUDNN_VERSION: << parameters.cudnn_version >>
+    PYTHON_VERSION: << parameters.python_version >>
+    TORCH_VERSION: << parameters.torch_version >>
+    
+setup_env: &setup_env:
+  steps:
+    - run:
+      name: Install dependencies
+      command: |
+        apt-get update -y
+        apt-get install -y ninja-build
+
+##############################################################################
+# Job specs
+##############################################################################
+jobs:
+  linux_build_wheel:
+    <<: *build_binary_params
+    machine:
+      image: pytorch/${TORCH_VERSION}-cuda${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel
+    steps:
+      - *setup_env
+      - checkout
+      - run:
+        name: Build PyPose wheel
+        no_output_timeout: 5m
+        command: python3 setup.py bdist_wheel
+
+##############################################################################
+# Workflows
+##############################################################################
+workflows:
+  version: 2
+  build:
+    jobs:
+      - linux_build_wheel
+        cuda_version: 11.0
+        torch_version: 1.10.0
