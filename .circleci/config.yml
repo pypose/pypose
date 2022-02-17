@@ -42,10 +42,8 @@ commands:
 jobs:
   linux_build_wheel:
     <<: *build_binary_params
-    environment:
-      DOCKER_IMAGE: pytorch/${TORCH_VERSION}-cuda${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel
     machine:
-      image: ${DOCKER_IMAGE}
+      image: pytorch/<< parameter.torch_version >>-cuda<< parameter.cuda_version >>-cudnn<< parameter.cudnn_version >>-devel
     steps:
       - setup_env
       - checkout
