@@ -35,7 +35,7 @@ commands:
           command: |
             apt-get update -y
             apt-get install -y ninja-build
-            pip3 install --progress-bar off torch==${TORCH_VERSION}+cu$(echo $CUDA_VERSION | sed -E 's/([0-9]+)\.([0-9]+).*/\1\2/')
+            # pip3 install --progress-bar off torch==${TORCH_VERSION}+cu$(echo $CUDA_VERSION | sed -E 's/([0-9]+)\.([0-9]+).*/\1\2/')
 
 ##############################################################################
 # Job specs
