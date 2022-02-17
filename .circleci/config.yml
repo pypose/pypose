@@ -46,6 +46,7 @@ jobs:
     docker:
       # - image: nvidia/cuda:<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel-ubuntu20.04
       - image: pytorch/pytorch:<< parameters.torch_version >>-cuda<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel
+        
     steps:
       - setup_env
       - checkout
@@ -53,7 +54,7 @@ jobs:
       - run:
           name: Build PyPose wheel
           no_output_timeout: 5m
-          command: python3 setup.py bdist_wheel
+          command: MAX_JOBS=2 python3 setup.py bdist_wheel
 
 ##############################################################################
 # Workflows
