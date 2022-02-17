@@ -54,7 +54,7 @@ jobs:
       - run:
           name: Build PyPose wheel
           no_output_timeout: 5m
-          command: MAX_JOBS=2 python3 setup.py bdist_wheel
+          command: MAX_JOBS=1 python3 setup.py bdist_wheel
 
 ##############################################################################
 # Workflows
