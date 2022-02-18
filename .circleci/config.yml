@@ -7,7 +7,7 @@ build_binary_params: &build_binary_params
   parameters:
     docker_image:
       type: string
-      default: "ubuntu-2004:202104-01"
+      default: ""
     cuda_version:
       type: string
       default: ""
@@ -28,7 +28,14 @@ build_binary_params: &build_binary_params
     TORCH_VERSION: << parameters.torch_version >>
 
 commands:
+  git_update_submodules: &git_update_submodules
+    description: Update submodules of clone
+    steps:
+      - run:
+          name: Update submodule
+          command: git submodule sync && git submodule update --init
   setup_env: &setup_env
+    description: Setup the build environment
     steps:
       - run:
           name: Install dependencies
@@ -36,6 +43,25 @@ commands:
             apt-get update -y
             DEBIAN_FRONTEND=noninteractive apt-get install -y git-all ninja-build
             # pip3 install --progress-bar off torch==${TORCH_VERSION}+cu$(echo $CUDA_VERSION | sed -E 's/([0-9]+)\.([0-9]+).*/\1\2/')
+  build_package: &build_package
+    description: Build PyPose package of specified type
+    parameters:
+      build_tag:
+        type: string
+        default: "dev"
+      dist_type:
+        type: string
+        default: "bdist_wheel"
+      max_jobs:
+        type: integer
+        default: 1
+    steps:
+      - run:
+          name: Build PyPose package (<< parameters.dist_type >>)
+          no_output_timeout: 30m
+          command: |
+            MAX_JOBS=<< parameters.max_jobs >>
+            python3 setup.py egg_info --tag-build=<< parameters.build_tag >> << parameters.dist_type >>
 
 ##############################################################################
 # Job specs
@@ -50,11 +76,8 @@ jobs:
     steps:
       - setup_env
       - checkout
-      - run: git submodule sync && git submodule update --init
-      - run:
-          name: Build PyPose wheel
-          no_output_timeout: 30m
-          command: MAX_JOBS=1 python3 setup.py bdist_wheel
+      - git_update_submodules
+      - build_package
 
 ##############################################################################
 # Workflows
