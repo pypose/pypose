@@ -78,6 +78,22 @@ jobs:
       - checkout
       - git_update_submodules
       - build_package
+  build_docs:
+    machine:
+      image: ubuntu-2004:202010-01
+    steps:
+      - checkout
+      - run: pip3 install pypose
+      - run:
+          name: Build PyPose documentation
+          command: |
+            cd docs
+            pip3 install -r requirements.txt
+            make dirhtml
+            # docs/build/dirhtml
+      - store_artifacts:
+          path: docs/build/dirhtml
+          destination: sphinx-docs
 
 ##############################################################################
 # Workflows
@@ -89,3 +105,6 @@ workflows:
       - linux_build_wheel:
           cuda_version: "11.3"
           torch_version: "1.10.0"
+  docs:
+    jobs:
+      - build_docs
