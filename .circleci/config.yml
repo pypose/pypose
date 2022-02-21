@@ -78,7 +78,7 @@ jobs:
     steps:
       # - setup_env
       - checkout
-      - git_update_submodules
+      # - git_update_submodules
       - build_package
       - store_artifacts:
           path: dist
