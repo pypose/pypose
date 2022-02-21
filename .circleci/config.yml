@@ -92,21 +92,26 @@ jobs:
     resource_class: medium
     steps:
       - checkout
-      # - run: mkdir -p /build
       - attach_workspace:
           at: .
-      # - run: pip3 install /build/dist/pypose-*.whl
-      - run: ls -al /build/dist
+      # - run: pip3 install dist/pypose-*.whl
       - run:
           name: Build PyPose documentation
           command: |
             cd docs
             pip3 install -r requirements.txt
             make dirhtml
-            # docs/build/dirhtml
       - store_artifacts:
           path: docs/build/dirhtml
           destination: sphinx-docs
+      - run:
+          name: Trigger pypose.github.io rebuild
+          command: |
+            curl -X POST -H "Authorization: token ${PYPOSE_ORG_AUTH}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/pypose/pypose.github.io/dispatches \
+            -d '{"event_type": "circle-ci-build", "client_payload": {"job_num": "${CIRCLE_BUILD_NUM}"}}'
+
 
 ##############################################################################
 # Workflows
