@@ -101,7 +101,7 @@ jobs:
             cd docs
             pip3 install -r requirements.txt
             make dirhtml
-            tar -czvf docs/build/docs.tar.gz docs/build/dirhtml
+            tar -czvf build/docs.tar.gz build/dirhtml
       - store_artifacts:
           path: docs/build/docs.tar.gz
           destination: sphinx-docs
