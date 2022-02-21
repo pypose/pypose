@@ -101,8 +101,9 @@ jobs:
             cd docs
             pip3 install -r requirements.txt
             make dirhtml
+            tar -czvf docs/build/docs.tar.gz docs/build/dirhtml
       - store_artifacts:
-          path: docs/build/dirhtml
+          path: docs/build/docs.tar.gz
           destination: sphinx-docs
       - run:
           name: Trigger pypose.github.io rebuild
@@ -110,7 +111,7 @@ jobs:
             curl -X POST -H "Authorization: token ${PYPOSE_ORG_AUTH}" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/pypose/pypose.github.io/dispatches \
-            -d '{"event_type": "circle-ci-build", "client_payload": {"job_num": "${CIRCLE_BUILD_NUM}"}}'
+            -d "{\"event_type\": \"circle-ci-build\", \"client_payload\": {\"job_num\": \"${CIRCLE_BUILD_NUM}\", \"file_name\": \"docs.tar.gz\"}}"
 
 
 ##############################################################################
