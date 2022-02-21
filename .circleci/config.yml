@@ -92,9 +92,9 @@ jobs:
     resource_class: medium
     steps:
       - checkout
-      - run: mkdir -p /build
+      # - run: mkdir -p /build
       - attach_workspace:
-          at: /build
+          at: .
       # - run: pip3 install /build/dist/pypose-*.whl
       - run: ls -al /build/dist
       - run:
