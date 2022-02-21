@@ -62,7 +62,7 @@ commands:
           command: |
             export MAX_JOBS=<< parameters.max_jobs >>
             mkdir -p dist
-            touch dist/test.txt
+            echo test > dist/test.txt
             # python3 setup.py egg_info --tag-build=<< parameters.build_tag >> << parameters.dist_type >>
 
 ##############################################################################
@@ -117,6 +117,8 @@ workflows:
       - linux_build_wheel:
           cuda_version: "11.3"
           torch_version: "1.10.0"
+      - build_docs:
+          requires: [linux_build_wheel]
   # docs:
   #   jobs:
   #     - build_docs
