@@ -107,13 +107,12 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-      # - run: pip3 install dist/pypose-*.whl
+      - run: pip3 install dist/pypose-*.whl
       - run:
           name: Build PyPose documentation
           command: |
             export "PATH=~/miniconda3/bin:$PATH" && conda init bash && . $HOME/miniconda3/etc/profile.d/conda.sh
             conda activate pyenv
-            nvidia-smi
             cd docs
             pip install -r requirements.txt
             make dirhtml
@@ -137,12 +136,12 @@ workflows:
   version: 2
   build:
     jobs:
-      # - linux_build_wheel:
-      #     cuda_version: "11.3.1"
-      #     torch_version: "1.10.0"
-      #     python_version: "3.8"
+      - linux_build_wheel:
+          cuda_version: "11.3.1"
+          torch_version: "1.10.0"
+          python_version: "3.8"
       - build_docs:
-          # requires: [linux_build_wheel]
+          requires: [linux_build_wheel]
           cuda_version: "11.3.1"
           torch_version: "1.10.0"
           python_version: "3.8"
