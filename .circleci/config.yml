@@ -112,8 +112,8 @@ jobs:
           command: |
             export "PATH=~/miniconda3/bin:$PATH" && conda init bash && . $HOME/miniconda3/etc/profile.d/conda.sh
             conda activate pyenv
-            cd docs
             pip install dist/pypose-*.whl
+            cd docs
             pip install -r requirements.txt
             make dirhtml
             tar -czvf build/docs.tar.gz build/dirhtml/*
