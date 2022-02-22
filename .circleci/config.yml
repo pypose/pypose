@@ -99,14 +99,16 @@ jobs:
           root: .
           paths: [dist]
   build_docs:
-    machine:
-      image: ubuntu-2004:202010-01
+    <<: *build_binary_params
+    docker:
+      - image: nvidia/cuda:<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel-ubuntu20.04
     resource_class: medium
     steps:
+      - setup_env
       - checkout
-      # - attach_workspace:
-      #     at: .
-      # - run: pip3 install dist/pypose-*.whl
+      - attach_workspace:
+          at: .
+      - run: pip3 install dist/pypose-*.whl
       - run:
           name: Build PyPose documentation
           command: |
