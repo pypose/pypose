@@ -23,6 +23,7 @@ build_binary_params: &build_binary_params
   environment:
     DOCKER_IMAGE: << parameters.docker_image >>
     CUDA_VERSION: << parameters.cuda_version >>
+    CUDA_VERSION_SHORT: $(echo ${CUDA_VERSION} | sed -E 's/([0-9]+)\.([0-9]+).*/\1.\2/')
     CUDNN_VERSION: << parameters.cudnn_version >>
     PYTHON_VERSION: << parameters.python_version >>
     TORCH_VERSION: << parameters.torch_version >>
@@ -41,8 +42,14 @@ commands:
           name: Install dependencies
           command: |
             apt-get update -y
-            DEBIAN_FRONTEND=noninteractive apt-get install -y git-all ninja-build
-            pip3 install --progress-bar off torch==${TORCH_VERSION}+cu$(echo $CUDA_VERSION | sed -E 's/([0-9]+)\.([0-9]+).*/\1\2/')
+            DEBIAN_FRONTEND=noninteractive apt-get install wget ninja-build
+            cd /tmp
+            wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+            chmod +x Miniconda3-latest-Linux-x86_64.sh && ./Miniconda3-latest-Linux-x86_64.sh -b
+            export "PATH=~/miniconda3/bin:$PATH" && conda init bash
+            conda create -n pyenv python=${PYTHON_VERSION} pytorch=${TORCH_VERSION} cudatoolkit=${CUDA_VERSION_SHORT} -c pytorch
+            conda activate pyenv
+            # pip3 install --progress-bar off torch==${TORCH_VERSION}+cu$(echo $CUDA_VERSION | sed -E 's/([0-9]+)\.([0-9]+).*/\1\2/')
   build_package: &build_package
     description: Build PyPose package of specified type
     parameters:
@@ -75,6 +82,8 @@ jobs:
       # - image: pytorch/pytorch:<< parameters.torch_version >>-cuda<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel
     resource_class: large
     steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
       - setup_env
       - checkout
       - git_update_submodules
@@ -123,6 +132,7 @@ workflows:
       - linux_build_wheel:
           cuda_version: "11.3.1"
           torch_version: "1.10.0"
+          python_version: "3.8"
       - build_docs:
           requires: [linux_build_wheel]
   # docs:
