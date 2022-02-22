@@ -114,10 +114,10 @@ jobs:
             cd docs
             pip3 install -r requirements.txt
             make dirhtml
-            tar -czvf build/docs.tar.gz build/dirhtml/*
+            tar -czvf build/docs.tar.gz -C build build/dirhtml/*
       - store_artifacts:
           path: docs/build/docs.tar.gz
-          destination: sphinx-docs
+          destination: sphinx-docs.tar.gz
       - run:
           name: Trigger pypose.github.io rebuild
           command: |
