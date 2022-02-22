@@ -107,13 +107,13 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-      - run: pip3 install dist/pypose-*.whl
       - run:
           name: Build PyPose documentation
           command: |
             export "PATH=~/miniconda3/bin:$PATH" && conda init bash && . $HOME/miniconda3/etc/profile.d/conda.sh
             conda activate pyenv
             cd docs
+            pip install dist/pypose-*.whl
             pip install -r requirements.txt
             make dirhtml
             tar -czvf build/docs.tar.gz build/dirhtml/*
