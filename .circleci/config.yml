@@ -62,8 +62,7 @@ commands:
           command: |
             export MAX_JOBS=<< parameters.max_jobs >>
             mkdir -p dist
-            echo test > dist/test.txt
-            # python3 setup.py egg_info --tag-build=<< parameters.build_tag >> << parameters.dist_type >>
+            python3 setup.py egg_info --tag-build=<< parameters.build_tag >> << parameters.dist_type >>
 
 ##############################################################################
 # Job specs
@@ -76,9 +75,9 @@ jobs:
       - image: pytorch/pytorch:<< parameters.torch_version >>-cuda<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel
     resource_class: large
     steps:
-      # - setup_env
+      - setup_env
       - checkout
-      # - git_update_submodules
+      - git_update_submodules
       - build_package
       - store_artifacts:
           path: dist
@@ -94,7 +93,7 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-      # - run: pip3 install dist/pypose-*.whl
+      - run: pip3 install dist/pypose-*.whl
       - run:
           name: Build PyPose documentation
           command: |
