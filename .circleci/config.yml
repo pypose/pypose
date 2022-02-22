@@ -70,6 +70,8 @@ commands:
           name: Build PyPose package (<< parameters.dist_type >>)
           no_output_timeout: 30m
           command: |
+            conda activate pyenv
+            which python3
             export MAX_JOBS=<< parameters.max_jobs >>
             mkdir -p dist
             python3 setup.py egg_info --tag-build=<< parameters.build_tag >> << parameters.dist_type >>
