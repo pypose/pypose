@@ -84,7 +84,6 @@ jobs:
     <<: *build_binary_params
     docker:
       - image: nvidia/cuda:<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel-ubuntu20.04
-      # - image: pytorch/pytorch:<< parameters.torch_version >>-cuda<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel
     resource_class: large
     steps:
       - setup_remote_docker:
@@ -114,7 +113,7 @@ jobs:
             cd docs
             pip3 install -r requirements.txt
             make dirhtml
-            tar -czvf build/docs.tar.gz -C build build/dirhtml/*
+            tar -czvf build/docs.tar.gz build/dirhtml/*
       - store_artifacts:
           path: docs/build/docs.tar.gz
           destination: sphinx-docs.tar.gz
