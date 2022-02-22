@@ -50,7 +50,7 @@ commands:
             chmod +x Miniconda3-latest-Linux-x86_64.sh && ./Miniconda3-latest-Linux-x86_64.sh -b
             export "PATH=~/miniconda3/bin:$PATH" && conda init bash && . $HOME/miniconda3/etc/profile.d/conda.sh
             # python dependencies
-            conda create -n pyenv -y python=${PYTHON_VERSION} setuptools #pytorch=${TORCH_VERSION} cudatoolkit=${CUDA_VERSION_SHORT} -c pytorch
+            conda create -n pyenv -y python=${PYTHON_VERSION} setuptools pytorch=${TORCH_VERSION} cudatoolkit=${CUDA_VERSION_SHORT} -c pytorch
   build_package: &build_package
     description: Build PyPose package of specified type
     parameters:
@@ -114,7 +114,7 @@ jobs:
             cd docs
             pip3 install -r requirements.txt
             make dirhtml
-            tar -czvf build/docs.tar.gz build/dirhtml
+            tar -czvf build/docs.tar.gz build/dirhtml/*
       - store_artifacts:
           path: docs/build/docs.tar.gz
           destination: sphinx-docs
