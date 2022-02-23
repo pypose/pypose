@@ -40,13 +40,15 @@ An example for IMU Preintegration
         IMU Preintegration
 
         optional arguments:
-        -h, --help            show this help message and exit
-        --device DEVICE       cuda or cpu
-        --batch-size BATCH_SIZE
-                                minibatch size (currently only support 1)
-        --save SAVE           location of png files to save
-        --dataroot DATAROOT   dataset location downloaded
-        --dataname DATANAME   dataset name
-        --datadrive DATADRIVE [DATADRIVE ...]
+          -h, --help            show this help message and exit
+          --device DEVICE       cuda or cpu
+          --integrating-step INTEGRATING_STEP
+                                number of integrated steps
+          --batch-size BATCH_SIZE
+                                batch size, only support 1 now
+          --save SAVE           location of png files to save
+          --dataroot DATAROOT   dataset location downloaded
+          --dataname DATANAME   dataset name
+          --datadrive DATADRIVE [DATADRIVE ...]
                                 data sequences
-        --plot3d              plot figure in 3d space, defalue: False
+          --plot3d              plot in 3D space, default: False
