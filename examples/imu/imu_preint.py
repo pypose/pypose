@@ -2,10 +2,13 @@ import os
 import torch
 import pykitti
 import argparse
+import numpy as np
 import pypose as pp
 from datetime import datetime
-import matplotlib.pyplot as plt
 import torch.utils.data as Data
+import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse
+from matplotlib.collections import PatchCollection
 
 
 class KITTI_IMU(Data.Dataset):
@@ -32,11 +35,23 @@ class KITTI_IMU(Data.Dataset):
         return P.unsqueeze(0), R.unsqueeze(0), V.unsqueeze(0)
 
 
+def plot_gaussian(ax, means, covs, color=None, sigma=3):
+    ''' Set specific color to show edges, otherwise same with facecolor.'''
+    ellipses = []
+    for i in range(len(means)):
+        eigvals, eigvecs = np.linalg.eig(covs[i])
+        axis = np.sqrt(eigvals) * sigma
+        slope = eigvecs[1][0] / eigvecs[1][1]
+        angle = 180.0 * np.arctan(slope) / np.pi
+        ellipses.append(Ellipse(means[i, 0:2], axis[0], axis[1], angle=angle))
+    ax.add_collection(PatchCollection(ellipses, edgecolors=color, linewidth=1))
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='IMU Preintegration')
-    parser.add_argument("--device", type=str, default='cuda:0', help="cuda or cpu")
-    parser.add_argument("--integrating-step", type=int, default=5, help="number of integrated steps")
+    parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
+    parser.add_argument("--integrating-step", type=int, default=1, help="number of integrated steps")
     parser.add_argument("--batch-size", type=int, default=1, help="batch size, only support 1 now")
     parser.add_argument("--save", type=str, default='./examples/imu/save/', help="location of png files to save")
     parser.add_argument("--dataroot", type=str, default='./examples/imu/', help="dataset location downloaded")
@@ -55,18 +70,22 @@ if __name__ == '__main__':
         integrator = pp.IMUPreintegrator(p, r, v).to(args.device)
         loader = Data.DataLoader(dataset=dataset, batch_size=args.batch_size)
         poses, poses_gt = [p.to(args.device)], [p.to(args.device)]
+        covs = [torch.zeros(9, 9, device=args.device)]
         for idx, (dt, ang, acc, vel, rot, pos_gt) in enumerate(loader):
             dt,  ang = dt.to(args.device),  ang.to(args.device)
             acc, rot = acc.to(args.device), rot.to(args.device)
             poses_gt.append(pos_gt.to(args.device))
             integrator.update(dt, ang, acc, rot)
             if idx % args.integrating_step == 0:
-                pos, rot, vel = integrator()
+                # Cov order is R, V, P
+                pos, rot, vel, cov = integrator()
                 poses.append(pos)
+                covs.append(cov)
         poses = torch.cat(poses).cpu().numpy()
         poses_gt = torch.cat(poses_gt).cpu().numpy()
+        covs = torch.stack(covs).cpu().numpy()
 
-        plt.figure(figsize=(3, 3))
+        plt.figure(figsize=(5, 5))
         if args.plot3d:
             ax = plt.axes(projection='3d')
             ax.plot3D(poses[:,0], poses[:,1], poses[:,2], 'b')
@@ -75,6 +94,7 @@ if __name__ == '__main__':
             ax = plt.axes()
             ax.plot(poses[:,0], poses[:,1], 'b')
             ax.plot(poses_gt[:,0], poses_gt[:,1], 'r')
+            plot_gaussian(ax, poses[:, 0:2], covs[:, 6:8,6:8])
         plt.title("PyPose IMU Integrator")
         plt.legend(["PyPose", "Ground Truth"])
         figure = os.path.join(args.save, args.dataname+'_'+drive+'.png')

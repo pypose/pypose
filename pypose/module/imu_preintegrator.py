@@ -6,11 +6,13 @@ from torch import nn
 class IMUPreintegrator(nn.Module):
     def __init__(self, position:torch.Tensor, rotation:pp.SO3, velocity:torch.Tensor, gravity=9.81007):
         super().__init__()
-        # Initial status of IMU: position, rotation, velocity
+        # Initial status of IMU: (pos)ition, (rot)ation, (vel)ocity, (cov)ariance
         self.register_buffer('gravity', torch.tensor([0, 0, gravity]))
-        self.register_buffer('position', position.clone())
-        self.register_buffer('rotation', rotation.clone())
-        self.register_buffer('velocity', velocity.clone())
+        self.register_buffer('pos', position.clone())
+        self.register_buffer('rot', rotation.clone())
+        self.register_buffer('vel', velocity.clone())
+        self.register_buffer('cov', torch.zeros(9,9))
+        # Note that cov[9x9] order is rot, vel, pos
         self.register_buffer('_dp', torch.zeros(3))
         self.register_buffer('_dv', torch.zeros(3))
         self.register_buffer('_dr', pp.identity_SO3())
@@ -22,30 +24,56 @@ class IMUPreintegrator(nn.Module):
         self._dr.identity_()
         self._dt.zero_()
 
-    def update(self, dt, ang, acc, rotation:pp.SO3=None):
+    def update(self, dt, ang, acc, rot:pp.SO3=None, ang_cov=None, acc_cov=None, ):
         """
         IMU Preintegration from duration (dt), angular rate (ang), linear acclearation (acc)
-        Known IMU rotation (estimation) can be provided for better precision
-        See Eq. A9, A10 in https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf
+        Uncertainty propagation from measurement covariance (cov): ang_cov, acc_cov
+        Known IMU rotation (rot) estimation can be provided for better precision
+        See Eq. A9, A10, A7, A8 in https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf
+
+        Uncertainty Propagation:
+        B = [Bg, Ba]
+        C = A @ C @ A + B @ Diag(Cg, Ca) @ B.T
+          = A @ C @ A + Bg @ Cg @ Bg.T + Ba @ Ca @ Ba.T
         """
         dr = pp.so3(ang*dt).Exp()
-        if isinstance(rotation, pp.LieGroup):
-            a = acc - rotation.Inv() @ self.gravity
+        if isinstance(rot, pp.LieGroup):
+            a = acc - rot.Inv() @ self.gravity
         else:
-            a = acc - (self.rotation * self._dr * dr).Inv() @ self.gravity
+            a = acc - (self.rot * self._dr * dr).Inv() @ self.gravity
         self._dp = self._dp + self._dv * dt + self._dr @ a * 0.5 * dt**2
         self._dv = self._dv + self._dr @ a * dt
         self._dr = self._dr * dr
         self._dt = self._dt + dt
+
+        if ang_cov is None: # gyro covariance
+            Cg = torch.eye(3, device=dt.device) * (1.6968*10**-4)**2
+        if acc_cov is None: # acc covariance
+            Ca = torch.eye(3, device=dt.device) * (2.0*10**-3)**2
+
+        Ha = pp.vec2skew(acc)
+        A = torch.eye(9, device=dt.device)
+        A[0:3, 0:3] = dr.matrix().mT
+        A[3:6, 0:3] = - self._dr.matrix() @ Ha * dt
+        A[6:9, 0:3] = - 0.5 * self._dr.matrix() @ Ha * dt**2
+        A[6:9, 3:6] = torch.eye(3, device=dt.device) * dt
+
+        Bg = torch.zeros(9, 3, device=dt.device)
+        Bg[0:3, 0:3] = pp.so3(ang*dt).Jr() * dt
+        Ba = torch.zeros(9, 3, device=dt.device)
+        Ba[3:6, 0:3] = self._dr.matrix() * dt
+        Ba[6:9, 0:3] = 0.5 * self._dr.matrix() * dt**2
+
+        self.cov = A @ self.cov @ A.mT + Bg @ Cg @ Bg.mT / dt + Ba @ Ca @ Ba.mT / dt
 
     def forward(self, reset=True):
         """
         Propagated IMU status.
         See Eq. 38 in http://rpg.ifi.uzh.ch/docs/TRO16_forster.pdf
         """
-        self.position = self.position + self.rotation @ self._dp + self.velocity * self._dt
-        self.velocity = self.velocity + self.rotation @ self._dv
-        self.rotation = self.rotation * self._dr
+        self.pos = self.pos + self.rot @ self._dp + self.vel * self._dt
+        self.vel = self.vel + self.rot @ self._dv
+        self.rot = self.rot * self._dr
         if reset is True:
             self.reset()
-        return self.position.clone(), self.rotation.clone(), self.velocity.clone()
+        return self.pos.clone(), self.rot.clone(), self.vel.clone() , self.cov.clone()

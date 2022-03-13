@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from .basics import vec2skew
 from .group_ops import exp, log, inv, mul, adj
 from .group_ops import adjT, jinv, act3, act4, toMatrix
 
@@ -209,7 +210,7 @@ class so3Type(GroupType):
         I = I.view([1] * (X.dim() - 1) + [3, 3])
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
 
-    def JacobianR(self, x):
+    def Jr(self, x):
         """
         Right jacobian of SO(3)
         The code is taken from the Sophus codebase :
@@ -219,19 +220,8 @@ class so3Type(GroupType):
         theta = torch.linalg.norm(x)
         if theta < 1e-5:
             return I
-        K = self.Hat(torch.nn.functional.normalize(x, dim=-1))
+        K = vec2skew(torch.nn.functional.normalize(x, dim=-1))
         return I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/torch.linalg.norm(x**3) * K@K
-
-    @classmethod
-    def Hat(self, v):
-        """Skew Matrix Batch"""
-        assert v.shape[-1] == 3, "Last dim should be 3"
-        shape, v = v.shape, v.view(-1,3)
-        S = torch.zeros(v.shape[:-1]+(3,3), device=v.device, dtype=v.dtype)
-        S[:,0,1], S[:,0,2] = -v[:,2],  v[:,1]
-        S[:,1,0], S[:,1,2] =  v[:,2], -v[:,0]
-        S[:,2,0], S[:,2,1] = -v[:,1],  v[:,0]
-        return S.view(shape[:-1]+(3,3))
 
 
 class SE3Type(GroupType):
@@ -426,8 +416,8 @@ class LieGroup(torch.Tensor):
     def Jinv(self, a):
         return self.gtype.Jinv(self, a)
 
-    def JacobianR(self):
-        return self.gtype.JacobianR(self)
+    def Jr(self):
+        return self.gtype.Jr(self)
 
     def Hat(self):
         return self.gtype.Hat(self)
