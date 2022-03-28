@@ -91,7 +91,7 @@ def identity_RxSO3(*args, **kwargs):
 
 def assert_gtype(func):
     def checker(*args, **kwargs):
-        assert isinstance(args[0], LieGroup)
+        assert isinstance(args[0], LieGroup), "Invalid LieGroup Type."
         out = func(*args, **kwargs)
         return out
     return checker

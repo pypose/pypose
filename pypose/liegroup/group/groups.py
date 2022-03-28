@@ -1,8 +1,8 @@
 import torch
 from torch import nn
-from .basics import vec2skew
 from .group_ops import exp, log, inv, mul, adj
 from .group_ops import adjT, jinv, act3, act4, toMatrix
+from .basics import vec2skew, cumops, cumsum, cummul, cumprod
 
 
 HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'double',
@@ -12,7 +12,9 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
                      'index_select', 'masked_select', 'movedim', 'moveaxis', 'narrow',
                      'permute', 'reshape', 'row_stack', 'scatter', 'scatter_add', 'clone',
                      'swapaxes', 'swapdims', 'take', 'take_along_dim', 'tile', 'copy',
-                     'transpose', 'unbind', 'gather', 'repeat', 'expand', 'expand_as']
+                     'transpose', 'unbind', 'gather', 'repeat', 'expand', 'expand_as',
+                     'index_select', 'masked_select', 'index_copy', 'index_copy_',
+                     'select_scatter', 'index_put','index_put_']
 
 
 class GroupType:
@@ -75,7 +77,7 @@ class GroupType:
         if not self.on_manifold and isinstance(y, torch.Tensor):
             return self.Act(x, y)
         # scalar * manifold
-        if self.on_manifold:
+        if self.on_manifold and not isinstance(y, LieGroup):
             if isinstance(y, torch.Tensor):
                 assert y.dim()==0 or y.shape[-1]==1, "Tensor Dimension Invalid"
             return torch.mul(x, y)
@@ -157,6 +159,21 @@ class GroupType:
         y = y.expand(shape+(y.shape[-1],)).reshape(-1,y.shape[-1]).contiguous()
         return (x, y), tuple(out_shape)
 
+    @classmethod
+    def cumops(self, X, Y, ops):
+        return cumops(X, Y, ops)
+
+    @classmethod
+    def cumsum(self, X, Y):
+        return cumsum(X, Y)
+
+    @classmethod
+    def cummul(self, X, Y):
+        return cummul(X, Y)
+
+    @classmethod
+    def cumprod(self, X, Y):
+        return cumprod(X, Y)
 
 class SO3Type(GroupType):
     def __init__(self):
@@ -436,6 +453,18 @@ class LieGroup(torch.Tensor):
 
     def identity_(self):
         self.gtype.identity_(self)
+
+    def cumops(self, other, ops):
+        self.gtype.cumops(self, other, ops)
+
+    def cumsum(self, other):
+        self.gtype.cumsum(self, other)
+
+    def cummul(self, other):
+        self.gtype.cummul(self, other)
+
+    def cumprod(self, other):
+        self.gtype.cumprod(self, other)
 
 
 class Parameter(LieGroup, nn.Parameter):

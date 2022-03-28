@@ -7,4 +7,5 @@ from .liegroup.group import Exp, Log, Inv, Mul, Retr, Act, Adj, AdjT, Jinv
 from .liegroup.group import SO3_type, so3_type, SE3_type, se3_type
 from .liegroup.group import Sim3_type, sim3_type, RxSO3_type, rxso3_type
 from .liegroup.group import mat2SO3, euler2SO3, vec2skew
+from .liegroup.group import cumops, cummul, cumprod, cumsum
 from .module import IMUPreintegrator
