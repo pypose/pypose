@@ -206,10 +206,20 @@ euler = torch.randn(5,3).cuda()
 X = pp.euler2SO3(euler)
 print(X)
 
-x = pp.randn_SE3(10)
-print(x, pp.cummul(x, dim=0))
-
 for i in range(128):
     x = torch.randn(4, 5, device="cuda:0")
     dim = torch.randint(0, 2, (1,)).item()
     assert torch.allclose(x.cumsum(dim=dim), pp.cumsum(x,dim=dim), atol=1e-07)
+
+for i in range(1, 1000):
+    x = torch.randn(i, dtype=torch.float64)
+    print(i, torch.allclose(x.cumsum(0), pp.cumsum(x, 0)))
+
+x = pp.randn_SE3(2)
+print(x, pp.cumprod(x, dim=0))
+
+x = pp.randn_SE3(3)
+print(x, x.cumprod(dim=0))
+print(x)
+x.cumprod_(dim=0)
+print(x)

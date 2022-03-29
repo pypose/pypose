@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from .group_ops import exp, log, inv, mul, adj
 from .group_ops import adjT, jinv, act3, act4, toMatrix
+from .basics import cumops_, cumsum_, cummul_, cumprod_
 from .basics import vec2skew, cumops, cumsum, cummul, cumprod
 
 
@@ -14,7 +15,7 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
                      'swapaxes', 'swapdims', 'take', 'take_along_dim', 'tile', 'copy',
                      'transpose', 'unbind', 'gather', 'repeat', 'expand', 'expand_as',
                      'index_select', 'masked_select', 'index_copy', 'index_copy_',
-                     'select_scatter', 'index_put','index_put_']
+                     'select', 'select_scatter', 'index_put','index_put_']
 
 
 class GroupType:
@@ -145,7 +146,8 @@ class GroupType:
     def __op__(cls, group, op, x, y=None):
         inputs, out_shape = cls.__broadcast_inputs(x, y)
         out = op.apply(group, *inputs)
-        return out.view(out_shape + (-1,))
+        dim = -1 if out.nelement() != 0 else x.shape[-1]
+        return out.view(out_shape + (dim,))
 
     @classmethod
     def __broadcast_inputs(self, x, y):
@@ -160,20 +162,37 @@ class GroupType:
         return (x, y), tuple(out_shape)
 
     @classmethod
-    def cumops(self, X, Y, ops):
-        return cumops(X, Y, ops)
+    def cumops(self, X, dim, ops):
+        return cumops(X, dim, ops)
 
     @classmethod
-    def cumsum(self, X, Y):
-        return cumsum(X, Y)
+    def cumsum(self, X, dim):
+        return cumsum(X, dim)
 
     @classmethod
-    def cummul(self, X, Y):
-        return cummul(X, Y)
+    def cummul(self, X, dim):
+        return cummul(X, dim)
 
     @classmethod
-    def cumprod(self, X, Y):
-        return cumprod(X, Y)
+    def cumprod(self, X, dim):
+        return cumprod(X, dim)
+
+    @classmethod
+    def cumops_(self, X, dim, ops):
+        return cumops_(X, dim, ops)
+
+    @classmethod
+    def cumsum_(self, X, dim):
+        return cumsum_(X, dim)
+
+    @classmethod
+    def cummul_(self, X, dim):
+        return cummul_(X, dim)
+
+    @classmethod
+    def cumprod_(self, X, dim):
+        return cumprod_(X, dim)
+
 
 class SO3Type(GroupType):
     def __init__(self):
@@ -454,17 +473,29 @@ class LieGroup(torch.Tensor):
     def identity_(self):
         self.gtype.identity_(self)
 
-    def cumops(self, other, ops):
-        self.gtype.cumops(self, other, ops)
+    def cumops(self, dim, ops):
+        self.gtype.cumops(self, other, dim, ops)
 
-    def cumsum(self, other):
-        self.gtype.cumsum(self, other)
+    def cumsum(self, dim):
+        self.gtype.cumsum(self, dim)
 
-    def cummul(self, other):
-        self.gtype.cummul(self, other)
+    def cummul(self, dim):
+        self.gtype.cummul(self, dim)
 
-    def cumprod(self, other):
-        self.gtype.cumprod(self, other)
+    def cumprod(self, dim):
+        self.gtype.cumprod(self, dim)
+
+    def cumops_(self, dim, ops):
+        self.gtype.cumops_(self, other, dim, ops)
+
+    def cumsum_(self, dim):
+        self.gtype.cumsum_(self, dim)
+
+    def cummul_(self, dim):
+        self.gtype.cummul_(self, dim)
+
+    def cumprod_(self, dim):
+        self.gtype.cumprod_(self, dim)
 
 
 class Parameter(LieGroup, nn.Parameter):
