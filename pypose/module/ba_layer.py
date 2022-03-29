@@ -20,6 +20,18 @@ class CameraModel(object):
         '''
         raise NotImplementedError()
 
+    def project_3d_2_2d_normalized(self, x):
+        '''
+        x (Tensor): [b, 3].
+        '''
+        raise NotImplementedError()
+
+    def get_projection_matrix(self):
+        '''
+        Return the 3x3 projection matrix.
+        '''
+        raise NotImplementedError()
+
 class PinholeCamera(CameraModel):
     def __init__(self, 
         fx:float, 
@@ -27,7 +39,8 @@ class PinholeCamera(CameraModel):
         cx:float, 
         cy:float, 
         shape:List[int], # [height, width]
-        eps:float=0.0):
+        eps:float=0.0,
+        device='cuda'):
 
         super().__init__()
 
@@ -38,6 +51,8 @@ class PinholeCamera(CameraModel):
         self.shape = shape
 
         self.eps = eps # Used for dealing with x[:, 2] = 0.
+
+        self.device = device
 
     def project_3d_2_2d(self, x):
         '''
@@ -62,12 +77,19 @@ class PinholeCamera(CameraModel):
 
         return p
 
+    def get_projection_matrix(self, requires_grad=False):
+        K = torch.eye(3, dtype=torch.float, device=self.device, requires_grad=requires_grad)
+        K[0, 0] = self.fx
+        K[1, 1] = self.fy
+        K[0, 2] = self.cx
+        K[1, 2] = self.cy
+        return K
+
 # Constant camera intrinsics.
 class BALayer(nn.Module):
     def __init__(self, 
         n_cam_poses, 
         n_points3d, 
-        cameras:List[CameraModel]=None,
         track_normalizer:float=None # Should be positive if not None.
         ):
 
@@ -78,11 +100,6 @@ class BALayer(nn.Module):
 
         # Tracked 3D points represented by 3-vectors.
         self.points3d = torch.zeros( (n_points3d, 3), dtype=torch.float )
-
-        if ( cameras is not None ):
-            assert ( len(cameras) == n_cam_poses ), \
-                f'len(cameras) = {len(cameras)}, n_cam_poses = {n_cam_poses}'
-        self.cameras = cameras
 
         if ( track_normalizer is not None ):
             assert ( track_normalizer > 0 ), \
@@ -103,16 +120,17 @@ class BALayer(nn.Module):
             tracks[ :n_points3d_ori, ... ] = self.points3d
             self.points3d = tracks
 
-    def forward(self, feats, feat_img, feat_loc, tracks):
+    def forward(self, proj_mats, feats, feat_img, feat_loc, tracks):
         '''
         F is number of feature maps, a.k.a, images.
         N is number of features in all feature maps.
         M is number of matcheds between two features.
 
-        feats (Tensor): [B, F, C, H, W], 2D feature maps statcked along the F channel. Should it be [B, C, F, H, W]?
-        feat_img (Tensor): [B, N, 1], dtype=torch.int64, feature-feature map/image/camera association.
-        feat_loc (Tensor): [B, N, 2], dtype=torch.float, 2D feature locations inside feature map indicated by feat_img.
-        tracks (Tensor): [B, M, 2], dtype=torch.int64, list of matched features. Lower feature indices come first.
+        proj_mats (Tesnor): [B, 3, 3], projection matrices for all the cameras.
+        feats (Tensor): [B, C, H, W], 2D feature maps statcked along the B channel. 
+        feat_img (Tensor): [N, 1], dtype=torch.int64, feature-feature map/image/camera association.
+        feat_loc (Tensor): [N, 2], dtype=torch.float, 2D feature locations inside feature map indicated by feat_img.
+        tracks (Tensor): [M, 2], dtype=torch.int64, list of matched features. Lower feature indices come first.
         '''
 
         assert ( self.cameras is not None ), \
@@ -126,6 +144,43 @@ class BALayer(nn.Module):
         # Allocate more when necessary.
 
         # 
+
+    def find_3d_point_association(self, N, tracks):
+        '''
+        N (int): Number of features.
+        tracks (Tensor): [M, 2], dtype=torch.int64, list of matched features. Lower feature indices come first.
+        '''
+
+        assert ( N > 1 )
+
+        device = tracks.device
+        M = tracks.shape[0]
+
+        # Build the adjacency matrix of all the visual features.
+        diag_indices = torch.arange(N, device=device)
+        row_indices = torch.cat( 
+            ( tracks[0, :], tracks[1, :], diag_indices ) )
+        col_indices = torch.cat(
+            ( tracks[1, :], tracks[0, :], diag_indices ) )
+        values = torch.ones( ( M + M + N, ), dtype=torch.float, device=device )
+        
+        A = torch.sparse_coo_tensor( 
+            (row_indices, col_indices), values, dtype=torch.float, device=device )
+        
+        # Populate all possible edges between the features.
+        # A loop?
+        # N?
+        T = A
+        for _ in range(N-1):
+            T = torch.sparse.mm(A, T)
+
+        # Get all the upper-triangle indices of T.
+        indices_T = T.coalesce().indices()
+        upper = indices_T[0] <= indices_T[1]
+        upper_indices_T = indices_T[:, upper]
+
+        # Build the mapping between 3D points and 2D features.
+        # A loop?
 
     def normalize_feat_loc(self, feat_loc):
         '''
