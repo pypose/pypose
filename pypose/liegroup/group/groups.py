@@ -369,11 +369,14 @@ RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
 class LieGroup(torch.Tensor):
     """ The Base Class for LieGroup Tensor
 
+    Returns:
+        LieGroup Tensor (Inherited from torch.Tensor)
+
     Args:
         data (tensor): Data of Liegroup Tensor
         gtype (gtype): Group Type, which can be **Selected Below**:
 
-    .. list-table:: Liegroup Types
+    .. list-table:: List of **gtype**
         :widths: 25 25 50 30
         :header-rows: 1
 
@@ -398,6 +401,14 @@ class LieGroup(torch.Tensor):
           - pypose.rxso3_type
           - pypose.RxSO3(), pypose.rxso3()
 
+    Note:
+        Alias of LieGroup for specific gtype is recommended.
+        For example, the following usage is equivalent:
+
+        - pp.LieGroup(data, gtype=pp.so3_type)
+
+        - pp.so3(data)
+
     Examples:
 
     >>> import torch
@@ -416,6 +427,9 @@ class LieGroup(torch.Tensor):
             [-0.8106,  0.8197,  0.7077],
             [-0.5743,  0.8182, -1.2104]], device='cuda:0',
         grad_fn=<AliasBackward0>)
+
+    Note:
+        All properties of `torch.tensor` is available.
     """
     def __init__(self, data, gtype, **kwargs):
         assert data.shape[-1] == gtype.dimension, 'Dimension Invalid.'
@@ -445,10 +459,45 @@ class LieGroup(torch.Tensor):
         return data
 
     @property
-    def gshape(self):
+    def gshape(self) -> torch.Size:
+        '''
+        LieGroup Tensor Shape (shape of torch.Tensor by removing the last dimension)
+
+        Returns:
+            torch.Size
+
+        Note:
+            The only difference from `tensor.shape` is the last dimension is hidden.
+
+        Examples:
+
+        >>> x = pp.randn_SE3(2)
+        >>> x.gshape
+        torch.Size([2])
+        >>> x.shape
+        torch.Size([2, 7])
+        '''
         return self.shape[:-1]
 
     def gview(self, *shape):
+        '''
+        Returns:
+            A new lieGroup tensor share with the same data as the self tensor but of a different shape.
+
+        Args:
+            shape (torch.Size or int...): the desired size
+
+        Note:
+            The only difference from `tensor.view` is the last dimension is hidden.
+            The last dimension can also be accessed via LieGroup.gtype.dimension.
+
+        Examples:
+            >>> x = pp.randn_so3(2,2)
+            >>> x.shape
+            torch.Size([2, 2, 3])
+            >>> x.gview(-1).gshape
+            torch.Size([4])
+        '''
         return self.view(*shape+(self.gtype.dimension,))
 
     def Exp(self):

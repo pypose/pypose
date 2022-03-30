@@ -15,7 +15,7 @@ assert y.is_leaf and x.is_leaf and a.is_leaf and b.is_leaf
 (pp.Log(y.Exp())**2).sin().sum().backward()
 
 print(y)
-print(y.shape)
+print(y.gshape)
 print(y.grad)
 
 def count_parameters(model):
@@ -209,11 +209,11 @@ print(X)
 for i in range(128):
     x = torch.randn(4, 5, device="cuda:0")
     dim = torch.randint(0, 2, (1,)).item()
-    assert torch.allclose(x.cumsum(dim=dim), pp.cumsum(x,dim=dim), atol=1e-07)
+    assert torch.allclose(x.cumsum(dim=dim), pp.cumops(x, dim, lambda a, b : a + b), atol=1e-07)
 
 for i in range(1, 1000):
     x = torch.randn(i, dtype=torch.float64)
-    print(i, torch.allclose(x.cumsum(0), pp.cumsum(x, 0)))
+    print(i, torch.allclose(x.cumsum(0), pp.cumops(x, 0, lambda a, b : a + b)))
 
 x = pp.randn_SE3(2)
 print(x, pp.cumprod(x, dim=0))

@@ -1,6 +1,5 @@
 LieGroup
 ========
-Description
 
 .. currentmodule:: pypose
 .. autoclass:: LieGroup
