@@ -10,6 +10,7 @@ Welcome to PyPose's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   pypose
    liegroup
 
 
