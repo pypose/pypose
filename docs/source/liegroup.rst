@@ -2,7 +2,7 @@ LieGroup
 ========
 Description
 
-.. currentmodule:: pypose.liegroup.group
+.. currentmodule:: pypose
 .. autoclass:: LieGroup
    :members:
    :show-inheritance:

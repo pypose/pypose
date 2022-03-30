@@ -2,8 +2,8 @@ import torch
 from torch import nn
 from .group_ops import exp, log, inv, mul, adj
 from .group_ops import adjT, jinv, act3, act4, toMatrix
-from .basics import cumops_, cumsum_, cummul_, cumprod_
-from .basics import vec2skew, cumops, cumsum, cummul, cumprod
+from .basics import vec2skew, cumops, cummul, cumprod
+from .basics import cumops_, cummul_, cumprod_
 
 
 HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'double',
@@ -166,10 +166,6 @@ class GroupType:
         return cumops(X, dim, ops)
 
     @classmethod
-    def cumsum(self, X, dim):
-        return cumsum(X, dim)
-
-    @classmethod
     def cummul(self, X, dim):
         return cummul(X, dim)
 
@@ -180,10 +176,6 @@ class GroupType:
     @classmethod
     def cumops_(self, X, dim, ops):
         return cumops_(X, dim, ops)
-
-    @classmethod
-    def cumsum_(self, X, dim):
-        return cumsum_(X, dim)
 
     @classmethod
     def cummul_(self, X, dim):
@@ -375,7 +367,56 @@ RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
 
 
 class LieGroup(torch.Tensor):
-    """ Lie Group """
+    """ The Base Class for LieGroup Tensor
+
+    Args:
+        data (tensor): Data of Liegroup Tensor
+        gtype (gtype): Group Type, which can be **Selected Below**:
+
+    .. list-table:: Liegroup Types
+        :widths: 25 25 50 30
+        :header-rows: 1
+
+        * - Name
+          - On Space
+          - On Manifold
+          - Alias Class
+        * - Orthogonal Group
+          - pypose.SO3_type
+          - pypose.so3_type
+          - pypose.SO3(), pypose.so3()
+        * - Euclidean Group
+          - pypose.SE3_type
+          - pypose.se3_type
+          - pypose.SE3(), pypose.se3()
+        * - Similarity Group
+          - pypose.Sim3_type
+          - pypose.sim3_type
+          - pypose.Sim3(), pypose.sim3()
+        * - Scaling Orthogonal
+          - pypose.RxSO3_type
+          - pypose.rxso3_type
+          - pypose.RxSO3(), pypose.rxso3()
+
+    Examples:
+
+    >>> import torch
+    >>> import pypose as pp
+    >>> data = torch.randn(3, 3, requires_grad=True, device='cuda:0')
+    >>> pp.LieGroup(data, gtype=pp.so3_type)
+    so3Type Group:
+    tensor([[ 0.9520,  0.4517,  0.5834],
+            [-0.8106,  0.8197,  0.7077],
+            [-0.5743,  0.8182, -1.2104]], device='cuda:0',
+        grad_fn=<AliasBackward0>)
+
+    >>> pp.so3(data)  ## Recommended
+    so3Type Group:
+    tensor([[ 0.9520,  0.4517,  0.5834],
+            [-0.8106,  0.8197,  0.7077],
+            [-0.5743,  0.8182, -1.2104]], device='cuda:0',
+        grad_fn=<AliasBackward0>)
+    """
     def __init__(self, data, gtype, **kwargs):
         assert data.shape[-1] == gtype.dimension, 'Dimension Invalid.'
         self.gtype = gtype
@@ -417,7 +458,7 @@ class LieGroup(torch.Tensor):
             \exp: \mathfrak{g} \mapsto G
 
         Returns:
-            LieGroup: The Lie group element
+            LieGroup: The LieGroup Tensor
 
         """
         return self.gtype.Exp(self)
@@ -474,28 +515,22 @@ class LieGroup(torch.Tensor):
         self.gtype.identity_(self)
 
     def cumops(self, dim, ops):
-        self.gtype.cumops(self, other, dim, ops)
-
-    def cumsum(self, dim):
-        self.gtype.cumsum(self, dim)
+        return self.gtype.cumops(self, other, dim, ops)
 
     def cummul(self, dim):
-        self.gtype.cummul(self, dim)
+        return self.gtype.cummul(self, dim)
 
     def cumprod(self, dim):
-        self.gtype.cumprod(self, dim)
+        return self.gtype.cumprod(self, dim)
 
     def cumops_(self, dim, ops):
-        self.gtype.cumops_(self, other, dim, ops)
-
-    def cumsum_(self, dim):
-        self.gtype.cumsum_(self, dim)
+        return self.gtype.cumops_(self, other, dim, ops)
 
     def cummul_(self, dim):
-        self.gtype.cummul_(self, dim)
+        return self.gtype.cummul_(self, dim)
 
     def cumprod_(self, dim):
-        self.gtype.cumprod_(self, dim)
+        return self.gtype.cumprod_(self, dim)
 
 
 class Parameter(LieGroup, nn.Parameter):
