@@ -2,10 +2,36 @@ import math
 import torch
 
 
-def vec2skew(v):
-    """Batch Skew Matrix"""
-    assert v.shape[-1] == 3, "Last dim should be 3"
-    shape, v = v.shape, v.view(-1,3)
+def vec2skew(input:torch.Tensor) -> torch.Tensor:
+    r"""
+    Batched Skew Matrices.
+
+    .. math::
+        {\displaystyle \mathbf{y}={\begin{bmatrix}\,\,
+        0&\!-x_{3}&\,\,\,x_{2}\\\,\,\,x_{3}&0&\!-x_{1}
+        \\\!-x_{2}&\,\,x_{1}&\,\,0\end{bmatrix}},}
+
+    Args:
+        input (Tensor): the tensor :math:`\mathbf{x}` to convert
+
+    Return:
+        Tensor: the skew matrices :math:`\mathbf{y}`
+
+    Shape:
+        - Input: :code:`(*, 3)`
+        - Output: :code:`(*, 3, 3)`
+
+    Note:
+        The last dimension of the input tensor has to be 3.
+
+    Example:
+        >>> pp.vec2skew(torch.randn(1,3))
+        tensor([[[ 0.0000, -2.2059, -1.2761],
+                [ 2.2059,  0.0000,  0.2929],
+                [ 1.2761, -0.2929,  0.0000]]])
+    """
+    assert input.shape[-1] == 3, "Last dim should be 3"
+    shape, v = input.shape, input.view(-1,3)
     S = torch.zeros(v.shape[:-1]+(3,3), device=v.device, dtype=v.dtype)
     S[:,0,1], S[:,0,2] = -v[:,2],  v[:,1]
     S[:,1,0], S[:,1,2] =  v[:,2], -v[:,0]
@@ -13,8 +39,11 @@ def vec2skew(v):
     return S.view(shape[:-1]+(3,3))
 
 
-def cumops_(v, dim, ops):
-    L = v.shape[dim]
+def cumops_(input, dim, ops):
+    r'''
+        Inplace version of :meth:`pypose.cumops`
+    '''
+    L, v = input.shape[dim], input
     assert dim != -1 or dim != v.shape[-1], "Invalid dim"
     for i in torch.pow(2, torch.arange(math.log2(L)+1, device=v.device, dtype=torch.int64)):
         index = torch.arange(i, L, device=v.device, dtype=torch.int64)
@@ -22,22 +51,56 @@ def cumops_(v, dim, ops):
     return v
 
 
-def cummul_(v, dim):
-    return cumops_(v, dim, lambda a, b : a * b)
-
-
-def cumprod_(v, dim):
+def cummul_(input, dim):
     r'''
-        Inplace version of pypose.cumprod
+        Inplace version of :meth:`pypose.cummul`
     '''
-    return cumops_(v, dim, lambda a, b : a @ b)
+    return cumops_(input, dim, lambda a, b : a * b)
 
 
-def cumops(v, dim, ops):
-    return cumops_(v.clone(), dim, ops)
+def cumprod_(input, dim):
+    r'''
+        Inplace version of :meth:`pypose.cumprod`
+    '''
+    return cumops_(input, dim, lambda a, b : a @ b)
 
 
-def cummul(v, dim):
+def cumops(input, dim, ops):
+    r"""Returns the cumulative customized operation of LieGroup elements of input in the dimension dim.
+
+    For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
+
+    .. math::
+        y_i = x_1~\mathrm{ops}~x_2 ~\mathrm{ops}~ \cdots ~\mathrm{ops}~ x_i
+
+    Args:
+        input (LieGroup): the input LieGroup Tensor
+        dim (int): the dimension to do the operation over
+        ops (func): the function to be customized
+
+    Returns:
+        LieGroup: LieGroup Tensor
+
+    Note:
+        - The users are supposed to provide meaningful customized operation.
+        - It doesn't check whether the results are valid for mathematical
+          definition of LieGroup, e.g., quaternion.
+
+    Examples:
+        >>> input = pp.randn_SE3(2)
+        >>> input.cumprod(dim = 0)
+        SE3Type Group:
+        tensor([[-0.6466,  0.2956,  2.4055, -0.4428,  0.1893,  0.3933,  0.7833],
+                [ 1.2711,  1.2020,  0.0651, -0.0685,  0.6732,  0.7331, -0.0685]])
+        >>> pp.cumops(input, 0, lambda a, b : a @ b)
+        SE3Type Group:
+        tensor([[-0.6466,  0.2956,  2.4055, -0.4428,  0.1893,  0.3933,  0.7833],
+                [ 1.2711,  1.2020,  0.0651, -0.0685,  0.6732,  0.7331, -0.0685]])
+    """
+    return cumops_(input.clone(), dim, ops)
+
+
+def cummul(input, dim):
     r"""Returns the cumulative multiplication (*) of LieGroup elements of input in the dimension dim.
 
     For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
@@ -59,10 +122,10 @@ def cummul(v, dim):
         tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
                 [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
     """
-    return cumops(v, dim, lambda a, b : a * b)
+    return cumops(input, dim, lambda a, b : a * b)
 
 
-def cumprod(v, dim):
+def cumprod(input, dim):
     r"""Returns the cumulative product (@) of LieGroup elements of input in the dimension dim.
 
     For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
@@ -84,4 +147,4 @@ def cumprod(v, dim):
         tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
                 [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
     """
-    return cumops(v, dim, lambda a, b : a @ b)
+    return cumops(input, dim, lambda a, b : a @ b)
