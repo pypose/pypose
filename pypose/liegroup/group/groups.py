@@ -521,6 +521,10 @@ class LieGroup(torch.Tensor):
         return self.gtype.cummul(self, dim)
 
     def cumprod(self, dim):
+        r"""
+
+        See :meth:`pypose.cumprod`
+        """
         return self.gtype.cumprod(self, dim)
 
     def cumops_(self, dim, ops):
