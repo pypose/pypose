@@ -22,9 +22,9 @@ class GroupType:
     '''Lie Group Type Base Class'''
     def __init__(self, groud, dimension, embedding, manifold):
         self._group     = groud     # Group ID
-        self._dimension = dimension # Data dimension
-        self._embedding = embedding # Embedding dimension
-        self._manifold  = manifold  # Manifold dimension
+        self._dimension = torch.Size([dimension]) # Data dimension
+        self._embedding = torch.Size([embedding]) # Embedding dimension
+        self._manifold  = torch.Size([manifold])  # Manifold dimension
 
     @property
     def group(self):
@@ -140,7 +140,7 @@ class GroupType:
         return self.randn(*args, sigma=1, **kwargs)
 
     def randn(self, *args, sigma=1., **kwargs):
-        return sigma * torch.randn(*(list(args)+[self.manifold]), **kwargs)
+        return sigma * torch.randn(*(tuple(args)+self.manifold), **kwargs)
 
     @classmethod
     def __op__(cls, group, op, x, y=None):
@@ -367,7 +367,7 @@ RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
 
 
 class LieGroup(torch.Tensor):
-    """ The Base Class for LieGroup Tensor
+    r""" The Base Class for LieGroup Tensor
 
     Returns:
         LieGroup Tensor (Inherited from torch.Tensor)
@@ -377,62 +377,64 @@ class LieGroup(torch.Tensor):
         gtype (gtype): Group Type, which can be **Selected Below**:
 
     .. list-table:: List of **gtype**
-        :widths: 25 25 50 30
+        :widths: 25 25 30 30 30
         :header-rows: 1
 
         * - Name
-          - On Space
-          - On Manifold
+          - Embedding
+          - Alias Class
+          - Manifold
           - Alias Class
         * - Orthogonal Group
-          - pypose.SO3_type
-          - pypose.so3_type
-          - pypose.SO3(), pypose.so3()
+          - :code:`SO3_type`
+          - :meth:`SO3`
+          - :code:`so3_type`
+          - :meth:`so3`
         * - Euclidean Group
-          - pypose.SE3_type
-          - pypose.se3_type
-          - pypose.SE3(), pypose.se3()
+          - :code:`SE3_type`
+          - :meth:`SE3`
+          - :code:`se3_type`
+          - :meth:`se3`
         * - Similarity Group
-          - pypose.Sim3_type
-          - pypose.sim3_type
-          - pypose.Sim3(), pypose.sim3()
+          - :code:`Sim3_type`
+          - :meth:`Sim3`
+          - :code:`sim3_type`
+          - :meth:`sim3`
         * - Scaling Orthogonal
-          - pypose.RxSO3_type
-          - pypose.rxso3_type
-          - pypose.RxSO3(), pypose.rxso3()
+          - :code:`RxSO3_type`
+          - :meth:`RxSO3`
+          - :code:`rxso3_type`
+          - :meth:`rxso3`
+
+    Examples:
+        >>> import torch
+        >>> import pypose as pp
+        >>> data = torch.randn(3, 3, requires_grad=True, device='cuda:0')
+        >>> pp.LieGroup(data, gtype=pp.so3_type)
+        so3Type Group:
+        tensor([[ 0.9520,  0.4517,  0.5834],
+                [-0.8106,  0.8197,  0.7077],
+                [-0.5743,  0.8182, -1.2104]], device='cuda:0', grad_fn=<AliasBackward0>)
+
+        >>> pp.so3(data)  ## Alias is Recommended
+        so3Type Group:
+        tensor([[ 0.9520,  0.4517,  0.5834],
+                [-0.8106,  0.8197,  0.7077],
+                [-0.5743,  0.8182, -1.2104]], device='cuda:0', grad_fn=<AliasBackward0>)
 
     Note:
         Alias of LieGroup for specific gtype is recommended.
         For example, the following usage is equivalent:
 
-        - pp.LieGroup(data, gtype=pp.so3_type)
+        - :code:`pp.LieGroup(data, gtype=pp.so3_type)`
 
-        - pp.so3(data)
-
-    Examples:
-
-    >>> import torch
-    >>> import pypose as pp
-    >>> data = torch.randn(3, 3, requires_grad=True, device='cuda:0')
-    >>> pp.LieGroup(data, gtype=pp.so3_type)
-    so3Type Group:
-    tensor([[ 0.9520,  0.4517,  0.5834],
-            [-0.8106,  0.8197,  0.7077],
-            [-0.5743,  0.8182, -1.2104]], device='cuda:0',
-        grad_fn=<AliasBackward0>)
-
-    >>> pp.so3(data)  ## Recommended
-    so3Type Group:
-    tensor([[ 0.9520,  0.4517,  0.5834],
-            [-0.8106,  0.8197,  0.7077],
-            [-0.5743,  0.8182, -1.2104]], device='cuda:0',
-        grad_fn=<AliasBackward0>)
+        - :code:`pp.so3(data)`
 
     Note:
         All properties of `torch.tensor` is available.
     """
     def __init__(self, data, gtype, **kwargs):
-        assert data.shape[-1] == gtype.dimension, 'Dimension Invalid.'
+        assert data.shape[-1:] == gtype.dimension, 'Dimension Invalid.'
         self.gtype = gtype
 
     def __new__(cls, data, **kwargs):
@@ -460,36 +462,39 @@ class LieGroup(torch.Tensor):
 
     @property
     def gshape(self) -> torch.Size:
-        '''
+        r'''
         LieGroup Tensor Shape (shape of torch.Tensor by removing the last dimension)
 
         Returns:
             torch.Size
 
         Note:
-            The only difference from `tensor.shape` is the last dimension is hidden.
+            - The only difference from :meth:`tensor.shape` is the last dimension is hidden.
+
+            - The last dimension can also be accessed via :code:`LieGroup.gtype.dimension`.
 
         Examples:
+            >>> x = pp.randn_SE3(2)
+            >>> x.gshape
+            torch.Size([2])
+            >>> x.shape
+            torch.Size([2, 7])
+            >>> x.gtype.dimension
+            torch.Size([7])
 
-        >>> x = pp.randn_SE3(2)
-        >>> x.gshape
-        torch.Size([2])
-        >>> x.shape
-        torch.Size([2, 7])
         '''
         return self.shape[:-1]
 
     def gview(self, *shape):
-        '''
+        r'''
         Returns:
-            A new lieGroup tensor share with the same data as the self tensor but of a different shape.
+            A new lieGroup tensor sharing with the same data as the self tensor but of a different shape.
 
         Args:
             shape (torch.Size or int...): the desired size
 
         Note:
-            The only difference from `tensor.view` is the last dimension is hidden.
-            The last dimension can also be accessed via LieGroup.gtype.dimension.
+            The only difference from :meth:`tensor.view` is the last dimension is hidden.
 
         Examples:
             >>> x = pp.randn_so3(2,2)
@@ -498,7 +503,7 @@ class LieGroup(torch.Tensor):
             >>> x.gview(-1).gshape
             torch.Size([4])
         '''
-        return self.view(*shape+(self.gtype.dimension,))
+        return self.view(*shape+self.gtype.dimension)
 
     def Exp(self):
         r"""The exponential map.
