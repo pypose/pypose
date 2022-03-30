@@ -3,21 +3,25 @@ from .utils import SO3, so3
 
 
 def mat2SO3(rotation_matrix, **kwargs):
-    """Convert 3x3 or 3x4 rotation matrix to SO3 group (by quaternion)
+    r"""Convert 3x3 or 3x4 rotation matrix to SO3 group (by quaternion)
 
     Args:
         rotation_matrix (Tensor): the rotation matrix to convert.
 
     Return:
-        Tensor: the SO3 group in quaternion
+        Tensor: SO3 Tensor
 
     Shape:
-        - Input: :math:`(*, 3, 3)` or '(*, 3, 4)'
-        - Output: :math:`(*, 4)`
+        - Input: :code:`(*, 3, 3)` or :code:`(*, 3, 4)`
+        - Output: :code:`(*, 4)`
 
-    Example:
-        >>> input = torch.rand(4, 3, 3)  # Nx3x3
-        >>> output = pp.mat2SO3(input)  # Nx4
+    Examples:
+        >>> input = torch.eye(3).repeat(2, 1, 1) # N x 3 x 3
+        >>> output = pp.mat2SO3(input)           # N x 4
+        >>> output
+        SO3Type Group:
+        tensor([[0., 0., 0., 1.],
+                [0., 0., 0., 1.]])
     """
     if not torch.is_tensor(rotation_matrix):
         rotation_matrix = torch.tensor(rotation_matrix)
@@ -83,7 +87,26 @@ def mat2SO3(rotation_matrix, **kwargs):
 
 
 def euler2SO3(euler:torch.Tensor, **kwargs):
-    # euler: (*, 3) in sequence of roll, pitch, yaw
+    r"""Convert Euler angles to SO3 Tensor
+
+    Args:
+        euler (Tensor): the euler angles to convert.
+
+    Return:
+        Tensor: SO3 Tensor
+
+    Shape:
+        - Input: :code:`(*, 3)`
+        - Output: :code:`(*, 4)`
+
+    Examples:
+        >>> output = pp.euler2SO3(input, requires_grad=True)
+        >>> output = pp.euler2SO3(input)
+        >>> output
+        SO3Type Group:
+        tensor([[-0.4873,  0.1162,  0.4829,  0.7182],
+                [ 0.3813,  0.4059, -0.2966,  0.7758]], grad_fn=<AliasBackward0>)
+    """
     if not torch.is_tensor(euler):
         euler = torch.tensor(euler)
     assert euler.shape[-1] == 3

@@ -1,5 +1,5 @@
-PyPose
-======
+Convert
+=======
 
 .. automodule:: pypose
 .. currentmodule:: pypose
@@ -8,6 +8,5 @@ PyPose
     :toctree: generated
     :nosignatures:
 
-    cumprod
-    cumprod_
-    vec2skew
+    mat2SO3
+    euler2SO3

@@ -1,7 +1,4 @@
-.. PyPose documentation master file, created by
-   sphinx-quickstart on Wed Jan 26 15:12:31 2022.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. PyPose documentation master file
 
 Welcome to PyPose's documentation!
 ==================================
@@ -10,8 +7,9 @@ Welcome to PyPose's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   pypose
    liegroup
+   basics
+   convert
 
 
 

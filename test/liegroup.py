@@ -5,7 +5,7 @@ import pypose as pp
 torch.manual_seed(0)
 torch.cuda.manual_seed(0)
 
-x = pp.so3(torch.randn(3,3)*0.1, requires_grad=True)
+x = pp.so3(torch.randn(3,3)*0.1)
 y = pp.randn_so3(3, sigma=0.1, dtype=torch.float64, requires_grad=True, device="cuda")
 a = pp.randn_se3(3, sigma=0.1, requires_grad=True)
 b = pp.SE3_type.randn(3, sigma=0.1, requires_grad=True)

@@ -38,11 +38,32 @@ def cumops(v, dim, ops):
 
 
 def cummul(v, dim):
+    r"""Returns the cumulative multiplication (*) of LieGroup elements of input in the dimension dim.
+
+    For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
+
+    .. math::
+        y_i = x_1 * x_2 * \cdots @ x_i
+
+    Args:
+        input (LieGroupTensor): the input tenso
+        dim (int): the dimension to do the operation over
+
+    Returns:
+        LieGroup: The LieGroup Tensor
+
+    Examples:
+        >>> input = pp.randn_SE3(2)
+        >>> pp.cumprod(input, dim=0)
+        SE3Type Group:
+        tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
+                [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
+    """
     return cumops(v, dim, lambda a, b : a * b)
 
 
 def cumprod(v, dim):
-    """Returns the cumulative product of LieGroup elements of input in the dimension dim.
+    r"""Returns the cumulative product (@) of LieGroup elements of input in the dimension dim.
 
     For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
 

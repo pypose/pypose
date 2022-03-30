@@ -58,9 +58,9 @@ class GroupType:
 
     def Inv(self, x):
         if self.on_manifold:
-            return LieGroup(-x, gtype=x.gtype, requires_grad=x.requires_grad)
+            return LieGroup(-x, gtype=x.gtype)
         out = self.__op__(self.group, inv, x)
-        return LieGroup(out, gtype=x.gtype, requires_grad=x.requires_grad)
+        return LieGroup(out, gtype=x.gtype)
 
     def Act(self, x, p):
         """ action on a points tensor(*, 3[4]) (homogeneous)"""
@@ -73,7 +73,7 @@ class GroupType:
         # Transform on transform
         if not self.on_manifold and isinstance(y, LieGroup) and not y.gtype.on_manifold:
             out = self.__op__(self.group, mul, x, y)
-            return LieGroup(out, gtype=x.gtype, requires_grad=x.requires_grad)
+            return LieGroup(out, gtype=x.gtype)
         # Transform on points
         if not self.on_manifold and isinstance(y, torch.Tensor):
             return self.Act(x, y)
@@ -96,7 +96,7 @@ class GroupType:
         assert not X.gtype.on_manifold and a.gtype.on_manifold
         assert X.gtype.group == a.gtype.group
         out = self.__op__(self.group, adj, X, a)
-        return LieGroup(out, gtype=a.gtype, requires_grad=a.requires_grad or X.requires_grad)
+        return LieGroup(out, gtype=a.gtype)
 
     def AdjT(self, X, a):
         ''' Exp(a) * X = X * Exp(AdjT) '''
@@ -105,7 +105,7 @@ class GroupType:
         assert not X.gtype.on_manifold and a.gtype.on_manifold, "Gtype Invalid"
         assert X.gtype.group == a.gtype.group, "Gtype Invalid"
         out = self.__op__(self.group, adjT, X, a)
-        return LieGroup(out, gtype=a.gtype, requires_grad=a.requires_grad or X.requires_grad)
+        return LieGroup(out, gtype=a.gtype)
 
     def Jinv(self, X, a):
         if self.on_manifold:
@@ -192,13 +192,12 @@ class SO3Type(GroupType):
 
     def Log(self, X):
         x = self.__op__(self.group, log, X)
-        return LieGroup(x, gtype=so3_type, requires_grad=X.requires_grad)
+        return LieGroup(x, gtype=so3_type)
 
     @classmethod
     def identity(cls, *args, **kwargs):
         data = torch.tensor([0., 0., 0., 1.], **kwargs)
-        return LieGroup(data.expand(args+(-1,)),
-                gtype=SO3_type, requires_grad=data.requires_grad)
+        return LieGroup(data.expand(args+(-1,)), gtype=SO3_type)
 
     def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
         data = so3_type.Exp(so3_type.randn(*args, sigma=sigma, **kwargs)).detach()
@@ -221,7 +220,7 @@ class so3Type(GroupType):
 
     def Exp(self, x):
         X = self.__op__(self.group, exp, x)
-        return LieGroup(X, gtype=SO3_type, requires_grad=x.requires_grad)
+        return LieGroup(X, gtype=SO3_type)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -258,13 +257,12 @@ class SE3Type(GroupType):
 
     def Log(self, X):
         x = self.__op__(self.group, log, X)
-        return LieGroup(x, gtype=se3_type, requires_grad=X.requires_grad)
+        return LieGroup(x, gtype=se3_type)
 
     @classmethod
     def identity(cls, *args, **kwargs):
         data = torch.tensor([0., 0., 0., 0., 0., 0., 1.], **kwargs)
-        return LieGroup(data.expand(args+(-1,)),
-                gtype=SE3_type, requires_grad=data.requires_grad)
+        return LieGroup(data.expand(args+(-1,)), gtype=SE3_type)
 
     def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
         data = se3_type.Exp(se3_type.randn(*args, sigma=sigma, **kwargs)).detach()
@@ -277,7 +275,7 @@ class se3Type(GroupType):
 
     def Exp(self, x):
         X = self.__op__(self.group, exp, x)
-        return LieGroup(X, gtype=SE3_type, requires_grad=x.requires_grad)
+        return LieGroup(X, gtype=SE3_type)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -294,13 +292,12 @@ class Sim3Type(GroupType):
 
     def Log(self, X):
         x = self.__op__(self.group, log, X)
-        return LieGroup(x, gtype=sim3_type, requires_grad=X.requires_grad)
+        return LieGroup(x, gtype=sim3_type)
 
     @classmethod
     def identity(cls, *args, **kwargs):
         data = torch.tensor([0., 0., 0., 0., 0., 0., 1., 1.], **kwargs)
-        return LieGroup(data.expand(args+(-1,)),
-                gtype=Sim3_type, requires_grad=data.requires_grad)
+        return LieGroup(data.expand(args+(-1,)), gtype=Sim3_type)
 
     def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
         data = sim3_type.Exp(sim3_type.randn(*args, sigma=sigma, **kwargs)).detach()
@@ -313,7 +310,7 @@ class sim3Type(GroupType):
 
     def Exp(self, x):
         X = self.__op__(self.group, exp, x)
-        return LieGroup(X, gtype=Sim3_type, requires_grad=x.requires_grad)
+        return LieGroup(X, gtype=Sim3_type)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -330,13 +327,12 @@ class RxSO3Type(GroupType):
 
     def Log(self, X):
         x = self.__op__(self.group, log, X)
-        return LieGroup(x, gtype=rxso3_type, requires_grad=X.requires_grad)
+        return LieGroup(x, gtype=rxso3_type)
 
     @classmethod
     def identity(cls, *args, **kwargs):
         data = torch.tensor([0., 0., 0., 1., 1.], **kwargs)
-        return LieGroup(data.expand(args+(-1,)),
-                gtype=rxso3_type, requires_grad=data.requires_grad)
+        return LieGroup(data.expand(args+(-1,)), gtype=rxso3_type)
 
     def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
         data = rxso3_type.Exp(rxso3_type.randn(*args, sigma=sigma, **kwargs)).detach()
@@ -349,7 +345,7 @@ class rxso3Type(GroupType):
 
     def Exp(self, x):
         X = self.__op__(self.group, exp, x)
-        return LieGroup(X, gtype=RxSO3_type, requires_grad=x.requires_grad)
+        return LieGroup(X, gtype=RxSO3_type)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -431,13 +427,15 @@ class LieGroup(torch.Tensor):
         - :code:`pp.so3(data)`
 
     Note:
-        All properties of `torch.tensor` is available.
+        All properties of :code:`torch.tensor` is available.
+        See more details at https://pytorch.org/docs/stable/tensor_attributes.html
+
     """
-    def __init__(self, data, gtype, **kwargs):
+    def __init__(self, data:torch.Tensor, gtype:GroupType):
         assert data.shape[-1:] == gtype.dimension, 'Dimension Invalid.'
         self.gtype = gtype
 
-    def __new__(cls, data, **kwargs):
+    def __new__(cls, data, gtype):
         return torch.Tensor.as_subclass(data, LieGroup)
 
     def __repr__(self):
@@ -481,7 +479,6 @@ class LieGroup(torch.Tensor):
             torch.Size([2, 7])
             >>> x.gtype.dimension
             torch.Size([7])
-
         '''
         return self.shape[:-1]
 
@@ -569,33 +566,68 @@ class LieGroup(torch.Tensor):
         self.gtype.identity_(self)
 
     def cumops(self, dim, ops):
+        r"""
+        See :meth:`pypose.cumops`
+        """
         return self.gtype.cumops(self, other, dim, ops)
 
     def cummul(self, dim):
+        r"""
+        See :meth:`pypose.cummul`
+        """
         return self.gtype.cummul(self, dim)
 
     def cumprod(self, dim):
         r"""
-
         See :meth:`pypose.cumprod`
         """
         return self.gtype.cumprod(self, dim)
 
     def cumops_(self, dim, ops):
+        r"""
+        Inplace version of :meth:`pypose.cumops`
+        """
         return self.gtype.cumops_(self, other, dim, ops)
 
     def cummul_(self, dim):
+        r"""
+        Inplace version of :meth:`pypose.cummul`
+        """
         return self.gtype.cummul_(self, dim)
 
     def cumprod_(self, dim):
+        r"""
+        Inplace version of :meth:`pypose.cumprod`
+        """
         return self.gtype.cumprod_(self, dim)
 
 
 class Parameter(LieGroup, nn.Parameter):
-    def __init__(self, data, gtype=None, **kwargs):
+    r'''
+    A kind of LieGroup Tensor that is to be considered a module parameter.
+
+    Parameters are of :meth:`LieGroup` and :meth:`torch.nn.Parameter`,
+    that have a very special property when used with Modules: when
+    they are assigned as Module attributes they are automatically
+    added to the list of its parameters, and will appear e.g., in
+    :meth:`parameters()` iterator.
+
+    Args:
+        data (LieGroup): parameter LieGroup tensor.
+        requires_grad (bool, optional): if the parameter requires
+            gradient. Default: True
+
+    Examples:
+        >>> x = pp.Parameter(pp.randn_so3(2))
+        >>> x.sum().backward() # Just test. There is no physical meaning
+        >>> x.grad
+        tensor([[1., 1., 1.],
+                [1., 1., 1.]])
+    '''
+    def __init__(self, data, **kwargs):
         self.gtype = data.gtype
 
-    def __new__(cls, data=None, gtype=None, requires_grad=True):
+    def __new__(cls, data=None, requires_grad=True):
         if data is None:
             data = torch.tensor([])
         return LieGroup._make_subclass(cls, data, requires_grad)
