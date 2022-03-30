@@ -2,7 +2,7 @@
 # System.
 from typing import List
 import math
-from networkx.utils import UnionFind
+# from networkx.utils import UnionFind
 
 # PyTorch.
 import torch
@@ -238,17 +238,24 @@ def find_leading_feature_from_full_matches(index, full_matches=None):
     # assert index.dtype == torch.int64, \
     #     f'index must be a tensor with dtype == torch.int64, index.dtype = {index.dtype}'
 
+    # The following does not work because nonzeros is not supported here.
     # Find the occurance of the current feature index.
     # This casuses host-device synchronization if full_maches is on CUDA. See the documents.
-    f = ( full_matches[1, :] == index ).nonzero(as_tuple=True)[0]
+    # f = ( full_matches[1, :] == index ).nonzero(as_tuple=True)[0]
 
-    if f.nelement() == 0:
-        # Not present in the second row of full_maches. 
-        # This means it is the leading feature.
-        return index
+    # The following doese not work because of data-dependent control flow
+    # if f.nelement() == 0:
+    #     # Not present in the second row of full_maches. 
+    #     # This means it is the leading feature.
+    #     return index
 
-    # The smallest matching index is the index of the leading feature.
-    return torch.min(f)
+    mask = full_matches[1, :] == index
+    mask = mask.type(torch.int)
+
+    # Since we assume that the smallest matching index is the index of the leading feature.
+    buffered_indices = mask * full_matches[0, :] + (1 - mask) * index
+
+    return torch.min(buffered_indices)
 
 # Constant camera intrinsics.
 class BALayer(nn.Module):
@@ -333,7 +340,7 @@ class BALayer(nn.Module):
         feature_indices = torch.arange(0, N, dtype=torch.int64, device=full_matches.device)
 
         # Vectorization.
-        leading_indices = map(find_leading_feature_from_full_matches)(feature_indices, full_matches=full_matches)
+        leading_indices = vmap(find_leading_feature_from_full_matches)(feature_indices, full_matches=full_matches)
 
         # Assign 3D point indices to the leading features.
         association = torch.zeros((N, ), dtype=torch.int64, device=full_matches.device)
