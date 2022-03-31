@@ -98,13 +98,123 @@ def assert_gtype(func):
 
 
 @assert_gtype
-def Exp(x):
-    return x.Exp()
+def Exp(input):
+    r"""The Exponential map for :code:`LieGroup` Tensor.
+
+    .. math::
+        \exp: \mathcal{g} \mapsto \mathcal{G}
+
+    .. list-table:: List of supported :math:`\exp` map
+        :widths: 30 30 30 30
+        :header-rows: 1
+
+        * - input :code:`gtype`
+          - :math:`\mathcal{g}`
+          - :math:`\mathcal{G}`
+          - output :code:`gtype`
+        * - :code:`so3_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^3`
+          - :math:`\mathcal{G}\in\mathbb{R}^4`
+          - :code:`SO3_type`
+        * - :code:`se3_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^6`
+          - :math:`\mathcal{G}\in\mathbb{R}^7`
+          - :code:`SE3_type`
+        * - :code:`sim3_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^7`
+          - :math:`\mathcal{G}\in\mathbb{R}^8`
+          - :code:`Sim3_type`
+        * - :code:`rxso3_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^4`
+          - :math:`\mathcal{G}\in\mathbb{R}^5`
+          - :code:`RxSO3_type`
+
+    Args:
+        input (LieGroup): the input LieGroup Tensor on manifold
+
+    Return:
+        LieGroup: The LieGroup Tensor in embedding space
+
+    Note:
+        This function :code:`Exp()` is different from :code:`exp()`, which returns
+        a new torch tensor with the exponential of the elements of the input tensor.
+
+    Example:
+        >>> x = pp.randn_so3(2, requires_grad=True)
+        so3Type Group:
+        tensor([[ 0.1366,  0.1370, -1.1921],
+                [-0.6003, -0.2165, -1.6576]], requires_grad=True)
+
+        >>> x.Exp() # equivalent to: pp.Exp(x)
+        SO3Type Group:
+        tensor([[ 0.0642,  0.0644, -0.5605,  0.8232],
+                [-0.2622, -0.0946, -0.7241,  0.6309]], grad_fn=<AliasBackward0>)
+
+        >>> x.exp() # Note that this returns torch.Tensor
+        tensor([[1.1463, 1.1469, 0.3036],
+                [0.5486, 0.8053, 0.1906]], grad_fn=<ExpBackward0>)
+    """
+    return input.Exp()
 
 
 @assert_gtype
-def Log(x):
-    return x.Log()
+def Log(input):
+    r"""The Logarithm map for :code:`LieGroup` Tensor.
+
+    .. math::
+        \log: \mathcal{G} \mapsto \mathcal{g}
+
+    .. list-table:: List of supported :math:`\log` map
+        :widths: 30 30 30 30
+        :header-rows: 1
+
+        * - input :code:`gtype`
+          - :math:`\mathcal{G}`
+          - :math:`\mathcal{g}`
+          - output :code:`gtype`
+        * - :code:`SO3_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^4`
+          - :math:`\mathcal{G}\in\mathbb{R}^3`
+          - :code:`so3_type`
+        * - :code:`SE3_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^7`
+          - :math:`\mathcal{G}\in\mathbb{R}^6`
+          - :code:`se3_type`
+        * - :code:`Sim3_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^8`
+          - :math:`\mathcal{G}\in\mathbb{R}^7`
+          - :code:`sim3_type`
+        * - :code:`RxSO3_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^5`
+          - :math:`\mathcal{G}\in\mathbb{R}^4`
+          - :code:`rxso3_type`
+
+    Args:
+        input (LieGroup): the input LieGroup Tensor on manifold
+
+    Return:
+        LieGroup: The LieGroup Tensor in embedding space
+
+    Note:
+        This function :code:`Log()` is different from :code:`log()`, which returns
+        a new torch tensor with the logarithm of the elements of the input tensor.
+
+    Example:
+        >>> x = pp.randn_SO3(2, requires_grad=True)
+        SO3Type Group:
+        tensor([[-0.1420,  0.1088,  0.5904,  0.7871],
+                [ 0.1470, -0.3328,  0.0580,  0.9297]], requires_grad=True)
+
+        >>> x.Log() # equivalent to: pp.Log(x)
+        so3Type Group:
+        tensor([[-0.3060,  0.2344,  1.2724],
+                [ 0.3012, -0.6817,  0.1187]], grad_fn=<AliasBackward0>)
+
+        >>> x.log() # Note that this returns torch.Tensor
+        tensor([[    nan, -2.2184, -0.5270, -0.2395],
+                [-1.9171,     nan, -2.8478, -0.0729]], grad_fn=<LogBackward0>)
+    """
+    return input.Log()
 
 
 @assert_gtype

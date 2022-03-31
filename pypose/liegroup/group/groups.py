@@ -484,11 +484,11 @@ class LieGroup(torch.Tensor):
 
     def gview(self, *shape):
         r'''
-        Returns:
-            A new lieGroup tensor sharing with the same data as the self tensor but of a different shape.
-
         Args:
             shape (torch.Size or int...): the desired size
+
+        Returns:
+            A new lieGroup tensor sharing with the same data as the self tensor but of a different shape.
 
         Note:
             The only difference from :meth:`tensor.view` is the last dimension is hidden.
@@ -503,15 +503,9 @@ class LieGroup(torch.Tensor):
         return self.view(*shape+self.gtype.dimension)
 
     def Exp(self):
-        r"""The exponential map.
-        
-        .. math::
-            \exp: \mathfrak{g} \mapsto G
-
-        Returns:
-            LieGroup: The LieGroup Tensor
-
-        """
+        r'''
+        See :meth:`pypose.Exp`
+        '''
         return self.gtype.Exp(self)
 
     def Log(self):
