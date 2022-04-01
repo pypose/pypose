@@ -2,13 +2,22 @@ Basics
 ======
 
 .. automodule:: pypose
-.. currentmodule:: pypose
 
 .. autosummary::
     :recursive:
     :toctree: generated
     :nosignatures:
 
+    Exp
+    Log
+    Exp
+    Log
+    Inv
+    Retr
+    Act
+    Adj
+    AdjT
+    Jinv
     randn_so3
     randn_SO3
     randn_se3

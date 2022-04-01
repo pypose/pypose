@@ -18,6 +18,82 @@ rxso3 = functools.partial(LieGroup, gtype=rxso3_type)
 
 
 def randn_like(input, sigma=1, **kwargs):
+    r'''
+    Returns a LieGroup tensor with the same size as input that is filled with random
+    LieGroup tensor that satisfies the corresponding :code:`input.gtype`.
+
+    The corresponding random generator can be
+
+    .. list-table:: List of available random LieGroup generator of input :code:`gtype`.
+        :widths: 25 25 30 30 30
+        :header-rows: 1
+
+        * - Name
+          - gtype
+          - randn function
+          - Manifold
+          - randn function
+        * - Orthogonal Group
+          - :code:`SO3_type`
+          - :meth:`randn_SO3`
+          - :code:`so3_type`
+          - :meth:`randn_so3`
+        * - Euclidean Group
+          - :code:`SE3_type`
+          - :meth:`randn_SE3`
+          - :code:`se3_type`
+          - :meth:`randn_se3`
+        * - Similarity Group
+          - :code:`Sim3_type`
+          - :meth:`randn_Sim3`
+          - :code:`sim3_type`
+          - :meth:`randn_sim3`
+        * - Scaling Orthogonal
+          - :code:`RxSO3_type`
+          - :meth:`randn_RxSO3`
+          - :code:`rxso3_type`
+          - :meth:`randn_rxso3`
+
+    Args:
+
+        input (LieGroup): the size of input will determine size of the output tensor.
+
+        dtype (torch.dtype, optional): the desired data type of returned Tensor.
+            Default: if None, defaults to the dtype of input.
+
+        layout (torch.layout, optional): the desired layout of returned tensor.
+            Default: if None, defaults to the layout of input.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, defaults to the device of input.
+
+        requires_grad (bool, optional): If autograd should record operations on the returned tensor.
+            Default: False.
+
+        memory_format (torch.memory_format, optional): the desired memory format of returned Tensor.
+            Default: torch.preserve_format.
+
+    Note:
+        If we have:
+
+        .. code::
+
+            import pypose as pp
+            x = pp.SO3(data)
+
+        Then the following two usages are equivalent:
+
+        .. code::
+
+            pp.randn_like(x)
+            pp.randn_SO3(x.gshape, dtype=x.dtype, layout=x.layout, device=x.device)
+
+    Example:
+        >>> x = pp.so3(torch.tensor([0, 0, 0]))
+        >>> pp.randn_like(x)
+        so3Type Group:
+        tensor([0.8970, 0.0943, 0.1399])
+    '''
     return input.gtype.randn_like(*input.gshape, sigma=sigma, **kwargs)
 
 

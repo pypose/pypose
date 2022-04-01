@@ -462,13 +462,13 @@ class LieGroup(torch.Tensor):
     @property
     def gshape(self) -> torch.Size:
         r'''
-        LieGroup Tensor Shape (shape of torch.Tensor by removing the last dimension)
+        LieGroup Tensor Shape (shape of torch.Tensor by ignoring the last dimension)
 
         Returns:
             torch.Size
 
         Note:
-            - The only difference from :meth:`tensor.shape` is the last dimension is hidden.
+            - The only difference from :code:`tensor.shape` is the last dimension is hidden.
 
             - The last dimension can also be accessed via :code:`LieGroup.gtype.dimension`.
 
@@ -485,6 +485,8 @@ class LieGroup(torch.Tensor):
 
     def gview(self, *shape):
         r'''
+        Returns a new LieGroup tensor with the same data as the self tensor but of a different :code:`gshape`.
+
         Args:
             shape (torch.Size or int...): the desired size
 
@@ -492,7 +494,7 @@ class LieGroup(torch.Tensor):
             A new lieGroup tensor sharing with the same data as the self tensor but of a different shape.
 
         Note:
-            The only difference from :meth:`tensor.view` is the last dimension is hidden.
+            The only difference from :code:`tensor.view` is the last dimension is hidden.
 
         Examples:
             >>> x = pp.randn_so3(2,2)
@@ -516,9 +518,15 @@ class LieGroup(torch.Tensor):
         return self.gtype.Log(self)
 
     def Inv(self):
+        r'''
+        See :meth:`pypose.Inv`
+        '''
         return self.gtype.Inv(self)
 
     def Act(self, p):
+        r'''
+        See :meth:`pypose.Act`
+        '''
         return self.gtype.Act(self, p)
 
     def __mul__(self, other):
@@ -531,18 +539,33 @@ class LieGroup(torch.Tensor):
             return self.Act(other)
 
     def Retr(self, a):
+        r'''
+        See :meth:`pypose.Retr`
+        '''
         return self.gtype.Retr(self, a)
 
     def Adj(self, a):
+        r'''
+        See :meth:`pypose.Adj`
+        '''
         return self.gtype.Adj(self, a)
 
     def AdjT(self, a):
+        r'''
+        See :meth:`pypose.AdjT`
+        '''
         return self.gtype.AdjT(self, a)
 
     def Jinv(self, a):
+        r'''
+        See :meth:`pypose.Jinv`
+        '''
         return self.gtype.Jinv(self, a)
 
     def Jr(self):
+        r'''
+        See :meth:`pypose.Jr`
+        '''
         return self.gtype.Jr(self)
 
     def tensor(self) -> torch.Tensor:

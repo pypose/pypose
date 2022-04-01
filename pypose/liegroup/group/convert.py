@@ -2,8 +2,8 @@ import torch
 from .utils import SO3, so3
 
 
-def mat2SO3(rotation_matrix, **kwargs):
-    r"""Convert 3x3 or 3x4 rotation matrix to SO3 group (by quaternion)
+def mat2SO3(rotation_matrix):
+    r"""Convert 3x3 or 3x4 rotation matrices to SO3 group
 
     Args:
         rotation_matrix (Tensor): the rotation matrix to convert.
@@ -81,12 +81,12 @@ def mat2SO3(rotation_matrix, **kwargs):
                     t2_rep * mask_c2 + t3_rep * mask_c3)  # noqa
 
     q = q.view(shape[:-2]+(4,))
-    q = q.index_select(-1, torch.tensor([1,2,3,0])) # wxyz -> xyzw
+    q = q.index_select(-1, torch.tensor([1,2,3,0], device=q.device)) # wxyz -> xyzw
 
     return SO3(q, **kwargs)
 
 
-def euler2SO3(euler:torch.Tensor, **kwargs):
+def euler2SO3(euler:torch.Tensor):
     r"""Convert Euler angles to SO3 Tensor
 
     Args:
@@ -100,9 +100,8 @@ def euler2SO3(euler:torch.Tensor, **kwargs):
         - Output: :code:`(*, 4)`
 
     Examples:
-        >>> output = pp.euler2SO3(input, requires_grad=True)
-        >>> output = pp.euler2SO3(input)
-        >>> output
+        >>> input = torch.randn(2, 3, requires_grad=True, dtype=torch.float64)
+        >>> pp.euler2SO3(input)
         SO3Type Group:
         tensor([[-0.4873,  0.1162,  0.4829,  0.7182],
                 [ 0.3813,  0.4059, -0.2966,  0.7758]], grad_fn=<AliasBackward0>)
@@ -120,4 +119,4 @@ def euler2SO3(euler:torch.Tensor, **kwargs):
                      cr * sp * cy + sr * cp * sy,
                      cr * cp * sy - sr * sp * cy,
                      cr * cp * cy + sr * sp * sy], dim=-1)
-    return SO3(q, **kwargs).gview(*shape[:-1])
+    return SO3(q).gview(*shape[:-1])

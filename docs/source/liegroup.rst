@@ -2,10 +2,29 @@ LieGroup
 ========
 
 .. currentmodule:: pypose
-.. autoclass:: LieGroup
-   :members:
-   :show-inheritance:
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
 
-.. autoclass:: Parameter
-   :members:
-   :show-inheritance:
+   LieGroup
+   Parameter
+   LieGroup.view
+   LieGroup.gview
+   LieGroup.shape
+   LieGroup.gshape
+   LieGroup.Exp
+   LieGroup.Log
+   LieGroup.Inv
+   LieGroup.Retr
+   LieGroup.Act
+   LieGroup.Adj
+   LieGroup.AdjT
+   LieGroup.Jinv
+   LieGroup.tensor
+   LieGroup.matrix
+   LieGroup.translation
+   LieGroup.quaternion
+   LieGroup.identity_
+   LieGroup.__mul__
+   LieGroup.__matmul__
+
