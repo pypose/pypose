@@ -10,3 +10,4 @@ Convert
 
     mat2SO3
     euler2SO3
+    vec2skew

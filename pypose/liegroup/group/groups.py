@@ -195,12 +195,12 @@ class SO3Type(GroupType):
         return LieGroup(x, gtype=so3_type)
 
     @classmethod
-    def identity(cls, *args, **kwargs):
+    def identity(cls, *size, **kwargs):
         data = torch.tensor([0., 0., 0., 1.], **kwargs)
-        return LieGroup(data.expand(args+(-1,)), gtype=SO3_type)
+        return LieGroup(data.expand(size+(-1,)), gtype=SO3_type)
 
-    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
-        data = so3_type.Exp(so3_type.randn(*args, sigma=sigma, **kwargs)).detach()
+    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
+        data = so3_type.Exp(so3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieGroup(data, gtype=SO3_type).requires_grad_(requires_grad)
 
     def matrix(self, X):
@@ -224,11 +224,11 @@ class so3Type(GroupType):
         return LieGroup(X, gtype=SO3_type)
 
     @classmethod
-    def identity(cls, *args, **kwargs):
-        return SO3_type.Log(SO3_type.identity(*args, **kwargs))
+    def identity(cls, *size, **kwargs):
+        return SO3_type.Log(SO3_type.identity(*size, **kwargs))
 
-    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
-        data = super().randn(*args, sigma=sigma, **kwargs).detach()
+    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
+        data = super().randn(*size, sigma=sigma, **kwargs).detach()
         return LieGroup(data, gtype=so3_type).requires_grad_(requires_grad)
 
     def matrix(self, gtensor):
@@ -261,12 +261,12 @@ class SE3Type(GroupType):
         return LieGroup(x, gtype=se3_type)
 
     @classmethod
-    def identity(cls, *args, **kwargs):
+    def identity(cls, *size, **kwargs):
         data = torch.tensor([0., 0., 0., 0., 0., 0., 1.], **kwargs)
-        return LieGroup(data.expand(args+(-1,)), gtype=SE3_type)
+        return LieGroup(data.expand(size+(-1,)), gtype=SE3_type)
 
-    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
-        data = se3_type.Exp(se3_type.randn(*args, sigma=sigma, **kwargs)).detach()
+    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
+        data = se3_type.Exp(se3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieGroup(data, gtype=SE3_type).requires_grad_(requires_grad)
 
 
@@ -279,11 +279,11 @@ class se3Type(GroupType):
         return LieGroup(X, gtype=SE3_type)
 
     @classmethod
-    def identity(cls, *args, **kwargs):
-        return SE3_type.Log(SE3_type.identity(*args, **kwargs))
+    def identity(cls, *size, **kwargs):
+        return SE3_type.Log(SE3_type.identity(*size, **kwargs))
 
-    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
-        data = super().randn(*args, sigma=sigma, **kwargs).detach()
+    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
+        data = super().randn(*size, sigma=sigma, **kwargs).detach()
         return LieGroup(data, gtype=se3_type).requires_grad_(requires_grad)
 
 
@@ -296,12 +296,12 @@ class Sim3Type(GroupType):
         return LieGroup(x, gtype=sim3_type)
 
     @classmethod
-    def identity(cls, *args, **kwargs):
+    def identity(cls, *size, **kwargs):
         data = torch.tensor([0., 0., 0., 0., 0., 0., 1., 1.], **kwargs)
-        return LieGroup(data.expand(args+(-1,)), gtype=Sim3_type)
+        return LieGroup(data.expand(size+(-1,)), gtype=Sim3_type)
 
-    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
-        data = sim3_type.Exp(sim3_type.randn(*args, sigma=sigma, **kwargs)).detach()
+    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
+        data = sim3_type.Exp(sim3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieGroup(data, gtype=Sim3_type).requires_grad_(requires_grad)
 
 
@@ -314,11 +314,11 @@ class sim3Type(GroupType):
         return LieGroup(X, gtype=Sim3_type)
 
     @classmethod
-    def identity(cls, *args, **kwargs):
-        return Sim3_type.Log(Sim3_type.identity(*args, **kwargs))
+    def identity(cls, *size, **kwargs):
+        return Sim3_type.Log(Sim3_type.identity(*size, **kwargs))
 
-    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
-        data = super().randn(*args, sigma=sigma, **kwargs).detach()
+    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
+        data = super().randn(*size, sigma=sigma, **kwargs).detach()
         return LieGroup(data, gtype=sim3_type).requires_grad_(requires_grad)
 
 
@@ -331,12 +331,12 @@ class RxSO3Type(GroupType):
         return LieGroup(x, gtype=rxso3_type)
 
     @classmethod
-    def identity(cls, *args, **kwargs):
+    def identity(cls, *size, **kwargs):
         data = torch.tensor([0., 0., 0., 1., 1.], **kwargs)
-        return LieGroup(data.expand(args+(-1,)), gtype=rxso3_type)
+        return LieGroup(data.expand(size+(-1,)), gtype=rxso3_type)
 
-    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
-        data = rxso3_type.Exp(rxso3_type.randn(*args, sigma=sigma, **kwargs)).detach()
+    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
+        data = rxso3_type.Exp(rxso3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieGroup(data, gtype=RxSO3_type).requires_grad_(requires_grad)
 
 
@@ -349,11 +349,11 @@ class rxso3Type(GroupType):
         return LieGroup(X, gtype=RxSO3_type)
 
     @classmethod
-    def identity(cls, *args, **kwargs):
-        return RxSO3_type.Log(RxSO3_type.identity(*args, **kwargs))
+    def identity(cls, *size, **kwargs):
+        return RxSO3_type.Log(RxSO3_type.identity(*size, **kwargs))
 
-    def randn(self, *args, sigma=1, requires_grad=False, **kwargs):
-        data = super().randn(*args, sigma=sigma, **kwargs).detach()
+    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
+        data = super().randn(*size, sigma=sigma, **kwargs).detach()
         return LieGroup(data, gtype=rxso3_type).requires_grad_(requires_grad)
 
 

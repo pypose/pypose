@@ -35,7 +35,7 @@ def randn_so3(*size, sigma=1, **kwargs):
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float): variance of the normal distribution. Default: 1.
+        sigma (float, optional): variance of the normal distribution. Default: 1.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
@@ -79,7 +79,7 @@ def randn_SO3(*size, sigma=1, **kwargs):
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float): variance :math:`\sigma` of the normal distribution. Default: 1.
+        sigma (float, optional): variance :math:`\sigma` of the normal distribution. Default: 1.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
@@ -110,64 +110,145 @@ def randn_SO3(*size, sigma=1, **kwargs):
     return SO3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_se3(*args, sigma=1, requires_grad=False, **kwargs):
-    return se3_type.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
+def randn_se3(*size, sigma=1, **kwargs):
+    r'''
+    Returns :code:`se3_type` LieGroup tensor filled with random numbers from a normal
+    distribution with mean 0 and variance :code:`sigma` (also called the standard normal distribution).
+
+    .. math::
+        \mathrm{out}_i = \mathcal{N}(\mathbf{0}_{6\times 1}, \mathbf{\sigma}_{6\times 1})
+
+    The shape of the tensor is defined by the variable argument size.
+
+    Args:
+        size (int...): a sequence of integers defining the shape of the output tensor.
+            Can be a variable number of arguments or a collection like a list or tuple.
+
+        sigma (float, optional): variance of the normal distribution. Default: 1.
+
+        requires_grad (bool, optional): If autograd should record operations on
+            the returned tensor. Default: False.
+
+        generator (torch.Generator, optional): a pseudorandom number generator for sampling
+
+        dtype (torch.dtype, optional): the desired data type of returned tensor.
+            Default: if None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+
+        layout (torch.layout, optional): the desired layout of returned Tensor.
+            Default: torch.strided.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, uses the current device for the default tensor
+            type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
+            for CPU tensor types and the current CUDA device for CUDA tensor types.
+
+    Returns:
+        LieGroup: a :code:`se3_type` LieGroup Tensor
+
+    Example:
+        >>> pp.randn_se3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
+        se3Type Group:
+        tensor([[-0.0599, -0.0593,  0.0809,  0.0352, -0.2173,  0.0342],
+                [-0.0226, -0.1081,  0.0270,  0.1368, -0.0327, -0.2052]],
+            dtype=torch.float64, requires_grad=True)
+    '''
+    return se3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_SE3(*args, sigma=1, requires_grad=False, **kwargs):
-    return SE3_type.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
+def randn_SE3(*size, sigma=1, **kwargs):
+    r'''
+    Returns :code:`SE3_type` LieGroup tensor filled with the Exponential map of the random
+    :code:`se3_type` LieGroup tensor with normal distribution with mean 0 and variance :code:`sigma`.
+
+    .. math::
+        \mathrm{out}_i = \mathrm{Exp}(\mathcal{N}(\mathbf{0}_{6\times 1}, \mathbf{\sigma}_{6\times 1}))
+
+    The shape of the tensor is defined by the variable argument size.
+
+    Args:
+        size (int...): a sequence of integers defining the shape of the output tensor.
+            Can be a variable number of arguments or a collection like a list or tuple.
+
+        sigma (float, optional): variance :math:`\sigma` of the normal distribution. Default: 1.
+
+        requires_grad (bool, optional): If autograd should record operations on
+            the returned tensor. Default: False.
+
+        generator (torch.Generator, optional): a pseudorandom number generator for sampling
+
+        dtype (torch.dtype, optional): the desired data type of returned tensor.
+            Default: if None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+
+        layout (torch.layout, optional): the desired layout of returned Tensor.
+            Default: torch.strided.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, uses the current device for the default tensor
+            type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
+            for CPU tensor types and the current CUDA device for CUDA tensor types.
+
+    Returns:
+        LieGroup: a :code:`SE3_type` LieGroup Tensor
+
+    Example:
+        >>> pp.randn_SE3(2, sigma=0.1)
+        SE3Type Group:
+        tensor([[-0.0522, -0.0456, -0.1996,  0.0266, -0.0240, -0.0375,  0.9987],
+                [-0.1344, -0.1673,  0.1111, -0.0219, -0.0454,  0.0710,  0.9962]])
+    '''
+    return SE3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_sim3(*args, sigma=1, requires_grad=False, **kwargs):
-    return sim3_type.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
+def randn_sim3(*size, sigma=1, **kwargs):
+    return sim3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_Sim3(*args, sigma=1, requires_grad=False, **kwargs):
-    return Sim3_type.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
+def randn_Sim3(*size, sigma=1, **kwargs):
+    return Sim3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_rxso3(*args, sigma=1, requires_grad=False, **kwargs):
-    return rxso3_type.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
+def randn_rxso3(*size, sigma=1, **kwargs):
+    return rxso3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_RxSO3(*args, sigma=1, requires_grad=False, **kwargs):
-    return RxSO3_type.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
+def randn_RxSO3(*size, sigma=1, **kwargs):
+    return RxSO3_type.randn(*size, sigma=sigma, **kwargs)
 
 
 def identity_like(liegroup, **kwargs):
     return liegroup.gtype.identity_like(*liegroup.gshape, **kwargs)
 
 
-def identity_SO3(*args, **kwargs):
-    return SO3_type.identity(*args, **kwargs)
+def identity_SO3(*size, **kwargs):
+    return SO3_type.identity(*size, **kwargs)
 
 
-def identity_so3(*args, **kwargs):
-    return so3_type.identity(*args, **kwargs)
+def identity_so3(*size, **kwargs):
+    return so3_type.identity(*size, **kwargs)
 
 
-def identity_SE3(*args, **kwargs):
-    return SE3_type.identity(*args, **kwargs)
+def identity_SE3(*size, **kwargs):
+    return SE3_type.identity(*size, **kwargs)
 
 
-def identity_se3(*args, **kwargs):
-    return se3_type.identity(*args, **kwargs)
+def identity_se3(*size, **kwargs):
+    return se3_type.identity(*size, **kwargs)
 
 
-def identity_sim3(*args, **kwargs):
-    return sim3_type.identity(*args, **kwargs)
+def identity_sim3(*size, **kwargs):
+    return sim3_type.identity(*size, **kwargs)
 
 
-def identity_Sim3(*args, **kwargs):
-    return Sim3_type.identity(*args, **kwargs)
+def identity_Sim3(*size, **kwargs):
+    return Sim3_type.identity(*size, **kwargs)
 
 
-def identity_rxso3(*args, **kwargs):
-    return rxso3_type.identity(*args, **kwargs)
+def identity_rxso3(*size, **kwargs):
+    return rxso3_type.identity(*size, **kwargs)
 
 
-def identity_RxSO3(*args, **kwargs):
-    return RxSO3_type.identity(*args, **kwargs)
+def identity_RxSO3(*size, **kwargs):
+    return RxSO3_type.identity(*size, **kwargs)
 
 
 def assert_gtype(func):

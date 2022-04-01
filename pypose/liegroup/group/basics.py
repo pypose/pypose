@@ -7,9 +7,9 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
     Batched Skew Matrices.
 
     .. math::
-        {\displaystyle \mathbf{y}={\begin{bmatrix}\,\,
-        0&\!-x_{3}&\,\,\,x_{2}\\\,\,\,x_{3}&0&\!-x_{1}
-        \\\!-x_{2}&\,\,x_{1}&\,\,0\end{bmatrix}},}
+        {\displaystyle \mathbf{y}_i={\begin{bmatrix}\,\,
+        0&\!-x_{i,3}&\,\,\,x_{i,2}\\\,\,\,x_{i,3}&0&\!-x_{i,1}
+        \\\!-x_{i,2}&\,\,x_{i,1}&\,\,0\end{bmatrix}},}
 
     Args:
         input (Tensor): the tensor :math:`\mathbf{x}` to convert
