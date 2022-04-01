@@ -212,6 +212,7 @@ class SO3Type(GroupType):
     def identity_(self, X):
         X.fill_(0)
         X.index_fill_(dim=-1, index=torch.tensor([-1], device=X.device), value=1)
+        return X
 
 
 class so3Type(GroupType):
@@ -509,6 +510,9 @@ class LieGroup(torch.Tensor):
         return self.gtype.Exp(self)
 
     def Log(self):
+        r'''
+        See :meth:`pypose.Log`
+        '''
         return self.gtype.Log(self)
 
     def Inv(self):
@@ -541,57 +545,115 @@ class LieGroup(torch.Tensor):
     def Jr(self):
         return self.gtype.Jr(self)
 
-    def Hat(self):
-        return self.gtype.Hat(self)
+    def tensor(self) -> torch.Tensor:
+        r'''
+        Return the torch.Tensor without changing data.
 
-    def tensor(self):
+        Return:
+            Tensor: the torch.Tensor form of LieGroup Tensor.
+
+        Example:
+            >>> x = pp.randn_SO3(2)
+            >>> x.tensor()
+            tensor([[ 0.1196,  0.2339, -0.6824,  0.6822],
+                    [ 0.9198, -0.2704, -0.2395,  0.1532]])
+        '''
         return self.data
 
-    def matrix(self):
+    def matrix(self) -> torch.Tensor:
+        r'''
+        Return LieGroup Tensor into matrix form.
+
+        Return:
+            Tensor: the batched matrix form (torch.Tensor) of LieGroup Tensor.
+
+        Example:
+            >>> x = pp.randn_SO3(2)
+            >>> x.matrix()
+            tensor([[[ 0.9285, -0.0040, -0.3713],
+                    [ 0.2503,  0.7454,  0.6178],
+                    [ 0.2743, -0.6666,  0.6931]],
+                    [[ 0.4805,  0.8602, -0.1706],
+                    [-0.7465,  0.2991, -0.5944],
+                    [-0.4603,  0.4130,  0.7858]]])
+        '''
         return self.gtype.matrix(self)
 
-    def translation(self):
+    def translation(self) -> torch.Tensor:
+        r'''
+        Extract the translation vector from a LieGroup Tensor.
+
+        Return:
+            Tensor: the batched translation.
+
+        Example:
+            >>> x = pp.randn_SE3(2)
+            >>> x.translation()
+            tensor([[-0.5358, -1.5421, -0.7224],
+                    [ 0.8331, -1.4412,  0.0863]])
+        '''
         return self.gtype.translation(self)
 
-    def quaternion(self):
+    def quaternion(self) -> torch.Tensor:
         return self.gtype.quaternion(self)
 
     def identity_(self):
-        self.gtype.identity_(self)
+        r'''
+        Inplace set the LieGroup Tensor to identity.
+
+        Return:
+            LieGroup: the :code:`self` LieGroup Tensor
+
+        Note:
+            The translation part, if there is, is set to zeros, while the
+            rotation part is set to identity quaternion.
+
+        Example:
+            >>> x = pp.randn_SO3(2)
+            >>> x
+            SO3Type Group:
+            tensor([[-0.0724,  0.1970,  0.0022,  0.9777],
+                    [ 0.3492,  0.4998, -0.5310,  0.5885]])
+            >>> x.identity_()
+            SO3Type Group:
+            tensor([[0., 0., 0., 1.],
+                    [0., 0., 0., 1.]])
+        '''
+        return self.gtype.identity_(self)
 
     def cumops(self, dim, ops):
         r"""
-        See :meth:`pypose.cumops`
+        See :func:`pypose.cumops`
         """
         return self.gtype.cumops(self, other, dim, ops)
 
     def cummul(self, dim):
         r"""
-        See :meth:`pypose.cummul`
+        See :func:`pypose.cummul`
         """
         return self.gtype.cummul(self, dim)
 
     def cumprod(self, dim):
         r"""
-        See :meth:`pypose.cumprod`
+        See :func:`pypose.cumprod`
         """
         return self.gtype.cumprod(self, dim)
 
     def cumops_(self, dim, ops):
         r"""
-        Inplace version of :meth:`pypose.cumops`
+        Inplace version of :func:`pypose.cumops`
         """
         return self.gtype.cumops_(self, other, dim, ops)
 
     def cummul_(self, dim):
         r"""
-        Inplace version of :meth:`pypose.cummul`
+        Inplace version of :func:`pypose.cummul`
         """
         return self.gtype.cummul_(self, dim)
 
     def cumprod_(self, dim):
         r"""
-        Inplace version of :meth:`pypose.cumprod`
+        Inplace version of :func:`pypose.cumprod`
         """
         return self.gtype.cumprod_(self, dim)
 

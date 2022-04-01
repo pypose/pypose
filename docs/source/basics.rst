@@ -11,6 +11,9 @@ Basics
 
     Exp
     Log
+    randn_so3
+    randn_SO3
+    randn_like
     cumprod
     cumprod_
     cummul

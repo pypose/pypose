@@ -17,16 +17,97 @@ RxSO3 = functools.partial(LieGroup, gtype=RxSO3_type)
 rxso3 = functools.partial(LieGroup, gtype=rxso3_type)
 
 
-def randn_like(liegroup, sigma=1, **kwargs):
-    return liegroup.gtype.randn_like(*liegroup.gshape, sigma=sigma, **kwargs)
+def randn_like(input, sigma=1, **kwargs):
+    return input.gtype.randn_like(*input.gshape, sigma=sigma, **kwargs)
 
 
-def randn_so3(*args, sigma=1, requires_grad=False, **kwargs):
-    return so3_type.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
+def randn_so3(*size, sigma=1, **kwargs):
+    r'''
+    Returns :code:`so3_type` LieGroup tensor filled with random numbers from a normal
+    distribution with mean 0 and variance :code:`sigma` (also called the standard normal distribution).
+
+    .. math::
+        \mathrm{out}_i = \mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma}_{3\times 1})
+
+    The shape of the tensor is defined by the variable argument size.
+
+    Args:
+        size (int...): a sequence of integers defining the shape of the output tensor.
+            Can be a variable number of arguments or a collection like a list or tuple.
+
+        sigma (float): variance of the normal distribution. Default: 1.
+
+        requires_grad (bool, optional): If autograd should record operations on
+            the returned tensor. Default: False.
+
+        generator (torch.Generator, optional): a pseudorandom number generator for sampling
+
+        dtype (torch.dtype, optional): the desired data type of returned tensor.
+            Default: if None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+
+        layout (torch.layout, optional): the desired layout of returned Tensor.
+            Default: torch.strided.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, uses the current device for the default tensor
+            type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
+            for CPU tensor types and the current CUDA device for CUDA tensor types.
+
+    Returns:
+        LieGroup: a :code:`so3_type` LieGroup Tensor
+
+    Example:
+        >>> pp.randn_so3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
+        so3Type Group:
+        tensor([[-0.0427, -0.0149,  0.0948],
+                [ 0.0607,  0.0473,  0.0703]], dtype=torch.float64, requires_grad=True)
+    '''
+    return so3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_SO3(*args, sigma=1, requires_grad=False, **kwargs):
-    return SO3_type.randn(*args, sigma=sigma, requires_grad=requires_grad, **kwargs)
+def randn_SO3(*size, sigma=1, **kwargs):
+    r'''
+    Returns :code:`SO3_type` LieGroup tensor filled with the Exponential map of the random
+    :code:`so3_type` LieGroup tensor with normal distribution with mean 0 and variance :code:`sigma`.
+
+    .. math::
+        \mathrm{out}_i = \mathrm{Exp}(\mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma}_{3\times 1}))
+
+    The shape of the tensor is defined by the variable argument size.
+
+    Args:
+        size (int...): a sequence of integers defining the shape of the output tensor.
+            Can be a variable number of arguments or a collection like a list or tuple.
+
+        sigma (float): variance :math:`\sigma` of the normal distribution. Default: 1.
+
+        requires_grad (bool, optional): If autograd should record operations on
+            the returned tensor. Default: False.
+
+        generator (torch.Generator, optional): a pseudorandom number generator for sampling
+
+        dtype (torch.dtype, optional): the desired data type of returned tensor.
+            Default: if None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+
+        layout (torch.layout, optional): the desired layout of returned Tensor.
+            Default: torch.strided.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, uses the current device for the default tensor
+            type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
+            for CPU tensor types and the current CUDA device for CUDA tensor types.
+
+    Returns:
+        LieGroup: a :code:`SO3_type` LieGroup Tensor
+
+    Example:
+        >>> pp.randn_SO3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
+        SO3Type Group:
+        tensor([[-0.0060, -0.0517, -0.0070,  0.9986],
+                [ 0.0015,  0.0753,  0.0503,  0.9959]], dtype=torch.float64, requires_grad=True)
+
+    '''
+    return SO3_type.randn(*size, sigma=sigma, **kwargs)
 
 
 def randn_se3(*args, sigma=1, requires_grad=False, **kwargs):
@@ -90,6 +171,7 @@ def identity_RxSO3(*args, **kwargs):
 
 
 def assert_gtype(func):
+    @functools.wraps(func)
     def checker(*args, **kwargs):
         assert isinstance(args[0], LieGroup), "Invalid LieGroup Type."
         out = func(*args, **kwargs)
@@ -136,7 +218,7 @@ def Exp(input):
         LieGroup: The LieGroup Tensor in embedding space
 
     Note:
-        This function :code:`Exp()` is different from :code:`exp()`, which returns
+        This function :func:`Exp()` is different from :func:`exp()`, which returns
         a new torch tensor with the exponential of the elements of the input tensor.
 
     Example:
@@ -196,7 +278,7 @@ def Log(input):
         LieGroup: The LieGroup Tensor in embedding space
 
     Note:
-        This function :code:`Log()` is different from :code:`log()`, which returns
+        This function :func:`Log()` is different from :func:`log()`, which returns
         a new torch tensor with the logarithm of the elements of the input tensor.
 
     Example:
