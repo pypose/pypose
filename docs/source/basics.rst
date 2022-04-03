@@ -1,7 +1,7 @@
 Basics
 ======
 
-.. automodule:: pypose
+.. currentmodule:: pypose
 
 .. autosummary::
     :recursive:
