@@ -279,6 +279,9 @@ class BALayer(nn.Module):
         self.track_normalizer = track_normalizer
 
     def allocate_if_not_enough(self, n_cam_poses, n_points3d):
+        '''
+        n_points3d could be a Tensor on the GPU.
+        '''
         n_cam_poses_ori = self.cam_poses.gshape[0]
 
         if ( n_cam_poses > n_cam_poses_ori ):
@@ -288,11 +291,11 @@ class BALayer(nn.Module):
 
         n_points3d_ori = self.points3d.shape[0]
         if ( n_points3d > n_points3d_ori ):
-            tracks = torch.zeros( (n_points3d, 3), dtype=self.points3d.dtype, device=self.points3d.device )
-            tracks[ :n_points3d_ori, ... ] = self.points3d
-            self.points3d = tracks
+            points = torch.zeros( (n_points3d, 3), dtype=self.points3d.dtype, device=self.points3d.device )
+            points[ :n_points3d_ori, ... ] = self.points3d
+            self.points3d = points
 
-    def forward(self, proj_mats, feats, feat_img, feat_loc, tracks):
+    def forward(self, proj_mats, feats, feat_img, feat_loc, matches):
         '''
         F is number of feature maps, a.k.a, images.
         N is number of features in all feature maps.
@@ -302,7 +305,7 @@ class BALayer(nn.Module):
         feats (Tensor): [F, C, H, W], 2D feature maps statcked along the B channel. 
         feat_img (Tensor): [N, 1], dtype=torch.int64, feature-feature map/image/camera association.
         feat_loc (Tensor): [N, 2], dtype=torch.float, 2D feature locations inside feature map indicated by feat_img.
-        tracks (Tensor): [M, 2], dtype=torch.int64, list of matched features. Lower feature indices come first.
+        matches (Tensor): [M, 2], dtype=torch.int64, list of matched features.
         '''
 
         assert ( self.cameras is not None ), \
@@ -310,14 +313,16 @@ class BALayer(nn.Module):
         assert ( len(self.cameras) == self.cam_poses.shape[0] ), \
             f'len(self.cameras) = {len(self.cameras)}, self.cam_poses.shape = {self.cam_poses.shape}'
 
-        F = feats.shape[0]
-        N = feat_img.shape[0]
+        
+        n_images = feats.shape[0]
+        n_feats  = feat_img.shape[0]
 
         # Find the association between features and 3D points.
-        association = self.find_3d_point_association( F, N, tracks )
+        association = self.find_3d_point_association( n_images, n_feats, matches )
 
-        # Test if we have enough camera poses and tracks.
+        # Test if we have enough camera poses and matches.
         # Allocate more when necessary.
+        self.allocate_if_not_enough( n_images, association.max() + 1 )
 
         
 
@@ -354,29 +359,29 @@ class BALayer(nn.Module):
 
         return association
 
-    def find_3d_point_association(self, n_img, N, tracks):
+    def find_3d_point_association(self, n_img, n_feat, matches):
         '''
         n_img (int): Number of images.
-        N (int): Number of features.
-        tracks (Tensor): [M, 2], dtype=torch.int64, list of matched features. Lower feature indices come first.
+        n_feat (int): Number of features.
+        matches (Tensor): [M, 2], dtype=torch.int64, list of matched features. Lower feature indices come first.
         '''
 
         assert ( n_img > 1 ), f'n_img must > 1, n_img = {n_img}'
-        assert ( N > 1 ), f'N must > 1, N = {N}'
+        assert ( n_feat > 1 ), f'n_feat must > 1, n_feat = {n_feat}'
 
-        device = tracks.device
-        M = tracks.shape[0]
+        device = matches.device
+        M = matches.shape[0]
 
         # Build the adjacency matrix of all the visual features.
-        diag_indices = torch.arange(N, device=device)
+        diag_indices = torch.arange(n_feat, device=device)
         row_indices = torch.cat( 
-            ( tracks[0, :], tracks[1, :], diag_indices ) )
+            ( matches[:, 0], matches[:, 1], diag_indices ) )
         col_indices = torch.cat(
-            ( tracks[1, :], tracks[0, :], diag_indices ) )
-        values = torch.ones( ( M + M + N, ), dtype=torch.float, device=device )
-        
+            ( matches[:, 1], matches[:, 0], diag_indices ) )
+        values = torch.ones( ( M + M + n_feat, ), dtype=torch.float, device=device )
+
         A = torch.sparse_coo_tensor( 
-            (row_indices, col_indices), values, dtype=torch.float, device=device )
+            torch.stack((row_indices, col_indices), dim=0), values, dtype=torch.float, device=device )
         
         # Populate all possible edges between the features.
         T = int_matrix_power(A, n_img)
@@ -387,7 +392,7 @@ class BALayer(nn.Module):
         upper_indices_T = indices_T[:, upper]
 
         # Build the mapping between 3D points and 2D features.
-        association = self.associate_3d_point_indices_2_features( N, upper_indices_T )
+        association = self.associate_3d_point_indices_2_features( n_feat, upper_indices_T )
 
         return association
 

@@ -231,3 +231,48 @@ class Test_ba_layer(unittest.TestCase):
             except Exception as exc:
                 print(exc)
                 self.assertTrue(False, f'BALayer.associate_3d_point_indices_2_features failed with entry {entry}')
+
+    def test_find_3d_point_association(self):
+        print()
+        show_delimeter( inspect.stack()[0][3] )
+
+        # Not fully-matched.
+        raw_matches = [
+            [ 0, 1 ],
+            [ 1, 4 ],
+            [ 4, 5 ],
+            [ 2, 3 ],
+        ]
+
+        # True association.
+        raw_true_association = [ 0, 0, 1, 1, 0, 0 ]
+
+        # Other information.
+        n_img  = 4
+        n_feat = 6
+
+        # Test entries.
+        test_entries = [
+            { 'device': 'cpu' },
+            { 'device': 'cuda' },
+        ]
+
+        for entry in test_entries:
+            print(entry)
+
+            # Create the tracks Tensor.
+            matches = torch.Tensor( raw_matches ).type(torch.int64).to(device=entry['device'])
+
+            # True association.
+            expected = torch.Tensor( raw_true_association ).type(torch.int64).to(device=entry['device'])
+
+            # Find the association.
+            association = Test_ba_layer.common_ba_layer_obj.find_3d_point_association(n_img, n_feat, matches)
+
+            # Compare
+            try:
+                torch_equal( association, expected )
+            except Exception as exc:
+                print(exc)
+                self.assertTrue(False, f'BALayer.find_3d_point_association failed with entry {entry}')
+
