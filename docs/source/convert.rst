@@ -1,7 +1,6 @@
 Convert
 =======
 
-.. automodule:: pypose
 .. currentmodule:: pypose
 
 .. autosummary::

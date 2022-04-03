@@ -2,12 +2,16 @@ LieGroup
 ========
 
 .. currentmodule:: pypose
+
 .. autosummary::
    :toctree: generated
    :nosignatures:
 
+   :template: autosummary/class-no-inherit.rst
    LieGroup
    Parameter
+
+   :template: autosummary/method.rst
    LieGroup.view
    LieGroup.gview
    LieGroup.shape
