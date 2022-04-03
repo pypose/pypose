@@ -4,7 +4,58 @@ from torch import nn
 
 
 class IMUPreintegrator(nn.Module):
-    def __init__(self, position:torch.Tensor, rotation:pp.SO3, velocity:torch.Tensor, gravity=9.81007):
+    r'''
+    Applies preintegration over IMU input signals.
+
+    IMU updates from duration (:math:`\delta t`), angular rate (:math:`\omega`),
+    linear acceleration (:math:`\mathbf{a}`) in body frame, as well as their
+    measurement covariance for angular rate :math:`C_{\omega}` and acceleration
+    :math:`C_{\mathbf{a}}`. Known IMU rotation :math:`R` estimation can also be provided
+    for better precision.
+
+    * Initlization :meth:`__init__`
+
+    Args:
+        position (torch.tensor, optional): initial postion. Default: torch.zeros(3)
+        rotation (pypose.SO3, optional): initial rotation. Default: pypose.identity_SO3()
+        velocity (torch.tensor, optional): initial postion. Default: torch.zeros(3)
+        gravity (float, optional): the gravity acceleration. Default: 9.81007
+
+    * Update function :meth:`update`
+
+    Args:
+        dt (torch.tensor): time interval from last update. Shape: (1)
+        ang (torch.tensor): angular rate (:math:`\omega`) in IMU body frame. Shape: (3)
+        acc (torch.tensor): linear acceleration (:math:`\mathbf{a}`) in IMU body frame. Shape: (3)
+        rot (pypose.SO3, optional): known IMU rotation. Group Shape :code:`gshape`: (1)
+        ang_cov (torch.tensor, optional): covariance matrix of angular rate. Shape: (3, 3).
+            Default: :code:`torch.eye(3)*(1.6968*10**-4)**2` (Adapted from Euroc dataset)
+        acc_cov (torch.tensor, optional): covariance matrix of linear acceleration. Shape: (3, 3).
+            Default: :code:`torch.eye(3)*(2.0*10**-3)**2`  (Adapted from Euroc dataset)
+
+    * Forward function :meth:`forward`
+
+    Args:
+        reset (bool, optional): if reset the preintegrator to initial state. Default: :code:`False`
+
+    Returns:
+        :code:`dict`: A :meth:`dict` contains 4 items: 'pos'tion, 'rot'ation, 'vel'ocity, and 'cov'ariance.
+
+        - 'rot' (pypose.SO3): rotation. Group Shape :code:`gshape`: (1)
+
+        - 'vel' (torch.tensor): velocity. Shape: (3)
+
+        - 'pos' (torch.tensor): postion. Shape: (3)
+
+        - 'cov' (torch.tensor): covariance (order: rotation, velocity, position). Shape: (9, 9)
+
+    Note:
+        Output covariance (Shape: (9, 9)) is in the order of rotation, velocity, and position.
+    '''
+    def __init__(self, position = torch.zeros(3),
+                       rotation = pp.identity_SO3(),
+                       velocity = torch.zeros(3),
+                       gravity = 9.81007):
         super().__init__()
         # Initial status of IMU: (pos)ition, (rot)ation, (vel)ocity, (cov)ariance
         self.register_buffer('gravity', torch.tensor([0, 0, gravity]))
@@ -24,9 +75,9 @@ class IMUPreintegrator(nn.Module):
         self._dr.identity_()
         self._dt.zero_()
 
-    def update(self, dt, ang, acc, rot:pp.SO3=None, ang_cov=None, acc_cov=None, ):
-        """
-        IMU Preintegration from duration (dt), angular rate (ang), linear acclearation (acc)
+    def update(self, dt, ang, acc, rot:pp.SO3=None, ang_cov=None, acc_cov=None):
+        r"""
+        IMU Preintegration from duration (dt), angular rate (ang), linear acceleration (acc)
         Uncertainty propagation from measurement covariance (cov): ang_cov, acc_cov
         Known IMU rotation (rot) estimation can be provided for better precision
         See Eq. A9, A10, A7, A8 in https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf
@@ -67,7 +118,7 @@ class IMUPreintegrator(nn.Module):
         self.cov = A @ self.cov @ A.mT + Bg @ Cg @ Bg.mT / dt + Ba @ Ca @ Ba.mT / dt
 
     def forward(self, reset=True):
-        """
+        r"""
         Propagated IMU status.
         See Eq. 38 in http://rpg.ifi.uzh.ch/docs/TRO16_forster.pdf
         """
@@ -76,4 +127,7 @@ class IMUPreintegrator(nn.Module):
         self.rot = self.rot * self._dr
         if reset is True:
             self.reset()
-        return self.pos.clone(), self.rot.clone(), self.vel.clone() , self.cov.clone()
+        return {'rot':self.rot.clone(),
+                'vel':self.vel.clone(),
+                'pos':self.pos.clone(),
+                'cov':self.cov.clone()}

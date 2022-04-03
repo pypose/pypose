@@ -10,7 +10,7 @@ Welcome to PyPose's documentation!
    liegroup
    basics
    convert
-
+   modules
 
 
 Indices and tables

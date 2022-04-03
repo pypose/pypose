@@ -10,8 +10,6 @@ Basics
 
     Exp
     Log
-    Exp
-    Log
     Inv
     Retr
     Act

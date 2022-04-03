@@ -83,7 +83,7 @@ def mat2SO3(rotation_matrix):
     q = q.view(shape[:-2]+(4,))
     q = q.index_select(-1, torch.tensor([1,2,3,0], device=q.device)) # wxyz -> xyzw
 
-    return SO3(q, **kwargs)
+    return SO3(q)
 
 
 def euler2SO3(euler:torch.Tensor):
