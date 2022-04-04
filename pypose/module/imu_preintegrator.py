@@ -13,20 +13,16 @@ class IMUPreintegrator(nn.Module):
     :math:`C_{\mathbf{a}}`. Known IMU rotation :math:`R` estimation can also be provided
     for better precision.
 
-    Note:
-        Output covariance (Shape: (9, 9)) is in the order of rotation, velocity, and position.
+    Args:
+        position (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
+        rotation (pypose.SO3, optional): initial rotation. Default: :meth:`identity_SO3`
+        velocity (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
+        gravity (float, optional): the gravity acceleration. Default: 9.81007
     """
     def __init__(self, position = torch.zeros(3),
                        rotation = pp.identity_SO3(),
                        velocity = torch.zeros(3),
                        gravity = 9.81007):
-        r"""
-        Args:
-            position (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
-            rotation (pypose.SO3, optional): initial rotation. Default: pypose.identity_SO3()
-            velocity (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
-            gravity (float, optional): the gravity acceleration. Default: 9.81007
-        """
         super().__init__()
         # Initial status of IMU: (pos)ition, (rot)ation, (vel)ocity, (cov)ariance
         self.register_buffer('gravity', torch.tensor([0, 0, gravity]))
@@ -51,7 +47,6 @@ class IMUPreintegrator(nn.Module):
         IMU Preintegration from duration (dt), angular rate (ang), linear acceleration (acc)
         Uncertainty propagation from measurement covariance (cov): ang_cov, acc_cov
         Known IMU rotation (rot) estimation can be provided for better precision
-        See Eq. A9, A10, A7, A8 in https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf
 
         Uncertainty Propagation:
 
@@ -63,16 +58,19 @@ class IMUPreintegrator(nn.Module):
             \end{align*}
 
         Args:
-            dt (torch.Tensor): time interval from last update. Shape: (1)
-            ang (torch.Tensor): angular rate (:math:`\omega`) in IMU body frame. Shape: (3)
+            dt (torch.Tensor): time interval from last update. :code:`shape`: (1)
+            ang (torch.Tensor): angular rate (:math:`\omega`) in IMU body frame. :code:`shape`: (3)
             acc (torch.Tensor): linear acceleration (:math:`\mathbf{a}`) in IMU body frame.
-                Shape: (3)
-            rot (pypose.SO3, optional): known IMU rotation. Group Shape :code:`gshape`: (1)
-            ang_cov (torch.Tensor, optional): covariance matrix of angular rate. Shape: (3, 3).
+                :code:`shape`: (3)
+            rot (pypose.SO3, optional): known IMU rotation. :code:`lshape`: (1)
+            ang_cov (torch.Tensor, optional): covariance matrix of angular rate. :code:`shape`: (3, 3).
                 Default: :code:`torch.eye(3)*(1.6968*10**-4)**2` (Adapted from Euroc dataset)
             acc_cov (torch.Tensor, optional): covariance matrix of linear acceleration.
-                Shape: (3, 3). Default: :code:`torch.eye(3)*(2.0*10**-3)**2`  (Adapted from
+                :code:`shape`: (3, 3). Default: :code:`torch.eye(3)*(2.0*10**-3)**2`  (Adapted from
                 Euroc dataset)
+
+        Refer to Eq. (A9), (A10), (A7), (A8) in
+        `this paper <https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf>`_ for more details.
         """
         dr = pp.so3(ang*dt).Exp()
         if isinstance(rot, pp.LieTensor):
@@ -107,7 +105,6 @@ class IMUPreintegrator(nn.Module):
     def forward(self, reset=True):
         r"""
         Propagated IMU status.
-        See Eq. 38 in http://rpg.ifi.uzh.ch/docs/TRO16_forster.pdf
 
         Args:
             reset (bool, optional): if reset the preintegrator to initial state. Default: :code:`False`
@@ -115,13 +112,18 @@ class IMUPreintegrator(nn.Module):
         Returns:
             :code:`dict`: A :class:`dict` containing 4 items: 'pos'ition, 'rot'ation, 'vel'ocity, and 'cov'ariance.
 
-            - 'rot' (pypose.SO3): rotation. Group Shape :code:`gshape`: (1)
+            - 'rot' (pypose.SO3): rotation. :code:`lshape`: (1)
 
-            - 'vel' (torch.Tensor): velocity. Shape: (3)
+            - 'vel' (torch.Tensor): velocity. :code:`shape`: (3)
 
-            - 'pos' (torch.Tensor): postion. Shape: (3)
+            - 'pos' (torch.Tensor): postion. :code:`shape`: (3)
 
-            - 'cov' (torch.Tensor): covariance (order: rotation, velocity, position). Shape: (9, 9)
+            - 'cov' (torch.Tensor): covariance (order: rotation, velocity, position). :code:`shape`: (9, 9)
+
+        Note:
+            Output covariance (Shape: (9, 9)) is in the order of rotation, velocity, and position.
+
+        Refer to Eq. (38) in `this paper <http://rpg.ifi.uzh.ch/docs/TRO16_forster.pdf>`_ for more details.
         """
         self.pos = self.pos + self.rot @ self._dp + self.vel * self._dt
         self.vel = self.vel + self.rot @ self._dv
