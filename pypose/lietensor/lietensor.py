@@ -377,7 +377,7 @@ class LieTensor(torch.Tensor):
 
             The shape of :code:`Tensor` object should be compatible
             with Lie Type :code:`ltype`, otherwise error will be raised.
-            See following table for more details.
+
         ltype (ltype): Lie Type, either **Lie Group** or **Lie Algebra** is listed below:
 
     .. list-table:: List of :code:`ltype` for **Lie Group**
@@ -432,7 +432,8 @@ class LieTensor(torch.Tensor):
 
     Note:
         Two attributs :code:`shape` and :code:`lshape` are available for LieTensor.
-        The only differece is that the :code:`lshape` ignore the last dimension of :code:`shape`.
+        The only differece is the :code:`lshape` takes the last dimension
+        of :code:`shape` as a single :code:`ltype` item, i.e., :code:`lshape=shape[:-1]`.
 
     Examples:
         >>> import torch

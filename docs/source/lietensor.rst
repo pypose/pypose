@@ -10,6 +10,8 @@ LieTensor
    :template: autosummary/class-no-inherit.rst
    LieTensor
    Parameter
+
+   :template: autosummary/base.rst
    SO3
    so3
    SE3
@@ -18,24 +20,3 @@ LieTensor
    sim3
    RxSO3
    rxso3
-
-   :template: autosummary/method.rst
-   LieTensor.view
-   LieTensor.lview
-   LieTensor.shape
-   LieTensor.lshape
-   LieTensor.tensor
-   LieTensor.matrix
-   LieTensor.translation
-   LieTensor.quaternion
-   LieTensor.identity_
-   LieTensor.__mul__
-   LieTensor.__matmul__
-   LieTensor.Exp
-   LieTensor.Log
-   LieTensor.Inv
-   LieTensor.Retr
-   LieTensor.Act
-   LieTensor.Adj
-   LieTensor.AdjT
-   LieTensor.Jinv
