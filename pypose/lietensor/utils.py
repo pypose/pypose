@@ -338,41 +338,68 @@ def assert_ltype(func):
 
 @assert_ltype
 def Exp(input):
-    r"""The Exponential map for :code:`LieTensor` Tensor.
+    r"""The Exponential map for :code:`LieTensor` (Lie Algebra).
 
     .. math::
-        \exp: \mathcal{g} \mapsto \mathcal{G}
+        \mathrm{Exp}: \mathcal{g} \mapsto \mathcal{G}
 
-    .. list-table:: List of supported :math:`\exp` map
-        :widths: 30 30 30 30
+    Args:
+        input (LieTensor): the input LieTensor (Lie Algebra)
+
+    Return:
+        LieTensor: the output LieTensor (Lie Group)
+
+    .. list-table:: List of supported :math:`\mathrm{Exp}` map
+        :widths: 20 20 8 20 20
         :header-rows: 1
 
         * - input :code:`ltype`
-          - :math:`\mathcal{g}`
-          - :math:`\mathcal{G}`
+          - :math:`\mathcal{g}` (Lie Algebra)
+          - :math:`\mapsto`
+          - :math:`\mathcal{G}` (Lie Group)
           - output :code:`ltype`
         * - :code:`so3_type`
-          - :math:`\mathcal{g}\in\mathbb{R}^3`
-          - :math:`\mathcal{G}\in\mathbb{R}^4`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times4}`
           - :code:`SO3_type`
         * - :code:`se3_type`
-          - :math:`\mathcal{g}\in\mathbb{R}^6`
-          - :math:`\mathcal{G}\in\mathbb{R}^7`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times6}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times7}`
           - :code:`SE3_type`
         * - :code:`sim3_type`
-          - :math:`\mathcal{g}\in\mathbb{R}^7`
-          - :math:`\mathcal{G}\in\mathbb{R}^8`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times7}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times8}`
           - :code:`Sim3_type`
         * - :code:`rxso3_type`
-          - :math:`\mathcal{g}\in\mathbb{R}^4`
-          - :math:`\mathcal{G}\in\mathbb{R}^5`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times5}`
           - :code:`RxSO3_type`
 
-    Args:
-        input (LieTensor): the input LieTensor (Lie Group)
+    * Input :math:`\mathbf{x}`'s :code:`ltype` is :code:`so3_type` (input :math:`\mathbf{x}` is an instance of :meth:`so3`):
 
-    Return:
-        LieTensor: The LieTensor (Lie Algebra)
+        If :math:`\|\mathbf{x}_i\| > \text{eps}`:
+
+        .. math::
+            \mathbf{y}_i = \left[\mathbf{x}_{i,1}\theta_i,
+            \mathbf{x}_{i,2}\theta_i,
+            \mathbf{x}_{i,3}\theta_i,
+            \cos(\frac{\|\mathbf{x}_i\|}{2})\right],
+
+        where :math:`\theta_i = \frac{1}{\|\mathbf{x}_i\|}\sin(\frac{\|\mathbf{x}_i\|}{2})`,
+
+        otherwise:
+
+        .. math::
+            \mathbf{y}_i = \left[\mathbf{x}_{i,1}\theta_i,~
+            \mathbf{x}_{i,2}\theta_i,~
+            \mathbf{x}_{i,3}\theta_i,~
+            1 - \frac{\|\mathbf{x}_i\|^2}{8} + \frac{\|\mathbf{x}_i\|^4}{384} \right],
+
+        where :math:`\theta_i = \frac{1}{2} - \frac{1}{48} \|\mathbf{x}_i\|^2 + \frac{1}{3840} \|\mathbf{x}_i\|^4`.
 
     Note:
         This function :func:`Exp()` is different from :func:`exp()`, which returns
@@ -384,12 +411,16 @@ def Exp(input):
         tensor([[ 0.1366,  0.1370, -1.1921],
                 [-0.6003, -0.2165, -1.6576]], requires_grad=True)
 
+        :meth:`Exp` returns LieTensor :meth:`SO3`.
+
         >>> x.Exp() # equivalent to: pp.Exp(x)
         SO3Type LieTensor:
         tensor([[ 0.0642,  0.0644, -0.5605,  0.8232],
                 [-0.2622, -0.0946, -0.7241,  0.6309]], grad_fn=<AliasBackward0>)
 
-        >>> x.exp() # Note that this returns torch.Tensor
+        :meth:`exp` returns torch tensor.
+
+        >>> x.exp() # Note that this returns torch tensor
         tensor([[1.1463, 1.1469, 0.3036],
                 [0.5486, 0.8053, 0.1906]], grad_fn=<ExpBackward0>)
     """
@@ -398,41 +429,46 @@ def Exp(input):
 
 @assert_ltype
 def Log(input):
-    r"""The Logarithm map for :code:`LieTensor`.
+    r"""The Logarithm map for :code:`LieTensor` (Lie Group).
 
     .. math::
-        \log: \mathcal{G} \mapsto \mathcal{g}
+        \mathrm{Log}: \mathcal{G} \mapsto \mathcal{g}
 
-    .. list-table:: List of supported :math:`\log` map
-        :widths: 30 30 30 30
+    Args:
+        input (LieTensor): the input LieTensor (Lie Group)
+
+    Return:
+        LieTensor: the output LieTensor (Lie Algebra)
+
+    .. list-table:: List of supported :math:`\mathrm{Log}` map
+        :widths: 20 20 8 20 20
         :header-rows: 1
 
         * - input :code:`ltype`
-          - :math:`\mathcal{G}`
-          - :math:`\mathcal{g}`
+          - :math:`\mathcal{G}` (Lie Group)
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}` (Lie Algebra)
           - output :code:`ltype`
         * - :code:`SO3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^4`
+          - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^3`
           - :code:`so3_type`
         * - :code:`SE3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^7`
+          - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^6`
           - :code:`se3_type`
         * - :code:`Sim3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^8`
+          - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^7`
           - :code:`sim3_type`
         * - :code:`RxSO3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^5`
+          - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^4`
           - :code:`rxso3_type`
-
-    Args:
-        input (LieTensor): the input LieTensor in form of Lie Group
-
-    Return:
-        LieTensor: The LieTensor  in form of Lie Algebra
 
     Note:
         This function :func:`Log()` is different from :func:`log()`, which returns
@@ -444,10 +480,14 @@ def Log(input):
         tensor([[-0.1420,  0.1088,  0.5904,  0.7871],
                 [ 0.1470, -0.3328,  0.0580,  0.9297]], requires_grad=True)
 
+        :meth:`Log` returns LieTensor :meth:`so3`.
+
         >>> x.Log() # equivalent to: pp.Log(x)
         so3Type LieTensor:
         tensor([[-0.3060,  0.2344,  1.2724],
                 [ 0.3012, -0.6817,  0.1187]], grad_fn=<AliasBackward0>)
+
+        :meth:`log` returns torch tensor.
 
         >>> x.log() # Note that this returns torch.Tensor
         tensor([[    nan, -2.2184, -0.5270, -0.2395],
