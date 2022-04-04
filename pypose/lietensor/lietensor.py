@@ -364,7 +364,7 @@ RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
 
 
 class LieTensor(torch.Tensor):
-    r""" The Base Class for LieTensor
+    r""" A sub-class of :code:`torch.Tensor` to represent Lie Algebra and Lie Group.
 
     Returns:
         LieTensor in form of Lie Type (Inherited from torch.Tensor)

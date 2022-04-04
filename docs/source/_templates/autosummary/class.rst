@@ -1,7 +1,7 @@
 .. currentmodule:: {{ module }}
 
 
-{{ name | escape | underline }}
+{{ fullname | escape | underline }}
 
 .. autoclass:: {{ name }}
     :inherited-members:
