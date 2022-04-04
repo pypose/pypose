@@ -1,7 +1,7 @@
 #include <torch/extension.h>
 #include <vector>
-#include "liegroup_gpu.h"
-#include "liegroup_cpu.h"
+#include "lietensor_gpu.h"
+#include "lietensor_cpu.h"
 
 
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")

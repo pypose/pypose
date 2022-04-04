@@ -1,5 +1,5 @@
 import torch
-import liegroup_backends as backend
+import lietensor_backends as backend
 
 
 class GroupOp(torch.autograd.Function):

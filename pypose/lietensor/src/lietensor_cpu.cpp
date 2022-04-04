@@ -1,5 +1,5 @@
 
-#include "liegroup_cpu.h"
+#include "lietensor_cpu.h"
 #include <Eigen/Dense>
 
 #include <iostream>

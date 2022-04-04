@@ -1,7 +1,7 @@
 import torch
 from torch import nn
-from .group_ops import exp, log, inv, mul, adj
-from .group_ops import adjT, jinv, act3, act4, toMatrix
+from .backends import exp, log, inv, mul, adj
+from .backends import adjT, jinv, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
 from .basics import cumops_, cummul_, cumprod_
 

@@ -1,10 +1,10 @@
 import torch
 import functools
-from .groups import  LieTensor
-from .groups import SE3_type, se3_type
-from .groups import SO3_type, so3_type
-from .groups import Sim3_type, sim3_type
-from .groups import RxSO3_type, rxso3_type
+from .lietensor import  LieTensor
+from .lietensor import SE3_type, se3_type
+from .lietensor import SO3_type, so3_type
+from .lietensor import Sim3_type, sim3_type
+from .lietensor import RxSO3_type, rxso3_type
 
 
 SO3 = functools.partial(LieTensor, ltype=SO3_type)

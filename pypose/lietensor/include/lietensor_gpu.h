@@ -1,6 +1,6 @@
 
-#ifndef LIEGROUP_GPU_H_
-#define LIEGROUP_GPU_H_
+#ifndef LIETENSOR_GPU_H_
+#define LIETENSOR_GPU_H_
 
 #include <vector>
 #include <torch/extension.h>

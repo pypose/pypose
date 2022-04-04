@@ -7,7 +7,7 @@ Welcome to PyPose's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   liegroup
+   lietensor
    basics
    convert
    modules
