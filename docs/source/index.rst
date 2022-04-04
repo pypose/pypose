@@ -1,6 +1,6 @@
 .. PyPose documentation master file
 
-Welcome to PyPose's documentation!
+PyPose Documentation
 ==================================
 
 .. toctree::

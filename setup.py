@@ -18,7 +18,7 @@ setup(
         CUDAExtension('lietensor_backends', 
             include_dirs=[
                 osp.join(ROOT, 'pypose/lietensor/include'),
-                osp.join(ROOT, 'pypose/lietensor/eigen')],
+                osp.join(ROOT, 'pypose/eigen')],
             sources=[
                 'pypose/lietensor/src/lietensor.cpp',
                 'pypose/lietensor/src/lietensor_gpu.cu',
