@@ -70,7 +70,7 @@ class IMUPreintegrator(nn.Module):
                 Euroc dataset)
 
         Refer to Eq. (A9), (A10), (A7), (A8) in
-        `this paper <https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf>`_ for more details.
+        `this RSS paper <https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf>`_ for more details.
         """
         dr = pp.so3(ang*dt).Exp()
         if isinstance(rot, pp.LieTensor):
@@ -123,7 +123,7 @@ class IMUPreintegrator(nn.Module):
         Note:
             Output covariance (Shape: (9, 9)) is in the order of rotation, velocity, and position.
 
-        Refer to Eq. (38) in `this paper <http://rpg.ifi.uzh.ch/docs/TRO16_forster.pdf>`_ for more details.
+        Refer to Eq. (38) in `this TRO paper <http://rpg.ifi.uzh.ch/docs/TRO16_forster.pdf>`_ for more details.
         """
         self.pos = self.pos + self.rot @ self._dp + self.vel * self._dt
         self.vel = self.vel + self.rot @ self._dv
