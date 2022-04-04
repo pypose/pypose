@@ -374,6 +374,28 @@ def Exp(input):
     Return:
         LieTensor: The LieTensor (Lie Algebra)
 
+    * Input :code:`ltype` is :code:`so3_type` (input is :meth:`so3`):
+
+        If :math:`\|\mathbf{x}_i\| > \text{eps}`:
+
+        .. math::
+            \mathbf{y}_i = \left[\mathbf{x}_{i,1}\theta_i,
+            \mathbf{x}_{i,2}\theta_i,
+            \mathbf{x}_{i,3}\theta_i,
+            \cos(\frac{\|\mathbf{x}_i\|}{2})\right],
+
+        where :math:`\theta_i = \frac{1}{\|\mathbf{x}_i\|}\sin(\frac{\|\mathbf{x}_i\|}{2})`,
+
+        otherwise:
+
+        .. math::
+            \mathbf{y}_i = \left[\mathbf{x}_{i,1}\theta_i,~
+            \mathbf{x}_{i,2}\theta_i,~
+            \mathbf{x}_{i,3}\theta_i,~
+            1 - \frac{\|\mathbf{x}_i\|^2}{8} + \frac{\|\mathbf{x}_i\|^4}{384} \right],
+
+        where :math:`\theta_i = \frac{1}{2} - \frac{1}{48} \|\mathbf{x}_i\|^2 + \frac{1}{3840} \|\mathbf{x}_i\|^4`.
+
     Note:
         This function :func:`Exp()` is different from :func:`exp()`, which returns
         a new torch tensor with the exponential of the elements of the input tensor.
