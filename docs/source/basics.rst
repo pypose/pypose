@@ -4,7 +4,6 @@ Basics
 .. currentmodule:: pypose
 
 .. autosummary::
-    :recursive:
     :toctree: generated
     :nosignatures:
 
