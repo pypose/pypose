@@ -19,7 +19,7 @@ def mat2SO3(rotation_matrix):
         >>> input = torch.eye(3).repeat(2, 1, 1) # N x 3 x 3
         >>> output = pp.mat2SO3(input)           # N x 4
         >>> output
-        SO3Type Group:
+        SO3Type LieTensor:
         tensor([[0., 0., 0., 1.],
                 [0., 0., 0., 1.]])
     """
@@ -102,7 +102,7 @@ def euler2SO3(euler:torch.Tensor):
     Examples:
         >>> input = torch.randn(2, 3, requires_grad=True, dtype=torch.float64)
         >>> pp.euler2SO3(input)
-        SO3Type Group:
+        SO3Type LieTensor:
         tensor([[-0.4873,  0.1162,  0.4829,  0.7182],
                 [ 0.3813,  0.4059, -0.2966,  0.7758]], grad_fn=<AliasBackward0>)
     """
@@ -119,4 +119,4 @@ def euler2SO3(euler:torch.Tensor):
                      cr * sp * cy + sr * cp * sy,
                      cr * cp * sy - sr * sp * cy,
                      cr * cp * cy + sr * sp * sy], dim=-1)
-    return SO3(q).gview(*shape[:-1])
+    return SO3(q).lview(*shape[:-1])

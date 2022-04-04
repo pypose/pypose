@@ -1,5 +1,5 @@
-LieGroup
-========
+LieTensor
+=========
 
 .. currentmodule:: pypose
 
@@ -8,34 +8,34 @@ LieGroup
    :nosignatures:
 
    :template: autosummary/class-no-inherit.rst
-   LieGroup
+   LieTensor
    Parameter
    SO3
    so3
    SE3
    se3
-   SIM3
    Sim3
+   sim3
    RxSO3
    rxso3
 
    :template: autosummary/method.rst
-   LieGroup.view
-   LieGroup.gview
-   LieGroup.shape
-   LieGroup.gshape
-   LieGroup.tensor
-   LieGroup.matrix
-   LieGroup.translation
-   LieGroup.quaternion
-   LieGroup.identity_
-   LieGroup.__mul__
-   LieGroup.__matmul__
-   LieGroup.Exp
-   LieGroup.Log
-   LieGroup.Inv
-   LieGroup.Retr
-   LieGroup.Act
-   LieGroup.Adj
-   LieGroup.AdjT
-   LieGroup.Jinv
+   LieTensor.view
+   LieTensor.lview
+   LieTensor.shape
+   LieTensor.lshape
+   LieTensor.tensor
+   LieTensor.matrix
+   LieTensor.translation
+   LieTensor.quaternion
+   LieTensor.identity_
+   LieTensor.__mul__
+   LieTensor.__matmul__
+   LieTensor.Exp
+   LieTensor.Log
+   LieTensor.Inv
+   LieTensor.Retr
+   LieTensor.Act
+   LieTensor.Adj
+   LieTensor.AdjT
+   LieTensor.Jinv

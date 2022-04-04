@@ -9,4 +9,3 @@ Modules
 
    :template: autosummary/class-no-inherit.rst
    IMUPreintegrator
-

@@ -88,7 +88,7 @@ class IMUPreintegrator(nn.Module):
           = A @ C @ A + Bg @ Cg @ Bg.T + Ba @ Ca @ Ba.T
         """
         dr = pp.so3(ang*dt).Exp()
-        if isinstance(rot, pp.LieGroup):
+        if isinstance(rot, pp.LieTensor):
             a = acc - rot.Inv() @ self.gravity
         else:
             a = acc - (self.rot * self._dr * dr).Inv() @ self.gravity

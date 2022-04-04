@@ -1,35 +1,35 @@
 import torch
 import functools
-from .groups import  LieGroup
+from .groups import  LieTensor
 from .groups import SE3_type, se3_type
 from .groups import SO3_type, so3_type
 from .groups import Sim3_type, sim3_type
 from .groups import RxSO3_type, rxso3_type
 
 
-SO3 = functools.partial(LieGroup, gtype=SO3_type)
-so3 = functools.partial(LieGroup, gtype=so3_type)
-SE3 = functools.partial(LieGroup, gtype=SE3_type)
-se3 = functools.partial(LieGroup, gtype=se3_type)
-Sim3 = functools.partial(LieGroup, gtype=Sim3_type)
-sim3 = functools.partial(LieGroup, gtype=sim3_type)
-RxSO3 = functools.partial(LieGroup, gtype=RxSO3_type)
-rxso3 = functools.partial(LieGroup, gtype=rxso3_type)
+SO3 = functools.partial(LieTensor, ltype=SO3_type)
+so3 = functools.partial(LieTensor, ltype=so3_type)
+SE3 = functools.partial(LieTensor, ltype=SE3_type)
+se3 = functools.partial(LieTensor, ltype=se3_type)
+Sim3 = functools.partial(LieTensor, ltype=Sim3_type)
+sim3 = functools.partial(LieTensor, ltype=sim3_type)
+RxSO3 = functools.partial(LieTensor, ltype=RxSO3_type)
+rxso3 = functools.partial(LieTensor, ltype=rxso3_type)
 
 
 def randn_like(input, sigma=1, **kwargs):
     r'''
-    Returns a LieGroup tensor with the same size as input that is filled with random
-    LieGroup tensor that satisfies the corresponding :code:`input.gtype`.
+    Returns a LieTensor with the same size as input that is filled with random
+    LieTensor that satisfies the corresponding :code:`input.ltype`.
 
     The corresponding random generator can be
 
-    .. list-table:: List of available random LieGroup generator of input :code:`gtype`.
+    .. list-table:: List of available random LieTensor generator of input :code:`ltype`.
         :widths: 25 25 30 30 30
         :header-rows: 1
 
         * - Name
-          - gtype
+          - ltype
           - randn function
           - Manifold
           - randn function
@@ -56,7 +56,7 @@ def randn_like(input, sigma=1, **kwargs):
 
     Args:
 
-        input (LieGroup): the size of input will determine size of the output tensor.
+        input (LieTensor): the size of input will determine size of the output tensor.
 
         dtype (torch.dtype, optional): the desired data type of returned Tensor.
             Default: if None, defaults to the dtype of input.
@@ -86,20 +86,20 @@ def randn_like(input, sigma=1, **kwargs):
         .. code::
 
             pp.randn_like(x)
-            pp.randn_SO3(x.gshape, dtype=x.dtype, layout=x.layout, device=x.device)
+            pp.randn_SO3(x.lshape, dtype=x.dtype, layout=x.layout, device=x.device)
 
     Example:
         >>> x = pp.so3(torch.tensor([0, 0, 0]))
         >>> pp.randn_like(x)
-        so3Type Group:
+        so3Type LieTensor:
         tensor([0.8970, 0.0943, 0.1399])
     '''
-    return input.gtype.randn_like(*input.gshape, sigma=sigma, **kwargs)
+    return input.ltype.randn_like(*input.lshape, sigma=sigma, **kwargs)
 
 
 def randn_so3(*size, sigma=1, **kwargs):
     r'''
-    Returns :code:`so3_type` LieGroup tensor filled with random numbers from a normal
+    Returns :code:`so3_type` LieTensor filled with random numbers from a normal
     distribution with mean 0 and variance :code:`sigma` (also called the standard normal distribution).
 
     .. math::
@@ -130,11 +130,11 @@ def randn_so3(*size, sigma=1, **kwargs):
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
     Returns:
-        LieGroup: a :code:`so3_type` LieGroup Tensor
+        LieTensor: a :code:`so3_type` LieTensor
 
     Example:
         >>> pp.randn_so3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
-        so3Type Group:
+        so3Type LieTensor:
         tensor([[-0.0427, -0.0149,  0.0948],
                 [ 0.0607,  0.0473,  0.0703]], dtype=torch.float64, requires_grad=True)
     '''
@@ -143,8 +143,8 @@ def randn_so3(*size, sigma=1, **kwargs):
 
 def randn_SO3(*size, sigma=1, **kwargs):
     r'''
-    Returns :code:`SO3_type` LieGroup tensor filled with the Exponential map of the random
-    :code:`so3_type` LieGroup tensor with normal distribution with mean 0 and variance :code:`sigma`.
+    Returns :code:`SO3_type` LieTensor filled with the Exponential map of the random
+    :code:`so3_type` LieTensor with normal distribution with mean 0 and variance :code:`sigma`.
 
     .. math::
         \mathrm{out}_i = \mathrm{Exp}(\mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma}_{3\times 1}))
@@ -174,11 +174,11 @@ def randn_SO3(*size, sigma=1, **kwargs):
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
     Returns:
-        LieGroup: a :code:`SO3_type` LieGroup Tensor
+        LieTensor: a :code:`SO3_type` LieTensor
 
     Example:
         >>> pp.randn_SO3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
-        SO3Type Group:
+        SO3Type LieTensor:
         tensor([[-0.0060, -0.0517, -0.0070,  0.9986],
                 [ 0.0015,  0.0753,  0.0503,  0.9959]], dtype=torch.float64, requires_grad=True)
 
@@ -188,7 +188,7 @@ def randn_SO3(*size, sigma=1, **kwargs):
 
 def randn_se3(*size, sigma=1, **kwargs):
     r'''
-    Returns :code:`se3_type` LieGroup tensor filled with random numbers from a normal
+    Returns :code:`se3_type` LieTensor filled with random numbers from a normal
     distribution with mean 0 and variance :code:`sigma` (also called the standard normal distribution).
 
     .. math::
@@ -219,11 +219,11 @@ def randn_se3(*size, sigma=1, **kwargs):
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
     Returns:
-        LieGroup: a :code:`se3_type` LieGroup Tensor
+        LieTensor: a :code:`se3_type` LieTensor
 
     Example:
         >>> pp.randn_se3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
-        se3Type Group:
+        se3Type LieTensor:
         tensor([[-0.0599, -0.0593,  0.0809,  0.0352, -0.2173,  0.0342],
                 [-0.0226, -0.1081,  0.0270,  0.1368, -0.0327, -0.2052]],
             dtype=torch.float64, requires_grad=True)
@@ -233,8 +233,8 @@ def randn_se3(*size, sigma=1, **kwargs):
 
 def randn_SE3(*size, sigma=1, **kwargs):
     r'''
-    Returns :code:`SE3_type` LieGroup tensor filled with the Exponential map of the random
-    :code:`se3_type` LieGroup tensor with normal distribution with mean 0 and variance :code:`sigma`.
+    Returns :code:`SE3_type` LieTensor filled with the Exponential map of the random
+    :code:`se3_type` LieTensor with normal distribution with mean 0 and variance :code:`sigma`.
 
     .. math::
         \mathrm{out}_i = \mathrm{Exp}(\mathcal{N}(\mathbf{0}_{6\times 1}, \mathbf{\sigma}_{6\times 1}))
@@ -264,11 +264,11 @@ def randn_SE3(*size, sigma=1, **kwargs):
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
     Returns:
-        LieGroup: a :code:`SE3_type` LieGroup Tensor
+        LieTensor: a :code:`SE3_type` LieTensor
 
     Example:
         >>> pp.randn_SE3(2, sigma=0.1)
-        SE3Type Group:
+        SE3Type LieTensor:
         tensor([[-0.0522, -0.0456, -0.1996,  0.0266, -0.0240, -0.0375,  0.9987],
                 [-0.1344, -0.1673,  0.1111, -0.0219, -0.0454,  0.0710,  0.9962]])
     '''
@@ -292,7 +292,7 @@ def randn_RxSO3(*size, sigma=1, **kwargs):
 
 
 def identity_like(liegroup, **kwargs):
-    return liegroup.gtype.identity_like(*liegroup.gshape, **kwargs)
+    return liegroup.ltype.identity_like(*liegroup.lshape, **kwargs)
 
 
 def identity_SO3(*size, **kwargs):
@@ -327,18 +327,18 @@ def identity_RxSO3(*size, **kwargs):
     return RxSO3_type.identity(*size, **kwargs)
 
 
-def assert_gtype(func):
+def assert_ltype(func):
     @functools.wraps(func)
     def checker(*args, **kwargs):
-        assert isinstance(args[0], LieGroup), "Invalid LieGroup Type."
+        assert isinstance(args[0], LieTensor), "Invalid LieTensor Type."
         out = func(*args, **kwargs)
         return out
     return checker
 
 
-@assert_gtype
+@assert_ltype
 def Exp(input):
-    r"""The Exponential map for :code:`LieGroup` Tensor.
+    r"""The Exponential map for :code:`LieTensor` Tensor.
 
     .. math::
         \exp: \mathcal{g} \mapsto \mathcal{G}
@@ -347,10 +347,10 @@ def Exp(input):
         :widths: 30 30 30 30
         :header-rows: 1
 
-        * - input :code:`gtype`
+        * - input :code:`ltype`
           - :math:`\mathcal{g}`
           - :math:`\mathcal{G}`
-          - output :code:`gtype`
+          - output :code:`ltype`
         * - :code:`so3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^3`
           - :math:`\mathcal{G}\in\mathbb{R}^4`
@@ -369,10 +369,10 @@ def Exp(input):
           - :code:`RxSO3_type`
 
     Args:
-        input (LieGroup): the input LieGroup Tensor on manifold
+        input (LieTensor): the input LieTensor (Lie Group)
 
     Return:
-        LieGroup: The LieGroup Tensor in embedding space
+        LieTensor: The LieTensor (Lie Algebra)
 
     Note:
         This function :func:`Exp()` is different from :func:`exp()`, which returns
@@ -380,12 +380,12 @@ def Exp(input):
 
     Example:
         >>> x = pp.randn_so3(2, requires_grad=True)
-        so3Type Group:
+        so3Type LieTensor:
         tensor([[ 0.1366,  0.1370, -1.1921],
                 [-0.6003, -0.2165, -1.6576]], requires_grad=True)
 
         >>> x.Exp() # equivalent to: pp.Exp(x)
-        SO3Type Group:
+        SO3Type LieTensor:
         tensor([[ 0.0642,  0.0644, -0.5605,  0.8232],
                 [-0.2622, -0.0946, -0.7241,  0.6309]], grad_fn=<AliasBackward0>)
 
@@ -396,9 +396,9 @@ def Exp(input):
     return input.Exp()
 
 
-@assert_gtype
+@assert_ltype
 def Log(input):
-    r"""The Logarithm map for :code:`LieGroup` Tensor.
+    r"""The Logarithm map for :code:`LieTensor`.
 
     .. math::
         \log: \mathcal{G} \mapsto \mathcal{g}
@@ -407,10 +407,10 @@ def Log(input):
         :widths: 30 30 30 30
         :header-rows: 1
 
-        * - input :code:`gtype`
+        * - input :code:`ltype`
           - :math:`\mathcal{G}`
           - :math:`\mathcal{g}`
-          - output :code:`gtype`
+          - output :code:`ltype`
         * - :code:`SO3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^4`
           - :math:`\mathcal{G}\in\mathbb{R}^3`
@@ -429,10 +429,10 @@ def Log(input):
           - :code:`rxso3_type`
 
     Args:
-        input (LieGroup): the input LieGroup Tensor on manifold
+        input (LieTensor): the input LieTensor in form of Lie Group
 
     Return:
-        LieGroup: The LieGroup Tensor in embedding space
+        LieTensor: The LieTensor  in form of Lie Algebra
 
     Note:
         This function :func:`Log()` is different from :func:`log()`, which returns
@@ -440,12 +440,12 @@ def Log(input):
 
     Example:
         >>> x = pp.randn_SO3(2, requires_grad=True)
-        SO3Type Group:
+        SO3Type LieTensor:
         tensor([[-0.1420,  0.1088,  0.5904,  0.7871],
                 [ 0.1470, -0.3328,  0.0580,  0.9297]], requires_grad=True)
 
         >>> x.Log() # equivalent to: pp.Log(x)
-        so3Type Group:
+        so3Type LieTensor:
         tensor([[-0.3060,  0.2344,  1.2724],
                 [ 0.3012, -0.6817,  0.1187]], grad_fn=<AliasBackward0>)
 
@@ -456,36 +456,36 @@ def Log(input):
     return input.Log()
 
 
-@assert_gtype
+@assert_ltype
 def Inv(x):
     return x.Inv()
 
 
-@assert_gtype
+@assert_ltype
 def Mul(x, y):
     return x * y
 
 
-@assert_gtype
+@assert_ltype
 def Retr(X, a):
     return X.Retr(a)
 
 
-@assert_gtype
+@assert_ltype
 def Act(X, p):
     return X.Act(p)
 
 
-@assert_gtype
+@assert_ltype
 def Adj(X, a):
     return X.Adj(a)
 
 
-@assert_gtype
+@assert_ltype
 def AdjT(X, a):
     return X.AdjT(a)
 
 
-@assert_gtype
+@assert_ltype
 def Jinv(X, a):
     return X.Jinv(a)
