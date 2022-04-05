@@ -24,6 +24,6 @@ More details can be found at [rst markdown](https://www.sphinx-doc.org/en/master
 
 3. Create a pull request.
 
-# 2. Contributing to New Features
+## 2. Contributing to New Features
 
 Create a pull request. More details to be added.
