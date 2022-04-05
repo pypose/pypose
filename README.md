@@ -15,7 +15,7 @@ To rebuild pypose, run`rm -rf build/ **/*.so` to clean the previous build first.
     git clone --recursive https://github.com/pypose/pypose.git
     cd pypose && python setup.py develop
 
-## 2. For contributors
+## 2. For Contributors
 
 2.1 Make sure the above installation is correct. 
 
