@@ -7,18 +7,14 @@ import unittest
 # System tools.
 import numpy as np
 
+# Test utils.
+from tests.unit_tests.common import ( torch_equal, show_delimeter )
+
 # PyTorch
 import torch
 
 # The test subject.
 from pypose.module import ba_layer
-
-# Construct a convenient helper function.
-torch_equal = functools.partial( 
-    torch.testing.assert_close, atol=0, rtol=1e-6 )
-
-def show_delimeter(msg):
-    print(f'========== {msg} ==========')
 
 class Test_ba_layer_standalone_functions(unittest.TestCase):
     def test_sparse_eye(self):
