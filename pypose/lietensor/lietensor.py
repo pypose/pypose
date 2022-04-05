@@ -366,9 +366,6 @@ RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
 class LieTensor(torch.Tensor):
     r""" A sub-class of :code:`torch.Tensor` to represent Lie Algebra and Lie Group.
 
-    Returns:
-        LieTensor in form of Lie Type (Inherited from torch.Tensor)
-
     Args:
         data (:code:`Tensor`, or :code:`list`, or ':code:`int`...'): A
             :code:`Tensor` object, or constructing a :code:`Tensor`
@@ -379,6 +376,9 @@ class LieTensor(torch.Tensor):
             with Lie Type :code:`ltype`, otherwise error will be raised.
 
         ltype (ltype): Lie Type, either **Lie Group** or **Lie Algebra** is listed below:
+
+    Returns:
+        LieTensor corresponding to Lie Type :code:`ltype`.
 
     .. list-table:: List of :code:`ltype` for **Lie Group**
         :widths: 25 25 30 30

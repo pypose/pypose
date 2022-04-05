@@ -15,7 +15,7 @@ class IMUPreintegrator(nn.Module):
 
     Args:
         position (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
-        rotation (pypose.SO3, optional): initial rotation. Default: :meth:`identity_SO3`
+        rotation (pypose.SO3, optional): initial rotation. Default: :meth:`pypose.identity_SO3`
         velocity (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
         gravity (float, optional): the gravity acceleration. Default: 9.81007
     """
@@ -110,7 +110,7 @@ class IMUPreintegrator(nn.Module):
             reset (bool, optional): if reset the preintegrator to initial state. Default: :code:`False`
 
         Returns:
-            :code:`dict`: A :class:`dict` containing 4 items: 'pos'ition, 'rot'ation, 'vel'ocity, and 'cov'ariance.
+            :code:`dict`: A :class:`dict` containing 4 items: 'rot'ation, 'vel'ocity, 'pos'ition, and 'cov'ariance.
 
             - 'rot' (pypose.SO3): rotation. :code:`lshape`: (1)
 
