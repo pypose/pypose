@@ -2,22 +2,26 @@ import torch
 from .utils import SO3, so3
 
 
-def mat2SO3(rotation_matrix, **kwargs):
-    """Convert 3x3 or 3x4 rotation matrix to SO3 group (by quaternion)
+def mat2SO3(rotation_matrix):
+    r"""Convert 3x3 or 3x4 rotation matrices to SO3 group
 
     Args:
         rotation_matrix (Tensor): the rotation matrix to convert.
 
     Return:
-        Tensor: the SO3 group in quaternion
+        Tensor: SO3 Tensor
 
     Shape:
-        - Input: :math:`(*, 3, 3)` or '(*, 3, 4)'
-        - Output: :math:`(*, 4)`
+        - Input: :code:`(*, 3, 3)` or :code:`(*, 3, 4)`
+        - Output: :code:`(*, 4)`
 
-    Example:
-        >>> input = torch.rand(4, 3, 3)  # Nx3x3
-        >>> output = pp.mat2SO3(input)  # Nx4
+    Examples:
+        >>> input = torch.eye(3).repeat(2, 1, 1) # N x 3 x 3
+        >>> output = pp.mat2SO3(input)           # N x 4
+        >>> output
+        SO3Type LieTensor:
+        tensor([[0., 0., 0., 1.],
+                [0., 0., 0., 1.]])
     """
     if not torch.is_tensor(rotation_matrix):
         rotation_matrix = torch.tensor(rotation_matrix)
@@ -77,13 +81,31 @@ def mat2SO3(rotation_matrix, **kwargs):
                     t2_rep * mask_c2 + t3_rep * mask_c3)  # noqa
 
     q = q.view(shape[:-2]+(4,))
-    q = q.index_select(-1, torch.tensor([1,2,3,0])) # wxyz -> xyzw
+    q = q.index_select(-1, torch.tensor([1,2,3,0], device=q.device)) # wxyz -> xyzw
 
-    return SO3(q, **kwargs)
+    return SO3(q)
 
 
-def euler2SO3(euler:torch.Tensor, **kwargs):
-    # euler: (*, 3) in sequence of roll, pitch, yaw
+def euler2SO3(euler:torch.Tensor):
+    r"""Convert Euler angles to SO3 Tensor
+
+    Args:
+        euler (Tensor): the euler angles to convert.
+
+    Return:
+        Tensor: SO3 Tensor
+
+    Shape:
+        - Input: :code:`(*, 3)`
+        - Output: :code:`(*, 4)`
+
+    Examples:
+        >>> input = torch.randn(2, 3, requires_grad=True, dtype=torch.float64)
+        >>> pp.euler2SO3(input)
+        SO3Type LieTensor:
+        tensor([[-0.4873,  0.1162,  0.4829,  0.7182],
+                [ 0.3813,  0.4059, -0.2966,  0.7758]], grad_fn=<AliasBackward0>)
+    """
     if not torch.is_tensor(euler):
         euler = torch.tensor(euler)
     assert euler.shape[-1] == 3
@@ -97,4 +119,4 @@ def euler2SO3(euler:torch.Tensor, **kwargs):
                      cr * sp * cy + sr * cp * sy,
                      cr * cp * sy - sr * sp * cy,
                      cr * cp * cy + sr * sp * sy], dim=-1)
-    return SO3(q, **kwargs).gview(*shape[:-1])
+    return SO3(q).lview(*shape[:-1])

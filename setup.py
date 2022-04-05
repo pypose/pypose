@@ -6,7 +6,7 @@ from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 ROOT = osp.dirname(osp.abspath(__file__))
 
 setup(
-    name='pypose', 
+    name='pypose',
     version='0.1.1',
     description='PyPose = (GTSAM | G2O) x PyTorch',
     author='Chen Wang',
@@ -15,14 +15,14 @@ setup(
     url = 'pypose.org',
     author_email = 'chenwang@dr.com',
     ext_modules=[
-        CUDAExtension('liegroup_backends', 
+        CUDAExtension('lietensor_backends', 
             include_dirs=[
-                osp.join(ROOT, 'pypose/liegroup/group/include'), 
-                osp.join(ROOT, 'pypose/liegroup/eigen')],
+                osp.join(ROOT, 'pypose/lietensor/include'),
+                osp.join(ROOT, 'pypose/eigen')],
             sources=[
-                'pypose/liegroup/group/src/liegroup.cpp', 
-                'pypose/liegroup/group/src/liegroup_gpu.cu',
-                'pypose/liegroup/group/src/liegroup_cpu.cpp'],
+                'pypose/lietensor/src/lietensor.cpp',
+                'pypose/lietensor/src/lietensor_gpu.cu',
+                'pypose/lietensor/src/lietensor_cpu.cpp'],
             extra_compile_args={
                 'cxx': ['-O2'], 
                 'nvcc': ['-O2',
@@ -34,14 +34,14 @@ setup(
                 ]
             }),
 
-        CUDAExtension('liegroup_extras', 
+        CUDAExtension('lietensor_extras',
             sources=[
-                'pypose/liegroup/group/extras/altcorr_kernel.cu',
-                'pypose/liegroup/group/extras/corr_index_kernel.cu',
-                'pypose/liegroup/group/extras/se3_builder.cu',
-                'pypose/liegroup/group/extras/se3_inplace_builder.cu',
-                'pypose/liegroup/group/extras/se3_solver.cu',
-                'pypose/liegroup/group/extras/extras.cpp',
+                'pypose/lietensor/extras/altcorr_kernel.cu',
+                'pypose/lietensor/extras/corr_index_kernel.cu',
+                'pypose/lietensor/extras/se3_builder.cu',
+                'pypose/lietensor/extras/se3_inplace_builder.cu',
+                'pypose/lietensor/extras/se3_solver.cu',
+                'pypose/lietensor/extras/extras.cpp',
             ],
             extra_compile_args={
                 'cxx': ['-O2'], 

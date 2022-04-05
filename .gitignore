@@ -131,3 +131,6 @@ dmypy.json
 
 # Visual Studio Code.
 *.code-workspace
+
+# sphinx
+docs/source/generated

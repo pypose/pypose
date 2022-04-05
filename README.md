@@ -12,3 +12,5 @@ PyPose = (GTSAM | G2O) x PyTorch
 
     git clone --recursive https://github.com/pypose/pypose.git
     cd pypose && python setup.py develop
+
+To rebuild the pypose, run`rm -rf build/ **/*.so` to clean the previous build first.

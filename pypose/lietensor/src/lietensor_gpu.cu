@@ -1,5 +1,5 @@
 
-#include "liegroup_gpu.h"
+#include "lietensor_gpu.h"
 #include <Eigen/Dense>
 
 #include "common.h"

@@ -77,10 +77,9 @@ if __name__ == '__main__':
             poses_gt.append(pos_gt.to(args.device))
             integrator.update(dt, ang, acc, rot)
             if idx % args.integrating_step == 0:
-                # Cov order is R, V, P
-                pos, rot, vel, cov = integrator()
-                poses.append(pos)
-                covs.append(cov)
+                states = integrator()
+                poses.append(states['pos'])
+                covs.append(states['cov'])
         poses = torch.cat(poses).cpu().numpy()
         poses_gt = torch.cat(poses_gt).cpu().numpy()
         covs = torch.stack(covs).cpu().numpy()

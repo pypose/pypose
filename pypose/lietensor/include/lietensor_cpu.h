@@ -1,6 +1,6 @@
 
-#ifndef LIEGROUP_CPU_H_
-#define LIEGROUP_CPU_H_
+#ifndef LIETENSOR_CPU_H_
+#define LIETENSOR_CPU_H_
 
 #include <vector>
 #include <torch/extension.h>

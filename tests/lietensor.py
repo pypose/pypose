@@ -5,7 +5,7 @@ import pypose as pp
 torch.manual_seed(0)
 torch.cuda.manual_seed(0)
 
-x = pp.so3(torch.randn(3,3)*0.1, requires_grad=True)
+x = pp.so3(torch.randn(3,3)*0.1)
 y = pp.randn_so3(3, sigma=0.1, dtype=torch.float64, requires_grad=True, device="cuda")
 a = pp.randn_se3(3, sigma=0.1, requires_grad=True)
 b = pp.SE3_type.randn(3, sigma=0.1, requires_grad=True)
@@ -15,7 +15,7 @@ assert y.is_leaf and x.is_leaf and a.is_leaf and b.is_leaf
 (pp.Log(y.Exp())**2).sin().sum().backward()
 
 print(y)
-print(y.shape)
+print(y.lshape)
 print(y.grad)
 
 def count_parameters(model):
@@ -144,8 +144,8 @@ s.Exp() * S
 X = pp.randn_SE3(8, requires_grad=True, dtype=torch.double)
 print(X.matrix())
 print(X.translation())
-assert hasattr(X.view(2,4,7), 'gtype')
-X.gview(2,4)
+assert hasattr(X.view(2,4,7), 'ltype')
+X.lview(2,4)
 print(X)
 
 
@@ -155,17 +155,17 @@ from torch.overrides import get_overridable_functions
 func_dict = get_overridable_functions()
 
 Z = torch.cat([X,Y], dim=0)
-assert isinstance(Z, pp.LieGroup)
-assert isinstance(torch.stack([X,Y], dim=0), pp.LieGroup)
+assert isinstance(Z, pp.LieTensor)
+assert isinstance(torch.stack([X,Y], dim=0), pp.LieTensor)
 
 print(torch.stack([X,Y], dim=0))
 Z1, Z2 = Z.split([2,2], dim=0)
-assert isinstance(Z1, pp.LieGroup)
-assert isinstance(Z2, pp.LieGroup)
-assert not isinstance(torch.randn(4), pp.LieGroup)
+assert isinstance(Z1, pp.LieTensor)
+assert isinstance(Z2, pp.LieTensor)
+assert not isinstance(torch.randn(4), pp.LieTensor)
 
 a, b = Z.tensor_split(2)
-assert isinstance(a, pp.LieGroup) and isinstance(b, pp.LieGroup)
+assert isinstance(a, pp.LieTensor) and isinstance(b, pp.LieTensor)
 
 x = pp.randn_SO3(4)
 print(x)
@@ -177,13 +177,13 @@ print(x.to("cuda"))
 
 a = pp.randn_SE3()
 y = a.sin()
-print(type(a.sin().as_subclass(torch.Tensor))) # <class 'pypose.liegroup.group.groups.LieGroup'>
+print(type(a.sin().as_subclass(torch.Tensor))) # <class 'pypose.liegroup.group.groups.LieTensor'>
 print(type(y))
 print(y)
 
 a = pp.randn_SE3(requires_grad=True)
 b = a.sin()
-print(type(b)) # <class 'pypose.liegroup.group.groups.LieGroup'>
+print(type(b)) # <class 'pypose.liegroup.group.groups.LieTensor'>
 c = torch.autograd.grad(b.sum(), a)
 print(type(c[0])) #
 print(type(a.tensor()))
@@ -205,3 +205,25 @@ print(X)
 euler = torch.randn(5,3).cuda()
 X = pp.euler2SO3(euler)
 print(X)
+
+for i in range(128):
+    x = torch.randn(4, 5, device="cuda:0")
+    dim = torch.randint(0, 2, (1,)).item()
+    assert torch.allclose(x.cumsum(dim=dim), pp.cumops(x, dim, lambda a, b : a + b), atol=1e-07)
+
+for i in range(1, 1000):
+    x = torch.randn(i, dtype=torch.float64)
+    print(i, torch.allclose(x.cumsum(0), pp.cumops(x, 0, lambda a, b : a + b)))
+
+x = pp.randn_SE3(2)
+print(x, pp.cumprod(x, dim=0))
+
+x = pp.randn_SE3(3)
+print(x, x.cumprod(dim=0))
+print(x)
+x.cumprod_(dim=0)
+print(x)
+
+generator = torch.Generator()
+x = pp.randn_so3(1, 2, sigma= 0.1, generator=generator, dtype=torch.float16)
+print(x)
