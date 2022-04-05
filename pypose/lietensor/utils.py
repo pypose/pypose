@@ -559,3 +559,8 @@ def AdjT(X, a):
 @assert_ltype
 def Jinv(X, a):
     return X.Jinv(a)
+
+
+@assert_ltype
+def Jr(x):
+    return x.Jr()
