@@ -1,12 +1,8 @@
-# Table of Contents
+# For developers
 
-- [Writing documentation](#writing-documentation)
+## 1. Contributing to Documentation
 
-## Writing documentation
-
-You may follow the [Google style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html) when writing docstrings for Python script files. New doc pages written in [reStructuredText markdown](https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html) can be added under [`docs/source`](docs/source). Make sure to refer to the newly added page in the body or `toctree` of an existing page.
-
-### Build docs locally
+## 1.1 Build docs locally
 
 Sphinx docs come with a makefile build system. To preview, build PyPose locally and
 
@@ -16,4 +12,18 @@ pip install -r requirements.txt
 make html
 ```
 
-The HTML pages are then built to `docs/build/html`.
+Then open the generated HTML page: `docs/build/index.html`.
+
+
+## 1.2 Writing documentation
+
+1. For the most simple case, you only need to edit the Python script files and add docstring to the functions and classes following the [Google style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html).
+
+2. Sometimes you may need to edit the rst files [like this](docs/source/lietensor.rst), e.g., adding a new doc page.
+More details for its usage can be found at [rst markdown](https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html).
+
+3. Create a pull request.
+
+# 2. Contributing to New Features
+
+Create a pull request. More details to be added.
