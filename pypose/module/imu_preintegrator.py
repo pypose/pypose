@@ -107,7 +107,7 @@ class IMUPreintegrator(nn.Module):
         Propagated IMU status.
 
         Args:
-            reset (bool, optional): if reset the preintegrator to initial state. Default: :code:`False`
+            reset (bool, optional): if reset the preintegrator to initial state. Default: :code:`True`
 
         Returns:
             :code:`dict`: A :class:`dict` containing 4 items: 'rot'ation, 'vel'ocity, 'pos'ition, and 'cov'ariance.
