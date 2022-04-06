@@ -62,12 +62,26 @@ class IMUPreintegrator(nn.Module):
             ang (torch.Tensor): angular rate (:math:`\omega`) in IMU body frame. :code:`shape`: (3)
             acc (torch.Tensor): linear acceleration (:math:`\mathbf{a}`) in IMU body frame.
                 :code:`shape`: (3)
-            rot (pypose.SO3, optional): known IMU rotation. :code:`lshape`: (1)
+            rot (pypose.SO3, optional): known IMU rotation, see following example. :code:`lshape`: (1)
             ang_cov (torch.Tensor, optional): covariance matrix of angular rate. :code:`shape`: (3, 3).
                 Default: :code:`torch.eye(3)*(1.6968*10**-4)**2` (Adapted from Euroc dataset)
             acc_cov (torch.Tensor, optional): covariance matrix of linear acceleration.
                 :code:`shape`: (3, 3). Default: :code:`torch.eye(3)*(2.0*10**-3)**2`  (Adapted from
                 Euroc dataset)
+
+        Example:
+
+            .. list-table:: 
+
+                * - .. figure:: /_static/img/module/imu/imu-known-rot.png
+                        :width: 300
+
+                    Fig. 1. Known Rotation.
+
+                  - .. figure:: /_static/img/module/imu/imu-unknown-rot.png
+                        :width: 300
+
+                    Fig. 2. Estimated Rotation.
 
         Refer to Eq. (A9), (A10), (A7), (A8) in
         `this RSS paper <https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf>`_ for more details.
