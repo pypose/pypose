@@ -4,7 +4,11 @@ PyPose = (GTSAM | G2O) x PyTorch
 ## 1. For Early Users
 
 1.1 Requirement:
-
+    
+[PyTorch 1.11+](https://pytorch.org/get-started/locally/) is required.
+    
+Additionally, install:
+   
     sudo apt-get update -y
     sudo apt-get install -y ninja-build
 
