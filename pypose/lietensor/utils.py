@@ -469,10 +469,41 @@ def Log(input):
           - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^4`
           - :code:`rxso3_type`
-
+    
     Note:
         This function :func:`Log()` is different from :func:`log()`, which returns
         a new torch tensor with the logarithm of the elements of the input tensor.
+
+    * :code:`SO3` :math:`\mapsto` :code:`so3` map. Input :math:`\mathbf{x}`'s :code:`ltype` is :code:`SO3_type` (input :math:`\mathbf{x}` is an instance of :meth:`SO3`):
+
+        Let :math:`w`, :math:`\boldsymbol{\nu}` be the scalar and vector parts of :math:`\mathbf{x}`, respectively; :math:`\mathbf{y}` be the output with :code:`so3_type`.
+
+        If :math:`\|\boldsymbol{\nu}\| > \text{eps}`:
+
+            .. math::
+                \mathbf{y} = \left\{
+                                \begin{array}{ll} 
+                                    2\frac{\mathrm{atan}(\|\boldsymbol{\nu}\|/w)}{\|\mathbf{\nu}\|}\boldsymbol{\nu}, \quad \|w\| > \text{eps} \\
+                                    \pm\frac{\pi}{\|\boldsymbol{\nu}\|}\boldsymbol{\nu}, \quad \|w\| \leq \text{eps}
+                                \end{array}
+                             \right.
+
+        otherwise:
+
+        .. math::
+            \mathbf{y} = 2\left( \frac{1}{w} - \frac{\|\boldsymbol{\nu}\|^2}{3w^3}\right)\boldsymbol{\nu}.
+
+    Note:
+        Atan-based log thanks to C. Hertzberg et al.:"Integrating Generic Sensor Fusion Algorithms with 
+        Sound State Representation through Encapsulation of Manifolds" Information Fusion, 2011. Intuitively, :math:`\boldsymbol{\nu}` is used to define the rotation 
+        axis and :math:`w` to define the angle of rotation. Hence, if a measure of the rotation angle is :math:`\theta`, the quaternion with unit norm can be written as 
+
+            .. math::
+                \mathbf{q} = \left[\sin(\theta/2) \mathbf{n}, \cos(\theta/2) \right]
+
+        where :math:`\mathbf{n}` is the unit vector along the rotation axis. 
+
+        Therefore, :math:`\|\boldsymbol{\nu}\| = \sin(\theta/2)`, :math:`\mathrm{atan}(\|\boldsymbol{\nu}\|/w) = \theta/2`
 
     Example:
         >>> x = pp.randn_SO3(2, requires_grad=True)
@@ -492,6 +523,96 @@ def Log(input):
         >>> x.log() # Note that this returns torch.Tensor
         tensor([[    nan, -2.2184, -0.5270, -0.2395],
                 [-1.9171,     nan, -2.8478, -0.0729]], grad_fn=<LogBackward0>)
+
+                
+    * :code:`SE3` :math:`\mapsto` :code:`se3` map. Input :math:`\mathbf{x}`'s :code:`ltype` is :code:`SE3_type` (input :math:`\mathbf{x}` is an instance of :meth:`SE3`):
+
+        Let :math:`\mathbf{t}`, :math:`\mathbf{q}` be the translation and rotation parts of :math:`\mathbf{x}`, respectively; :math:`\mathbf{y}` be the output with :code:`se3_type`.
+
+        .. math::
+            \mathbf{y} = \left[\mathbf{J}^{-1}\mathbf{t}, \mathbf{q}.\mathrm{Log}() \right],
+
+        where :math:`\mathbf{J}` is the Jacobian matrix.
+
+    Example:
+        >>> x = pp.randn_SE3(2, requires_grad=True)
+        SE3Type LieTensor:
+        tensor([[ 0.0648,  0.3764, -1.4237,  0.3287,  0.2104, -0.4227,  0.8179],
+        [ 0.8046, -0.3559, -0.7221, -0.4576, -0.5232,  0.3643,  0.6198]], requires_grad=True)
+
+        :meth:`Log` returns LieTensor :meth:`se3`.
+
+        >>> x.Log() # equivalent to: pp.Log(x)
+        se3Type LieTensor:
+        tensor([[ 0.2958, -0.0840, -1.4733,  0.7004,  0.4483, -0.9009],
+                [ 0.0850, -0.1020, -1.2616, -1.0524, -1.2031,  0.8377]], grad_fn=<AliasBackward0>)
+
+        :meth:`log` returns torch tensor.
+
+        >>> x.log() # Note that this returns torch.Tensor
+        tensor([[-2.7358, -0.9771,     nan, -1.1126, -1.5588,     nan, -0.2010],
+                [-0.2174,     nan,     nan,     nan,     nan, -1.0098, -0.4784]], grad_fn=<LogBackward0>)
+        
+
+    * :code:`RxSO3` :math:`\mapsto` :code:`rxso3` map. Input :math:`\mathbf{x}`'s :code:`ltype` is :code:`RxSO3_type` (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`):
+
+        Let :math:`\mathbf{q}`, :math:`s` be the rotation and scale parts of :math:`\mathbf{x}`, respectively; :math:`\mathbf{y}` be the output with :code:`rxso3_type`.
+
+        .. math::
+            \mathbf{y} = \left[\mathbf{q}.\mathrm{Log}(), \log(s) \right].
+
+    Example:
+        >>> x = pp.randn_RxSO3(2, requires_grad=True)
+        RxSO3Type LieTensor:
+        tensor([[-0.5035,  0.1290, -0.8188,  0.2436,  1.7175],
+                [ 0.2842, -0.1558, -0.3545,  0.8771,  2.9936]], requires_grad=True)
+
+
+        :meth:`Log` returns LieTensor :meth:`rxso3`.
+
+        >>> x.Log() # equivalent to: pp.Log(x)
+        rxso3Type LieTensor:
+        tensor([[-1.3755,  0.3525, -2.2367,  0.5409],
+                [ 0.5929, -0.3250, -0.7394,  1.0965]], grad_fn=<AliasBackward0>)
+
+
+        :meth:`log` returns torch tensor.
+
+        >>> x.log() # Note that this returns torch.Tensor
+        tensor([[    nan, -2.0477,     nan, -1.4121,  0.5409],
+                [-1.2581,     nan,     nan, -0.1311,  1.0965]], grad_fn=<LogBackward0>)
+
+
+    * :code:`Sim3` :math:`\mapsto` :code:`sim3` map. Input :math:`\mathbf{x}`'s :code:`ltype` is :code:`Sim3_type` (input :math:`\mathbf{x}` is an instance of :meth:`Sim3`):
+
+        Let :math:`\mathbf{t}`, :math:`\mathbf{q}s` be the translation and :code:`RxSO3` parts of :math:`\mathbf{x}`, respectively; :math:`\mathbf{y}` be the output with :code:`sim3_type`.
+
+        .. math::
+            \mathbf{y} = \left[\mathbf{J}_s^{-1}\mathbf{t}, \mathbf{q}s.\mathrm{Log}() \right],
+
+        where :math:`\mathbf{J}_s` is the similarity transformed Jacobian matrix.
+
+    Example:
+        >>> x = pp.randn_Sim3(2, requires_grad=True)
+        Sim3Type LieTensor:
+        tensor([[ 0.0624, -0.2797,  0.1231,  0.0803,  0.2879,  0.5486,  0.7808,  0.5272],
+                [-0.5700,  1.4452, -0.4464,  0.2679,  0.7336,  0.6245, -0.0061,  2.3336]], requires_grad=True)
+
+
+        :meth:`Log` returns LieTensor :meth:`sim3`.
+
+        >>> x.Log() # equivalent to: pp.Log(x)
+        sim3Type LieTensor:
+        tensor([[-0.1747, -0.3698,  0.2000,  0.1735,  0.6220,  1.1852, -0.6402],
+                [-0.8685, -0.1717,  1.2139, -0.8385, -2.2957, -1.9545,  0.8474]], grad_fn=<AliasBackward0>)
+
+
+        :meth:`log` returns torch tensor.
+
+        >>> x.log() # Note that this returns torch.Tensor
+        tensor([[-2.7741,     nan, -2.0947, -2.5220, -1.2451, -0.6004, -0.2474, -0.6402],
+                [    nan,  0.3683,     nan, -1.3170, -0.3098, -0.4707,     nan,  0.8474]], grad_fn=<LogBackward0>)
+
     """
     return input.Log()
 
