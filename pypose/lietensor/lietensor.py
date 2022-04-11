@@ -19,16 +19,16 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
 
 
 class LieType:
-    '''Lie Group Type Base Class'''
-    def __init__(self, groud, dimension, embedding, manifold):
-        self._group     = groud     # Group ID
+    '''LieTensor Type Base Class'''
+    def __init__(self, lid, dimension, embedding, manifold):
+        self._lid       = lid                     # LieType ID
         self._dimension = torch.Size([dimension]) # Data dimension
         self._embedding = torch.Size([embedding]) # Embedding dimension
         self._manifold  = torch.Size([manifold])  # Manifold dimension
 
     @property
-    def group(self):
-        return self._group
+    def lid(self):
+        return self._lid
 
     @property
     def dimension(self):
@@ -48,18 +48,18 @@ class LieType:
 
     def Log(self, X):
         if self.on_manifold:
-            raise AttributeError("Manifold Type has no Log attribute")
+            raise AttributeError("Lie Algebra has no Log attribute")
         raise NotImplementedError("Instance has no Log attribute.")
 
     def Exp(self, x):
         if not self.on_manifold:
-            raise AttributeError("Embedding Type has no Exp attribute")
+            raise AttributeError("Lie Group has no Exp attribute")
         raise NotImplementedError("Instance has no Exp attribute.")
 
     def Inv(self, x):
         if self.on_manifold:
             return LieTensor(-x, ltype=x.ltype)
-        out = self.__op__(self.group, inv, x)
+        out = self.__op__(self.lid, inv, x)
         return LieTensor(out, ltype=x.ltype)
 
     def Act(self, x, p):
@@ -67,12 +67,12 @@ class LieType:
         assert not self.on_manifold and isinstance(p, torch.Tensor)
         assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
         act = act3 if p.shape[-1]==3 else act4
-        return self.__op__(self.group, act, x, p)
+        return self.__op__(self.lid, act, x, p)
 
     def Mul(self, x, y):
         # Transform on transform
         if not self.on_manifold and isinstance(y, LieTensor) and not y.ltype.on_manifold:
-            out = self.__op__(self.group, mul, x, y)
+            out = self.__op__(self.lid, mul, x, y)
             return LieTensor(out, ltype=x.ltype)
         # Transform on points
         if not self.on_manifold and isinstance(y, torch.Tensor):
@@ -86,46 +86,46 @@ class LieType:
 
     def Retr(self, X, a):
         if self.on_manifold:
-            raise AttributeError("Gtype has no Retr attribute")
+            raise AttributeError("Has no Retr attribute")
         return a.Exp() * X
 
     def Adj(self, X, a):
         ''' X * Exp(a) = Exp(Adj) * X '''
         if self.on_manifold:
-            raise AttributeError("Gtype has no Adj attribute")
+            raise AttributeError("Has no Adj attribute")
         assert not X.ltype.on_manifold and a.ltype.on_manifold
-        assert X.ltype.group == a.ltype.group
-        out = self.__op__(self.group, adj, X, a)
+        assert X.ltype.lid == a.ltype.lid
+        out = self.__op__(self.lid, adj, X, a)
         return LieTensor(out, ltype=a.ltype)
 
     def AdjT(self, X, a):
         ''' Exp(a) * X = X * Exp(AdjT) '''
         if self.on_manifold:
-            raise AttributeError("Gtype has no AdjT attribute")
-        assert not X.ltype.on_manifold and a.ltype.on_manifold, "Gtype Invalid"
-        assert X.ltype.group == a.ltype.group, "Gtype Invalid"
-        out = self.__op__(self.group, adjT, X, a)
+            raise AttributeError("Has no AdjT attribute")
+        assert not X.ltype.on_manifold and a.ltype.on_manifold, "ltype Invalid"
+        assert X.ltype.lid == a.ltype.lid, "ltype Invalid"
+        out = self.__op__(self.lid, adjT, X, a)
         return LieTensor(out, ltype=a.ltype)
 
     def Jinv(self, X, a):
         if self.on_manifold:
-            raise AttributeError("Gtype has no Jinv attribute")
-        return self.__op__(self.group, jinv, X, a)
+            raise AttributeError("ltype has no Jinv attribute")
+        return self.__op__(self.lid, jinv, X, a)
 
-    def matrix(self, gtensor):
+    def matrix(self, lietensor):
         """ To 4x4 matrix """
-        X = gtensor.Exp() if self.on_manifold else gtensor
+        X = lietensor.Exp() if self.on_manifold else lietensor
         I = torch.eye(4, dtype=X.dtype, device=X.device)
         I = I.view([1] * (X.dim() - 1) + [4, 4])
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
 
-    def translation(self, gtensor):
+    def translation(self, lietensor):
         """ To translation """
-        X = gtensor.Exp() if self.on_manifold else gtensor
+        X = lietensor.Exp() if self.on_manifold else lietensor
         p = torch.tensor([0., 0., 0.], dtype=X.dtype, device=X.device)
         return X.Act(p.view([1] * (X.dim() - 1) + [3,]))
 
-    def quaternion(self, gtensor):
+    def quaternion(self, lietensor):
         raise NotImplementedError('quaternion not implemented yet')
 
     @classmethod
@@ -143,9 +143,9 @@ class LieType:
         return sigma * torch.randn(*(tuple(args)+self.manifold), **kwargs)
 
     @classmethod
-    def __op__(cls, group, op, x, y=None):
+    def __op__(cls, lid, op, x, y=None):
         inputs, out_shape = cls.__broadcast_inputs(x, y)
-        out = op.apply(group, *inputs)
+        out = op.apply(lid, *inputs)
         dim = -1 if out.nelement() != 0 else x.shape[-1]
         return out.view(out_shape + (dim,))
 
@@ -191,7 +191,7 @@ class SO3Type(LieType):
         super().__init__(1, 4, 4, 3)
 
     def Log(self, X):
-        x = self.__op__(self.group, log, X)
+        x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=so3_type)
 
     @classmethod
@@ -220,7 +220,7 @@ class so3Type(LieType):
         super().__init__(1, 3, 4, 3)
 
     def Exp(self, x):
-        X = self.__op__(self.group, exp, x)
+        X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=SO3_type)
 
     @classmethod
@@ -231,9 +231,9 @@ class so3Type(LieType):
         data = super().randn(*size, sigma=sigma, **kwargs).detach()
         return LieTensor(data, ltype=so3_type).requires_grad_(requires_grad)
 
-    def matrix(self, gtensor):
+    def matrix(self, lietensor):
         """ To 3x3 matrix """
-        X = gtensor.Exp()
+        X = lietensor.Exp()
         I = torch.eye(3, dtype=X.dtype, device=X.device)
         I = I.view([1] * (X.dim() - 1) + [3, 3])
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
@@ -257,7 +257,7 @@ class SE3Type(LieType):
         super().__init__(3, 7, 7, 6)
 
     def Log(self, X):
-        x = self.__op__(self.group, log, X)
+        x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=se3_type)
 
     @classmethod
@@ -275,7 +275,7 @@ class se3Type(LieType):
         super().__init__(3, 6, 7, 6)
 
     def Exp(self, x):
-        X = self.__op__(self.group, exp, x)
+        X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=SE3_type)
 
     @classmethod
@@ -292,7 +292,7 @@ class Sim3Type(LieType):
         super().__init__(4, 8, 8, 7)
 
     def Log(self, X):
-        x = self.__op__(self.group, log, X)
+        x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=sim3_type)
 
     @classmethod
@@ -310,7 +310,7 @@ class sim3Type(LieType):
         super().__init__(4, 7, 8, 7)
 
     def Exp(self, x):
-        X = self.__op__(self.group, exp, x)
+        X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=Sim3_type)
 
     @classmethod
@@ -327,7 +327,7 @@ class RxSO3Type(LieType):
         super().__init__(2, 5, 5, 4)
 
     def Log(self, X):
-        x = self.__op__(self.group, log, X)
+        x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=rxso3_type)
 
     @classmethod
@@ -345,7 +345,7 @@ class rxso3Type(LieType):
         super().__init__(2, 4, 5, 4)
 
     def Exp(self, x):
-        X = self.__op__(self.group, exp, x)
+        X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=RxSO3_type)
 
     @classmethod
@@ -364,10 +364,7 @@ RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
 
 
 class LieTensor(torch.Tensor):
-    r""" The Base Class for LieTensor
-
-    Returns:
-        LieTensor in form of Lie Type (Inherited from torch.Tensor)
+    r""" A sub-class of :code:`torch.Tensor` to represent Lie Algebra and Lie Group.
 
     Args:
         data (:code:`Tensor`, or :code:`list`, or ':code:`int`...'): A
@@ -379,6 +376,9 @@ class LieTensor(torch.Tensor):
             with Lie Type :code:`ltype`, otherwise error will be raised.
 
         ltype (ltype): Lie Type, either **Lie Group** or **Lie Algebra** is listed below:
+
+    Returns:
+        LieTensor corresponding to Lie Type :code:`ltype`.
 
     .. list-table:: List of :code:`ltype` for **Lie Group**
         :widths: 25 25 30 30
@@ -431,9 +431,10 @@ class LieTensor(torch.Tensor):
           - :meth:`rxso3`
 
     Note:
-        Two attributs :code:`shape` and :code:`lshape` are available for LieTensor.
-        The only differece is the :code:`lshape` takes the last dimension
-        of :code:`shape` as a single :code:`ltype` item, i.e., :code:`lshape=shape[:-1]`.
+        In most of the cases, Lie Group should be used. Lie Algebra is used only
+        when it needs to be optimized by back-propagation via gradients: in this
+        case, LieTensor is taken as :meth:`pypose.Parameter` in a module, which follows
+        PyTorch traditions.
 
     Examples:
         >>> import torch
@@ -483,6 +484,11 @@ class LieTensor(torch.Tensor):
         so3Type LieTensor:
         tensor([[-1.5948,  0.3113, -0.9807]], device='cuda:0', dtype=torch.float64,
             grad_fn=<AliasBackward0>)
+
+    Note:
+        Two attributs :code:`shape` and :code:`lshape` are available for LieTensor.
+        The only differece is the :code:`lshape` hides the last dimension of :code:`shape`,
+        since :code:`lshape` takes the data in the last dimension as a single :code:`ltype` item.
     """
     def __init__(self, *data, ltype:LieType):
         tensor = data[0] if isinstance(data[0], torch.Tensor) else torch.Tensor(*data)
@@ -504,13 +510,13 @@ class LieTensor(torch.Tensor):
         ltypes = (torch.Tensor if t is LieTensor or Parameter else t for t in types)
         data = torch.Tensor.__torch_function__(func, ltypes, args, kwargs)
         if data is not None and func.__name__ in HANDLED_FUNCTIONS:
-            liegroup = args
-            while not isinstance(liegroup, LieTensor):
-                liegroup = liegroup[0]
+            lietensor = args
+            while not isinstance(lietensor, LieTensor):
+                lietensor = lietensor[0]
             if isinstance(data, (tuple, list)):
-                return (LieTensor(item, ltype=liegroup.ltype)
+                return (LieTensor(item, ltype=lietensor.ltype)
                         if isinstance(item, torch.Tensor) else item for item in data)
-            return LieTensor(data, ltype=liegroup.ltype)
+            return LieTensor(data, ltype=lietensor.ltype)
         return data
 
     @property
@@ -522,7 +528,8 @@ class LieTensor(torch.Tensor):
             torch.Size
 
         Note:
-            - The only difference from :code:`tensor.shape` is the last dimension is hidden.
+            - The only difference from :code:`shape` is the last dimension is hidden,
+              since :code:`lshape` takes the last dimension as a single :code:`ltype` item.
 
             - The last dimension can also be accessed via :code:`LieTensor.ltype.dimension`.
 

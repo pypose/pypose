@@ -227,3 +227,7 @@ print(x)
 generator = torch.Generator()
 x = pp.randn_so3(1, 2, sigma= 0.1, generator=generator, dtype=torch.float16)
 print(x)
+
+x = pp.randn_so3(2,2)
+x.Jr()
+pp.Jr(x)

@@ -7,4 +7,4 @@ Modules
    :nosignatures:
 
    :template: autosummary/class-no-inherit.rst
-   IMUPreintegrator
+   module.IMUPreintegrator

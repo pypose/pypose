@@ -8,14 +8,44 @@ from .lietensor import RxSO3_type, rxso3_type
 
 
 SO3 = functools.partial(LieTensor, ltype=SO3_type)
-so3 = functools.partial(LieTensor, ltype=so3_type)
-SE3 = functools.partial(LieTensor, ltype=SE3_type)
-se3 = functools.partial(LieTensor, ltype=se3_type)
-Sim3 = functools.partial(LieTensor, ltype=Sim3_type)
-sim3 = functools.partial(LieTensor, ltype=sim3_type)
-RxSO3 = functools.partial(LieTensor, ltype=RxSO3_type)
-rxso3 = functools.partial(LieTensor, ltype=rxso3_type)
+SO3.__doc__ = r'''
+Alias of LieTensor for SO3.
+'''
 
+so3 = functools.partial(LieTensor, ltype=so3_type)
+so3.__doc__ = r'''
+Alias of LieTensor for so3.
+'''
+
+SE3 = functools.partial(LieTensor, ltype=SE3_type)
+SE3.__doc__ = r'''
+Alias of LieTensor for SE3.
+'''
+
+se3 = functools.partial(LieTensor, ltype=se3_type)
+se3.__doc__ = r'''
+Alias of LieTensor for se3.
+'''
+
+Sim3 = functools.partial(LieTensor, ltype=Sim3_type)
+Sim3.__doc__ = r'''
+Alias of LieTensor for Sim3.
+'''
+
+sim3 = functools.partial(LieTensor, ltype=sim3_type)
+sim3.__doc__ = r'''
+Alias of LieTensor for sim3.
+'''
+
+RxSO3 = functools.partial(LieTensor, ltype=RxSO3_type)
+RxSO3.__doc__ = r'''
+Alias of LieTensor for RxSO3.
+'''
+
+rxso3 = functools.partial(LieTensor, ltype=rxso3_type)
+rxso3.__doc__ = r'''
+Alias of LieTensor for rxso3.
+'''
 
 def randn_like(input, sigma=1, **kwargs):
     r'''
@@ -650,3 +680,8 @@ def AdjT(X, a):
 @assert_ltype
 def Jinv(X, a):
     return X.Jinv(a)
+
+
+@assert_ltype
+def Jr(x):
+    return x.Jr()
