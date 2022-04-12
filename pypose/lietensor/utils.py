@@ -480,24 +480,24 @@ def Log(input):
           - :math:`\mathcal{g}` (Lie Algebra)
           - output :code:`ltype`
         * - :code:`SO3_type`
-          - :math:`\mathcal{g}\in\mathbb{R}^4`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :math:`\mapsto`
-          - :math:`\mathcal{G}\in\mathbb{R}^3`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times3}`
           - :code:`so3_type`
         * - :code:`SE3_type`
-          - :math:`\mathcal{g}\in\mathbb{R}^7`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times7}`
           - :math:`\mapsto`
-          - :math:`\mathcal{G}\in\mathbb{R}^6`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times6}`
           - :code:`se3_type`
         * - :code:`Sim3_type`
-          - :math:`\mathcal{g}\in\mathbb{R}^8`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times8}`
           - :math:`\mapsto`
-          - :math:`\mathcal{G}\in\mathbb{R}^7`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times7}`
           - :code:`sim3_type`
         * - :code:`RxSO3_type`
-          - :math:`\mathcal{g}\in\mathbb{R}^5`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times5}`
           - :math:`\mapsto`
-          - :math:`\mathcal{G}\in\mathbb{R}^4`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times4}`
           - :code:`rxso3_type`
     
     Note:
@@ -507,75 +507,76 @@ def Log(input):
     * If input :math:`\mathbf{x}`'s :code:`ltype` is :code:`SO3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`SO3`):
 
-        Let :math:`w`, :math:`\boldsymbol{\nu}` be the scalar and vector parts of
-        :math:`\mathbf{x}`, respectively; :math:`\mathbf{y}` be the output.
+        Let :math:`w_i`, :math:`\boldsymbol{\nu}_i` be the scalar and vector parts of
+        :math:`\mathbf{x}_i`, respectively; :math:`\mathbf{y}` be the output.
 
-        If :math:`\|\boldsymbol{\nu}\| > \text{eps}`:
+        If :math:`\|\boldsymbol{\nu}_i\| > \text{eps}`:
 
             .. math::
-                \mathbf{y} = \left\{
+                \mathbf{y}_i = \left\{
                                 \begin{array}{ll} 
-                                    2\frac{\mathrm{atan}(\|\boldsymbol{\nu}\|/w)}{\|
-                                    \mathbf{\nu}\|}\boldsymbol{\nu}, \quad \|w\| > \text{eps} \\
-                                    \pm\frac{\pi}{\|\boldsymbol{\nu}\|}\boldsymbol{\nu},
-                                    \quad \|w\| \leq \text{eps}
+                                    2\frac{\mathrm{arctan}(\|\boldsymbol{\nu}_i\|/w_i)}{\|
+                                    \boldsymbol{\nu}_i\|}\boldsymbol{\nu}_i, \quad \|w_i\| > \text{eps}, \\
+                                    \mathrm{sign}(w_i) \frac{\pi}{\|\boldsymbol{\nu}_i\|}\boldsymbol{\nu}_i,
+                                    \quad \|w_i\| \leq \text{eps},
                                 \end{array}
                              \right.
 
         otherwise:
 
         .. math::
-            \mathbf{y} = 2\left( \frac{1}{w} - \frac{\|\boldsymbol{\nu}\|^2}{3w^3}\right)\boldsymbol{\nu}.
+            \mathbf{y}_i = 2\left( \frac{1}{w_i} - \frac{\|\boldsymbol{\nu}_i\|^2}{3w_i^3}\right)\boldsymbol{\nu}_i.
 
     * If input :math:`\mathbf{x}`'s :code:`ltype` is :code:`SE3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`SE3`):
 
-        Let :math:`\mathbf{t}`, :math:`\mathbf{q}` be the translation and rotation parts of
-        :math:`\mathbf{x}`, respectively; :math:`\mathbf{y}` be the output.
+        Let :math:`\mathbf{t}_i`, :math:`\mathbf{q}_i` be the translation and rotation parts of
+        :math:`\mathbf{x}_i`, respectively; :math:`\mathbf{y}` be the output.
 
         .. math::
-            \mathbf{y} = \left[\mathbf{J}^{-1}\mathbf{t}, \mathrm{Log}(\mathbf{q}) \right],
+            \mathbf{y}_i = \left[\mathbf{J}_i^{-1}\mathbf{t}_i, \mathrm{Log}(\mathbf{q}_i) \right],
 
         where :math:`\mathrm{Log}` is the Logarithm map for :code:`SO3_type` input and
-        :math:`\mathbf{J}` is the Jacobian matrix.
+        :math:`\mathbf{J}_i` is the Jacobian matrix.
 
     * If input :math:`\mathbf{x}`'s :code:`ltype` is :code:`RxSO3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`):
 
-        Let :math:`\mathbf{q}`, :math:`s` be the rotation and scale parts of :math:`\mathbf{x}`, respectively;
+        Let :math:`\mathbf{q}_i`, :math:`s_i` be the rotation and scale parts of :math:`\mathbf{x}_i`, respectively;
         :math:`\mathbf{y}` be the output.
 
         .. math::
-            \mathbf{y} = \left[\mathrm{Log}(\mathbf{q}), \log(s) \right].
+            \mathbf{y}_i = \left[\mathrm{Log}(\mathbf{q}_i), \log(s_i) \right].
 
     * If input :math:`\mathbf{x}`'s :code:`ltype` is :code:`Sim3_type` (input :math:`\mathbf{x}`
       is an instance of :meth:`Sim3`):
 
-        Let :math:`\mathbf{t}`, :math:`\mathbf{q}_s` be the translation and :code:`RxSO3` parts
-        of :math:`\mathbf{x}`, respectively; :math:`\mathbf{y}` be the output.
+        Let :math:`\mathbf{t}_i`, :math:`^s\mathbf{q}_i` be the translation and :code:`RxSO3` parts
+        of :math:`\mathbf{x}_i`, respectively; :math:`\mathbf{y}` be the output.
 
         .. math::
-            \mathbf{y} = \left[\mathbf{J}_s^{-1}\mathbf{t}, \mathrm{Log}(\mathbf{q}_s) \right],
+            \mathbf{y}_i = \left[^s\mathbf{J}_i^{-1}\mathbf{t}_i, \mathrm{Log}(^s\mathbf{q}_i) \right],
 
-        where :math:`\mathbf{J}_s` is the similarity transformed Jacobian matrix.
+        where :math:`^s\mathbf{J}` is the similarity transformed Jacobian matrix.
 
     Note:
-        The :math:`\mathrm{atan}`-based Logarithm map implementation thanks to the paper:
+        The :math:`\mathrm{arctan}`-based Logarithm map implementation thanks to the paper:
 
         * C. Hertzberg et al., `Integrating Generic Sensor Fusion Algorithms with Sound State
           Representation through Encapsulation of Manifolds <https://doi.org/10.1016/j.inffus.2011.08.003>`_,
           Information Fusion, 2013.
 
-        Intuitively, :math:`\boldsymbol{\nu}` is used to define the rotation axis and
-        :math:`w` to define the angle of rotation :math:`\theta`, then the quaternion
-        with unit norm can be written as 
+        Assume we have a unit rotation axis :math:`\mathbf{n}` and rotation angle :math:`\theta`, then
+        its quaternion :math:`\mathbf{q}=[\boldsymbol{\nu}, w]`, where :math:`w` is
+        the scalar part, can be defined as
 
             .. math::
                 \mathbf{q} = \left[\sin(\theta/2) \mathbf{n}, \cos(\theta/2) \right]
 
-        where :math:`\mathbf{n}` is the unit vector along the rotation axis. 
+        Therefore, given a quaternion, we can calculate its rotation angle :math:`\theta` as
 
-        Therefore, :math:`\|\boldsymbol{\nu}\| = \sin(\theta/2)`, :math:`\mathrm{atan}(\|\boldsymbol{\nu}\|/w) = \theta/2`
+            .. math::
+                \theta = 2\mathrm{arctan}(\|\boldsymbol{\nu}\|/w),~\|\boldsymbol{\nu}\| = \sin(\theta/2).
 
     Example:
 
