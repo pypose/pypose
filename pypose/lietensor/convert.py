@@ -87,7 +87,30 @@ def mat2SO3(rotation_matrix):
 
 
 def euler2SO3(euler:torch.Tensor):
-    r"""Convert Euler angles to SO3 Tensor
+    r"""Convert Euler angles to SO3 Tensor. 
+
+    First, the principal axes are extracted from the input tensor, :math:`{x}`, where:
+
+    * Roll = :math:`{x[:,0]}`
+    * Pitch = :math:`{x[:,1]}`
+    * Yaw = :math:`{x[:,2]}`
+
+    Second, the cosine(:math:`{c}`) and sine(:math:`{s}`) angles of Pitch(:math:`{P}`), Row(:math:`{R}`),
+    and yaw(:math:`{Y}`) are calculated. 
+
+    * :math:`{cy}`, :math:`{sy}` = :math:`{cos(1/2*Y)}`, :math:`{sin(1/2*Y)}`
+    * :math:`{cp}`, :math:`{sp}` = :math:`{cos(1/2*P)}`, :math:`{sin(1/2*P)}`
+    * :math:`{cr}`, :math:`{sr}` = :math:`{cos(1/2*R)}`, :math:`{sin(1/2*R)}`
+
+    Finally, the SO3 tensor is computed:
+
+    .. math::
+        {\displaystyle \mathbf{y}={\begin{bmatrix}\,
+        sr * cp * cy - cr * sp * sy\\\,
+        cr * sp * cy + sr * cp * sy\\\,
+        cr * cp * sy - sr * sp * cy\\\,
+        cr * cp * cy + sr * sp * sy\end{bmatrix}}}
+
 
     Args:
         euler (Tensor): the euler angles to convert.
@@ -98,6 +121,9 @@ def euler2SO3(euler:torch.Tensor):
     Shape:
         - Input: :code:`(*, 3)`
         - Output: :code:`(*, 4)`
+    
+    Note:
+        The last dimension of the input tensor has to be 3.
 
     Examples:
         >>> input = torch.randn(2, 3, requires_grad=True, dtype=torch.float64)
