@@ -3,13 +3,13 @@ from .utils import SO3, so3
 
 
 def mat2SO3(rotation_matrix):
-    r"""Convert 3x3 or 3x4 rotation matrices to SO3 group
+    r"""Convert batched 3x3 or 3x4 rotation matrices to SO3Type LieTensor.
 
     Args:
         rotation_matrix (Tensor): the rotation matrix to convert.
 
     Return:
-        Tensor: SO3 Tensor
+        LieTensor: SO3Type LieTensor
 
     Shape:
         - Input: :code:`(*, 3, 3)` or :code:`(*, 3, 4)`
@@ -17,8 +17,7 @@ def mat2SO3(rotation_matrix):
 
     Examples:
         >>> input = torch.eye(3).repeat(2, 1, 1) # N x 3 x 3
-        >>> output = pp.mat2SO3(input)           # N x 4
-        >>> output
+        >>> pp.mat2SO3(input)                    # N x 4
         SO3Type LieTensor:
         tensor([[0., 0., 0., 1.],
                 [0., 0., 0., 1.]])
@@ -87,41 +86,24 @@ def mat2SO3(rotation_matrix):
 
 
 def euler2SO3(euler:torch.Tensor):
-    r"""Convert Euler angles to SO3 Tensor. 
-
-    First, the principal axes are extracted from the input tensor, :math:`{x}`, where:
-
-    * Roll = :math:`{x[:,0]}`
-    * Pitch = :math:`{x[:,1]}`
-    * Yaw = :math:`{x[:,2]}`
-
-    Second, the cosine(:math:`{c}`) and sine(:math:`{s}`) angles of Pitch(:math:`{P}`), Row(:math:`{R}`),
-    and yaw(:math:`{Y}`) are calculated. 
-
-    * :math:`{cy}`, :math:`{sy}` = :math:`{cos(1/2*Y)}`, :math:`{sin(1/2*Y)}`
-    * :math:`{cp}`, :math:`{sp}` = :math:`{cos(1/2*P)}`, :math:`{sin(1/2*P)}`
-    * :math:`{cr}`, :math:`{sr}` = :math:`{cos(1/2*R)}`, :math:`{sin(1/2*R)}`
-
-    Finally, the SO3 tensor is computed:
-
-    .. math::
-        {\displaystyle \mathbf{y}={\begin{bmatrix}\,
-        sr * cp * cy - cr * sp * sy\\\,
-        cr * sp * cy + sr * cp * sy\\\,
-        cr * cp * sy - sr * sp * cy\\\,
-        cr * cp * cy + sr * sp * sy\end{bmatrix}}}
-
+    r"""Convert batched Euler angles (roll, pitch, and yaw) to SO3Type LieTensor.
 
     Args:
-        euler (Tensor): the euler angles to convert.
+        euler (Tensor): the euler angles to convert, :code:`shape: (*, 3)`.
 
     Return:
-        Tensor: SO3 Tensor
+        LieTensor: SO3Type LieTensor, :code:`lshape: (*)`.
 
-    Shape:
-        - Input: :code:`(*, 3)`
-        - Output: :code:`(*, 4)`
-    
+    .. math::
+        {\displaystyle \mathbf{y}_i={\begin{bmatrix}\,
+        \sin(\alpha_i)\cos(\beta_i)\cos(\gamma_i) - \cos(\alpha_i)\sin(\beta_i)\sin(\gamma_i)\\\,
+        \cos(\alpha_i)\sin(\beta_i)\cos(\gamma_i) + \sin(\alpha_i)\cos(\beta_i)\sin(\gamma_i)\\\,
+        \cos(\alpha_i)\cos(\beta_i)\sin(\gamma_i) - \sin(\alpha_i)\sin(\beta_i)\cos(\gamma_i)\\\,
+        \cos(\alpha_i)\cos(\beta_i)\cos(\gamma_i) + \sin(\alpha_i)\sin(\beta_i)\sin(\gamma_i)\end{bmatrix}}},
+
+    where the :math:`i`-th item of input :math:`\mathbf{x}_i = [\alpha_i, \beta_i, \gamma_i]`
+    are roll, pitch, and yaw, respectively.
+
     Note:
         The last dimension of the input tensor has to be 3.
 
@@ -130,7 +112,7 @@ def euler2SO3(euler:torch.Tensor):
         >>> pp.euler2SO3(input)
         SO3Type LieTensor:
         tensor([[-0.4873,  0.1162,  0.4829,  0.7182],
-                [ 0.3813,  0.4059, -0.2966,  0.7758]], grad_fn=<AliasBackward0>)
+                [ 0.3813,  0.4059, -0.2966,  0.7758]], dtype=torch.float64, grad_fn=<AliasBackward0>)
     """
     if not torch.is_tensor(euler):
         euler = torch.tensor(euler)

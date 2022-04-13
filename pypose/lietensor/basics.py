@@ -4,7 +4,7 @@ import torch
 
 def vec2skew(input:torch.Tensor) -> torch.Tensor:
     r"""
-    Batched Skew Matrices.
+    Convert batched vectors to skew matrices.
 
     .. math::
         {\displaystyle \mathbf{y}_i={\begin{bmatrix}\,\,
