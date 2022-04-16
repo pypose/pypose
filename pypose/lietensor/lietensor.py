@@ -375,7 +375,7 @@ class LieTensor(torch.Tensor):
             The shape of :code:`Tensor` object should be compatible
             with Lie Type :code:`ltype`, otherwise error will be raised.
 
-        ltype (ltype): Lie Type, either **Lie Group** or **Lie Algebra** is listed below:
+        ltype (:code:`ltype`): Lie Type, either **Lie Group** or **Lie Algebra** is listed below:
 
     Returns:
         LieTensor corresponding to Lie Type :code:`ltype`.
@@ -749,13 +749,18 @@ class Parameter(LieTensor, nn.Parameter):
     Parameters are of :meth:`LieTensor` and :meth:`torch.nn.Parameter`,
     that have a very special property when used with Modules: when
     they are assigned as Module attributes they are automatically
-    added to the list of its parameters, and will appear e.g., in
+    added to the list of its parameters, and will appear, e.g., in
     :meth:`parameters()` iterator.
 
     Args:
         data (LieTensor): parameter LieTensor.
         requires_grad (bool, optional): if the parameter requires
             gradient. Default: True
+
+    Note:
+        :meth:`Parameter` is **highly recommended** to use with LieTensor for
+        **Lie Algebra types**, e.g., :meth:`so3`, :meth:`se3`, :meth:`sim3`,
+        and :meth:`rxso3`, although Lie Group types are also applicable.
 
     Examples:
         >>> x = pp.Parameter(pp.randn_so3(2))
