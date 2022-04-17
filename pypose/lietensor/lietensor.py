@@ -364,70 +364,70 @@ RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
 
 
 class LieTensor(torch.Tensor):
-    r""" A sub-class of :code:`torch.Tensor` to represent Lie Algebra and Lie Group.
+    r""" A sub-class of :obj:`torch.Tensor` to represent Lie Algebra and Lie Group.
 
     Args:
-        data (:code:`Tensor`, or :code:`list`, or ':code:`int`...'): A
-            :code:`Tensor` object, or constructing a :code:`Tensor`
-            object from :code:`list`, which defines tensor data, or from
-            ':code:`int`...', which defines tensor shape.
+        data (:obj:`Tensor`, or :obj:`list`, or ':obj:`int`...'): A
+            :obj:`Tensor` object, or constructing a :obj:`Tensor`
+            object from :obj:`list`, which defines tensor data, or from
+            ':obj:`int`...', which defines tensor shape.
 
-            The shape of :code:`Tensor` object should be compatible
-            with Lie Type :code:`ltype`, otherwise error will be raised.
+            The shape of :obj:`Tensor` object should be compatible
+            with Lie Type :obj:`ltype`, otherwise error will be raised.
 
-        ltype (:code:`ltype`): Lie Type, either **Lie Group** or **Lie Algebra** is listed below:
+        ltype (:obj:`ltype`): Lie Type, either **Lie Group** or **Lie Algebra** is listed below:
 
     Returns:
-        LieTensor corresponding to Lie Type :code:`ltype`.
+        LieTensor corresponding to Lie Type :obj:`ltype`.
 
-    .. list-table:: List of :code:`ltype` for **Lie Group**
+    .. list-table:: List of :obj:`ltype` for **Lie Group**
         :widths: 25 25 30 30
         :header-rows: 1
 
-        * - Operations
-          - :code:`ltype`
-          - :code:`shape`
+        * - Representation
+          - :obj:`ltype`
+          - :obj:`shape`
           - Alias Class
         * - Rotation
-          - :code:`SO3_type`
-          - :code:`(*, 4)`
+          - :obj:`SO3_type`
+          - :obj:`(*, 4)`
           - :meth:`SO3`
         * - Rotation + Translation
-          - :code:`SE3_type`
-          - :code:`(*, 7)`
+          - :obj:`SE3_type`
+          - :obj:`(*, 7)`
           - :meth:`SE3`
         * - Rotation + Translation + Scale
-          - :code:`Sim3_type`
-          - :code:`(*, 8)`
+          - :obj:`Sim3_type`
+          - :obj:`(*, 8)`
           - :meth:`Sim3`
         * - Rotation + Scale
-          - :code:`RxSO3_type`
-          - :code:`(*, 5)`
+          - :obj:`RxSO3_type`
+          - :obj:`(*, 5)`
           - :meth:`RxSO3`
 
-    .. list-table:: List of :code:`ltype` for **Lie Algebra**
+    .. list-table:: List of :obj:`ltype` for **Lie Algebra**
         :widths: 25 25 30 30
         :header-rows: 1
 
-        * - Operations
-          - :code:`ltype`
-          - :code:`shape`
+        * - Representation
+          - :obj:`ltype`
+          - :obj:`shape`
           - Alias Class
         * - Rotation
-          - :code:`so3_type`
-          - :code:`(*, 3)`
+          - :obj:`so3_type`
+          - :obj:`(*, 3)`
           - :meth:`so3`
         * - Rotation + Translation
-          - :code:`se3_type`
-          - :code:`(*, 6)`
+          - :obj:`se3_type`
+          - :obj:`(*, 6)`
           - :meth:`se3`
         * - Rotation + Translation + Scale
-          - :code:`sim3_type`
-          - :code:`(*, 7)`
+          - :obj:`sim3_type`
+          - :obj:`(*, 7)`
           - :meth:`sim3`
         * - Rotation + Scale
-          - :code:`rxso3_type`
-          - :code:`(*, 4)`
+          - :obj:`rxso3_type`
+          - :obj:`(*, 4)`
           - :meth:`rxso3`
 
     Note:
@@ -435,6 +435,14 @@ class LieTensor(torch.Tensor):
         when it needs to be optimized by back-propagation via gradients: in this
         case, LieTensor is taken as :meth:`pypose.Parameter` in a module, which follows
         PyTorch traditions.
+
+
+    Note:
+        Two attributes :obj:`shape` and :obj:`lshape` are available for LieTensor.
+        The only differece is the :obj:`lshape` hides the last dimension of :obj:`shape`,
+        since :obj:`lshape` takes the data in the last dimension as a single :obj:`ltype` item.
+
+        See LieTensor method :meth:`lview` for more details.
 
     Examples:
         >>> import torch
@@ -446,7 +454,7 @@ class LieTensor(torch.Tensor):
                 [-0.8106,  0.8197,  0.7077],
                 [-0.5743,  0.8182, -1.2104]], device='cuda:0', grad_fn=<AliasBackward0>)
 
-        Alias for specific LieTensor is recommended:
+        Alias class for specific LieTensor is recommended:
 
         >>> pp.so3(data)
         so3Type LieTensor:
@@ -454,41 +462,43 @@ class LieTensor(torch.Tensor):
                 [-0.8106,  0.8197,  0.7077],
                 [-0.5743,  0.8182, -1.2104]], device='cuda:0', grad_fn=<AliasBackward0>)
 
-        Other available constructors:
+        See more alias classes at `Table 1 for Lie Group <#id1>`_  and `Table 2 for Lie Algebra <#id1>`_.
 
-        >>> pp.so3([0, 0, 0])
-        so3Type LieTensor:
-        tensor([0., 0., 0.])
+        Other constructors:
 
-        >>> pp.so3(2, 3)
-        so3Type LieTensor:
-        tensor([[0., 0., 0.],
-                [0., 0., 0.]])
+            - From list.
+
+            >>> pp.so3([0, 0, 0])
+            so3Type LieTensor:
+            tensor([0., 0., 0.])
+
+            - From ints.
+
+            >>> pp.so3(2, 3)
+            so3Type LieTensor:
+            tensor([[0., 0., 0.],
+                    [0., 0., 0.]])
 
     Note:
         Alias class for LieTensor is recommended.
         For example, the following usage is equivalent:
 
-        - :code:`pp.LieTensor(tensor, ltype=pp.so3_type)`
+        - :obj:`pp.LieTensor(tensor, ltype=pp.so3_type)`
 
-        - :code:`pp.so3(tensor)` (This is preferred).
+        - :obj:`pp.so3(tensor)` (This is preferred).
 
     Note:
-        LieTensor constructor from tensor is recommended, since many useful attributes from
-        torch.tensor, such as :code:`dtype`, :code:`device`, and :code:`requires_grad`
-        as can be used. See more details at
+        All attributes from Tensor are available for LieTensor, e.g., :obj:`dtype`,
+        :obj:`device`, and :obj:`requires_grad`. See more details at
         `tensor attributes <https://pytorch.org/docs/stable/tensor_attributes.html>`_.
 
-        >>> data = torch.randn(1, 3, dtype=torch.float64, device="cuda", requires_grad=True)
-        >>> pp.so3(data)
-        so3Type LieTensor:
-        tensor([[-1.5948,  0.3113, -0.9807]], device='cuda:0', dtype=torch.float64,
-            grad_fn=<AliasBackward0>)
+        Example:
 
-    Note:
-        Two attributs :code:`shape` and :code:`lshape` are available for LieTensor.
-        The only differece is the :code:`lshape` hides the last dimension of :code:`shape`,
-        since :code:`lshape` takes the data in the last dimension as a single :code:`ltype` item.
+            >>> data = torch.randn(1, 3, dtype=torch.float64, device="cuda", requires_grad=True)
+            >>> pp.so3(data) # All Tensor attributes are available for LieTensor
+            so3Type LieTensor:
+            tensor([[-1.5948,  0.3113, -0.9807]], device='cuda:0', dtype=torch.float64,
+                grad_fn=<AliasBackward0>)
     """
     def __init__(self, *data, ltype:LieType):
         tensor = data[0] if isinstance(data[0], torch.Tensor) else torch.Tensor(*data)
@@ -528,10 +538,10 @@ class LieTensor(torch.Tensor):
             torch.Size
 
         Note:
-            - The only difference from :code:`shape` is the last dimension is hidden,
-              since :code:`lshape` takes the last dimension as a single :code:`ltype` item.
+            - The only difference from :obj:`shape` is the last dimension is hidden,
+              since :obj:`lshape` takes the last dimension as a single :obj:`ltype` item.
 
-            - The last dimension can also be accessed via :code:`LieTensor.ltype.dimension`.
+            - The last dimension can also be accessed via :obj:`LieTensor.ltype.dimension`.
 
         Examples:
             >>> x = pp.randn_SE3(2)
@@ -546,7 +556,7 @@ class LieTensor(torch.Tensor):
 
     def lview(self, *shape):
         r'''
-        Returns a new LieTensor with the same data as the self tensor but of a different :code:`lshape`.
+        Returns a new LieTensor with the same data as the self tensor but of a different :obj:`lshape`.
 
         Args:
             shape (torch.Size or int...): the desired size
@@ -555,7 +565,10 @@ class LieTensor(torch.Tensor):
             A new lieGroup tensor sharing with the same data as the self tensor but of a different shape.
 
         Note:
-            The only difference from :code:`tensor.view` is the last dimension is hidden.
+            The only difference from :meth:`view` is the last dimension is hidden.
+
+            See `Tensor.view <https://pytorch.org/docs/stable/generated/torch.Tensor.view.html?highlight=view#torch.Tensor.view>`_
+            for its usage.
 
         Examples:
             >>> x = pp.randn_so3(2,2)
@@ -686,7 +699,7 @@ class LieTensor(torch.Tensor):
         Inplace set the LieTensor to identity.
 
         Return:
-            LieTensor: the :code:`self` LieTensor
+            LieTensor: the :obj:`self` LieTensor
 
         Note:
             The translation part, if there is, is set to zeros, while the

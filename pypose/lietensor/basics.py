@@ -18,8 +18,8 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
         Tensor: the skew matrices :math:`\mathbf{y}`
 
     Shape:
-        - Input: :code:`(*, 3)`
-        - Output: :code:`(*, 3, 3)`
+        - Input: :obj:`(*, 3)`
+        - Output: :obj:`(*, 3, 3)`
 
     Note:
         The last dimension of the input tensor has to be 3.

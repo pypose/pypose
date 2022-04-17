@@ -50,11 +50,11 @@ Alias of LieTensor for rxso3.
 def randn_like(input, sigma=1, **kwargs):
     r'''
     Returns a LieTensor with the same size as input that is filled with random
-    LieTensor that satisfies the corresponding :code:`input.ltype`.
+    LieTensor that satisfies the corresponding :obj:`input.ltype`.
 
     The corresponding random generator can be
 
-    .. list-table:: List of available random LieTensor generator of input :code:`ltype`.
+    .. list-table:: List of available random LieTensor generator of input :obj:`ltype`.
         :widths: 25 25 30 30 30
         :header-rows: 1
 
@@ -64,24 +64,24 @@ def randn_like(input, sigma=1, **kwargs):
           - Manifold
           - randn function
         * - Orthogonal Group
-          - :code:`SO3_type`
+          - :obj:`SO3_type`
           - :meth:`randn_SO3`
-          - :code:`so3_type`
+          - :obj:`so3_type`
           - :meth:`randn_so3`
         * - Euclidean Group
-          - :code:`SE3_type`
+          - :obj:`SE3_type`
           - :meth:`randn_SE3`
-          - :code:`se3_type`
+          - :obj:`se3_type`
           - :meth:`randn_se3`
         * - Similarity Group
-          - :code:`Sim3_type`
+          - :obj:`Sim3_type`
           - :meth:`randn_Sim3`
-          - :code:`sim3_type`
+          - :obj:`sim3_type`
           - :meth:`randn_sim3`
         * - Scaling Orthogonal
-          - :code:`RxSO3_type`
+          - :obj:`RxSO3_type`
           - :meth:`randn_RxSO3`
-          - :code:`rxso3_type`
+          - :obj:`rxso3_type`
           - :meth:`randn_rxso3`
 
     Args:
@@ -129,8 +129,8 @@ def randn_like(input, sigma=1, **kwargs):
 
 def randn_so3(*size, sigma=1, **kwargs):
     r'''
-    Returns :code:`so3_type` LieTensor filled with random numbers from a normal
-    distribution with mean 0 and variance :code:`sigma` (also called the standard normal distribution).
+    Returns :obj:`so3_type` LieTensor filled with random numbers from a normal
+    distribution with mean 0 and variance :obj:`sigma` (also called the standard normal distribution).
 
     .. math::
         \mathrm{out}_i = \mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma}_{3\times 1})
@@ -160,7 +160,7 @@ def randn_so3(*size, sigma=1, **kwargs):
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
     Returns:
-        LieTensor: a :code:`so3_type` LieTensor
+        LieTensor: a :obj:`so3_type` LieTensor
 
     Example:
         >>> pp.randn_so3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
@@ -173,8 +173,8 @@ def randn_so3(*size, sigma=1, **kwargs):
 
 def randn_SO3(*size, sigma=1, **kwargs):
     r'''
-    Returns :code:`SO3_type` LieTensor filled with the Exponential map of the random
-    :code:`so3_type` LieTensor with normal distribution with mean 0 and variance :code:`sigma`.
+    Returns :obj:`SO3_type` LieTensor filled with the Exponential map of the random
+    :obj:`so3_type` LieTensor with normal distribution with mean 0 and variance :obj:`sigma`.
 
     .. math::
         \mathrm{out}_i = \mathrm{Exp}(\mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma}_{3\times 1}))
@@ -204,7 +204,7 @@ def randn_SO3(*size, sigma=1, **kwargs):
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
     Returns:
-        LieTensor: a :code:`SO3_type` LieTensor
+        LieTensor: a :obj:`SO3_type` LieTensor
 
     Example:
         >>> pp.randn_SO3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
@@ -218,8 +218,8 @@ def randn_SO3(*size, sigma=1, **kwargs):
 
 def randn_se3(*size, sigma=1, **kwargs):
     r'''
-    Returns :code:`se3_type` LieTensor filled with random numbers from a normal
-    distribution with mean 0 and variance :code:`sigma` (also called the standard normal distribution).
+    Returns :obj:`se3_type` LieTensor filled with random numbers from a normal
+    distribution with mean 0 and variance :obj:`sigma` (also called the standard normal distribution).
 
     .. math::
         \mathrm{out}_i = \mathcal{N}(\mathbf{0}_{6\times 1}, \mathbf{\sigma}_{6\times 1})
@@ -249,7 +249,7 @@ def randn_se3(*size, sigma=1, **kwargs):
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
     Returns:
-        LieTensor: a :code:`se3_type` LieTensor
+        LieTensor: a :obj:`se3_type` LieTensor
 
     Example:
         >>> pp.randn_se3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
@@ -263,8 +263,8 @@ def randn_se3(*size, sigma=1, **kwargs):
 
 def randn_SE3(*size, sigma=1, **kwargs):
     r'''
-    Returns :code:`SE3_type` LieTensor filled with the Exponential map of the random
-    :code:`se3_type` LieTensor with normal distribution with mean 0 and variance :code:`sigma`.
+    Returns :obj:`SE3_type` LieTensor filled with the Exponential map of the random
+    :obj:`se3_type` LieTensor with normal distribution with mean 0 and variance :obj:`sigma`.
 
     .. math::
         \mathrm{out}_i = \mathrm{Exp}(\mathcal{N}(\mathbf{0}_{6\times 1}, \mathbf{\sigma}_{6\times 1}))
@@ -294,7 +294,7 @@ def randn_SE3(*size, sigma=1, **kwargs):
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
     Returns:
-        LieTensor: a :code:`SE3_type` LieTensor
+        LieTensor: a :obj:`SE3_type` LieTensor
 
     Example:
         >>> pp.randn_SE3(2, sigma=0.1)
@@ -368,7 +368,7 @@ def assert_ltype(func):
 
 @assert_ltype
 def Exp(input):
-    r"""The Exponential map for :code:`LieTensor` (Lie Algebra).
+    r"""The Exponential map for :obj:`LieTensor` (Lie Algebra).
 
     .. math::
         \mathrm{Exp}: \mathcal{g} \mapsto \mathcal{G}
@@ -383,33 +383,33 @@ def Exp(input):
         :widths: 20 20 8 20 20
         :header-rows: 1
 
-        * - input :code:`ltype`
+        * - input :obj:`ltype`
           - :math:`\mathcal{g}` (Lie Algebra)
           - :math:`\mapsto`
           - :math:`\mathcal{G}` (Lie Group)
-          - output :code:`ltype`
-        * - :code:`so3_type`
+          - output :obj:`ltype`
+        * - :obj:`so3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
           - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times4}`
-          - :code:`SO3_type`
-        * - :code:`se3_type`
+          - :obj:`SO3_type`
+        * - :obj:`se3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times6}`
           - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times7}`
-          - :code:`SE3_type`
-        * - :code:`sim3_type`
+          - :obj:`SE3_type`
+        * - :obj:`sim3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times7}`
           - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times8}`
-          - :code:`Sim3_type`
-        * - :code:`rxso3_type`
+          - :obj:`Sim3_type`
+        * - :obj:`rxso3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times5}`
-          - :code:`RxSO3_type`
+          - :obj:`RxSO3_type`
 
-    * Input :math:`\mathbf{x}`'s :code:`ltype` is :code:`so3_type` (input :math:`\mathbf{x}` is an instance of :meth:`so3`):
+    * Input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`so3_type` (input :math:`\mathbf{x}` is an instance of :meth:`so3`):
 
         If :math:`\|\mathbf{x}_i\| > \text{eps}`:
 
@@ -459,7 +459,7 @@ def Exp(input):
 
 @assert_ltype
 def Log(input):
-    r"""The Logarithm map for :code:`LieTensor` (Lie Group).
+    r"""The Logarithm map for :obj:`LieTensor` (Lie Group).
 
     .. math::
         \mathrm{Log}: \mathcal{G} \mapsto \mathcal{g}
@@ -474,37 +474,37 @@ def Log(input):
         :widths: 20 20 8 20 20
         :header-rows: 1
 
-        * - input :code:`ltype`
+        * - input :obj:`ltype`
           - :math:`\mathcal{G}` (Lie Group)
           - :math:`\mapsto`
           - :math:`\mathcal{g}` (Lie Algebra)
-          - output :code:`ltype`
-        * - :code:`SO3_type`
+          - output :obj:`ltype`
+        * - :obj:`SO3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times3}`
-          - :code:`so3_type`
-        * - :code:`SE3_type`
+          - :obj:`so3_type`
+        * - :obj:`SE3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times7}`
           - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times6}`
-          - :code:`se3_type`
-        * - :code:`Sim3_type`
+          - :obj:`se3_type`
+        * - :obj:`Sim3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times8}`
           - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times7}`
-          - :code:`sim3_type`
-        * - :code:`RxSO3_type`
+          - :obj:`sim3_type`
+        * - :obj:`RxSO3_type`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times5}`
           - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times4}`
-          - :code:`rxso3_type`
+          - :obj:`rxso3_type`
     
     Note:
         This function :func:`Log()` is different from :func:`log()`, which returns
         a new torch tensor with the logarithm of the elements of the input tensor.
 
-    * If input :math:`\mathbf{x}`'s :code:`ltype` is :code:`SO3_type`
+    * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`SO3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`SO3`):
 
         Let :math:`w_i`, :math:`\boldsymbol{\nu}_i` be the scalar and vector parts of
@@ -527,7 +527,7 @@ def Log(input):
         .. math::
             \mathbf{y}_i = 2\left( \frac{1}{w_i} - \frac{\|\boldsymbol{\nu}_i\|^2}{3w_i^3}\right)\boldsymbol{\nu}_i.
 
-    * If input :math:`\mathbf{x}`'s :code:`ltype` is :code:`SE3_type`
+    * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`SE3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`SE3`):
 
         Let :math:`\mathbf{t}_i`, :math:`\mathbf{q}_i` be the translation and rotation parts of
@@ -536,10 +536,10 @@ def Log(input):
         .. math::
             \mathbf{y}_i = \left[\mathbf{J}_i^{-1}\mathbf{t}_i, \mathrm{Log}(\mathbf{q}_i) \right],
 
-        where :math:`\mathrm{Log}` is the Logarithm map for :code:`SO3_type` input and
+        where :math:`\mathrm{Log}` is the Logarithm map for :obj:`SO3_type` input and
         :math:`\mathbf{J}_i` is the Jacobian matrix.
 
-    * If input :math:`\mathbf{x}`'s :code:`ltype` is :code:`RxSO3_type`
+    * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`RxSO3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`):
 
         Let :math:`\mathbf{q}_i`, :math:`s_i` be the rotation and scale parts of :math:`\mathbf{x}_i`, respectively;
@@ -548,10 +548,10 @@ def Log(input):
         .. math::
             \mathbf{y}_i = \left[\mathrm{Log}(\mathbf{q}_i), \log(s_i) \right].
 
-    * If input :math:`\mathbf{x}`'s :code:`ltype` is :code:`Sim3_type` (input :math:`\mathbf{x}`
+    * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`Sim3_type` (input :math:`\mathbf{x}`
       is an instance of :meth:`Sim3`):
 
-        Let :math:`\mathbf{t}_i`, :math:`^s\mathbf{q}_i` be the translation and :code:`RxSO3` parts
+        Let :math:`\mathbf{t}_i`, :math:`^s\mathbf{q}_i` be the translation and :obj:`RxSO3` parts
         of :math:`\mathbf{x}_i`, respectively; :math:`\mathbf{y}` be the output.
 
         .. math::
@@ -566,7 +566,7 @@ def Log(input):
           Representation through Encapsulation of Manifolds <https://doi.org/10.1016/j.inffus.2011.08.003>`_,
           Information Fusion, 2013.
 
-        Assume we have a unit rotation axis :math:`\mathbf{n}` and rotation angle :math:`\theta`, then
+        Assume we have a unit rotation axis :math:`\mathbf{n}` and rotation angle :math:`\theta~(0\leq\theta<2\pi)`, then
         its quaternion :math:`\mathbf{q}=[\boldsymbol{\nu}, w]`, where :math:`w` is
         the scalar part, can be defined as
 
@@ -580,7 +580,7 @@ def Log(input):
 
     Example:
 
-        * :math:`\mathrm{Log}`: :code:`SO3` :math:`\mapsto` :code:`so3`
+        * :math:`\mathrm{Log}`: :obj:`SO3` :math:`\mapsto` :obj:`so3`
 
         >>> x = pp.randn_SO3(2)
         >>> x.Log() # equivalent to: pp.Log(x)
@@ -588,7 +588,7 @@ def Log(input):
         tensor([[-0.3060,  0.2344,  1.2724],
                 [ 0.3012, -0.6817,  0.1187]])
 
-        * :math:`\mathrm{Log}`: :code:`SE3` :math:`\mapsto` :code:`se3`
+        * :math:`\mathrm{Log}`: :obj:`SE3` :math:`\mapsto` :obj:`se3`
 
         >>> x = pp.randn_SE3(2)
         >>> x.Log() # equivalent to: pp.Log(x)
@@ -597,7 +597,7 @@ def Log(input):
                 [ 0.0850, -0.1020, -1.2616, -1.0524, -1.2031,  0.8377]])
 
 
-        * :math:`\mathrm{Log}`: :code:`RxSO3` :math:`\mapsto` :code:`rxso3`
+        * :math:`\mathrm{Log}`: :obj:`RxSO3` :math:`\mapsto` :obj:`rxso3`
 
         >>> x = pp.randn_RxSO3(2)
         >>> x.Log() # equivalent to: pp.Log(x)
@@ -605,7 +605,7 @@ def Log(input):
         tensor([[-1.3755,  0.3525, -2.2367,  0.5409],
                 [ 0.5929, -0.3250, -0.7394,  1.0965]])
 
-        * :math:`\mathrm{Log}`: :code:`Sim3` :math:`\mapsto` :code:`sim3`
+        * :math:`\mathrm{Log}`: :obj:`Sim3` :math:`\mapsto` :obj:`sim3`
 
         >>> x = pp.randn_Sim3(2)
         >>> x.Log() # equivalent to: pp.Log(x)

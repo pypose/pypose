@@ -12,8 +12,8 @@ def mat2SO3(rotation_matrix):
         Tensor: SO3 Tensor
 
     Shape:
-        - Input: :code:`(*, 3, 3)` or :code:`(*, 3, 4)`
-        - Output: :code:`(*, 4)`
+        - Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)`
+        - Output: :obj:`(*, 4)`
 
     Examples:
         >>> input = torch.eye(3).repeat(2, 1, 1) # N x 3 x 3
@@ -96,8 +96,8 @@ def euler2SO3(euler:torch.Tensor):
         Tensor: SO3 Tensor
 
     Shape:
-        - Input: :code:`(*, 3)`
-        - Output: :code:`(*, 4)`
+        - Input: :obj:`(*, 3)`
+        - Output: :obj:`(*, 4)`
 
     Examples:
         >>> input = torch.randn(2, 3, requires_grad=True, dtype=torch.float64)
