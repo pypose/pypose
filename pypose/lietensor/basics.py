@@ -13,9 +13,9 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
         Tensor: the skew matrices :math:`\mathbf{y}`.
 
     Shape:
+        Input: :obj:`(*, 3)`
 
-        - Input :obj:`shape`: :obj:`(*, 3)`
-        - Output :obj:`shape`: :obj:`(*, 3, 3)`
+        Output: :obj:`(*, 3, 3)`
 
     .. math::
         {\displaystyle \mathbf{y}_i={\begin{bmatrix}\,\,

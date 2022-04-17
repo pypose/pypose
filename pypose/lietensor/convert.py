@@ -12,9 +12,9 @@ def mat2SO3(rotation_matrix):
         LieTensor: the converted SO3Type LieTensor.
 
     Shape:
+        Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)`
 
-        - Input :obj:`shape`: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)`
-        - Output :obj:`lshape`: :obj:`(*)`
+        Output: :obj:`(*, 4)`
 
     Examples:
 
@@ -97,9 +97,9 @@ def euler2SO3(euler:torch.Tensor):
         LieTensor: the converted SO3Type LieTensor.
 
     Shape:
+        Input: :obj:`(*, 3)`
 
-        - Input :obj:`shape`: :obj:`(*, 3)`
-        - Output :obj:`lshape`: :obj:`(*)`
+        Output: :obj:`(*, 4)`
 
     .. math::
         {\displaystyle \mathbf{y}_i={\begin{bmatrix}\,
