@@ -4,22 +4,23 @@ import torch
 
 def vec2skew(input:torch.Tensor) -> torch.Tensor:
     r"""
-    Batched Skew Matrices.
+    Convert batched vectors to skew matrices.
+
+    Args:
+        input (Tensor): the tensor :math:`\mathbf{x}` to convert.
+
+    Return:
+        Tensor: the skew matrices :math:`\mathbf{y}`.
+
+    Shape:
+
+        - Input :obj:`shape`: :obj:`(*, 3)`
+        - Output :obj:`shape`: :obj:`(*, 3, 3)`
 
     .. math::
         {\displaystyle \mathbf{y}_i={\begin{bmatrix}\,\,
         0&\!-x_{i,3}&\,\,\,x_{i,2}\\\,\,\,x_{i,3}&0&\!-x_{i,1}
-        \\\!-x_{i,2}&\,\,x_{i,1}&\,\,0\end{bmatrix}},}
-
-    Args:
-        input (Tensor): the tensor :math:`\mathbf{x}` to convert
-
-    Return:
-        Tensor: the skew matrices :math:`\mathbf{y}`
-
-    Shape:
-        - Input: :obj:`(*, 3)`
-        - Output: :obj:`(*, 3, 3)`
+        \\\!-x_{i,2}&\,\,x_{i,1}&\,\,0\end{bmatrix}}}
 
     Note:
         The last dimension of the input tensor has to be 3.
