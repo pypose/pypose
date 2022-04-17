@@ -462,7 +462,7 @@ class LieTensor(torch.Tensor):
                 [-0.8106,  0.8197,  0.7077],
                 [-0.5743,  0.8182, -1.2104]], device='cuda:0', grad_fn=<AliasBackward0>)
 
-        See more alias classes at `Table 1 for Lie Group <#id1>`_  and `Table 2 for Lie Algebra <#id1>`_.
+        See more alias classes at `Table 1 for Lie Group <#id1>`_  and `Table 2 for Lie Algebra <#id2>`_.
 
         Other constructors:
 
