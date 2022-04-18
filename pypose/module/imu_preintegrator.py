@@ -58,15 +58,15 @@ class IMUPreintegrator(nn.Module):
             \end{align*}
 
         Args:
-            dt (torch.Tensor): time interval from last update. :code:`shape`: (1)
-            ang (torch.Tensor): angular rate (:math:`\omega`) in IMU body frame. :code:`shape`: (3)
+            dt (torch.Tensor): time interval from last update. :obj:`shape`: (1)
+            ang (torch.Tensor): angular rate (:math:`\omega`) in IMU body frame. :obj:`shape`: (3)
             acc (torch.Tensor): linear acceleration (:math:`\mathbf{a}`) in IMU body frame.
-                :code:`shape`: (3)
-            rot (pypose.SO3, optional): known IMU rotation, see following example. :code:`lshape`: (1)
-            ang_cov (torch.Tensor, optional): covariance matrix of angular rate. :code:`shape`: (3, 3).
-                Default: :code:`torch.eye(3)*(1.6968*10**-4)**2` (Adapted from Euroc dataset)
+                :obj:`shape`: (3)
+            rot (pypose.SO3, optional): known IMU rotation, see following example. :obj:`lshape`: (1)
+            ang_cov (torch.Tensor, optional): covariance matrix of angular rate. :obj:`shape`: (3, 3).
+                Default: :obj:`torch.eye(3)*(1.6968*10**-4)**2` (Adapted from Euroc dataset)
             acc_cov (torch.Tensor, optional): covariance matrix of linear acceleration.
-                :code:`shape`: (3, 3). Default: :code:`torch.eye(3)*(2.0*10**-3)**2`  (Adapted from
+                :obj:`shape`: (3, 3). Default: :obj:`torch.eye(3)*(2.0*10**-3)**2`  (Adapted from
                 Euroc dataset)
 
         Example:
@@ -121,18 +121,18 @@ class IMUPreintegrator(nn.Module):
         Propagated IMU status.
 
         Args:
-            reset (bool, optional): if reset the preintegrator to initial state. Default: :code:`True`
+            reset (bool, optional): if reset the preintegrator to initial state. Default: :obj:`True`
 
         Returns:
-            :code:`dict`: A :class:`dict` containing 4 items: 'rot'ation, 'vel'ocity, 'pos'ition, and 'cov'ariance.
+            :obj:`dict`: A :class:`dict` containing 4 items: 'rot'ation, 'vel'ocity, 'pos'ition, and 'cov'ariance.
 
-            - 'rot' (pypose.SO3): rotation. :code:`lshape`: (1)
+            - 'rot' (pypose.SO3): rotation. :obj:`lshape`: (1)
 
-            - 'vel' (torch.Tensor): velocity. :code:`shape`: (3)
+            - 'vel' (torch.Tensor): velocity. :obj:`shape`: (3)
 
-            - 'pos' (torch.Tensor): postion. :code:`shape`: (3)
+            - 'pos' (torch.Tensor): postion. :obj:`shape`: (3)
 
-            - 'cov' (torch.Tensor): covariance (order: rotation, velocity, position). :code:`shape`: (9, 9)
+            - 'cov' (torch.Tensor): covariance (order: rotation, velocity, position). :obj:`shape`: (9, 9)
 
         Note:
             Output covariance (Shape: (9, 9)) is in the order of rotation, velocity, and position.
