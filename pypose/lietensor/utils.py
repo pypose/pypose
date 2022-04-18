@@ -409,7 +409,12 @@ def Exp(input):
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times5}`
           - :obj:`RxSO3_type`
 
-    * Input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`so3_type` (input :math:`\mathbf{x}` is an instance of :meth:`so3`):
+    Note:
+        This function :func:`Exp()` is different from :func:`exp()`, which returns
+        a new torch tensor with the exponential of the elements of the input tensor.
+
+    * Input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`so3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`so3`):
 
         If :math:`\|\mathbf{x}_i\| > \text{eps}`:
 
@@ -431,28 +436,85 @@ def Exp(input):
 
         where :math:`\theta_i = \frac{1}{2} - \frac{1}{48} \|\mathbf{x}_i\|^2 + \frac{1}{3840} \|\mathbf{x}_i\|^4`.
 
-    Note:
-        This function :func:`Exp()` is different from :func:`exp()`, which returns
-        a new torch tensor with the exponential of the elements of the input tensor.
+    * Input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`se3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`se3`):
+
+        Let :math:`\bm{\tau}_i`, :math:`\bm{\phi}_i` be the translation and rotation parts of
+        :math:`\mathbf{x}_i`, respectively; :math:`\mathbf{y}` be the output.
+
+        .. math::
+            \mathbf{y}_i = \left[\mathbf{J}_i\bm{\tau}_i, \mathrm{Exp}(\bm{\phi}_i)\right],
+        
+        where :math:`\mathrm{Exp}` is the Exponential map for :obj:`so3_type` input and
+        :math:`\mathbf{J}_i` is the left Jacobian.
+
+    * Input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`rxso3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`rxso3`):
+
+        Let :math:`\bm{\phi}_i`, :math:`s_i` be the rotation and scale parts of
+        :math:`\mathbf{x}_i`, respectively; :math:`\mathbf{y}` be the output.
+
+        .. math::
+            \mathbf{y}_i = \left[\mathrm{Exp}(\bm{\phi}_i), \mathrm{exp}(s_i)\right],
+
+        where :math:`\mathrm{exp}` is the exponential function.
+
+    * Input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`sim3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`sim3`):
+
+        Let :math:`\bm{\tau}_i`, :math:`^{s}\bm{\phi}_i` be the translation and
+        :meth:`rxso3` parts of :math:`\mathbf{x}_i`, respectively; :math:`\mathbf{y}` be the output.
+
+        .. math::
+            \mathbf{y}_i = \left[^{s}\mathbf{J}_i\bm{\tau}_i, \mathrm{Exp}(^{s}\bm{\phi}_i)\right],
+        
+        where :math:`^{s}\mathbf{J}` is the similarity transformed left Jacobian.
 
     Example:
+    
+    * :math:`\mathrm{Exp}`: :meth:`so3` :math:`\mapsto` :meth:`SO3`
+
         >>> x = pp.randn_so3(2, requires_grad=True)
         so3Type LieTensor:
-        tensor([[ 0.1366,  0.1370, -1.1921],
-                [-0.6003, -0.2165, -1.6576]], requires_grad=True)
-
-        :meth:`Exp` returns LieTensor :meth:`SO3`.
-
+        tensor([[-0.2547, -0.4478,  0.0783],
+                [ 0.7381,  0.2163, -1.8465]], requires_grad=True)
         >>> x.Exp() # equivalent to: pp.Exp(x)
         SO3Type LieTensor:
-        tensor([[ 0.0642,  0.0644, -0.5605,  0.8232],
-                [-0.2622, -0.0946, -0.7241,  0.6309]], grad_fn=<AliasBackward0>)
+        tensor([[-0.1259, -0.2214,  0.0387,  0.9662],
+                [ 0.3105,  0.0910, -0.7769,  0.5402]], grad_fn=<AliasBackward0>)
 
-        :meth:`exp` returns torch tensor.
+    * :math:`\mathrm{Exp}`: :meth:`se3` :math:`\mapsto` :meth:`SE3`
 
-        >>> x.exp() # Note that this returns torch tensor
-        tensor([[1.1463, 1.1469, 0.3036],
-                [0.5486, 0.8053, 0.1906]], grad_fn=<ExpBackward0>)
+        >>> x = pp.randn_se3(2)
+        se3Type LieTensor:
+        tensor([[ 1.1912,  1.2425, -0.9696,  0.9540, -0.4061, -0.7204],
+                [ 0.5964, -1.1894,  0.6451,  1.1373, -2.6733,  0.4142]])
+        >>> x.Exp() # equivalent to: pp.Exp(x)
+        SE3Type LieTensor:
+        tensor([[ 1.6575,  0.8838, -0.1499,  0.4459, -0.1898, -0.3367,  0.8073],
+                [ 0.2654, -1.3860,  0.2852,  0.3855, -0.9061,  0.1404,  0.1034]])
+
+    * :math:`\mathrm{Exp}`: :meth:`rxso3` :math:`\mapsto` :meth:`RxSO3`
+
+        >>> x = pp.randn_rxso3(2)
+        rxso3Type LieTensor:
+        tensor([[-1.2559, -0.9545,  0.2480, -0.3000],
+                [ 1.0867,  0.4305, -0.4303,  0.1563]])
+        >>> x.Exp() # equivalent to: pp.Exp(x)
+        RxSO3Type LieTensor:
+        tensor([[-0.5633, -0.4281,  0.1112,  0.6979,  0.7408],
+                [ 0.5089,  0.2016, -0.2015,  0.8122,  1.1692]])
+
+    * :math:`\mathrm{Exp}`: :meth:`sim3` :math:`\mapsto` :meth:`Sim3`
+
+        >>> x = pp.randn_sim3(2)
+        sim3Type LieTensor:
+        tensor([[-1.2279,  0.0967, -1.1261,  1.2900,  0.2519, -0.7583,  0.8938],
+                [ 0.4278, -0.4025, -1.3189, -1.7345, -0.9196,  0.3332,  0.1777]])
+        >>> x.Exp() # equivalent to: pp.Exp(x)
+        Sim3Type LieTensor:
+        tensor([[-1.5811,  1.8128, -0.5835,  0.5849,  0.1142, -0.3438,  0.7257,  2.4443],
+                [ 0.9574, -0.9265, -0.2385, -0.7309, -0.3875,  0.1404,  0.5440,  1.1945]])
     """
     return input.Exp()
 
@@ -537,7 +599,7 @@ def Log(input):
             \mathbf{y}_i = \left[\mathbf{J}_i^{-1}\mathbf{t}_i, \mathrm{Log}(\mathbf{q}_i) \right],
 
         where :math:`\mathrm{Log}` is the Logarithm map for :obj:`SO3_type` input and
-        :math:`\mathbf{J}_i` is the Jacobian matrix.
+        :math:`\mathbf{J}_i` is the left Jacobian.
 
     * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`RxSO3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`):
@@ -557,7 +619,7 @@ def Log(input):
         .. math::
             \mathbf{y}_i = \left[^s\mathbf{J}_i^{-1}\mathbf{t}_i, \mathrm{Log}(^s\mathbf{q}_i) \right],
 
-        where :math:`^s\mathbf{J}` is the similarity transformed Jacobian matrix.
+        where :math:`^s\mathbf{J}` is the similarity transformed left Jacobian.
 
     Note:
         The :math:`\mathrm{arctan}`-based Logarithm map implementation thanks to the paper:
