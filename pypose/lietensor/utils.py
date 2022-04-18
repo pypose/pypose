@@ -757,14 +757,17 @@ def Jinv(X, a):
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :obj:`rxso3_type`
 
-    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`SO3_type` and :obj:`so3_type`
-      (input :math:`\mathbf{a}` is an instance of :meth:`so3`). Let :math:`\mathbf{y}` be the output.
+    Let the input be (:math:`\mathbf{x}`, :math:`\mathbf{a}`), :math:`\mathbf{y}` be the output.
 
         .. math::
             \mathbf{y}_i = \mathbf{J}^{-1}_i(\mathbf{x}_i)\mathbf{a}_i,
 
-        where :math:`\mathbf{J}^{-1}_i(\mathbf{x}_i)` is the left-Jacobian of :math:`\mathbf{x}_i`. Let :math:`\boldsymbol{\phi}_i = \theta_i\mathbf{n}_i` 
-        be the corresponding Lie Algebra of :math:`\mathbf{x}_i`, :math:`\boldsymbol{\Phi}_i` be the skew matrix of :math:`\boldsymbol{\phi}_i`:
+        where :math:`\mathbf{J}^{-1}_i(\mathbf{x}_i)` is the left-Jacobian of :math:`\mathbf{x}_i`. 
+
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`SO3_type` and :obj:`so3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`SO3`, :math:`\mathbf{a}` is an instance of :meth:`so3`). 
+      Let :math:`\boldsymbol{\phi}_i = \theta_i\mathbf{n}_i` be the corresponding Lie Algebra of :math:`\mathbf{x}_i`, 
+      :math:`\boldsymbol{\Phi}_i` be the skew matrix of :math:`\boldsymbol{\phi}_i`:
 
         .. math::
             \mathbf{J}^{-1}_i(\mathbf{x}_i) = \mathbf{I} - \frac{1}{2}\boldsymbol{\Phi}_i + \mathrm{coef}\boldsymbol{\Phi}_i^2
@@ -776,9 +779,65 @@ def Jinv(X, a):
                                 \begin{array}{ll} 
                                     \frac{1}{\theta^2} - \frac{\cos{\frac{\theta}{2}}}{2\theta\sin{\frac{\theta}{2}}}, \quad \|\theta\| > \text{eps}, \\
                                     \frac{1}{12},
-                                    \quad \|\theta\| \leq \text{eps},
+                                    \quad \|\theta\| \leq \text{eps}
                                 \end{array}
                              \right.
+
+
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`SE3_type` and :obj:`se3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`SE3`, :math:`\mathbf{a}` is an instance of :meth:`se3`). 
+      Let :math:`\boldsymbol{\phi}_i = \theta_i\mathbf{n}_i` be the corresponding Lie Algebra of the SO3 part of 
+      :math:`\mathbf{x}_i`, :math:`\boldsymbol{\tau}` be the Lie Algebra of the translation part of :math:`\mathbf{x}_i`; 
+      :math:`\boldsymbol{\Phi}` and :math:`\boldsymbol{\Tau}` be the skew matrices, respectively:
+
+        .. math::
+            \mathbf{J}^{-1}_i(\mathbf{x}_i) = \left[
+                                \begin{array}{cc} 
+                                    \mathbf{J}_i^{-1}(\boldsymbol{\Phi}) & -\mathbf{J}_i^{-1}(\boldsymbol{\Phi})\mathbf{Q}(\boldsymbol{\tau}, \boldsymbol{\phi})\mathbf{J}_i^{-1}(\boldsymbol{\Phi}) \\
+                                    \mathbf{0} & \mathbf{J}_i^{-1}(\boldsymbol{\Phi})
+                                \end{array}
+                             \right]
+
+        where :math:`\mathbf{J}_i^{-1}(\boldsymbol{\Phi})` is the left Jacobian of the SO3 part of :math:`\mathbf{x}_i`. :math:`\mathbf{Q}_i(\boldsymbol{\tau}, \boldsymbol{\phi})` is 
+
+        .. math::
+            \begin{align}
+                \mathbf{Q}_i(\boldsymbol{\tau}, \boldsymbol{\phi}) = \frac{1}{2}\boldsymbol{\Tau} &+ c_1 (\boldsymbol{\Phi\Tau} + \boldsymbol{\Tau\Phi} + \boldsymbol{\Phi\Tau\Phi}) \\
+                                                               &+ c_2 (\boldsymbol{\Phi^2\Tau} + \boldsymbol{\Tau\Phi^2} - 3\boldsymbol{\Phi\Tau\Phi})\\
+                                                               &+ c_3 (\boldsymbol{\Phi\Tau\Phi^2} + \boldsymbol{\Phi^2\Tau\Phi})  
+
+            \end{align}
+
+        where,
+
+        .. math::
+            c_1 = \left\{
+                    \begin{array}{ll} 
+                        \frac{\theta - \sin\theta}{\theta^3}, \quad \|\theta\| > \text{eps}, \\
+                        \frac{1}{6}-\frac{1}{120}\theta^2,
+                        \quad \|\theta\| \leq \text{eps}
+                    \end{array}
+                    \right.     
+
+
+       .. math::
+            c_2 = \left\{
+                    \begin{array}{ll} 
+                        \frac{\theta^2 +2\cos\theta - 2}{2\theta^4}, \quad \|\theta\| > \text{eps}, \\
+                        \frac{1}{24}-\frac{1}{720}\theta^2,
+                        \quad \|\theta\| \leq \text{eps}
+                    \end{array}
+                    \right.
+
+       .. math::
+            c_3 = \left\{
+                    \begin{array}{ll} 
+                        \frac{2\theta - 3\sin\theta + \theta\cos\theta}{2\theta^5}, \quad \|\theta\| > \text{eps}, \\
+                        \frac{1}{120}-\frac{1}{2520}\theta^2,
+                        \quad \|\theta\| \leq \text{eps}
+                    \end{array}
+                    \right.
+
 
     Note:
         :math:`\mathrm{Jinv}` is usually used in the Baker-Campbell-Hausdorff formula (BCH formula) when performing LieTensor multiplication.
@@ -787,8 +846,9 @@ def Jinv(X, a):
         * J. Sola et al., `A micro Lie theory for state estimation in robotics <https://arxiv.org/abs/1812.01537>`_,
           arXiv preprint arXiv:1812.01537 (2018).
         
-        In particular, Eq.(146) is the math used in the :obj:`SO3_type`, :obj:`so3_type` scenario. 
-    
+        In particular, Eq.(146) is the math used in the :obj:`SO3_type`, :obj:`so3_type` scenario; 
+        Eq.(179b) and Eq.(180) are the math used in the :obj:`SE3_type`, :obj:`se3_type` scenario.
+
     Example:
 
         * :math:`\mathrm{Jinv}`: (:obj:`SO3`, :obj:`so3`) :math:`\mapsto` :obj:`so3`
@@ -798,6 +858,14 @@ def Jinv(X, a):
         >>> x.Jinv(a) # equivalent to: pp.Jinv(x, a)
             tensor([[-0.1068,  1.6051, -2.0121],
                     [-0.6726, -0.0345,  0.2493]])
+
+        * :math:`\mathrm{Jinv}`: (:obj:`SE3`, :obj:`se3`) :math:`\mapsto` :obj:`se3`
+
+        >>> x = pp.randn_SE3(2, requires_grad=True)
+        >>> a = pp.randn_se3(2)
+        >>> x.Jinv(a) # equivalent to: pp.Jinv(x, a)
+            tensor([[-1.3803,  0.7891, -0.4268,  0.6917, -0.2167,  0.3333],
+                    [-1.4517, -0.8059,  0.9343,  1.7398,  0.6579,  0.4785]], grad_fn=<ViewBackward0>)
 
     """    
 
