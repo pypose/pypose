@@ -14,7 +14,7 @@ Basics
     Act
     Adj
     AdjT
-    Jinv
+    Jinvp
     Jr
     randn_so3
     randn_SO3

@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from .backends import exp, log, inv, mul, adj
-from .backends import adjT, jinv, act3, act4, toMatrix
+from .backends import adjT, jinvp, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
 from .basics import cumops_, cummul_, cumprod_
 
@@ -107,10 +107,12 @@ class LieType:
         out = self.__op__(self.lid, adjT, X, a)
         return LieTensor(out, ltype=a.ltype)
 
-    def Jinv(self, X, a):
+    def Jinvp(self, X, p):
         if self.on_manifold:
-            raise AttributeError("ltype has no Jinv attribute")
-        return self.__op__(self.lid, jinv, X, a)
+            raise AttributeError("ltype has no Jinvp attribute")
+        assert isinstance(p, LieTensor) and p.ltype.on_manifold, "Args p has to be Lie Algebra"
+        out = self.__op__(self.lid, jinvp, X, p)
+        return LieTensor(out, ltype=p.ltype)
 
     def matrix(self, lietensor):
         """ To 4x4 matrix """
@@ -630,11 +632,11 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.AdjT(self, a)
 
-    def Jinv(self, a):
+    def Jinvp(self, p):
         r'''
-        See :meth:`pypose.Jinv`
+        See :meth:`pypose.Jinvp`
         '''
-        return self.ltype.Jinv(self, a)
+        return self.ltype.Jinvp(self, p)
 
     def Jr(self):
         r'''
