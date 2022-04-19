@@ -715,19 +715,22 @@ def AdjT(X, a):
 
 
 @assert_ltype
-def Jinv(X, a):
-    r"""Perturbation of one LieTensor on another .
+def Jinvp(input, p):
+    r"""
+    The dot product between left Jacobian inverse at the point given
+    by input (Lie Group) and second point (Lie Algebra).
 
     .. math::
-        \mathrm{Jinv}: (\mathcal{G}, \mathcal{g}) \mapsto \mathcal{g}
+        \mathrm{Jinvp}: (\mathcal{G}, \mathcal{g}) \mapsto \mathcal{g}
 
     Args:
-        input (LieTensor): the input LieTensor tuple (Lie Group, Lie Algebra)
+        input (LieTensor): the input LieTensor (Lie Group)
+        p (LieTensor): the second LieTensor (Lie Algebra)
 
     Return:
         LieTensor: the output LieTensor (Lie Algebra)
 
-    .. list-table:: List of supported :math:`\mathrm{Jinv}` map
+    .. list-table:: List of supported :math:`\mathrm{Jinvp}` map
         :widths: 20 20 8 20 20
         :header-rows: 1
 
@@ -781,7 +784,7 @@ def Jinv(X, a):
                              \right.
 
     Note:
-        :math:`\mathrm{Jinv}` is usually used in the Baker-Campbell-Hausdorff formula (BCH formula) when performing LieTensor multiplication.
+        :math:`\mathrm{Jinvp}` is usually used in the Baker-Campbell-Hausdorff formula (BCH formula) when performing LieTensor multiplication.
         One can refer to this paper for more details:
 
         * J. Sola et al., `A micro Lie theory for state estimation in robotics <https://arxiv.org/abs/1812.01537>`_,
@@ -791,17 +794,18 @@ def Jinv(X, a):
     
     Example:
 
-        * :math:`\mathrm{Jinv}`: (:obj:`SO3`, :obj:`so3`) :math:`\mapsto` :obj:`so3`
+        * :math:`\mathrm{Jinvp}`: (:obj:`SO3`, :obj:`so3`) :math:`\mapsto` :obj:`so3`
 
         >>> x = pp.randn_SO3(2)
-        >>> a = pp.randn_so3(2)
-        >>> x.Jinv(a) # equivalent to: pp.Jinv(x, a)
-            tensor([[-0.1068,  1.6051, -2.0121],
-                    [-0.6726, -0.0345,  0.2493]])
+        >>> p = pp.randn_so3(2)
+        >>> x.Jinvp(p) # equivalent to: pp.Jinvp(x, a)
+        so3Type LieTensor:
+        tensor([[ 0.8782,  0.5898, -1.9071],
+                [-0.6499, -0.3977,  0.8115]])
 
-    """    
 
-    return X.Jinv(a)
+    """
+    return input.Jinvp(p)
 
 
 @assert_ltype
