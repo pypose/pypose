@@ -234,5 +234,4 @@ pp.Jr(x)
 
 x = pp.randn_SO3(2)
 p = pp.randn_so3(2)
-p = torch.randn(2,3)
 x.Jinvp(p)
