@@ -353,14 +353,14 @@ def identity_like(liegroup, **kwargs):
     return liegroup.ltype.identity_like(*liegroup.lshape, **kwargs)
 
 
-def identity_SO3(*size, **kwargs):
+def identity_SO3(*lsize, **kwargs):
     r'''
-    Returns idetity :obj:`SO3_type` LieTensor with the given :obj:`size`.
-    Please check :obj:`pp.SO3` for more instructions of the keywords.
+    Returns identity :obj:`SO3_type` LieTensor with the given :obj:`lsize`.
 
     Args:
-        size (int...): a sequence of integers defining the shape of the output tensor.
-            Can be a variable number of arguments or a collection like a list or tuple.
+        lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
+            the output LieTensor. Can be a variable number of arguments or a collection like a
+            list or tuple. If not given, a single :obj:`SO3_type` item will be returned.
 
     Args:
         requires_grad (bool, optional): If autograd should record operations on
@@ -383,18 +383,21 @@ def identity_SO3(*size, **kwargs):
         LieTensor: a :obj:`SO3_type` LieTensor
     
     Example:
-        >>> pp.identity_SO3(3)
+        >>> pp.identity_SO3()
+        SO3Type LieTensor:
+        tensor([0., 0., 0., 1.])
+
+        >>> pp.identity_SO3(2)
         SO3Type LieTensor:
         tensor([[0., 0., 0., 1.],
-                [0., 0., 0., 1.],
                 [0., 0., 0., 1.]])
 
-        >>> pp.identity_SO3(2,1)
+        >>> pp.identity_SO3(2, 1)
         SO3Type LieTensor:
         tensor([[[0., 0., 0., 1.]],
                 [[0., 0., 0., 1.]]])
     '''
-    return SO3_type.identity(*size, **kwargs)
+    return SO3_type.identity(*lsize, **kwargs)
 
 
 def identity_so3(*size, **kwargs):
