@@ -322,31 +322,295 @@ def randn_RxSO3(*size, sigma=1, **kwargs):
 
 
 def identity_like(liegroup, **kwargs):
+    r'''
+     Returns identity LieTensor with the same :obj:`size` and :obj:`ltype` as the given LieTensor.
+
+    Args:
+        requires_grad (bool, optional): If autograd should record operations on
+            the returned tensor. Default: False.
+
+        generator (torch.Generator, optional): a pseudorandom number generator for sampling
+
+        dtype (torch.dtype, optional): the desired data type of returned tensor.
+            Default: if None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+
+        layout (torch.layout, optional): the desired layout of returned Tensor.
+            Default: torch.strided.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, uses the current device for the default tensor
+            type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
+            for CPU tensor types and the current CUDA device for CUDA tensor types.
+    
+    Example:
+        >>> x = pp.randn_SO3(3, device="cuda:0", dtype=torch.double, requires_grad=True)
+        >>> pp.identity_like(x, device="cpu")
+        SO3Type LieTensor:
+        tensor([[0., 0., 0., 1.],
+                [0., 0., 0., 1.],
+                [0., 0., 0., 1.]])
+    '''
     return liegroup.ltype.identity_like(*liegroup.lshape, **kwargs)
 
 
 def identity_SO3(*size, **kwargs):
+    r'''
+    Returns idetity :obj:`SO3_type` LieTensor with the given :obj:`size`.
+    Please check :obj:`pp.SO3` for more instructions of the keywords.
+
+    Args:
+        size (int...): a sequence of integers defining the shape of the output tensor.
+            Can be a variable number of arguments or a collection like a list or tuple.
+
+    Args:
+        requires_grad (bool, optional): If autograd should record operations on
+            the returned tensor. Default: False.
+
+        generator (torch.Generator, optional): a pseudorandom number generator for sampling
+
+        dtype (torch.dtype, optional): the desired data type of returned tensor.
+            Default: if None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+
+        layout (torch.layout, optional): the desired layout of returned Tensor.
+            Default: torch.strided.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, uses the current device for the default tensor
+            type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
+            for CPU tensor types and the current CUDA device for CUDA tensor types.
+    
+    Returns:
+        LieTensor: a :obj:`SO3_type` LieTensor
+    
+    Example:
+        >>> pp.identity_SO3(3)
+        SO3Type LieTensor:
+        tensor([[0., 0., 0., 1.],
+                [0., 0., 0., 1.],
+                [0., 0., 0., 1.]])
+
+        >>> pp.identity_SO3(2,1)
+        SO3Type LieTensor:
+        tensor([[[0., 0., 0., 1.]],
+                [[0., 0., 0., 1.]]])
+    '''
     return SO3_type.identity(*size, **kwargs)
 
 
 def identity_so3(*size, **kwargs):
+    r'''
+    Returns idetity :obj:`so3_type` LieTensor with the given :obj:`size`.
+    Please check :obj:`pp.so3` for more instructions of the keywords.
+
+    Args:
+        size (int...): a sequence of integers defining the shape of the output tensor.
+            Can be a variable number of arguments or a collection like a list or tuple.
+
+        requires_grad (bool, optional): If autograd should record operations on
+            the returned tensor. Default: False.
+
+        generator (torch.Generator, optional): a pseudorandom number generator for sampling
+
+        dtype (torch.dtype, optional): the desired data type of returned tensor.
+            Default: if None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+
+        layout (torch.layout, optional): the desired layout of returned Tensor.
+            Default: torch.strided.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, uses the current device for the default tensor
+            type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
+            for CPU tensor types and the current CUDA device for CUDA tensor types.
+    
+    Returns:
+        LieTensor: a :obj:`so3_type` LieTensor
+    
+    Example:
+        >>> pp.identity_so3(3)
+        so3Type LieTensor:
+        tensor([[0., 0., 0.],
+                [0., 0., 0.],
+                [0., 0., 0.]])
+
+        >>> pp.identity_so3(2,1)
+        so3Type LieTensor:
+        tensor([[[0., 0., 0.]],
+                [[0., 0., 0.]]])
+    '''
     return so3_type.identity(*size, **kwargs)
 
 
 def identity_SE3(*size, **kwargs):
+    r'''
+    Returns idetity :obj:`SE3_type` LieTensor with the given :obj:`size`.
+    Please check :obj:`pp.SE3` for more instructions of the keywords.
+
+    Args:
+        size (int...): a sequence of integers defining the shape of the output tensor.
+            Can be a variable number of arguments or a collection like a list or tuple.
+
+        requires_grad (bool, optional): If autograd should record operations on
+            the returned tensor. Default: False.
+
+        generator (torch.Generator, optional): a pseudorandom number generator for sampling
+
+        dtype (torch.dtype, optional): the desired data type of returned tensor.
+            Default: if None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+
+        layout (torch.layout, optional): the desired layout of returned Tensor.
+            Default: torch.strided.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, uses the current device for the default tensor
+            type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
+            for CPU tensor types and the current CUDA device for CUDA tensor types.
+    
+    Returns:
+        LieTensor: a :obj:`SE3_type` LieTensor
+    
+    Example:
+        >>> pp.identity_SE3(3)
+        SE3Type LieTensor:
+        tensor([[0., 0., 0., 0., 0., 0., 1.],
+                [0., 0., 0., 0., 0., 0., 1.],
+                [0., 0., 0., 0., 0., 0., 1.]])
+
+        >>> pp.identity_SE3(2,1)
+        SE3Type LieTensor:
+        tensor([[[0., 0., 0., 0., 0., 0., 1.]],
+                [[0., 0., 0., 0., 0., 0., 1.]]])
+    '''
     return SE3_type.identity(*size, **kwargs)
 
 
 def identity_se3(*size, **kwargs):
+    r'''
+    Returns idetity :obj:`se3_type` LieTensor with the given :obj:`size`.
+    Please check :obj:`pp.se3` for more instructions of the keywords.
+    
+    Args:
+        size (int...): a sequence of integers defining the shape of the output tensor.
+            Can be a variable number of arguments or a collection like a list or tuple.
+
+        requires_grad (bool, optional): If autograd should record operations on
+            the returned tensor. Default: False.
+
+        generator (torch.Generator, optional): a pseudorandom number generator for sampling
+
+        dtype (torch.dtype, optional): the desired data type of returned tensor.
+            Default: if None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+
+        layout (torch.layout, optional): the desired layout of returned Tensor.
+            Default: torch.strided.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, uses the current device for the default tensor
+            type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
+            for CPU tensor types and the current CUDA device for CUDA tensor types.
+    
+    Returns:
+        LieTensor: a :obj:`se3_type` LieTensor
+    
+    Example:
+        >>> pp.identity_se3(3)
+        se3Type LieTensor:
+        tensor([[0., 0., 0., 0., 0., 0.],
+                [0., 0., 0., 0., 0., 0.],
+                [0., 0., 0., 0., 0., 0.]])
+
+        >>> pp.identity_se3(2,1)
+        se3Type LieTensor:
+        tensor([[0., 0., 0., 0., 0., 0.],
+                [0., 0., 0., 0., 0., 0.]])
+    '''
     return se3_type.identity(*size, **kwargs)
 
 
 def identity_sim3(*size, **kwargs):
+    r'''
+     Returns idetity :obj:`sim3_type` LieTensor with the given :obj:`size`. 
+     Please check :obj:`pp.sim3` for more instructions of the keywords.
+
+    Args:
+        size (int...): a sequence of integers defining the shape of the output tensor.
+            Can be a variable number of arguments or a collection like a list or tuple.
+
+        requires_grad (bool, optional): If autograd should record operations on
+            the returned tensor. Default: False.
+
+        generator (torch.Generator, optional): a pseudorandom number generator for sampling
+
+        dtype (torch.dtype, optional): the desired data type of returned tensor.
+            Default: if None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+
+        layout (torch.layout, optional): the desired layout of returned Tensor.
+            Default: torch.strided.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, uses the current device for the default tensor
+            type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
+            for CPU tensor types and the current CUDA device for CUDA tensor types.
+    
+    Returns:
+        LieTensor: a :obj:`sim3_type` LieTensor
+        
+    Example:
+        >>> identity_sim3(3)
+        sim3Type LieTensor:
+        tensor([[0., 0., 0., 0., 0., 0., 0.],
+                [0., 0., 0., 0., 0., 0., 0.],
+                [0., 0., 0., 0., 0., 0., 0.]])
+
+        >>> identity_sim3(2,1)
+        sim3Type LieTensor:
+        tensor([[[0., 0., 0., 0., 0., 0., 0.]],
+                [[0., 0., 0., 0., 0., 0., 0.]]])
+    '''
     return sim3_type.identity(*size, **kwargs)
 
 
 def identity_Sim3(*size, **kwargs):
-    return Sim3_type.identity(*size, **kwargs)
+    r'''
+    Returns idetity :obj:`Sim3_type` LieTensor with the given :obj:`size`.
+    Please check :obj:`pp.Sim3` for more instructions of the keywords.
+
+    Args:
+        size (int...): a sequence of integers defining the shape of the output tensor.
+            Can be a variable number of arguments or a collection like a list or tuple.
+
+    Args:
+        requires_grad (bool, optional): If autograd should record operations on
+            the returned tensor. Default: False.
+
+        generator (torch.Generator, optional): a pseudorandom number generator for sampling
+
+        dtype (torch.dtype, optional): the desired data type of returned tensor.
+            Default: if None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+
+        layout (torch.layout, optional): the desired layout of returned Tensor.
+            Default: torch.strided.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, uses the current device for the default tensor
+            type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
+            for CPU tensor types and the current CUDA device for CUDA tensor types.
+    
+    Returns:
+        LieTensor: a :obj:`Sim3_type` LieTensor
+        
+    Example:
+        >>> identity_Sim3(3)
+        Sim3Type LieTensor:
+        tensor([[0., 0., 0., 0., 0., 0., 1., 1.],
+                [0., 0., 0., 0., 0., 0., 1., 1.],
+                [0., 0., 0., 0., 0., 0., 1., 1.]])
+
+        >>> identity_Sim3(2,1)
+        Sim3Type LieTensor:
+        tensor([[[0., 0., 0., 0., 0., 0., 1., 1.]],
+                [[0., 0., 0., 0., 0., 0., 1., 1.]]])
+    '''
+    return Sim3_type.identity(*size, **kwargs)    
 
 
 def identity_rxso3(*size, **kwargs):
