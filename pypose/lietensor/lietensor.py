@@ -513,7 +513,8 @@ class LieTensor(torch.Tensor):
 
     def __repr__(self):
         if hasattr(self, 'ltype'):
-            return self.ltype.__class__.__name__ + " LieTensor:\n" + super().__repr__()
+            return self.ltype.__class__.__name__ + \
+                   ' %s:\n'%(self.__class__.__name__) + super().__repr__()
         else:
             return super().__repr__()
 
