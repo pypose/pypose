@@ -503,10 +503,10 @@ class LieTensor(torch.Tensor):
                 grad_fn=<AliasBackward0>)
     """
     def __init__(self, *data, ltype:LieType):
-        tensor = data[0] if isinstance(data[0], torch.Tensor) else torch.Tensor(*data)
-        assert tensor.shape[-1:] == ltype.dimension, 'Dimension Invalid.'
+        assert self.shape[-1:] == ltype.dimension, 'Dimension Invalid.'
         self.ltype = ltype
 
+    @staticmethod
     def __new__(cls, *data, ltype):
         tensor = data[0] if isinstance(data[0], torch.Tensor) else torch.Tensor(*data)
         return torch.Tensor.as_subclass(tensor, LieTensor)
