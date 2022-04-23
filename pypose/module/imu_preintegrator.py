@@ -47,7 +47,30 @@ class IMUPreintegrator(nn.Module):
         IMU Preintegration from duration (dt), angular rate (ang), linear acceleration (acc)
         Uncertainty propagation from measurement covariance (cov): ang_cov, acc_cov
         Known IMU rotation (rot) estimation can be provided for better precision
+        
+        IMU Measurements Propagation:
+        
+        .. math::
+            \begin{align*}
+                {\Delta}R_{ik+1} &= {\Delta}R_{ik} Exp ((w_k - b_i^g) {\Delta}t) \\
+                {\Delta}v_{ik+1} &= {\Delta}v_{ik} + {\Delta}R_{ik} (a_k - b_i^g) {\Delta}t  \\
+                {\Delta}p_{ik+1} &= {\Delta}v_{ik} + {\Delta}v_{ik} {\Delta}t + 1/2 {\Delta}R_{ik} (a_k - b_i^g) {\Delta}t^2
+            \end{align*} 
+            
+            
+        where:
 
+            - :math:`{\Delta}R_{ik}` denote the preintegrated rotation measurement between keyframe i and k   
+            
+            - :math:`{\Delta}v_{ik}` denote the preintegrated velocity measurement between keyframe i and k              
+            
+            - :math:`{\Delta}p_{ik}` denote the preintegrated position measurement between keyframe i and k   
+            
+            - :math:`a_k` is linear acceleration at :math:`k^{th}` keyframe   
+            
+            - :math:`w_k` is angular rate at :math:`k^{th}` keyframe
+
+            
         Uncertainty Propagation:
 
         .. math::
@@ -56,6 +79,38 @@ class IMUPreintegrator(nn.Module):
                 C &= A C A^T + B \mathrm{diag}(C_g, C_a) B^T \\
                   &= A C A^T + B_g C_g B_g^T + B_a C_a B_a^T
             \end{align*}
+        
+        Where :
+         
+        .. math::
+
+            A = \begin{bmatrix}
+                    {\Delta}R_{ik+1}^T & 0_{3*3} \\
+                    -{\Delta}R_{ik} (a_k - b_i^g) \wedge {\Delta}t & I_{3*3} & 0_{3*3} \\
+                    -1/2{\Delta}R_{ik} (a_k - b_i^g) \wedge {\Delta}t^2 & I_{3*3} {\Delta}t & I_{3*3}
+                \end{bmatrix}
+       
+        .. math::
+
+            B_g = \begin{bmatrix}
+                    J_r^k \Delta t  \\
+                    0_{3*3}  \\
+                    0_{3*3} 
+                \end{bmatrix}
+                
+        .. math::
+
+            B_a = \begin{bmatrix}
+                    0_{3*3} \\
+                    {\Delta}R_{ik} {\Delta}t  \\
+                    1/2 {\Delta}R_{ik} {\Delta}t^2
+                \end{bmatrix}
+                
+        
+        C = 9*9 Covarience Matrix 
+        
+        :math:`J_r^k` = right jacobian of Angular rate at k keyframe
+            
 
         Args:
             dt (torch.Tensor): time interval from last update. :obj:`shape`: (1)
@@ -120,6 +175,15 @@ class IMUPreintegrator(nn.Module):
         r"""
         Propagated IMU status.
 
+        .. math::
+            \begin{align*}
+                R_j &= {\Delta}R_{ij} * R_i                \\
+                v_j &= {\Delta}v_{ij} * R_i   + v_i + g \Delta t_{ij} \\
+                p_j &= {\Delta}p_{ij} * R_i   + p_i + v_i \Delta t_{ij} + 1/2 g \Delta t_{ij}^2 \\
+                
+            \end{align*} 
+
+
         Args:
             reset (bool, optional): if reset the preintegrator to initial state. Default: :obj:`True`
 
@@ -134,6 +198,12 @@ class IMUPreintegrator(nn.Module):
 
             - 'cov' (torch.Tensor): covariance (order: rotation, velocity, position). :obj:`shape`: (9, 9)
 
+        IMU State Propagation :
+        
+        
+        
+        
+        
         Note:
             Output covariance (Shape: (9, 9)) is in the order of rotation, velocity, and position.
 
