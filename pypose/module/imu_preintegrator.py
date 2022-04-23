@@ -52,23 +52,22 @@ class IMUPreintegrator(nn.Module):
         
         .. math::
             \begin{align*}
-                {\Delta}R_{ik+1} &= {\Delta}R_{ik} Exp ((w_k - b_i^g) {\Delta}t) \\
+                {\Delta}R_{ik+1} &= {\Delta}R_{ik} \mathrm{Exp} ((w_k - b_i^g) {\Delta}t) \\
                 {\Delta}v_{ik+1} &= {\Delta}v_{ik} + {\Delta}R_{ik} (a_k - b_i^g) {\Delta}t  \\
                 {\Delta}p_{ik+1} &= {\Delta}v_{ik} + {\Delta}v_{ik} {\Delta}t + 1/2 {\Delta}R_{ik} (a_k - b_i^g) {\Delta}t^2
-            \end{align*} 
-            
-            
+            \end{align*}
+
         where:
 
-            - :math:`{\Delta}R_{ik}` denote the preintegrated rotation measurement between keyframe i and k   
-            
-            - :math:`{\Delta}v_{ik}` denote the preintegrated velocity measurement between keyframe i and k              
-            
-            - :math:`{\Delta}p_{ik}` denote the preintegrated position measurement between keyframe i and k   
-            
-            - :math:`a_k` is linear acceleration at :math:`k^{th}` keyframe   
-            
-            - :math:`w_k` is angular rate at :math:`k^{th}` keyframe
+            - :math:`{\Delta}R_{ik}` is the preintegrated rotation between the :math:`i`-th and :math:`k`-th time step.
+
+            - :math:`{\Delta}v_{ik}` is the preintegrated velocity between the :math:`i`-th and :math:`k`-th time step.
+
+            - :math:`{\Delta}p_{ik}` is the preintegrated position between the :math:`i`-th and :math:`k`-th time step.
+
+            - :math:`a_k` is linear acceleration at the :math:`k`-th time step.
+
+            - :math:`w_k` is angular rate at the :math:`k`-{th} time step.
 
             
         Uncertainty Propagation:
@@ -78,39 +77,32 @@ class IMUPreintegrator(nn.Module):
                 B &= [B_g, B_a]                              \\
                 C &= A C A^T + B \mathrm{diag}(C_g, C_a) B^T \\
                   &= A C A^T + B_g C_g B_g^T + B_a C_a B_a^T
-            \end{align*}
-        
-        Where :
-         
-        .. math::
+            \end{align*},
 
+        .. math::
             A = \begin{bmatrix}
                     {\Delta}R_{ik+1}^T & 0_{3*3} \\
-                    -{\Delta}R_{ik} (a_k - b_i^g) \wedge {\Delta}t & I_{3*3} & 0_{3*3} \\
-                    -1/2{\Delta}R_{ik} (a_k - b_i^g) \wedge {\Delta}t^2 & I_{3*3} {\Delta}t & I_{3*3}
-                \end{bmatrix}
-       
-        .. math::
+                    -{\Delta}R_{ik} (a_k - b_i^g)^\wedge {\Delta}t & I_{3*3} & 0_{3*3} \\
+                    -1/2{\Delta}R_{ik} (a_k - b_i^g)^\wedge {\Delta}t^2 & I_{3*3} {\Delta}t & I_{3*3}
+                \end{bmatrix},
 
+        .. math::
             B_g = \begin{bmatrix}
                     J_r^k \Delta t  \\
                     0_{3*3}  \\
                     0_{3*3} 
-                \end{bmatrix}
-                
-        .. math::
+                \end{bmatrix},
 
             B_a = \begin{bmatrix}
                     0_{3*3} \\
                     {\Delta}R_{ik} {\Delta}t  \\
                     1/2 {\Delta}R_{ik} {\Delta}t^2
-                \end{bmatrix}
-                
-        
-        C = 9*9 Covarience Matrix 
-        
-        :math:`J_r^k` = right jacobian of Angular rate at k keyframe
-            
+                \end{bmatrix},
+
+        where :math:`\cdot^\wedge` is the skew matrix (:meth:`pypose.vec2skew`),
+        :math:`C \in\mathbf{R}^{9\times 9}` is the covarience matrix,
+        and :math:`J_r^k` is the right jacobian (:meth:`pypose.Jr`) of integrated rotation
+        :math:`\mathrm{Exp}(w_k{\Delta}t)` at :math:`k`-th time step.            
 
         Args:
             dt (torch.Tensor): time interval from last update. :obj:`shape`: (1)
