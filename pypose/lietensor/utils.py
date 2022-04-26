@@ -599,7 +599,7 @@ def Log(input):
             \mathbf{y}_i = \left[\mathbf{J}_i^{-1}\mathbf{t}_i, \mathrm{Log}(\mathbf{q}_i) \right],
 
         where :math:`\mathrm{Log}` is the Logarithm map for :obj:`SO3_type` input and
-        :math:`\mathbf{J}_i` is the left Jacobian.
+        :math:`\mathbf{J}_i` is the left Jacobian for :obj:`SO3_type` input.
 
     * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`RxSO3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`):
@@ -614,12 +614,60 @@ def Log(input):
       is an instance of :meth:`Sim3`):
 
         Let :math:`\mathbf{t}_i`, :math:`^s\mathbf{q}_i` be the translation and :obj:`RxSO3` parts
-        of :math:`\mathbf{x}_i`, respectively; :math:`\mathbf{y}` be the output.
+        of :math:`\mathbf{x}_i`, respectively; :math:`\boldsymbol{\phi}_i`, :math:`\sigma_i` be the corresponding Lie Algebra of the SO3 and scale part of 
+        :math:`^s\mathbf{q}_i`, :math:`\boldsymbol{\Phi}_i = \theta_i\mathbf{n}_i` be the skew matrix; :math:`s_i = e^\sigma_i`, :math:`\mathbf{y}` be the output.
 
         .. math::
             \mathbf{y}_i = \left[^s\mathbf{J}_i^{-1}\mathbf{t}_i, \mathrm{Log}(^s\mathbf{q}_i) \right],
 
-        where :math:`^s\mathbf{J}_i` is the similarity transformed left Jacobian.
+        where :math:`^s\mathbf{J}_i` is:
+
+            .. math::
+               ^s\mathbf{J}_i = A\boldsymbol{\Phi}_i + B\boldsymbol{\Phi}_i^2 + C\mathbf{I}
+
+        in which if :math:`\|\sigma_i\| > \text{eps}`:
+
+        .. math::
+            C = \frac{e^{\sigma_i} - 1}{\sigma_i}\mathbf{I}
+
+        .. math::
+            A = \left\{
+                            \begin{array}{ll} 
+                                \frac{s_i\sin\theta_i\sigma_i + (1-s_i\cos\theta_i)\theta_i}{\theta_i(\sigma_i^2 + \theta_i^2)}, \quad \|\theta_i\| > \text{eps}, \\
+                                \frac{(\sigma_i-1)s_i+1}{\sigma_i^2}, \quad \|\theta_i\| \leq \text{eps},
+                            \end{array}
+                            \right.
+
+        .. math::
+            B = \left\{
+                            \begin{array}{ll} 
+                                \left( C - \frac{(s_i\cos\theta_i-1)\sigma+ s_i\sin\theta_i\sigma_i}{\theta_i^2+\sigma_i^2}\right)\frac{1}{\theta_i^2}, \quad \|\theta_i\| > \text{eps}, \\
+                                \frac{s_i\sigma_i^2/2 + s_i-1-\sigma_i s_i}{\sigma_i^3}, \quad \|\theta_i\| \leq \text{eps},
+                            \end{array}
+                            \right.
+
+
+        otherwise:
+
+        .. math::
+            C = 1
+
+        .. math::
+            A = \left\{
+                            \begin{array}{ll} 
+                                \frac{1-\cos\theta_i}{\theta_i^2}, \quad \|\theta_i\| > \text{eps}, \\
+                                \frac{1}{2}, \quad \|\theta_i\| \leq \text{eps},
+                            \end{array}
+                            \right.
+
+        .. math::
+            B = \left\{
+                            \begin{array}{ll} 
+                                \frac{\theta_i - \sin\theta_i}{\theta_i^3}, \quad \|\theta_i\| > \text{eps}, \\
+                                \frac{1}{6}, \quad \|\theta_i\| \leq \text{eps},
+                            \end{array}
+                            \right.
+
 
     Note:
         The :math:`\mathrm{arctan}`-based Logarithm map implementation thanks to the paper:
@@ -645,6 +693,13 @@ def Log(input):
         
             .. math::
                 \theta \mathbf{n} = 2\frac{\mathrm{arctan}(\|\boldsymbol{\nu}\|/w)}{\|\boldsymbol{\nu}\|}\boldsymbol{\nu}.
+
+    Warning: 
+        :math:`^s\mathbf{J}_i` in :obj:`Sim3_type` is different from the left Jacobian of Sim3. More details can be found in Eq.(5.7):
+
+        * H. Strasdat, `Local accuracy and global consistency for efficient visual SLAM <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.640.199&rep=rep1&type=pdf>`_, 
+          Dissertation. Department of Computing, Imperial College London, 2012.
+
 
     Example:
 
@@ -777,9 +832,9 @@ def Jinv(X, a):
         .. math::
             \mathrm{coef} = \left\{
                                 \begin{array}{ll} 
-                                    \frac{1}{\theta^2} - \frac{\cos{\frac{\theta}{2}}}{2\theta\sin{\frac{\theta}{2}}}, \quad \|\theta\| > \text{eps}, \\
+                                    \frac{1}{\theta_i^2} - \frac{\cos{\frac{\theta_i}{2}}}{2\theta\sin{\frac{\theta_i}{2}}}, \quad \|\theta_i\| > \text{eps}, \\
                                     \frac{1}{12},
-                                    \quad \|\theta\| \leq \text{eps}
+                                    \quad \|\theta_i\| \leq \text{eps}
                                 \end{array}
                              \right.
 
@@ -787,24 +842,24 @@ def Jinv(X, a):
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`SE3_type` and :obj:`se3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`SE3`, :math:`\mathbf{a}` is an instance of :meth:`se3`). 
       Let :math:`\boldsymbol{\phi}_i = \theta_i\mathbf{n}_i` be the corresponding Lie Algebra of the SO3 part of 
-      :math:`\mathbf{x}_i`, :math:`\boldsymbol{\tau}` be the Lie Algebra of the translation part of :math:`\mathbf{x}_i`; 
-      :math:`\boldsymbol{\Phi}` and :math:`\boldsymbol{\Tau}` be the skew matrices, respectively:
+      :math:`\mathbf{x}_i`, :math:`\boldsymbol{\tau}_i` be the Lie Algebra of the translation part of :math:`\mathbf{x}_i`; 
+      :math:`\boldsymbol{\Phi}_i` and :math:`\boldsymbol{\Tau}_i` be the skew matrices, respectively:
 
         .. math::
             \mathbf{J}^{-1}_i(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
-                                    \mathbf{J}_i^{-1}(\boldsymbol{\Phi}) & -\mathbf{J}_i^{-1}(\boldsymbol{\Phi})\mathbf{Q}(\boldsymbol{\tau}, \boldsymbol{\phi})\mathbf{J}_i^{-1}(\boldsymbol{\Phi}) \\
-                                    \mathbf{0} & \mathbf{J}_i^{-1}(\boldsymbol{\Phi})
+                                    \mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i) & -\mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i)\mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i)\mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i) \\
+                                    \mathbf{0} & \mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i)
                                 \end{array}
                              \right]
 
-        where :math:`\mathbf{J}_i^{-1}(\boldsymbol{\Phi})` is the left Jacobian of the SO3 part of :math:`\mathbf{x}_i`. :math:`\mathbf{Q}_i(\boldsymbol{\tau}, \boldsymbol{\phi})` is 
+        where :math:`\mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i)` is the left Jacobian of the SO3 part of :math:`\mathbf{x}_i`. :math:`\mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i)` is 
 
         .. math::
             \begin{align}
-                \mathbf{Q}_i(\boldsymbol{\tau}, \boldsymbol{\phi}) = \frac{1}{2}\boldsymbol{\Tau} &+ c_1 (\boldsymbol{\Phi\Tau} + \boldsymbol{\Tau\Phi} + \boldsymbol{\Phi\Tau\Phi}) \\
-                                                               &+ c_2 (\boldsymbol{\Phi^2\Tau} + \boldsymbol{\Tau\Phi^2} - 3\boldsymbol{\Phi\Tau\Phi})\\
-                                                               &+ c_3 (\boldsymbol{\Phi\Tau\Phi^2} + \boldsymbol{\Phi^2\Tau\Phi})  
+                \mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i) = \frac{1}{2}\boldsymbol{\Tau}_i &+ c_1 (\boldsymbol{\Phi_i\Tau_i} + \boldsymbol{\Tau_i\Phi_i} + \boldsymbol{\Phi_i\Tau_i\Phi_i}) \\
+                                                               &+ c_2 (\boldsymbol{\Phi_i^2\Tau_i} + \boldsymbol{\Tau_i\Phi_i^2} - 3\boldsymbol{\Phi_i\Tau_i\Phi_i})\\
+                                                               &+ c_3 (\boldsymbol{\Phi_i\Tau_i\Phi_i^2} + \boldsymbol{\Phi_i^2\Tau_i\Phi_i})  
 
             \end{align}
 
@@ -813,9 +868,9 @@ def Jinv(X, a):
         .. math::
             c_1 = \left\{
                     \begin{array}{ll} 
-                        \frac{\theta - \sin\theta}{\theta^3}, \quad \|\theta\| > \text{eps}, \\
-                        \frac{1}{6}-\frac{1}{120}\theta^2,
-                        \quad \|\theta\| \leq \text{eps}
+                        \frac{\theta_i - \sin\theta_i}{\theta_i^3}, \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{1}{6}-\frac{1}{120}\theta_i^2,
+                        \quad \|\theta_i\| \leq \text{eps}
                     \end{array}
                     \right.     
 
@@ -823,27 +878,40 @@ def Jinv(X, a):
        .. math::
             c_2 = \left\{
                     \begin{array}{ll} 
-                        \frac{\theta^2 +2\cos\theta - 2}{2\theta^4}, \quad \|\theta\| > \text{eps}, \\
-                        \frac{1}{24}-\frac{1}{720}\theta^2,
-                        \quad \|\theta\| \leq \text{eps}
+                        \frac{\theta_i^2 +2\cos\theta_i - 2}{2\theta_i^4}, \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{1}{24}-\frac{1}{720}\theta_i^2,
+                        \quad \|\theta_i\| \leq \text{eps}
                     \end{array}
                     \right.
 
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`Sim3_type` and :obj:`sim3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`Sim3`, :math:`\mathbf{a}` is an instance of :meth:`sim3`). 
       Let :math:`\boldsymbol{X}_i` be the Adjoint matrix of :math:`\mathbf{x}_i`, e.g. :math:`\boldsymbol{X}_i = \mathrm{Ad}(\mathbf{x}_i)`,
-      :math:`\boldsymbol{\xi}_i` be the corresponding Lie Algebra of :math:`\mathbf{x}_i`. Notice that :math:`\boldsymbol{\xi}_i^{\curlywedge} = \mathrm{ad}(\boldsymbol{\xi}_i^{\wedge})`
-      is also the Lie algebra of :math:`\boldsymbol{X}_i`, e.g. :math:`\boldsymbol{X}_i = \mathrm{exp}(\boldsymbol{\xi}_i^{\curlywedge})`. 
+      :math:`\boldsymbol{\xi}_i` be the corresponding Lie Algebra of :math:`\mathbf{x}_i`. Notate :math:`\boldsymbol{\xi}_i^{\curlywedge} = \mathrm{ad}(\boldsymbol{\xi}_i^{\wedge})`.
+      Notice that :math:`\boldsymbol{\xi}_i` is also the Lie algebra of :math:`\boldsymbol{X}_i`, e.g. :math:`\boldsymbol{X}_i = \mathrm{exp}(\boldsymbol{\xi}_i^{\curlywedge})`. 
       The inverse of left Jacobian can be approximated as:
 
         .. math::
-            \mathbf{J}^{-1}_i(\mathbf{x}_i) = \sum_{n=0}(-1)^n\frac{B_n}{n!}(\boldsymbol{\xi}^{\curlywedge})^n
+            \mathbf{J}^{-1}_i(\mathbf{x}_i) = \sum_{n=0}(-1)^n\frac{B_n}{n!}(\boldsymbol{\xi}_i^{\curlywedge})^n
 
         where :math:`B_n` are the Bernoulli numbers. :math:`B_0 = 1`, :math:`B_1 = -\frac{1}{2}`, :math:`B_2 = \frac{1}{6}`, :math:`B_3 = 0`, :math:`B_4 = -\frac{1}{30}`.
 
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`RxSO3_type` and :obj:`rxso3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`, :math:`\mathbf{a}` is an instance of :meth:`rxso3`). 
-      The inverse of left Jacobian of :math:`\mathbf{x}` is the same as that for the SO3 part of :math:`\mathbf{x}_i`.
+      Let :math:`\boldsymbol{\phi}_i` be the corresponding Lie Algebra of the SO3 part of 
+      :math:`\mathbf{x}_i`, :math:`\boldsymbol{\Phi}_i` be the skew matrix,
+      The inverse of left Jacobian of :math:`\mathbf{x}_i` is the same as that for the SO3 part of :math:`\mathbf{x}_i`.
+
+        .. math::
+            \mathbf{J}^{-1}_i(\mathbf{x}_i) = \left[
+                                \begin{array}{cc} 
+                                    \mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i) & \mathbf{0} \\
+                                    \mathbf{0} & 1
+                                \end{array}
+                             \right]
+
+        where :math:`\mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i)` is the left Jacobian of the SO3 part of :math:`\mathbf{x}_i`.
+
 
 
     Note:
@@ -860,7 +928,7 @@ def Jinv(X, a):
         Numerical approximation is used based on series expansion. One can refer to Eq.(26) of this paper for more details about the approximation:
 
         * Z. Teed et al., `Tangent Space Backpropagation for 3D Transformation Groups. <https://openaccess.thecvf.com/content/CVPR2021/html/Teed_Tangent_Space_Backpropagation_for_3D_Transformation_Groups_CVPR_2021_paper.html>`_,
-          in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (2021).
+          in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2021).
 
         In particular, the Bernoulli numbers can be obtained from (7.72) of this famous book: 
 
