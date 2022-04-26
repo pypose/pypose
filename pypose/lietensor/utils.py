@@ -751,7 +751,7 @@ def Jinv(X, a):
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times7}`
           - :obj:`sim3_type`
-        * - (:obj:`RxSO3_type`, :obj:`rxSO3_type`)
+        * - (:obj:`RxSO3_type`, :obj:`rxso3_type`)
           - :math:`(\mathcal{G}\in\mathbb{R}^{*\times5}, \mathcal{g}\in\mathbb{R}^{*\times4})`
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
@@ -829,14 +829,21 @@ def Jinv(X, a):
                     \end{array}
                     \right.
 
-       .. math::
-            c_3 = \left\{
-                    \begin{array}{ll} 
-                        \frac{2\theta - 3\sin\theta + \theta\cos\theta}{2\theta^5}, \quad \|\theta\| > \text{eps}, \\
-                        \frac{1}{120}-\frac{1}{2520}\theta^2,
-                        \quad \|\theta\| \leq \text{eps}
-                    \end{array}
-                    \right.
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`Sim3_type` and :obj:`sim3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`Sim3`, :math:`\mathbf{a}` is an instance of :meth:`sim3`). 
+      Let :math:`\boldsymbol{X}_i` be the Adjoint matrix of :math:`\mathbf{x}_i`, e.g. :math:`\boldsymbol{X}_i = \mathrm{Ad}(\mathbf{x}_i)`,
+      :math:`\boldsymbol{\xi}_i` be the corresponding Lie Algebra of :math:`\mathbf{x}_i`. Notice that :math:`\boldsymbol{\xi}_i^{\curlywedge} = \mathrm{ad}(\boldsymbol{\xi}_i^{\wedge})`
+      is also the Lie algebra of :math:`\boldsymbol{X}_i`, e.g. :math:`\boldsymbol{X}_i = \mathrm{exp}(\boldsymbol{\xi}_i^{\curlywedge})`. 
+      The inverse of left Jacobian can be approximated as:
+
+        .. math::
+            \mathbf{J}^{-1}_i(\mathbf{x}_i) = \sum_{n=0}(-1)^n\frac{B_n}{n!}(\boldsymbol{\xi}^{\curlywedge})^n
+
+        where :math:`B_n` are the Bernoulli numbers. :math:`B_0 = 1`, :math:`B_1 = -\frac{1}{2}`, :math:`B_2 = \frac{1}{6}`, :math:`B_3 = 0`, :math:`B_4 = -\frac{1}{30}`.
+
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`RxSO3_type` and :obj:`rxso3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`, :math:`\mathbf{a}` is an instance of :meth:`rxso3`). 
+      The inverse of left Jacobian of :math:`\mathbf{x}` is the same as that for the SO3 part of :math:`\mathbf{x}_i`.
 
 
     Note:
@@ -848,6 +855,18 @@ def Jinv(X, a):
         
         In particular, Eq.(146) is the math used in the :obj:`SO3_type`, :obj:`so3_type` scenario; 
         Eq.(179b) and Eq.(180) are the math used in the :obj:`SE3_type`, :obj:`se3_type` scenario.
+
+        For Lie groups such as :obj:`Sim3_type`, :obj:`sim3_type`, there is no analytic expression for the left Jacobian and its inverse. 
+        Numerical approximation is used based on series expansion. One can refer to Eq.(26) of this paper for more details about the approximation:
+
+        * Z. Teed et al., `Tangent Space Backpropagation for 3D Transformation Groups. <https://openaccess.thecvf.com/content/CVPR2021/html/Teed_Tangent_Space_Backpropagation_for_3D_Transformation_Groups_CVPR_2021_paper.html>`_,
+          in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (2021).
+
+        In particular, the Bernoulli numbers can be obtained from (7.72) of this famous book: 
+
+
+        * T. Barfoot, `State Estimation for Robotics. <https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.708.1086&rep=rep1&type=pdf>`_,
+          Cambridge University Press (2017).
 
     Example:
 
@@ -861,11 +880,28 @@ def Jinv(X, a):
 
         * :math:`\mathrm{Jinv}`: (:obj:`SE3`, :obj:`se3`) :math:`\mapsto` :obj:`se3`
 
-        >>> x = pp.randn_SE3(2, requires_grad=True)
+        >>> x = pp.randn_SE3(2)
         >>> a = pp.randn_se3(2)
         >>> x.Jinv(a) # equivalent to: pp.Jinv(x, a)
             tensor([[-1.3803,  0.7891, -0.4268,  0.6917, -0.2167,  0.3333],
-                    [-1.4517, -0.8059,  0.9343,  1.7398,  0.6579,  0.4785]], grad_fn=<ViewBackward0>)
+                    [-1.4517, -0.8059,  0.9343,  1.7398,  0.6579,  0.4785]])
+
+        * :math:`\mathrm{Jinv}`: (:obj:`Sim3`, :obj:`sim3`) :math:`\mapsto` :obj:`sim3`
+
+        >>> x = pp.randn_Sim3(2)
+        >>> a = pp.randn_sim3(2)
+        >>> x.Jinv(a) # equivalent to: pp.Jinv(x, a)
+            tensor([[ 0.3943, -1.2546,  0.3209,  0.2298, -1.1028, -1.4039,  0.3704],
+                    [-0.3591,  0.4190,  0.2833, -0.3121,  1.6293, -0.8617, -0.7911]])
+
+        * :math:`\mathrm{Jinv}`: (:obj:`RXSO3`, :obj:`rxso3`) :math:`\mapsto` :obj:`rxso3`
+
+        >>> x = pp.randn_RxSO3(2)
+        >>> a = pp.randn_rxso3(2)
+        >>> x.Jinv(a) # equivalent to: pp.Jinv(x, a)
+            tensor([[ 0.1730, -1.3778,  0.1657,  0.1820],
+                    [-1.0347,  1.6627,  0.3992,  0.1227]])
+
 
     """    
 
