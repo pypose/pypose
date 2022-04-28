@@ -1,5 +1,6 @@
-import torch
+import torch, warnings
 from torch import nn, linalg
+from torch.utils._pytree import tree_map
 from .backends import exp, log, inv, mul, adj
 from .backends import adjT, jinvp, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
@@ -509,7 +510,8 @@ class LieTensor(torch.Tensor):
                 grad_fn=<AliasBackward0>)
     """
     def __init__(self, *data, ltype:LieType):
-        assert self.shape[-1:] == ltype.dimension, 'Dimension Invalid.'
+        assert self.shape[-1:] == ltype.dimension, 'Dimension Invalid. Go to{}'.format(
+            'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor')
         self.ltype = ltype
 
     @staticmethod
@@ -532,10 +534,16 @@ class LieTensor(torch.Tensor):
             lietensor = args
             while not isinstance(lietensor, LieTensor):
                 lietensor = lietensor[0]
-            if isinstance(data, (tuple, list)):
-                return (LieTensor(item, ltype=lietensor.ltype)
-                        if isinstance(item, torch.Tensor) else item for item in data)
-            return LieTensor(data, ltype=lietensor.ltype)
+            def warp(t):
+                if isinstance(t, torch.Tensor) and not isinstance(t, cls):
+                    lt = torch.Tensor.as_subclass(t, LieTensor)
+                    lt.ltype = lietensor.ltype
+                    if lt.shape[-1:] != lt.ltype.dimension:
+                        link = 'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor'
+                        warnings.warn('Tensor Shape Invalid by calling {}, go to {}'.format(func, link))
+                    return lt
+                return t
+            return tree_map(warp, data)
         return data
 
     @property
