@@ -887,15 +887,12 @@ def Log(input):
         .. math::
             \mathbf{y}_i = \left[^s\mathbf{W}_i^{-1}\mathbf{t}_i, \mathrm{Log}(^s\mathbf{q}_i) \right],
 
-        where :math:`^s\mathbf{W}_i` is:
+        where
 
             .. math::
                ^s\mathbf{W}_i = A\boldsymbol{\Phi}_i + B\boldsymbol{\Phi}_i^2 + C\mathbf{I}
 
         in which if :math:`\|\sigma_i\| > \text{eps}`:
-
-        .. math::
-            C = \frac{e^{\sigma_i} - 1}{\sigma_i}\mathbf{I}
 
         .. math::
             A = \left\{
@@ -916,10 +913,10 @@ def Log(input):
                 \end{array}
             \right.
 
-        otherwise:
-
         .. math::
-            C = 1
+            C = \frac{e^{\sigma_i} - 1}{\sigma_i}\mathbf{I}
+
+        otherwise:
 
         .. math::
             A = \left\{
@@ -936,6 +933,9 @@ def Log(input):
                         \frac{1}{6}, \quad \|\theta_i\| \leq \text{eps},
                     \end{array}
                 \right.
+
+        .. math::
+            C = 1
 
     Note:
         The :math:`\mathrm{arctan}`-based Logarithm map implementation thanks to the paper:
@@ -1178,7 +1178,7 @@ def Jinvp(input, p):
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`RxSO3_type` and :obj:`rxso3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`, :math:`\mathbf{a}` is an instance of :meth:`rxso3`). 
       Let :math:`\boldsymbol{\phi}_i` be the corresponding Lie Algebra of the SO3 part of 
-      :math:`\mathbf{x}_i`, :math:`\boldsymbol{\Phi}_i` be the skew matrix,
+      :math:`\mathbf{x}_i`, :math:`\boldsymbol{\Phi}_i` be the skew matrix (:meth:`pypose.vec2skew`),
       The inverse of left Jacobian of :math:`\mathbf{x}_i` is the same as that for the SO3 part of :math:`\mathbf{x}_i`.
 
         .. math::
@@ -1209,12 +1209,13 @@ def Jinvp(input, p):
         One can refer to Eq. (26) of this paper for more details about the approximation:
 
         * Z. Teed et al., `Tangent Space Backpropagation for 3D Transformation Groups.
-          <https://openaccess.thecvf.com/content/CVPR2021/html/Teed_Tangent_Space_Backpropagation_for_3D_Transformation_Groups_CVPR_2021_paper.html>`_,
-          in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2021).
+          <https://arxiv.org/pdf/2103.12032.pdf>`_, in IEEE/CVF Conference on Computer Vision and
+          Pattern Recognition (CVPR) (2021).
 
         In particular, the Bernoulli numbers can be obtained from Eq. (7.72) of this famous book:
 
-        * T. Barfoot, `State Estimation for Robotics. <https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.708.1086&rep=rep1&type=pdf>`_,
+        * T. Barfoot, `State Estimation for Robotics.
+          <https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.708.1086&rep=rep1&type=pdf>`_,
           Cambridge University Press (2017).
 
     Example:
