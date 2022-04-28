@@ -1,5 +1,5 @@
 import torch
-from torch import nn
+from torch import nn, linalg
 from .backends import exp, log, inv, mul, adj
 from .backends import adjT, jinvp, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
@@ -216,6 +216,12 @@ class SO3Type(LieType):
         X.index_fill_(dim=-1, index=torch.tensor([-1], device=X.device), value=1)
         return X
 
+    def Jr(self, X):
+        """
+        Right jacobian of SO(3)
+        """
+        return X.Log().Jr()
+
 
 class so3Type(LieType):
     def __init__(self):
@@ -242,16 +248,16 @@ class so3Type(LieType):
 
     def Jr(self, x):
         """
-        Right jacobian of SO(3)
+        Right jacobian of so(3)
         The code is taken from the Sophus codebase :
         https://github.com/XueLianjie/BA_schur/blob/3af9a94248d4a272c53cfc7acccea4d0208b77f7/thirdparty/Sophus/sophus/so3.hpp#L113
         """
         I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.shape[:-1]+(3,3))
-        theta = torch.linalg.norm(x)
+        theta = linalg.norm(x)
         if theta < 1e-5:
             return I
         K = vec2skew(torch.nn.functional.normalize(x, dim=-1))
-        return I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/torch.linalg.norm(x**3) * K@K
+        return I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/linalg.norm(x**3) * K@K
 
 
 class SE3Type(LieType):
