@@ -1154,7 +1154,7 @@ def Jinvp(input, p):
                     \end{array}
                     \right.
 
-       .. math::
+        .. math::
             c_2 = \left\{
                     \begin{array}{ll} 
                         \frac{\theta_i^2 +2\cos\theta_i - 2}{2\theta_i^4}, \quad \|\theta_i\| > \text{eps}, \\
@@ -1162,6 +1162,16 @@ def Jinvp(input, p):
                         \quad \|\theta_i\| \leq \text{eps}
                     \end{array}
                     \right.
+
+        .. math::
+            c_3 = \left\{
+                    \begin{array}{ll} 
+                        \frac{2\theta_i - 3\sin\theta_i + \theta_i\cos\theta_i}{2\theta_i^5}, 
+                        \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{1}{120}-\frac{1}{2520}\theta_i^2,
+                        \quad \|\theta_i\| \leq \text{eps}
+                    \end{array}
+                    \right.           
 
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`Sim3_type` and :obj:`sim3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`Sim3`, :math:`\mathbf{a}` is an instance of :meth:`sim3`).
