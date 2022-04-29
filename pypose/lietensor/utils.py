@@ -323,7 +323,10 @@ def randn_RxSO3(*size, sigma=1, **kwargs):
 
 def identity_like(liegroup, **kwargs):
     r'''
-     Returns identity LieTensor with the same :obj:`size` and :obj:`ltype` as the given LieTensor.
+     Returns identity LieTensor with the same :obj:`lsize` and :obj:`ltype` as the given LieTensor.
+
+    Args:
+        liegroup (LieTensor): the size of liegroup will determine the size of the output tensor. 
 
     Args:
         requires_grad (bool, optional): If autograd should record operations on
@@ -400,15 +403,16 @@ def identity_SO3(*lsize, **kwargs):
     return SO3_type.identity(*lsize, **kwargs)
 
 
-def identity_so3(*size, **kwargs):
+def identity_so3(*lsize, **kwargs):
     r'''
-    Returns idetity :obj:`so3_type` LieTensor with the given :obj:`size`.
-    Please check :obj:`pp.so3` for more instructions of the keywords.
+    Returns identity :obj:`so3_type` LieTensor with the given :obj:`lsize`.
 
     Args:
-        size (int...): a sequence of integers defining the shape of the output tensor.
-            Can be a variable number of arguments or a collection like a list or tuple.
+        lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
+            the output LieTensor. Can be a variable number of arguments or a collection like a
+            list or tuple. If not given, a single :obj:`so3_type` item will be returned.
 
+    Args:
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
 
@@ -429,10 +433,13 @@ def identity_so3(*size, **kwargs):
         LieTensor: a :obj:`so3_type` LieTensor
     
     Example:
-        >>> pp.identity_so3(3)
+        >>> pp.identity_so3()
+        so3Type LieTensor:
+        tensor([0., 0., 0.])
+
+        >>> pp.identity_so3(2)
         so3Type LieTensor:
         tensor([[0., 0., 0.],
-                [0., 0., 0.],
                 [0., 0., 0.]])
 
         >>> pp.identity_so3(2,1)
@@ -440,17 +447,19 @@ def identity_so3(*size, **kwargs):
         tensor([[[0., 0., 0.]],
                 [[0., 0., 0.]]])
     '''
-    return so3_type.identity(*size, **kwargs)
+    return so3_type.identity(*lsize, **kwargs)
 
 
-def identity_SE3(*size, **kwargs):
+def identity_SE3(*lsize, **kwargs):
     r'''
-    Returns idetity :obj:`SE3_type` LieTensor with the given :obj:`size`.
-    Please check :obj:`pp.SE3` for more instructions of the keywords.
+    Returns identity :obj:`SE3_type` LieTensor with the given :obj:`lsize`.
 
     Args:
-        size (int...): a sequence of integers defining the shape of the output tensor.
-            Can be a variable number of arguments or a collection like a list or tuple.
+        lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
+            the output LieTensor. Can be a variable number of arguments or a collection like a
+            list or tuple. If not given, a single :obj:`SE3_type` item will be returned.
+    
+    Args:
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
@@ -472,10 +481,13 @@ def identity_SE3(*size, **kwargs):
         LieTensor: a :obj:`SE3_type` LieTensor
     
     Example:
-        >>> pp.identity_SE3(3)
+        >>> pp.identity_SE3()
+        SE3Type LieTensor:
+        tensor([0., 0., 0., 0., 0., 0., 1.])
+
+        >>> pp.identity_SE3(2)
         SE3Type LieTensor:
         tensor([[0., 0., 0., 0., 0., 0., 1.],
-                [0., 0., 0., 0., 0., 0., 1.],
                 [0., 0., 0., 0., 0., 0., 1.]])
 
         >>> pp.identity_SE3(2,1)
@@ -483,18 +495,19 @@ def identity_SE3(*size, **kwargs):
         tensor([[[0., 0., 0., 0., 0., 0., 1.]],
                 [[0., 0., 0., 0., 0., 0., 1.]]])
     '''
-    return SE3_type.identity(*size, **kwargs)
+    return SE3_type.identity(*lsize, **kwargs)
 
 
-def identity_se3(*size, **kwargs):
+def identity_se3(*lsize, **kwargs):
     r'''
-    Returns idetity :obj:`se3_type` LieTensor with the given :obj:`size`.
-    Please check :obj:`pp.se3` for more instructions of the keywords.
+    Returns identity :obj:`se3_type` LieTensor with the given :obj:`lsize`.
     
     Args:
-        size (int...): a sequence of integers defining the shape of the output tensor.
-            Can be a variable number of arguments or a collection like a list or tuple.
+        lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
+            the output LieTensor. Can be a variable number of arguments or a collection like a
+            list or tuple. If not given, a single :obj:`se3_type` item will be returned.
 
+    Args:
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
 
@@ -515,10 +528,13 @@ def identity_se3(*size, **kwargs):
         LieTensor: a :obj:`se3_type` LieTensor
     
     Example:
-        >>> pp.identity_se3(3)
+        >>> pp.identity_se3()
+        se3Type LieTensor:
+        tensor([0., 0., 0., 0., 0., 0.])
+
+        >>> pp.identity_se3(2)
         se3Type LieTensor:
         tensor([[0., 0., 0., 0., 0., 0.],
-                [0., 0., 0., 0., 0., 0.],
                 [0., 0., 0., 0., 0., 0.]])
 
         >>> pp.identity_se3(2,1)
@@ -526,18 +542,19 @@ def identity_se3(*size, **kwargs):
         tensor([[0., 0., 0., 0., 0., 0.],
                 [0., 0., 0., 0., 0., 0.]])
     '''
-    return se3_type.identity(*size, **kwargs)
+    return se3_type.identity(*lsize, **kwargs)
 
 
-def identity_sim3(*size, **kwargs):
+def identity_sim3(*lsize, **kwargs):
     r'''
-     Returns idetity :obj:`sim3_type` LieTensor with the given :obj:`size`. 
-     Please check :obj:`pp.sim3` for more instructions of the keywords.
+     Returns identity :obj:`sim3_type` LieTensor with the given :obj:`lsize`. 
 
     Args:
-        size (int...): a sequence of integers defining the shape of the output tensor.
-            Can be a variable number of arguments or a collection like a list or tuple.
+        lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
+            the output LieTensor. Can be a variable number of arguments or a collection like a
+            list or tuple. If not given, a single :obj:`sim3_type` item will be returned.
 
+    Args:
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
 
@@ -558,10 +575,13 @@ def identity_sim3(*size, **kwargs):
         LieTensor: a :obj:`sim3_type` LieTensor
         
     Example:
-        >>> identity_sim3(3)
+        >>> pp.identity_sim3()
+        sim3Type LieTensor:
+        tensor([0., 0., 0., 0., 0., 0., 0.])
+
+        >>> identity_sim3(2)
         sim3Type LieTensor:
         tensor([[0., 0., 0., 0., 0., 0., 0.],
-                [0., 0., 0., 0., 0., 0., 0.],
                 [0., 0., 0., 0., 0., 0., 0.]])
 
         >>> identity_sim3(2,1)
@@ -569,17 +589,17 @@ def identity_sim3(*size, **kwargs):
         tensor([[[0., 0., 0., 0., 0., 0., 0.]],
                 [[0., 0., 0., 0., 0., 0., 0.]]])
     '''
-    return sim3_type.identity(*size, **kwargs)
+    return sim3_type.identity(*lsize, **kwargs)
 
 
-def identity_Sim3(*size, **kwargs):
+def identity_Sim3(*lsize, **kwargs):
     r'''
-    Returns idetity :obj:`Sim3_type` LieTensor with the given :obj:`size`.
-    Please check :obj:`pp.Sim3` for more instructions of the keywords.
+    Returns identity :obj:`Sim3_type` LieTensor with the given :obj:`lsize`.
 
     Args:
-        size (int...): a sequence of integers defining the shape of the output tensor.
-            Can be a variable number of arguments or a collection like a list or tuple.
+        lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
+            the output LieTensor. Can be a variable number of arguments or a collection like a
+            list or tuple. If not given, a single :obj:`Sim3_type` item will be returned.
 
     Args:
         requires_grad (bool, optional): If autograd should record operations on
@@ -602,10 +622,13 @@ def identity_Sim3(*size, **kwargs):
         LieTensor: a :obj:`Sim3_type` LieTensor
         
     Example:
-        >>> identity_Sim3(3)
+        >>> pp.identity_Sim3()
+        Sim3Type LieTensor:
+        tensor([0., 0., 0., 0., 0., 0., 1., 1.])
+
+        >>> identity_Sim3(2)
         Sim3Type LieTensor:
         tensor([[0., 0., 0., 0., 0., 0., 1., 1.],
-                [0., 0., 0., 0., 0., 0., 1., 1.],
                 [0., 0., 0., 0., 0., 0., 1., 1.]])
 
         >>> identity_Sim3(2,1)
@@ -613,7 +636,7 @@ def identity_Sim3(*size, **kwargs):
         tensor([[[0., 0., 0., 0., 0., 0., 1., 1.]],
                 [[0., 0., 0., 0., 0., 0., 1., 1.]]])
     '''
-    return Sim3_type.identity(*size, **kwargs)    
+    return Sim3_type.identity(*lsize, **kwargs)    
 
 
 def identity_rxso3(*size, **kwargs):
