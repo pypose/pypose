@@ -699,7 +699,7 @@ def Exp(input):
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times5}`
           - :obj:`RxSO3_type`
 
-    Note:
+    Warning:
         This function :func:`Exp()` is different from :func:`exp()`, which returns
         a new torch tensor with the exponential of the elements of the input tensor.
 
