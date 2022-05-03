@@ -18,7 +18,6 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
                      'index_select', 'masked_select', 'index_copy', 'index_copy_',
                      'select', 'select_scatter', 'index_put','index_put_']
 
-LIETENSOR_EPS = 1e-6
 
 class LieType:
     '''LieTensor Type Base Class'''
