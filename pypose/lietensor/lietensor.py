@@ -18,6 +18,7 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
                      'index_select', 'masked_select', 'index_copy', 'index_copy_',
                      'select', 'select_scatter', 'index_put','index_put_']
 
+LIETENSOR_EPS = 1e-6
 
 class LieType:
     '''LieTensor Type Base Class'''
@@ -253,12 +254,11 @@ class so3Type(LieType):
         The code is taken from the Sophus codebase :
         https://github.com/XueLianjie/BA_schur/blob/3af9a94248d4a272c53cfc7acccea4d0208b77f7/thirdparty/Sophus/sophus/so3.hpp#L113
         """
-        I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.shape[:-1]+(3,3))
-        theta = linalg.norm(x)
-        if theta < 1e-5:
-            return I
-        K = vec2skew(torch.nn.functional.normalize(x, dim=-1))
-        return I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/linalg.norm(x**3) * K@K
+        K = vec2skew(x)
+        theta = torch.linalg.norm(x, dim=-1, keepdim=True)
+        I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.lshape+(3, 3))
+        Jr = I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/theta**3 * K@K
+        return torch.where(theta>torch.finfo(x.dtype).eps, Jr, I)
 
 
 class SE3Type(LieType):
@@ -672,7 +672,7 @@ class LieTensor(torch.Tensor):
             tensor([[ 0.1196,  0.2339, -0.6824,  0.6822],
                     [ 0.9198, -0.2704, -0.2395,  0.1532]])
         '''
-        return self.data
+        return torch.Tensor(self)
 
     def matrix(self) -> torch.Tensor:
         r'''
