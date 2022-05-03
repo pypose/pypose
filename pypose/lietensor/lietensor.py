@@ -254,7 +254,7 @@ class so3Type(LieType):
         https://github.com/XueLianjie/BA_schur/blob/3af9a94248d4a272c53cfc7acccea4d0208b77f7/thirdparty/Sophus/sophus/so3.hpp#L113
         """
         K = vec2skew(x)
-        theta = torch.linalg.norm(x, dim=-1, keepdim=True)
+        theta = torch.linalg.norm(x, dim=-1, keepdim=True).unsqueeze(-1)
         I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.lshape+(3, 3))
         Jr = I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/theta**3 * K@K
         return torch.where(theta>torch.finfo(x.dtype).eps, Jr, I)
