@@ -34,9 +34,9 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
     v = input.tensor() if hasattr(input, 'ltype') else input
     assert v.shape[-1] == 3, "Last dim should be 3"
     O = torch.zeros(v.shape[:-1], device=v.device, dtype=v.dtype, requires_grad=v.requires_grad)
-    return torch.stack([torch.stack([      O, -v[:,2],  v[:,1]], dim=-1),
-                        torch.stack([ v[:,2],       O, -v[:,0]], dim=-1),
-                        torch.stack([-v[:,1],  v[:,0],       O], dim=-1)], dim=-1)
+    return torch.stack([torch.stack([        O, -v[...,2],  v[...,1]], dim=-1),
+                        torch.stack([ v[...,2],         O, -v[...,0]], dim=-1),
+                        torch.stack([-v[...,1],  v[...,0],         O], dim=-1)], dim=-1)
 
 
 def cumops_(input, dim, ops):
