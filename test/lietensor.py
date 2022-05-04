@@ -243,3 +243,8 @@ def func(x):
 
 J = jacobian(func, p)
 print(J)
+
+x = pp.randn_so3(2,1,2, requires_grad=True)
+J = x.Jr()
+print(x.shape, J.shape)
+assert J.requires_grad is True

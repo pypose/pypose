@@ -1294,4 +1294,23 @@ def Jinvp(input, p):
 
 @assert_ltype
 def Jr(x):
+    r"""
+    The batched right Jacobian of a LieTensor.
+
+    Args:
+        input (LieTensor): the input LieTensor (either Lie Group or Lie Algebra)
+
+    Return:
+        Tensor: the right Jocobian Matrices
+
+    Example:
+
+    * :math:`\mathrm{Jr}`: :meth:`so3` :math:`\mapsto` :math:`\mathcal{R}^{*\times 3\times 3}`
+
+    >>> x = pp.randn_so3(requires_grad=True)
+    >>> x.Jr()
+    tensor([[ 0.9289, -0.3053, -0.0895],
+            [ 0.3180,  0.9082,  0.1667],
+            [ 0.0104, -0.1889,  0.9757]], grad_fn=<SWhereBackward0>)
+    """
     return x.Jr()
