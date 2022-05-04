@@ -905,10 +905,10 @@ def Log(input):
       is an instance of :meth:`Sim3`):
 
         Let :math:`\mathbf{t}_i`, :math:`^s\mathbf{q}_i` be the translation and :obj:`RxSO3` parts
-        of :math:`\mathbf{x}_i`, respectively; :math:`\boldsymbol{\phi}_i`, :math:`\sigma_i` be the
-        corresponding Lie Algebra of the SO3 and scale part of :math:`^s\mathbf{q}_i`,
-        :math:`\boldsymbol{\Phi}_i = \theta_i\mathbf{n}_i` be the skew matrix;
-        :math:`s_i = e^\sigma_i`, :math:`\mathbf{y}` be the output.
+        of :math:`\mathbf{x}_i`, respectively; :math:`\boldsymbol{\phi}_i`, :math:`\sigma_i` be the corresponding 
+        Lie Algebra of the SO3 and scale part of :math:`^s\mathbf{q}_i`, :math:`\boldsymbol{\Phi}_i` be the skew 
+        matrix of :math:`\boldsymbol{\phi}_i`, :math:`\boldsymbol{\phi}_i` can be represented as 
+        :math:`\theta_i\mathbf{n}_i`, :math:`s_i = e^\sigma_i`, :math:`\mathbf{y}` be the output.
 
         .. math::
             \mathbf{y}_i = \left[^s\mathbf{W}_i^{-1}\mathbf{t}_i, \mathrm{Log}(^s\mathbf{q}_i) \right],
