@@ -1,5 +1,5 @@
 ---
-name: Refactoring
+name: 🛠️ Refactoring
 about: Suggest a refactoring of the code
 title: ''
 labels: ''
