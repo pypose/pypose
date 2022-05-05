@@ -66,25 +66,29 @@ def cumprod_(input, dim):
 
 
 def cumops(input, dim, ops):
-    r"""Returns the cumulative customized operation of LieTensor elements of input in the dimension dim.
-
-    For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
+    r"""Returns the cumulative user-defined operation of LieTensor along a dimension.
 
     .. math::
-        y_i = x_1~\mathrm{ops}~x_2 ~\mathrm{ops}~ \cdots ~\mathrm{ops}~ x_i
+        y_i = x_1~\mathrm{\circ}~x_2 ~\mathrm{\circ}~ \cdots ~\mathrm{\circ}~ x_i,
+
+    where :math:`\mathrm{\circ}` is the user-defined operation and :math:`x_i,~y_i`
+    are the :math:`i`-th LieType item along the :obj:`dim` dimension of input and
+    output, respectively.
 
     Args:
         input (LieTensor): the input LieTensor
         dim (int): the dimension to do the operation over
-        ops (func): the function to be customized
+        ops (func): the user-defined operation or function
 
     Returns:
         LieTensor: LieTensor
 
     Note:
-        - The users are supposed to provide meaningful customized operation.
-        - It doesn't check whether the results are valid for mathematical
+        - The users are supposed to provide meaningful operation.
+        - This function doesn't check whether the results are valid for mathematical
           definition of LieTensor, e.g., quaternion.
+        - The time complexity of the function is :math:`\mathcal{O}(\log N)`, where
+          :math:`N` is the LieTensor size along the :obj:`dim` dimension.
 
     Examples:
         >>> input = pp.randn_SE3(2)
@@ -101,19 +105,24 @@ def cumops(input, dim, ops):
 
 
 def cummul(input, dim):
-    r"""Returns the cumulative multiplication (*) of LieTensor elements of input in the dimension dim.
-
-    For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
+    r"""Returns the cumulative multiplication (*) of LieTensor along a dimension.
 
     .. math::
-        y_i = x_1 * x_2 * \cdots @ x_i
+        y_i = x_1 * x_2 * \cdots * x_i,
+
+    where :math:`x_i,~y_i` are the :math:`i`-th LieType item along the :obj:`dim`
+    dimension of input and output, respectively.
 
     Args:
-        input (LieTensor): the input tenso
-        dim (int): the dimension to do the operation over
+        input (LieTensor): the input LieTensor
+        dim (int): the dimension to do the multiplication over
 
     Returns:
         LieTensor: The LieTensor
+
+    Note:
+        - The time complexity of the function is :math:`\mathcal{O}(\log N)`, where
+          :math:`N` is the LieTensor size along the :obj:`dim` dimension.
 
     Examples:
         >>> input = pp.randn_SE3(2)
@@ -126,19 +135,24 @@ def cummul(input, dim):
 
 
 def cumprod(input, dim):
-    r"""Returns the cumulative product (@) of LieTensor elements of input in the dimension dim.
-
-    For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
+    r"""Returns the cumulative product (@) of LieTensor along a dimension.
 
     .. math::
-        y_i = x_1 @ x_2 @ \cdots @ x_i
+        y_i = x_1 ~@~ x_2 ~@~ \cdots ~@~ x_i,
+
+    where :math:`x_i,~y_i` are the :math:`i`-th LieType item along the :obj:`dim`
+    dimension of input and output, respectively.
 
     Args:
-        input (LieTensor): the input tenso
+        input (LieTensor): the input LieTensor
         dim (int): the dimension to do the operation over
 
     Returns:
         LieTensor: The LieTensor
+
+    Note:
+        - The time complexity of the function is :math:`\mathcal{O}(\log N)`, where
+          :math:`N` is the LieTensor size along the :obj:`dim` dimension.
 
     Examples:
         >>> input = pp.randn_SE3(2)
