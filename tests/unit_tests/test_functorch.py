@@ -14,6 +14,10 @@ import torch
 from functorch import vmap, jacrev
 
 def huber_cost(e, delta=0.1):
+    '''
+    This is the definition used by Ceres Solver.
+    http://ceres-solver.org/nnls_modeling.html#instances
+    '''
     n = torch.norm(e)
 
     if n <= delta:
@@ -22,11 +26,25 @@ def huber_cost(e, delta=0.1):
     return delta * ( torch.sqrt(n) - 0.5 * delta )
 
 def huber_cost_v(e, delta=torch.Tensor([0.1])):
+    '''
+    This is the definition used by Ceres Solver.
+    http://ceres-solver.org/nnls_modeling.html#instances
+    '''
     n = torch.norm(e)
     m = n <= delta
     m = m.type(torch.float)
     return m * ( 0.5 * n ) + (1 - m) * delta * ( torch.sqrt(n) - 0.5 * delta )
 
+class MyTensor(torch.Tensor):
+    def __init__(self, *args, **kwargs):
+        pass
+
+    @staticmethod
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls, *args, **kwargs)
+
+    def my_func(self):
+        return self
 class Test_functorch(unittest.TestCase):
     def test_robust_cost_function(self):
         print()
@@ -59,3 +77,13 @@ class Test_functorch(unittest.TestCase):
                 f'robust cost function failed with \
                 e = {e}\njacobian = {jacobian} \
                 e.grad.unsqueeze(1) = {e.grad.unsqueeze(1)} ')
+
+    def test_inherited_type(self):
+        print()
+        show_delimeter('Test functorch with inherited type. ')
+
+        # x = MyTensor((0.5,))
+        # y = torch.Tensor((1,))
+
+        # f = lambda a, b: a.my_func() * b
+        # j = jacrev(f)(x, y)
