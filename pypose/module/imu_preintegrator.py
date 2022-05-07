@@ -15,7 +15,7 @@ class IMUPreintegrator(nn.Module):
 
     Args:
         position (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
-        rotation (pypose.SO3, optional): initial rotation. Default: :meth:`pypose.identity_SO3`
+        rotation (pypose.SO3, optional): initial rotation. Default: :math:`pypose.identity_SO3`
         velocity (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
         gravity (float, optional): the gravity acceleration. Default: 9.81007
     """
@@ -53,8 +53,8 @@ class IMUPreintegrator(nn.Module):
         .. math::
             \begin{align*}
                 {\Delta}R_{ik+1} &= {\Delta}R_{ik} \mathrm{Exp} ((w_k - b_i^g) {\Delta}t) \\
-                {\Delta}v_{ik+1} &= {\Delta}v_{ik} + {\Delta}R_{ik} (a_k - b_i^g) {\Delta}t  \\
-                {\Delta}p_{ik+1} &= {\Delta}v_{ik} + {\Delta}v_{ik} {\Delta}t + 1/2 {\Delta}R_{ik} (a_k - b_i^g) {\Delta}t^2
+                {\Delta}v_{ik+1} &= {\Delta}v_{ik} + {\Delta}R_{ik} (a_k - b_i^a) {\Delta}t  \\
+                {\Delta}p_{ik+1} &= {\Delta}v_{ik} + {\Delta}v_{ik} {\Delta}t + 1/2 {\Delta}R_{ik} (a_k - b_i^a) {\Delta}t^2
             \end{align*}
 
         where:
@@ -75,7 +75,7 @@ class IMUPreintegrator(nn.Module):
         .. math::
             \begin{align*}
                 B &= [B_g, B_a]                              \\
-                C &= A C A^T + B \mathrm{diag}(C_g, C_a) B^T \\
+                C_{ik+1} &= A C_{ik} A^T + B \mathrm{diag}(C_g, C_a) B^T \\
                   &= A C A^T + B_g C_g B_g^T + B_a C_a B_a^T
             \end{align*},
 
@@ -115,6 +115,29 @@ class IMUPreintegrator(nn.Module):
             acc_cov (torch.Tensor, optional): covariance matrix of linear acceleration.
                 :obj:`shape`: (3, 3). Default: :obj:`torch.eye(3)*(2.0*10**-3)**2`  (Adapted from
                 Euroc dataset)
+
+        Example:
+
+            >>> p = torch.zeros(3)
+            >>> r = pp.identity_SO3()
+            >>> v = torch.zeros(3)
+
+
+            >>> # Preintegrator Initialisation
+            >>> integrator = pp.module.IMUPreintegrator(p,r,v)
+            >>> ang = torch.tensor([0.1,0.1,0.1])
+            >>> acc = torch.tensor([0.1,0.1,0.1])
+            >>> rot = pp.mat2SO3(torch.eye(3))
+            >>> dt = torch.tensor([0.002])
+
+            >>> # Update Function
+            >>> integrator.update(dt, ang, acc, rot)
+            >>> integrator.update(dt, ang, acc, rot)
+
+            >>> # Forward Function
+            >>> print(integrator()['vel'])
+            tensor([ 0.0004,  0.0004, -0.0388])
+
 
         Example:
 
