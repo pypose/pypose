@@ -31,13 +31,12 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
                 [ 2.2059,  0.0000,  0.2929],
                 [ 1.2761, -0.2929,  0.0000]]])
     """
-    assert input.shape[-1] == 3, "Last dim should be 3"
-    shape, v = input.shape, input.view(-1,3)
-    S = torch.zeros(v.shape[:-1]+(3,3), device=v.device, dtype=v.dtype)
-    S[:,0,1], S[:,0,2] = -v[:,2],  v[:,1]
-    S[:,1,0], S[:,1,2] =  v[:,2], -v[:,0]
-    S[:,2,0], S[:,2,1] = -v[:,1],  v[:,0]
-    return S.view(shape[:-1]+(3,3))
+    v = input.tensor() if hasattr(input, 'ltype') else input
+    assert v.shape[-1] == 3, "Last dim should be 3"
+    O = torch.zeros(v.shape[:-1], device=v.device, dtype=v.dtype, requires_grad=v.requires_grad)
+    return torch.stack([torch.stack([        O, -v[...,2],  v[...,1]], dim=-1),
+                        torch.stack([ v[...,2],         O, -v[...,0]], dim=-1),
+                        torch.stack([-v[...,1],  v[...,0],         O], dim=-1)], dim=-1)
 
 
 def cumops_(input, dim, ops):
@@ -67,25 +66,29 @@ def cumprod_(input, dim):
 
 
 def cumops(input, dim, ops):
-    r"""Returns the cumulative customized operation of LieTensor elements of input in the dimension dim.
-
-    For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
+    r"""Returns the cumulative user-defined operation of LieTensor along a dimension.
 
     .. math::
-        y_i = x_1~\mathrm{ops}~x_2 ~\mathrm{ops}~ \cdots ~\mathrm{ops}~ x_i
+        y_i = x_1~\mathrm{\circ}~x_2 ~\mathrm{\circ}~ \cdots ~\mathrm{\circ}~ x_i,
+
+    where :math:`\mathrm{\circ}` is the user-defined operation and :math:`x_i,~y_i`
+    are the :math:`i`-th LieType item along the :obj:`dim` dimension of input and
+    output, respectively.
 
     Args:
         input (LieTensor): the input LieTensor
         dim (int): the dimension to do the operation over
-        ops (func): the function to be customized
+        ops (func): the user-defined operation or function
 
     Returns:
         LieTensor: LieTensor
 
     Note:
-        - The users are supposed to provide meaningful customized operation.
-        - It doesn't check whether the results are valid for mathematical
+        - The users are supposed to provide meaningful operation.
+        - This function doesn't check whether the results are valid for mathematical
           definition of LieTensor, e.g., quaternion.
+        - The time complexity of the function is :math:`\mathcal{O}(\log N)`, where
+          :math:`N` is the LieTensor size along the :obj:`dim` dimension.
 
     Examples:
         >>> input = pp.randn_SE3(2)
@@ -102,19 +105,24 @@ def cumops(input, dim, ops):
 
 
 def cummul(input, dim):
-    r"""Returns the cumulative multiplication (*) of LieTensor elements of input in the dimension dim.
-
-    For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
+    r"""Returns the cumulative multiplication (*) of LieTensor along a dimension.
 
     .. math::
-        y_i = x_1 * x_2 * \cdots @ x_i
+        y_i = x_1 * x_2 * \cdots * x_i,
+
+    where :math:`x_i,~y_i` are the :math:`i`-th LieType item along the :obj:`dim`
+    dimension of input and output, respectively.
 
     Args:
-        input (LieTensor): the input tenso
-        dim (int): the dimension to do the operation over
+        input (LieTensor): the input LieTensor
+        dim (int): the dimension to do the multiplication over
 
     Returns:
         LieTensor: The LieTensor
+
+    Note:
+        - The time complexity of the function is :math:`\mathcal{O}(\log N)`, where
+          :math:`N` is the LieTensor size along the :obj:`dim` dimension.
 
     Examples:
         >>> input = pp.randn_SE3(2)
@@ -127,19 +135,24 @@ def cummul(input, dim):
 
 
 def cumprod(input, dim):
-    r"""Returns the cumulative product (@) of LieTensor elements of input in the dimension dim.
-
-    For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
+    r"""Returns the cumulative product (@) of LieTensor along a dimension.
 
     .. math::
-        y_i = x_1 @ x_2 @ \cdots @ x_i
+        y_i = x_1 ~@~ x_2 ~@~ \cdots ~@~ x_i,
+
+    where :math:`x_i,~y_i` are the :math:`i`-th LieType item along the :obj:`dim`
+    dimension of input and output, respectively.
 
     Args:
-        input (LieTensor): the input tenso
+        input (LieTensor): the input LieTensor
         dim (int): the dimension to do the operation over
 
     Returns:
         LieTensor: The LieTensor
+
+    Note:
+        - The time complexity of the function is :math:`\mathcal{O}(\log N)`, where
+          :math:`N` is the LieTensor size along the :obj:`dim` dimension.
 
     Examples:
         >>> input = pp.randn_SE3(2)

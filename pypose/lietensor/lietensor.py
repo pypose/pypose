@@ -1,5 +1,7 @@
-import torch
+
+import torch, warnings
 from torch import nn, linalg
+from torch.utils._pytree import tree_map
 from .backends import exp, log, inv, mul, adj
 from .backends import adjT, jinvp, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
@@ -252,12 +254,13 @@ class so3Type(LieType):
         The code is taken from the Sophus codebase :
         https://github.com/XueLianjie/BA_schur/blob/3af9a94248d4a272c53cfc7acccea4d0208b77f7/thirdparty/Sophus/sophus/so3.hpp#L113
         """
-        I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.shape[:-1]+(3,3))
-        theta = linalg.norm(x)
-        if theta < 1e-5:
-            return I
-        K = vec2skew(torch.nn.functional.normalize(x, dim=-1))
-        return I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/linalg.norm(x**3) * K@K
+
+        K = vec2skew(x)
+        theta = torch.linalg.norm(x, dim=-1, keepdim=True).unsqueeze(-1)
+        I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.lshape+(3, 3))
+        Jr = I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/theta**3 * K@K
+        return torch.where(theta>torch.finfo(x.dtype).eps, Jr, I)
+
 
 
 class SE3Type(LieType):
@@ -509,7 +512,8 @@ class LieTensor(torch.Tensor):
                 grad_fn=<AliasBackward0>)
     """
     def __init__(self, *data, ltype:LieType):
-        assert self.shape[-1:] == ltype.dimension, 'Dimension Invalid.'
+        assert self.shape[-1:] == ltype.dimension, 'Dimension Invalid. Go to{}'.format(
+            'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor')
         self.ltype = ltype
 
     @staticmethod
@@ -532,10 +536,16 @@ class LieTensor(torch.Tensor):
             lietensor = args
             while not isinstance(lietensor, LieTensor):
                 lietensor = lietensor[0]
-            if isinstance(data, (tuple, list)):
-                return (LieTensor(item, ltype=lietensor.ltype)
-                        if isinstance(item, torch.Tensor) else item for item in data)
-            return LieTensor(data, ltype=lietensor.ltype)
+            def warp(t):
+                if isinstance(t, torch.Tensor) and not isinstance(t, cls):
+                    lt = torch.Tensor.as_subclass(t, LieTensor)
+                    lt.ltype = lietensor.ltype
+                    if lt.shape[-1:] != lt.ltype.dimension:
+                        link = 'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor'
+                        warnings.warn('Tensor Shape Invalid by calling {}, go to {}'.format(func, link))
+                    return lt
+                return t
+            return tree_map(warp, data)
         return data
 
     @property
@@ -664,7 +674,7 @@ class LieTensor(torch.Tensor):
             tensor([[ 0.1196,  0.2339, -0.6824,  0.6822],
                     [ 0.9198, -0.2704, -0.2395,  0.1532]])
         '''
-        return self.data
+        return torch.Tensor(self)
 
     def matrix(self) -> torch.Tensor:
         r'''

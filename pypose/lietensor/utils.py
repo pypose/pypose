@@ -323,7 +323,10 @@ def randn_RxSO3(*size, sigma=1, **kwargs):
 
 def identity_like(liegroup, **kwargs):
     r'''
-     Returns identity LieTensor with the same :obj:`size` and :obj:`ltype` as the given LieTensor.
+     Returns identity LieTensor with the same :obj:`lsize` and :obj:`ltype` as the given LieTensor.
+
+    Args:
+        liegroup (LieTensor): the size of liegroup will determine the size of the output tensor. 
 
     Args:
         requires_grad (bool, optional): If autograd should record operations on
@@ -400,15 +403,16 @@ def identity_SO3(*lsize, **kwargs):
     return SO3_type.identity(*lsize, **kwargs)
 
 
-def identity_so3(*size, **kwargs):
+def identity_so3(*lsize, **kwargs):
     r'''
-    Returns idetity :obj:`so3_type` LieTensor with the given :obj:`size`.
-    Please check :obj:`pp.so3` for more instructions of the keywords.
+    Returns identity :obj:`so3_type` LieTensor with the given :obj:`lsize`.
 
     Args:
-        size (int...): a sequence of integers defining the shape of the output tensor.
-            Can be a variable number of arguments or a collection like a list or tuple.
+        lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
+            the output LieTensor. Can be a variable number of arguments or a collection like a
+            list or tuple. If not given, a single :obj:`so3_type` item will be returned.
 
+    Args:
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
 
@@ -429,10 +433,13 @@ def identity_so3(*size, **kwargs):
         LieTensor: a :obj:`so3_type` LieTensor
     
     Example:
-        >>> pp.identity_so3(3)
+        >>> pp.identity_so3()
+        so3Type LieTensor:
+        tensor([0., 0., 0.])
+
+        >>> pp.identity_so3(2)
         so3Type LieTensor:
         tensor([[0., 0., 0.],
-                [0., 0., 0.],
                 [0., 0., 0.]])
 
         >>> pp.identity_so3(2,1)
@@ -440,17 +447,19 @@ def identity_so3(*size, **kwargs):
         tensor([[[0., 0., 0.]],
                 [[0., 0., 0.]]])
     '''
-    return so3_type.identity(*size, **kwargs)
+    return so3_type.identity(*lsize, **kwargs)
 
 
-def identity_SE3(*size, **kwargs):
+def identity_SE3(*lsize, **kwargs):
     r'''
-    Returns idetity :obj:`SE3_type` LieTensor with the given :obj:`size`.
-    Please check :obj:`pp.SE3` for more instructions of the keywords.
+    Returns identity :obj:`SE3_type` LieTensor with the given :obj:`lsize`.
 
     Args:
-        size (int...): a sequence of integers defining the shape of the output tensor.
-            Can be a variable number of arguments or a collection like a list or tuple.
+        lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
+            the output LieTensor. Can be a variable number of arguments or a collection like a
+            list or tuple. If not given, a single :obj:`SE3_type` item will be returned.
+    
+    Args:
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
@@ -472,10 +481,13 @@ def identity_SE3(*size, **kwargs):
         LieTensor: a :obj:`SE3_type` LieTensor
     
     Example:
-        >>> pp.identity_SE3(3)
+        >>> pp.identity_SE3()
+        SE3Type LieTensor:
+        tensor([0., 0., 0., 0., 0., 0., 1.])
+
+        >>> pp.identity_SE3(2)
         SE3Type LieTensor:
         tensor([[0., 0., 0., 0., 0., 0., 1.],
-                [0., 0., 0., 0., 0., 0., 1.],
                 [0., 0., 0., 0., 0., 0., 1.]])
 
         >>> pp.identity_SE3(2,1)
@@ -483,18 +495,19 @@ def identity_SE3(*size, **kwargs):
         tensor([[[0., 0., 0., 0., 0., 0., 1.]],
                 [[0., 0., 0., 0., 0., 0., 1.]]])
     '''
-    return SE3_type.identity(*size, **kwargs)
+    return SE3_type.identity(*lsize, **kwargs)
 
 
-def identity_se3(*size, **kwargs):
+def identity_se3(*lsize, **kwargs):
     r'''
-    Returns idetity :obj:`se3_type` LieTensor with the given :obj:`size`.
-    Please check :obj:`pp.se3` for more instructions of the keywords.
+    Returns identity :obj:`se3_type` LieTensor with the given :obj:`lsize`.
     
     Args:
-        size (int...): a sequence of integers defining the shape of the output tensor.
-            Can be a variable number of arguments or a collection like a list or tuple.
+        lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
+            the output LieTensor. Can be a variable number of arguments or a collection like a
+            list or tuple. If not given, a single :obj:`se3_type` item will be returned.
 
+    Args:
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
 
@@ -515,10 +528,13 @@ def identity_se3(*size, **kwargs):
         LieTensor: a :obj:`se3_type` LieTensor
     
     Example:
-        >>> pp.identity_se3(3)
+        >>> pp.identity_se3()
+        se3Type LieTensor:
+        tensor([0., 0., 0., 0., 0., 0.])
+
+        >>> pp.identity_se3(2)
         se3Type LieTensor:
         tensor([[0., 0., 0., 0., 0., 0.],
-                [0., 0., 0., 0., 0., 0.],
                 [0., 0., 0., 0., 0., 0.]])
 
         >>> pp.identity_se3(2,1)
@@ -526,18 +542,19 @@ def identity_se3(*size, **kwargs):
         tensor([[0., 0., 0., 0., 0., 0.],
                 [0., 0., 0., 0., 0., 0.]])
     '''
-    return se3_type.identity(*size, **kwargs)
+    return se3_type.identity(*lsize, **kwargs)
 
 
-def identity_sim3(*size, **kwargs):
+def identity_sim3(*lsize, **kwargs):
     r'''
-     Returns idetity :obj:`sim3_type` LieTensor with the given :obj:`size`. 
-     Please check :obj:`pp.sim3` for more instructions of the keywords.
+     Returns identity :obj:`sim3_type` LieTensor with the given :obj:`lsize`. 
 
     Args:
-        size (int...): a sequence of integers defining the shape of the output tensor.
-            Can be a variable number of arguments or a collection like a list or tuple.
+        lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
+            the output LieTensor. Can be a variable number of arguments or a collection like a
+            list or tuple. If not given, a single :obj:`sim3_type` item will be returned.
 
+    Args:
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
 
@@ -558,10 +575,13 @@ def identity_sim3(*size, **kwargs):
         LieTensor: a :obj:`sim3_type` LieTensor
         
     Example:
-        >>> identity_sim3(3)
+        >>> pp.identity_sim3()
+        sim3Type LieTensor:
+        tensor([0., 0., 0., 0., 0., 0., 0.])
+
+        >>> identity_sim3(2)
         sim3Type LieTensor:
         tensor([[0., 0., 0., 0., 0., 0., 0.],
-                [0., 0., 0., 0., 0., 0., 0.],
                 [0., 0., 0., 0., 0., 0., 0.]])
 
         >>> identity_sim3(2,1)
@@ -569,17 +589,17 @@ def identity_sim3(*size, **kwargs):
         tensor([[[0., 0., 0., 0., 0., 0., 0.]],
                 [[0., 0., 0., 0., 0., 0., 0.]]])
     '''
-    return sim3_type.identity(*size, **kwargs)
+    return sim3_type.identity(*lsize, **kwargs)
 
 
-def identity_Sim3(*size, **kwargs):
+def identity_Sim3(*lsize, **kwargs):
     r'''
-    Returns idetity :obj:`Sim3_type` LieTensor with the given :obj:`size`.
-    Please check :obj:`pp.Sim3` for more instructions of the keywords.
+    Returns identity :obj:`Sim3_type` LieTensor with the given :obj:`lsize`.
 
     Args:
-        size (int...): a sequence of integers defining the shape of the output tensor.
-            Can be a variable number of arguments or a collection like a list or tuple.
+        lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
+            the output LieTensor. Can be a variable number of arguments or a collection like a
+            list or tuple. If not given, a single :obj:`Sim3_type` item will be returned.
 
     Args:
         requires_grad (bool, optional): If autograd should record operations on
@@ -602,10 +622,13 @@ def identity_Sim3(*size, **kwargs):
         LieTensor: a :obj:`Sim3_type` LieTensor
         
     Example:
-        >>> identity_Sim3(3)
+        >>> pp.identity_Sim3()
+        Sim3Type LieTensor:
+        tensor([0., 0., 0., 0., 0., 0., 1., 1.])
+
+        >>> identity_Sim3(2)
         Sim3Type LieTensor:
         tensor([[0., 0., 0., 0., 0., 0., 1., 1.],
-                [0., 0., 0., 0., 0., 0., 1., 1.],
                 [0., 0., 0., 0., 0., 0., 1., 1.]])
 
         >>> identity_Sim3(2,1)
@@ -613,7 +636,7 @@ def identity_Sim3(*size, **kwargs):
         tensor([[[0., 0., 0., 0., 0., 0., 1., 1.]],
                 [[0., 0., 0., 0., 0., 0., 1., 1.]]])
     '''
-    return Sim3_type.identity(*size, **kwargs)    
+    return Sim3_type.identity(*lsize, **kwargs)    
 
 
 def identity_rxso3(*size, **kwargs):
@@ -842,14 +865,15 @@ def Log(input):
         If :math:`\|\boldsymbol{\nu}_i\| > \text{eps}`:
 
             .. math::
-                \mathbf{y}_i = \left\{
-                                \begin{array}{ll} 
-                                    2\frac{\mathrm{arctan}(\|\boldsymbol{\nu}_i\|/w_i)}{\|
-                                    \boldsymbol{\nu}_i\|}\boldsymbol{\nu}_i, \quad \|w_i\| > \text{eps}, \\
-                                    \mathrm{sign}(w_i) \frac{\pi}{\|\boldsymbol{\nu}_i\|}\boldsymbol{\nu}_i,
-                                    \quad \|w_i\| \leq \text{eps},
-                                \end{array}
-                             \right.
+                \mathbf{y}_i = 
+                    \left\{
+                        \begin{array}{ll} 
+                            2\frac{\mathrm{arctan}(\|\boldsymbol{\nu}_i\|/w_i)}{\|
+                            \boldsymbol{\nu}_i\|}\boldsymbol{\nu}_i, \quad \|w_i\| > \text{eps}, \\
+                            \mathrm{sign}(w_i) \frac{\pi}{\|\boldsymbol{\nu}_i\|}\boldsymbol{\nu}_i,
+                            \quad \|w_i\| \leq \text{eps},
+                        \end{array}
+                    \right.
 
         otherwise:
 
@@ -866,7 +890,7 @@ def Log(input):
             \mathbf{y}_i = \left[\mathbf{J}_i^{-1}\mathbf{t}_i, \mathrm{Log}(\mathbf{q}_i) \right],
 
         where :math:`\mathrm{Log}` is the Logarithm map for :obj:`SO3_type` input and
-        :math:`\mathbf{J}_i` is the left Jacobian.
+        :math:`\mathbf{J}_i` is the left Jacobian for :obj:`SO3_type` input.
 
     * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`RxSO3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`):
@@ -881,12 +905,63 @@ def Log(input):
       is an instance of :meth:`Sim3`):
 
         Let :math:`\mathbf{t}_i`, :math:`^s\mathbf{q}_i` be the translation and :obj:`RxSO3` parts
-        of :math:`\mathbf{x}_i`, respectively; :math:`\mathbf{y}` be the output.
+        of :math:`\mathbf{x}_i`, respectively; :math:`\boldsymbol{\phi}_i`, :math:`\sigma_i` be the corresponding 
+        Lie Algebra of the SO3 and scale part of :math:`^s\mathbf{q}_i`, :math:`\boldsymbol{\Phi}_i` be the skew 
+        matrix of :math:`\boldsymbol{\phi}_i`, :math:`\boldsymbol{\phi}_i` can be represented as 
+        :math:`\theta_i\mathbf{n}_i`, :math:`s_i = e^\sigma_i`, :math:`\mathbf{y}` be the output.
 
         .. math::
-            \mathbf{y}_i = \left[^s\mathbf{J}_i^{-1}\mathbf{t}_i, \mathrm{Log}(^s\mathbf{q}_i) \right],
+            \mathbf{y}_i = \left[^s\mathbf{W}_i^{-1}\mathbf{t}_i, \mathrm{Log}(^s\mathbf{q}_i) \right],
 
-        where :math:`^s\mathbf{J}_i` is the similarity transformed left Jacobian.
+        where
+
+            .. math::
+               ^s\mathbf{W}_i = A\boldsymbol{\Phi}_i + B\boldsymbol{\Phi}_i^2 + C\mathbf{I}
+
+        in which if :math:`\|\sigma_i\| > \text{eps}`:
+
+        .. math::
+            A = \left\{
+                    \begin{array}{ll} 
+                        \frac{s_i\sin\theta_i\sigma_i + (1-s_i\cos\theta_i)\theta_i}
+                        {\theta_i(\sigma_i^2 + \theta_i^2)}, \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{(\sigma_i-1)s_i+1}{\sigma_i^2}, \quad \|\theta_i\| \leq \text{eps},
+                    \end{array}
+                \right.
+
+        .. math::
+            B = 
+            \left\{
+                \begin{array}{ll} 
+                    \left( C - \frac{(s_i\cos\theta_i-1)\sigma+ s_i\sin\theta_i\sigma_i}
+                    {\theta_i^2+\sigma_i^2}\right)\frac{1}{\theta_i^2}, \quad \|\theta_i\| > \text{eps}, \\
+                    \frac{s_i\sigma_i^2/2 + s_i-1-\sigma_i s_i}{\sigma_i^3}, \quad \|\theta_i\| \leq \text{eps},
+                \end{array}
+            \right.
+
+        .. math::
+            C = \frac{e^{\sigma_i} - 1}{\sigma_i}\mathbf{I}
+
+        otherwise:
+
+        .. math::
+            A = \left\{
+                    \begin{array}{ll} 
+                        \frac{1-\cos\theta_i}{\theta_i^2}, \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{1}{2}, \quad \|\theta_i\| \leq \text{eps},
+                    \end{array}
+                \right.
+
+        .. math::
+            B = \left\{
+                    \begin{array}{ll} 
+                        \frac{\theta_i - \sin\theta_i}{\theta_i^3}, \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{1}{6}, \quad \|\theta_i\| \leq \text{eps},
+                    \end{array}
+                \right.
+
+        .. math::
+            C = 1
 
     Note:
         The :math:`\mathrm{arctan}`-based Logarithm map implementation thanks to the paper:
@@ -895,23 +970,32 @@ def Log(input):
           Representation through Encapsulation of Manifolds <https://doi.org/10.1016/j.inffus.2011.08.003>`_,
           Information Fusion, 2013.
 
-        Assume we have a unit rotation axis :math:`\mathbf{n}` and rotation angle :math:`\theta~(0\leq\theta<2\pi)`, then
-        the corresponding quaternion with unit norm :math:`\mathbf{q}` can be represented as
+        Assume we have a unit rotation axis :math:`\mathbf{n}` and rotation angle
+        :math:`\theta~(0\leq\theta<2\pi)`, then the corresponding quaternion with
+        unit norm :math:`\mathbf{q}` can be represented as
 
             .. math::
                 \mathbf{q} = \left[\sin(\theta/2) \mathbf{n}, \cos(\theta/2) \right]
 
-        Therefore, given a quaternion :math:`\mathbf{q}=[\boldsymbol{\nu}, w]`, where :math:`\boldsymbol{\nu}` is the vector part,
-        :math:`w` is the scalar part, to find the corresponding rotation vector , the rotation angle :math:`\theta` can be obtained as 
+        Therefore, given a quaternion :math:`\mathbf{q}=[\boldsymbol{\nu}, w]`, where :math:`\boldsymbol{\nu}`
+        is the vector part, :math:`w` is the scalar part, to find the corresponding rotation vector ,
+        the rotation angle :math:`\theta` can be obtained as 
 
             .. math::
                 \theta = 2\mathrm{arctan}(\|\boldsymbol{\nu}\|/w),~\|\boldsymbol{\nu}\| = \sin(\theta/2), 
 
-        The unit rotation axis :math:`\mathbf{n}` can be obtained as :math:`\mathbf{n} = \frac{\boldsymbol{\nu}}{{\|\boldsymbol{\nu}\|}}`.     
-        Hence, the corresponding rotation vector is 
-        
+        The unit rotation axis :math:`\mathbf{n}` can be obtained as :math:`\mathbf{n} =
+        \frac{\boldsymbol{\nu}}{{\|\boldsymbol{\nu}\|}}`. Hence, the corresponding rotation vector is 
+
             .. math::
-                \theta \mathbf{n} = 2\frac{\mathrm{arctan}(\|\boldsymbol{\nu}\|/w)}{\|\boldsymbol{\nu}\|}\boldsymbol{\nu}.
+                \theta \mathbf{n} = 2\frac{\mathrm{arctan}
+                (\|\boldsymbol{\nu}\|/w)}{\|\boldsymbol{\nu}\|}\boldsymbol{\nu}.
+
+        More details about :math:`^s\mathbf{W}_i` in :obj:`Sim3_type` can be found in Eq. (5.7):
+
+        * H. Strasdat, `Local accuracy and global consistency for efficient visual SLAM
+          <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.640.199&rep=rep1&type=pdf>`_, 
+          Dissertation. Department of Computing, Imperial College London, 2012.
 
     Example:
 
@@ -1021,100 +1105,129 @@ def Jinvp(input, p):
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times7}`
           - :obj:`sim3_type`
-        * - (:obj:`RxSO3_type`, :obj:`rxSO3_type`)
+        * - (:obj:`RxSO3_type`, :obj:`rxso3_type`)
           - :math:`(\mathcal{G}\in\mathbb{R}^{*\times5}, \mathcal{g}\in\mathbb{R}^{*\times4})`
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :obj:`rxso3_type`
 
-    Let the input be (:math:`\mathbf{x}`, :math:`\mathbf{a}`), :math:`\mathbf{y}` be the output.
+    Let the input be (:math:`\mathbf{x}`, :math:`\mathbf{p}`), :math:`\mathbf{y}` be the output.
 
         .. math::
-            \mathbf{y}_i = \mathbf{J}^{-1}_i(\mathbf{x}_i)\mathbf{a}_i,
+            \mathbf{y}_i = \mathbf{J}^{-1}_i(\mathbf{x}_i)\mathbf{p}_i,
 
-        where :math:`\mathbf{J}^{-1}_i(\mathbf{x}_i)` is the left-Jacobian of :math:`\mathbf{x}_i`. 
+        where :math:`\mathbf{J}^{-1}_i(\mathbf{x}_i)` is the inverse of left Jacobian of :math:`\mathbf{x}_i`. 
 
-    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`SO3_type` and :obj:`so3_type`
-      (input :math:`\mathbf{x}` is an instance of :meth:`SO3`, :math:`\mathbf{a}` is an instance of :meth:`so3`). 
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`SO3_type` and :obj:`so3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`SO3`, :math:`\mathbf{p}` is an instance of :meth:`so3`).
       Let :math:`\boldsymbol{\phi}_i = \theta_i\mathbf{n}_i` be the corresponding Lie Algebra of :math:`\mathbf{x}_i`, 
-      :math:`\boldsymbol{\Phi}_i` be the skew matrix of :math:`\boldsymbol{\phi}_i`:
+      :math:`\boldsymbol{\Phi}_i` be the skew matrix (:meth:`pypose.vec2skew`) of :math:`\boldsymbol{\phi}_i`:
 
         .. math::
             \mathbf{J}^{-1}_i(\mathbf{x}_i) = \mathbf{I} - \frac{1}{2}\boldsymbol{\Phi}_i +
             \mathrm{coef}\boldsymbol{\Phi}_i^2
 
-        where :math:`\mathbf{I}` is the identity matrix with the same dimension as :math:`\boldsymbol{\Phi}_i`, and 
+      where :math:`\mathbf{I}` is the identity matrix with the same dimension as :math:`\boldsymbol{\Phi}_i`, and 
 
         .. math::
             \mathrm{coef} = \left\{
                                 \begin{array}{ll} 
-                                    \frac{1}{\theta^2} - \frac{\cos{\frac{\theta}{2}}}{2\theta\sin{\frac{\theta}{2}}},
-                                    \quad \|\theta\| > \text{eps}, \\
-                                    \frac{1}{12}, \quad \|\theta\| \leq \text{eps}
+                                    \frac{1}{\theta_i^2} - \frac{\cos{\frac{\theta_i}{2}}}{2\theta\sin{\frac{\theta_i}{2}}},
+                                    \quad \|\theta_i\| > \text{eps}, \\
+                                    \frac{1}{12},
+                                    \quad \|\theta_i\| \leq \text{eps}
                                 \end{array}
                              \right.
 
-
-    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`SE3_type` and :obj:`se3_type`
-      (input :math:`\mathbf{x}` is an instance of :meth:`SE3`, :math:`\mathbf{a}` is an instance of :meth:`se3`). 
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`SE3_type` and :obj:`se3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`SE3`, :math:`\mathbf{p}` is an instance of :meth:`se3`).
       Let :math:`\boldsymbol{\phi}_i = \theta_i\mathbf{n}_i` be the corresponding Lie Algebra of the SO3 part of 
-      :math:`\mathbf{x}_i`, :math:`\boldsymbol{\tau}` be the Lie Algebra of the translation part of :math:`\mathbf{x}_i`; 
-      :math:`\boldsymbol{\Phi}` and :math:`\boldsymbol{\Tau}` be the skew matrices, respectively:
+      :math:`\mathbf{x}_i`, :math:`\boldsymbol{\tau}_i` be the Lie Algebra of the translation part of :math:`\mathbf{x}_i`; 
+      :math:`\boldsymbol{\Phi}_i` and :math:`\boldsymbol{\Tau}_i` be the skew matrices, respectively:
 
         .. math::
             \mathbf{J}^{-1}_i(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
-                                    \mathbf{J}_i^{-1}(\boldsymbol{\Phi}) & -\mathbf{J}_i^{-1}
-                                    (\boldsymbol{\Phi})\mathbf{Q}(\boldsymbol{\tau},
-                                    \boldsymbol{\phi})\mathbf{J}_i^{-1}(\boldsymbol{\Phi}) \\
-                                    \mathbf{0} & \mathbf{J}_i^{-1}(\boldsymbol{\Phi})
+                                    \mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i) & -\mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i)
+                                    \mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i)\mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i) \\
+                                    \mathbf{0} & \mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i)
                                 \end{array}
                              \right]
 
-        where :math:`\mathbf{J}_i^{-1}(\boldsymbol{\Phi})` is the left Jacobian of
-        the SO3 part of :math:`\mathbf{x}_i`. :math:`\mathbf{Q}_i(\boldsymbol{\tau}, \boldsymbol{\phi})` is 
+        where :math:`\mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i)` is the inverse of left Jacobian of the SO3 part of :math:`\mathbf{x}_i`.
+        :math:`\mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i)` is 
 
         .. math::
-            \begin{align}
-                \mathbf{Q}_i(\boldsymbol{\tau}, \boldsymbol{\phi}) =
-                \frac{1}{2}\boldsymbol{\Tau} &+ c_1 (\boldsymbol{\Phi\Tau} +
-                \boldsymbol{\Tau\Phi} + \boldsymbol{\Phi\Tau\Phi}) \\
-                &+ c_2 (\boldsymbol{\Phi^2\Tau} + \boldsymbol{\Tau\Phi^2} - 3\boldsymbol{\Phi\Tau\Phi})\\
-                &+ c_3 (\boldsymbol{\Phi\Tau\Phi^2} + \boldsymbol{\Phi^2\Tau\Phi})  
-
-            \end{align}
+            \begin{align*}
+                \mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i) = \frac{1}{2}\boldsymbol{\Tau}_i &+ c_1
+                (\boldsymbol{\Phi_i\Tau_i} + \boldsymbol{\Tau_i\Phi_i} + \boldsymbol{\Phi_i\Tau_i\Phi_i}) \\
+                 &+ c_2 (\boldsymbol{\Phi_i^2\Tau_i} + \boldsymbol{\Tau_i\Phi_i^2} - 3\boldsymbol{\Phi_i\Tau_i\Phi_i})\\
+                 &+ c_3 (\boldsymbol{\Phi_i\Tau_i\Phi_i^2} + \boldsymbol{\Phi_i^2\Tau_i\Phi_i})  
+            \end{align*}
 
         where,
 
         .. math::
             c_1 = \left\{
                     \begin{array}{ll} 
-                        \frac{\theta - \sin\theta}{\theta^3}, \quad \|\theta\| > \text{eps}, \\
-                        \frac{1}{6}-\frac{1}{120}\theta^2,
-                        \quad \|\theta\| \leq \text{eps}
+                        \frac{\theta_i - \sin\theta_i}{\theta_i^3}, \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{1}{6}-\frac{1}{120}\theta_i^2,
+                        \quad \|\theta_i\| \leq \text{eps}
                     \end{array}
-                    \right.     
+                    \right.
 
-
-       .. math::
+        .. math::
             c_2 = \left\{
                     \begin{array}{ll} 
-                        \frac{\theta^2 +2\cos\theta - 2}{2\theta^4}, \quad \|\theta\| > \text{eps}, \\
-                        \frac{1}{24}-\frac{1}{720}\theta^2,
-                        \quad \|\theta\| \leq \text{eps}
+                        \frac{\theta_i^2 +2\cos\theta_i - 2}{2\theta_i^4}, \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{1}{24}-\frac{1}{720}\theta_i^2,
+                        \quad \|\theta_i\| \leq \text{eps}
                     \end{array}
                     \right.
 
-       .. math::
+        .. math::
             c_3 = \left\{
                     \begin{array}{ll} 
-                        \frac{2\theta - 3\sin\theta + \theta\cos\theta}{2\theta^5},
-                        \quad \|\theta\| > \text{eps}, \\
-                        \frac{1}{120}-\frac{1}{2520}\theta^2,
-                        \quad \|\theta\| \leq \text{eps}
+                        \frac{2\theta_i - 3\sin\theta_i + \theta_i\cos\theta_i}{2\theta_i^5}, 
+                        \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{1}{120}-\frac{1}{2520}\theta_i^2,
+                        \quad \|\theta_i\| \leq \text{eps}
                     \end{array}
-                    \right.
+                    \right.           
 
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`Sim3_type` and :obj:`sim3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`Sim3`, :math:`\mathbf{p}` is an instance of :meth:`sim3`).
+      The inverse of left Jacobian can be approximated as:
+
+        .. math::
+            \mathbf{J}^{-1}_i(\mathbf{x}_i) = \sum_{n=0}(-1)^n\frac{B_n}{n!}(\boldsymbol{\xi}_i^{\curlywedge})^n
+
+        where :math:`B_n` is the Bernoulli number: :math:`B_0 = 1`, :math:`B_1 = -\frac{1}{2}`,
+        :math:`B_2 = \frac{1}{6}`, :math:`B_3 = 0`, :math:`B_4 = -\frac{1}{30}`.
+        :math:`\boldsymbol{\xi}_i^{\curlywedge} = \mathrm{adj}(\boldsymbol{\xi}_i^{\wedge})` and :math:`\mathrm{adj}` 
+        is the adjoint of the Lie algebra :math:`\mathfrak{sim}(3)`, e.g., :math:`\boldsymbol{\xi}_i \in \mathfrak{sim}(3)`.
+        Notice that if notate :math:`\boldsymbol{X}_i = \mathrm{Adj}(\mathbf{x}_i)` and :math:`\mathrm{Adj}` 
+        is the adjoint of the Lie group :math:`\mathrm{Sim}(3)`, there is a nice property:
+        :math:`\mathrm{Adj}(\mathrm{Exp}(\boldsymbol{\xi}_i^{\curlywedge})) = \mathrm{Exp}(\mathrm{adj}(\boldsymbol{\xi}_i^{\wedge}))`, 
+        or :math:`\boldsymbol{X}_i = \mathrm{Exp}(\boldsymbol{\xi}_i^{\curlywedge})`.
+        
+
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`RxSO3_type` and :obj:`rxso3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`, :math:`\mathbf{p}` is an instance of :meth:`rxso3`).
+      Let :math:`\boldsymbol{\phi}_i` be the corresponding Lie Algebra of the SO3 part of
+      :math:`\mathbf{x}_i`, :math:`\boldsymbol{\Phi}_i` be the skew matrix (:meth:`pypose.vec2skew`),
+      The inverse of left Jacobian of :math:`\mathbf{x}_i` is the same as that for the SO3 part of :math:`\mathbf{x}_i`.
+
+        .. math::
+            \mathbf{J}^{-1}_i(\mathbf{x}_i) = \left[
+                                \begin{array}{cc} 
+                                    \mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i) & \mathbf{0} \\
+                                    \mathbf{0} & 1
+                                \end{array}
+                             \right]
+
+        where :math:`\mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i)` is the
+        inverse of left Jacobian of the SO3 part of :math:`\mathbf{x}_i`.
 
     Note:
         :math:`\mathrm{Jinvp}` is usually used in the Baker-Campbell-Hausdorff formula
@@ -1124,32 +1237,80 @@ def Jinvp(input, p):
         * J. Sola et al., `A micro Lie theory for state estimation in
           robotics <https://arxiv.org/abs/1812.01537>`_, arXiv preprint arXiv:1812.01537 (2018).
 
-        In particular, Eq.(146) is the math used in the :obj:`SO3_type`, :obj:`so3_type` scenario; 
-        Eq.(179b) and Eq.(180) are the math used in the :obj:`SE3_type`, :obj:`se3_type` scenario.
+        In particular, Eq. (146) is the math used in the :obj:`SO3_type`, :obj:`so3_type` scenario; 
+        Eq. (179b) and Eq. (180) are the math used in the :obj:`SE3_type`, :obj:`se3_type` scenario.
+
+        For Lie groups such as :obj:`Sim3_type`, :obj:`sim3_type`,
+        there is no analytic expression for the left Jacobian and its inverse. 
+        Numerical approximation is used based on series expansion.
+        One can refer to Eq. (26) of this paper for more details about the approximation:
+
+        * Z. Teed et al., `Tangent Space Backpropagation for 3D Transformation Groups.
+          <https://arxiv.org/pdf/2103.12032.pdf>`_, in IEEE/CVF Conference on Computer Vision and
+          Pattern Recognition (CVPR) (2021).
+
+        In particular, the Bernoulli numbers can be obtained from Eq. (7.72) of this famous book:
+
+        * T. Barfoot, `State Estimation for Robotics.
+          <https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.708.1086&rep=rep1&type=pdf>`_,
+          Cambridge University Press (2017).
 
     Example:
 
         * :math:`\mathrm{Jinvp}`: (:obj:`SO3`, :obj:`so3`) :math:`\mapsto` :obj:`so3`
 
         >>> x = pp.randn_SO3(2)
-        >>> p = pp.randn_so3(2)
-        >>> x.Jinvp(p) # equivalent to: pp.Jinvp(x, a)
-        so3Type LieTensor:
-        tensor([[ 0.8782,  0.5898, -1.9071],
-                [-0.6499, -0.3977,  0.8115]])
+        >>> a = pp.randn_so3(2)
+        >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
+            tensor([[-0.1068,  1.6051, -2.0121],
+                    [-0.6726, -0.0345,  0.2493]])
 
         * :math:`\mathrm{Jinvp}`: (:obj:`SE3`, :obj:`se3`) :math:`\mapsto` :obj:`se3`
 
         >>> x = pp.randn_SE3(2)
-        >>> p = pp.randn_se3(2)
-        >>> x.Jinvp(p) # equivalent to: pp.Jinv(x, a)
-        se3Type LieTensor:
-        tensor([[-1.3803,  0.7891, -0.4268,  0.6917, -0.2167,  0.3333],
-                [-1.4517, -0.8059,  0.9343,  1.7398,  0.6579,  0.4785]])
+        >>> a = pp.randn_se3(2)
+        >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
+            tensor([[-1.3803,  0.7891, -0.4268,  0.6917, -0.2167,  0.3333],
+                    [-1.4517, -0.8059,  0.9343,  1.7398,  0.6579,  0.4785]])
+
+        * :math:`\mathrm{Jinvp}`: (:obj:`Sim3`, :obj:`sim3`) :math:`\mapsto` :obj:`sim3`
+
+        >>> x = pp.randn_Sim3(2)
+        >>> a = pp.randn_sim3(2)
+        >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
+            tensor([[ 0.3943, -1.2546,  0.3209,  0.2298, -1.1028, -1.4039,  0.3704],
+                    [-0.3591,  0.4190,  0.2833, -0.3121,  1.6293, -0.8617, -0.7911]])
+
+        * :math:`\mathrm{Jinvp}`: (:obj:`RxSO3`, :obj:`rxso3`) :math:`\mapsto` :obj:`rxso3`
+
+        >>> x = pp.randn_RxSO3(2)
+        >>> a = pp.randn_rxso3(2)
+        >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
+            tensor([[ 0.1730, -1.3778,  0.1657,  0.1820],
+                    [-1.0347,  1.6627,  0.3992,  0.1227]])
     """
     return input.Jinvp(p)
 
 
 @assert_ltype
 def Jr(x):
+    r"""
+    The batched right Jacobian of a LieTensor.
+
+    Args:
+        input (LieTensor): the input LieTensor (either Lie Group or Lie Algebra)
+
+    Return:
+        Tensor: the right Jocobian Matrices
+
+    Example:
+
+    * :math:`\mathrm{Jr}`: :meth:`so3` :math:`\mapsto` :math:`\mathcal{R}^{*\times 3\times 3}`
+
+    >>> x = pp.randn_so3(requires_grad=True)
+    >>> x.Jr()
+    tensor([[ 0.9289, -0.3053, -0.0895],
+            [ 0.3180,  0.9082,  0.1667],
+            [ 0.0104, -0.1889,  0.9757]], grad_fn=<SWhereBackward0>)
+    """
     return x.Jr()

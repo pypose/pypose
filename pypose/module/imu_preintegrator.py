@@ -167,20 +167,20 @@ class IMUPreintegrator(nn.Module):
         self._dt = self._dt + dt
 
         if ang_cov is None: # gyro covariance
-            Cg = torch.eye(3, device=dt.device) * (1.6968*10**-4)**2
+            Cg = torch.eye(3, device=dt.device, dtype=dt.dtype) * (1.6968*10**-4)**2
         if acc_cov is None: # acc covariance
-            Ca = torch.eye(3, device=dt.device) * (2.0*10**-3)**2
+            Ca = torch.eye(3, device=dt.device, dtype=dt.dtype) * (2.0*10**-3)**2
 
         Ha = pp.vec2skew(acc)
-        A = torch.eye(9, device=dt.device)
+        A = torch.eye(9, device=dt.device, dtype=dt.dtype)
         A[0:3, 0:3] = dr.matrix().mT
         A[3:6, 0:3] = - self._dr.matrix() @ Ha * dt
         A[6:9, 0:3] = - 0.5 * self._dr.matrix() @ Ha * dt**2
-        A[6:9, 3:6] = torch.eye(3, device=dt.device) * dt
+        A[6:9, 3:6] = torch.eye(3, device=dt.device, dtype=dt.dtype) * dt
 
-        Bg = torch.zeros(9, 3, device=dt.device)
+        Bg = torch.zeros(9, 3, device=dt.device, dtype=dt.dtype)
         Bg[0:3, 0:3] = pp.so3(ang*dt).Jr() * dt
-        Ba = torch.zeros(9, 3, device=dt.device)
+        Ba = torch.zeros(9, 3, device=dt.device, dtype=dt.dtype)
         Ba[3:6, 0:3] = self._dr.matrix() * dt
         Ba[6:9, 0:3] = 0.5 * self._dr.matrix() * dt**2
 
