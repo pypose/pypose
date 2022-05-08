@@ -1,51 +1,224 @@
 import torch
 import functools
 from .lietensor import  LieTensor
+from .lietensor import LieType
 from .lietensor import SE3_type, se3_type
 from .lietensor import SO3_type, so3_type
 from .lietensor import Sim3_type, sim3_type
 from .lietensor import RxSO3_type, rxso3_type
 
 
-SO3 = functools.partial(LieTensor, ltype=SO3_type)
-SO3.__doc__ = r'''
-Alias of LieTensor for SO3.
-'''
+def _LieTensor_wrapper_add_docstr(wrapper: functools.partial, embedding_doc):
+    ltype: LieType = wrapper.keywords['ltype']
+    type_name = type(ltype).__name__.removesuffix('Type')
+    type_dim = ltype.dimension[0]
+    see_method = ['Exp', 'Inv'] if ltype.on_manifold else \
+        ['Log', 'Inv', 'Act', 'Retr', 'Adj', 'AdjT', 'Jinvp']
+    wrapper.__doc__ = fr'''Creates a {type_name} :obj:`LieTensor`.
 
-so3 = functools.partial(LieTensor, ltype=so3_type)
-so3.__doc__ = r'''
-Alias of LieTensor for so3.
-'''
+    Args:
+        data (:obj:`Tensor`, or :obj:`list`, or ':obj:`int`...'): A
+            :obj:`Tensor` object, or constructing a :obj:`Tensor`
+            object from :obj:`list`, which defines tensor data (see below), or
+            from ':obj:`int`...', which defines tensor shape.
 
-SE3 = functools.partial(LieTensor, ltype=SE3_type)
-SE3.__doc__ = r'''
-Alias of LieTensor for SE3.
-'''
+            The shape of :obj:`Tensor` object must be `(*, {type_dim})`,
+            where `*` is zero or more batch dimensions (the
+            :obj:`~LieTensor.lshape` of this LieTensor). Otherwise error will
+            be thrown.
 
-se3 = functools.partial(LieTensor, ltype=se3_type)
-se3.__doc__ = r'''
-Alias of LieTensor for se3.
-'''
+    {embedding_doc}
 
-Sim3 = functools.partial(LieTensor, ltype=Sim3_type)
-Sim3.__doc__ = r'''
-Alias of LieTensor for Sim3.
-'''
+    If `data` is tensor-like, the last dimension should correspond to the
+    {type_dim} elements of the above embedding.
 
-sim3 = functools.partial(LieTensor, ltype=sim3_type)
-sim3.__doc__ = r'''
-Alias of LieTensor for sim3.
-'''
+    Note:
+        It is not advised to construct {type_name} Tensors by specifying storage
+        sizes with `int...`, which does not initialize data.
 
-RxSO3 = functools.partial(LieTensor, ltype=RxSO3_type)
-RxSO3.__doc__ = r'''
-Alias of LieTensor for RxSO3.
-'''
+        Consider using :obj:`pypose.randn_{type_name}` or
+        :obj:`pypose.identity_{type_name}` instead.
 
-rxso3 = functools.partial(LieTensor, ltype=rxso3_type)
-rxso3.__doc__ = r'''
-Alias of LieTensor for rxso3.
-'''
+    See {', '.join([f':obj:`pypose.{m}`' for m in see_method])} for
+    implementations of relavant operations.
+    '''
+    return wrapper
+
+SO3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=SO3_type),
+    r'''Internally, SO3 LieTensors are stored as unit quaternions:
+
+    .. math::
+        \mathrm{data}[*, :] = [q_x, q_y, q_z, q_w]
+
+    where :math:`q_x^2 + q_y^2 + q_z^2 + q_w^2 = 1`.
+    
+    Note:
+        Normalization is not required at initialization as it is done internally
+        by the library right before further computation. However, the normalized
+        quaternion will not be written back to the tensor storage to prevent
+        in-place data alteration.
+
+    Examples:
+        >>> pp.SO3(torch.randn(2, 4))
+        SO3Type LieTensor:
+        tensor([[-1.0722, -0.9440,  0.9437, -0.8485],
+                [-0.2725,  0.8414, -1.0730,  1.3270]])
+        >>> pp.SO3([0, 0, 0, 1])
+        SO3Type LieTensor:
+        tensor([0., 0., 0., 1.])
+    ''')
+
+so3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=so3_type),
+    r'''Internally, so3 LieTensors are stored in the
+    `axis-angle <https://en.wikipedia.org/wiki/Axis-angle_representation>`_ format:
+
+    .. math::
+        \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z]
+
+    with :math:`\delta = \begin{pmatrix} \delta_x & \delta_y & \delta_z \end{pmatrix}^T`
+    being the axis of rotation and :math:`\theta = \|{\delta}\|` being the angle.
+
+    Examples:
+        >>> pp.so3(torch.randn(2, 3))
+        so3Type LieTensor:
+        tensor([[ 0.1571,  0.2203, -0.2457],
+                [-0.3311,  0.5412, -0.7028]])
+        >>> pp.so3([0, 0, 1])
+        so3Type LieTensor:
+        tensor([0., 0., 1.])
+    ''')
+
+SE3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=SE3_type),
+    r'''Internally, SE3 LieTensors are stored by concatenating the unit quaternion
+    representing the rotation with a vector representing the translation.
+
+    .. math::
+        \mathrm{data}[*, :] = [t_x, t_y, t_z, q_x, q_y, q_z, q_w]
+
+    where :math:`\begin{pmatrix} t_x & t_y & t_z \end{pmatrix}^T \in \mathbb{R}^3` is
+    the translation and
+    :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` is the unit
+    quaternion as in :obj:`pypose.SO3`.
+
+    Examples:
+        >>> pp.SE3(torch.randn(2, 7))
+        SE3Type LieTensor:
+        tensor([[ 0.1626,  1.6349,  0.3607,  0.2848, -0.0948,  0.1541,  1.0003],
+                [ 1.4034, -1.3085, -0.8886, -1.6703,  0.7381,  1.5575,  0.6280]])
+        >>> pp.SE3([0, 0, 0, 0, 0, 0, 1])
+        SE3Type LieTensor:
+        tensor([0., 0., 0., 0., 0., 0., 1.])
+    ''')
+
+se3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=se3_type),
+    r'''Internally, se3 LieTensors are stored by concatenating the axis-angle
+    representation of the rotation with the "velocity" vector:
+
+    .. math::
+        \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z, \log t_x, \log t_y, \log t_z]
+
+    where :math:`\begin{pmatrix} \delta_x & \delta_y & \delta_z \end{pmatrix}^T`
+    is the axis-angle vector as in :obj:`pypose.so3`, and
+    :math:`\begin{pmatrix} \log t_x & \log t_y & \log t_z \end{pmatrix}^T`
+    is the element-wise logarithm of the translation vector from :obj:`pypose.SE3`.
+
+    Examples:
+        >>> pp.se3(torch.randn(2, 6))
+        se3Type LieTensor:
+        tensor([[-0.8710, -1.4994, -0.2843,  1.0185, -0.3932, -0.4839],
+                [-0.4750, -0.4804, -0.7083, -1.8141, -1.4409, -0.3125]])
+        >>> pp.se3([0, 0, 0, 0, 0, 1])
+        se3Type LieTensor:
+        tensor([0., 0., 0., 0., 0., 1.])
+    ''')
+
+RxSO3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=RxSO3_type),
+    r'''Internally, RxSO3 LieTensors are stored by concatenating the unit quaternion
+    representing the rotation with a scaling factor:
+
+    .. math::
+        \mathrm{data}[*, :] = [q_x, q_y, q_z, q_w, s]
+
+    where :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T`
+    is the unit quaternion as in :obj:`pypose.SO3` and
+    :math:`s \in \mathbb{R}` is the scaling factor.
+
+    Examples:
+        >>> pp.RxSO3(torch.randn(2, 5))
+        RxSO3Type LieTensor:
+        tensor([[-0.3693,  2.5155, -0.5384, -0.8119, -0.4798],
+                [-0.4058, -0.5909, -0.4918, -0.2994,  0.5440]])
+        >>> pp.RxSO3([0, 0, 0, 1, 1])
+        RxSO3Type LieTensor:
+        tensor([0., 0., 0., 1., 1.])
+    ''')
+
+rxso3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=rxso3_type),
+    r'''Internally, rxso3 LieTensors are stored by concatenating the axis-angle
+    representation of the rotation with the log scale:
+
+    .. math::
+        \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z, \log s]
+
+    where :math:`\begin{pmatrix} \delta_x & \delta_y & \delta_z \end{pmatrix}^T`
+    is the axis-angle vector in :obj:`pypose.so3`, and
+    :math:`s \in \mathbb{R}` is the scaling factor in :obj:`pypose.RxSO3`.
+
+    Examples:
+        >>> pp.rxso3(torch.randn(2, 4))
+        rxso3Type LieTensor:
+        tensor([[ 0.3752, -0.1576,  1.2057,  0.6086],
+                [ 0.8434,  0.2449,  0.0488, -0.1202]])
+        >>> pp.rxso3([0, 0, 0, 0, 1])
+        RxSO3Type LieTensor:
+        tensor([0., 0., 0., 0., 1.])
+    ''')
+
+Sim3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=Sim3_type),
+    r'''Internally, Sim3 LieTensors are stored by concatenating the translation
+    vector with an RxSO3:
+
+    .. math::
+        \mathrm{data}[*, :] = [t_x, t_y, t_z, q_x, q_y, q_z, q_w, s]
+
+    where :math:`\begin{pmatrix} t_x & t_y & t_z \end{pmatrix}^T \in \mathbb{R}^3`
+    is the translation vector and
+    :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` and
+    :math:`s \in \mathbb{R}` are the unit quaternion and the scaling factor
+    as in :obj`pp.RxSO3`, respectively.
+
+    Examples:
+        >>> pp.Sim3(torch.randn(2, 8))
+        Sim3Type LieTensor:
+        tensor([[ 0.0175,  0.8657, -0.2274,  2.2380, -0.0297, -0.3799, -0.0664,  0.9995],
+                [ 0.8744,  0.4114,  1.2041, -0.5687, -0.5630,  0.6025, -0.6137,  1.1185]])
+        >>> pp.Sim3([0, 0, 0, 0, 0, 0, 1, 1])
+        Sim3Type LieTensor:
+        tensor([0., 0., 0., 0., 0., 0., 1., 1.])
+    ''')
+
+sim3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=sim3_type),
+    r'''Internally, sim3 LieTensors are stored by concatenating the log translation
+    vector with the corresponding rxso3:
+
+    .. math::
+        \mathrm{data}[*, :] = [\log t_x, \log t_y, \log t_z, \delta_x, \delta_y, \delta_z, \log s]
+
+    where :math:`\begin{pmatrix} \log t_x & \log t_y & \log t_z \end{pmatrix}^T`
+    is the log translation vector as in :obj:`pypose.se3`, and
+    :math:`\begin{pmatrix} \delta_x & \delta_y & \delta_z & \log s \end{pmatrix}^T`
+    represents the rotation and scaling, as in :obj:`pypose.rxso3`.
+
+    Examples:
+        >>> pp.Sim3(torch.randn(2, 7))
+        sim3Type LieTensor:
+        sim3Type LieTensor:
+        tensor([[ 0.1477, -1.3500, -2.1571,  0.8893, -0.7821, -0.9889, -0.7887],
+                [ 0.2251,  0.3512,  0.0485,  0.0163, -1.7090, -0.0417, -0.3842]])
+        >>> pp.sim3([0, 0, 0, 0, 0, 0, 1])
+        sim3Type LieTensor:
+        tensor([0., 0., 0., 0., 0., 0., 1.])
+    ''')
 
 def randn_like(input, sigma=1, **kwargs):
     r'''
