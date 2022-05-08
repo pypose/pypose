@@ -15,7 +15,7 @@ class IMUPreintegrator(nn.Module):
 
     Args:
         position (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
-        rotation (pypose.SO3, optional): initial rotation. Default: :math:`pypose.identity_SO3`
+        rotation (pypose.SO3, optional): initial rotation. Default: :meth:`pypose.identity_SO3`
         velocity (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
         gravity (float, optional): the gravity acceleration. Default: 9.81007
     """
@@ -102,7 +102,10 @@ class IMUPreintegrator(nn.Module):
         where :math:`\cdot^\wedge` is the skew matrix (:meth:`pypose.vec2skew`),
         :math:`C \in\mathbf{R}^{9\times 9}` is the covarience matrix,
         and :math:`J_r^k` is the right jacobian (:meth:`pypose.Jr`) of integrated rotation
-        :math:`\mathrm{Exp}(w_k{\Delta}t)` at :math:`k`-th time step.            
+        :math:`\mathrm{Exp}(w_k{\Delta}t)` at :math:`k`-th time step. 
+        
+        Refer to Eq. (A7), (A8), (A9) in
+        `this RSS paper <https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf>`_ for more details.           
 
         Args:
             dt (torch.Tensor): time interval from last update. :obj:`shape`: (1)
@@ -117,26 +120,60 @@ class IMUPreintegrator(nn.Module):
                 Euroc dataset)
 
         Example:
-
+            >>> import torch
+            >>> import pypose as pp
+            Initial Position
             >>> p = torch.zeros(3)
+            Initial rotation
             >>> r = pp.identity_SO3()
+            Initial Velocity
             >>> v = torch.zeros(3)
 
 
             >>> # Preintegrator Initialisation
             >>> integrator = pp.module.IMUPreintegrator(p,r,v)
+
+            >>> # IMU data
+            Imu's angular velocity 
             >>> ang = torch.tensor([0.1,0.1,0.1])
+            Imu's acceleration
             >>> acc = torch.tensor([0.1,0.1,0.1])
+            Ground truth rotation
             >>> rot = pp.mat2SO3(torch.eye(3))
+            Difference between two time stamps
             >>> dt = torch.tensor([0.002])
 
             >>> # Update Function
+            Takes as input the imu values and calculates the preintegrated 
+            IMU measurements, which is further used for state estimation
             >>> integrator.update(dt, ang, acc, rot)
             >>> integrator.update(dt, ang, acc, rot)
+            Note : This function can be run multiple times before getting the integrated results.
 
             >>> # Forward Function
-            >>> print(integrator()['vel'])
-            tensor([ 0.0004,  0.0004, -0.0388])
+            >>> states = integrator()
+            >>> print(states)
+            {'rot': SO3Type LieTensor:tensor([2.0000e-04, 2.0000e-04, 2.0000e-04, 1.0000e+00]), 
+            'vel': tensor([ 0.0004,  0.0004, -0.0388]), 'pos': tensor([ 7.9608e-07,  8.0392e-07, -7.7681e-05]), 
+            'cov': tensor([[ 1.1517e-10, -1.1376e-18, -1.1377e-18, -1.3820e-17,  1.1523e-14,
+            -1.1510e-14, -1.3820e-20,  1.1523e-17, -1.1510e-17],
+            [-1.1371e-18,  1.1517e-10, -1.1373e-18, -1.1510e-14, -1.3820e-17,
+            1.1523e-14, -1.1510e-17, -1.3820e-20,  1.1523e-17],
+            [-1.1375e-18, -1.1370e-18,  1.1517e-10,  1.1523e-14, -1.1510e-14,
+            -1.3820e-17,  1.1523e-17, -1.1510e-17, -1.3820e-20],
+            [-1.3820e-17, -1.1510e-14,  1.1523e-14,  1.6000e-08, -2.2395e-18,
+            -2.5163e-18,  3.2000e-11, -2.0812e-21, -2.8846e-21],
+            [ 1.1523e-14, -1.3820e-17, -1.1510e-14, -2.4096e-18,  1.6000e-08,
+            -2.0727e-18, -2.8247e-21,  3.2000e-11, -1.8848e-21],
+            [-1.1510e-14,  1.1523e-14, -1.3820e-17, -2.1689e-18, -2.4546e-18,
+            1.6000e-08, -2.0030e-21, -2.8351e-21,  3.2000e-11],
+            [-1.3820e-20, -1.1510e-17,  1.1523e-17,  3.2000e-11, -2.3062e-21,
+            -2.5428e-21,  8.0000e-14, -2.1770e-24, -3.0055e-24],
+            [ 1.1523e-17, -1.3820e-20, -1.1510e-17, -2.5685e-21,  3.2000e-11,
+            -2.4488e-21, -3.0256e-24,  8.0000e-14, -2.2277e-24],
+            [-1.1510e-17,  1.1523e-17, -1.3820e-20, -2.2312e-21, -2.5284e-21,
+            3.2000e-11, -2.0607e-24, -2.9413e-24,  8.0000e-14]])}
+
 
 
         Example:
@@ -196,7 +233,16 @@ class IMUPreintegrator(nn.Module):
                 v_j &= {\Delta}v_{ij} * R_i   + v_i + g \Delta t_{ij} \\
                 p_j &= {\Delta}p_{ij} * R_i   + p_i + v_i \Delta t_{ij} + 1/2 g \Delta t_{ij}^2 \\
                 
-            \end{align*} 
+            \end{align*}         
+            
+        where:
+
+        - :math:`{\Delta}R_{ij}`, :math:`{\Delta}v_{ij}` ,  :math:`{\Delta}p_{ij}` are the preintegrated measurements between the :math:`i`-th and :math:`j`-th time step.
+
+        -  R_j , v_j , p_j are the propagated state variables
+
+        -  R_i , v_i , p_i are the initial state variables
+        
 
 
         Args:
@@ -212,12 +258,7 @@ class IMUPreintegrator(nn.Module):
             - 'pos' (torch.Tensor): postion. :obj:`shape`: (3)
 
             - 'cov' (torch.Tensor): covariance (order: rotation, velocity, position). :obj:`shape`: (9, 9)
-
-        IMU State Propagation :
-        
-        
-        
-        
+   
         
         Note:
             Output covariance (Shape: (9, 9)) is in the order of rotation, velocity, and position.
