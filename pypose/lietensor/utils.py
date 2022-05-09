@@ -1047,11 +1047,70 @@ def Mul(x, y):
 
 @assert_ltype
 def Retr(X, a):
+    r""""
+    Perform a retraction from a point :math:`X` on the manifold with a given direction :math:`a`.
+
+    .. math::
+        Retr(X, a) = \mathrm{Exp}(a) * X
+
+    Args:
+        X (LieTensor): the input LieTensor to retract (Lie Group)
+
+        a (LieTensor): the direction of the retraction (Lie Algebra)
+
+    Return:
+        LieTensor: LieTensor with the same :obj:`ltype` as :code:`a.Exp()` (Lie Group)
+
+    Examples:
+
+    * X.Retr(:obj:`so3`)
+    >>> a = pp.randn_so3() # lie algebra
+    >>> X = pp.identity_SO3() # lie group
+    >>> X.Retr(a)
+        SO3Type LieTensor:
+        tensor([0.6399, 0.0898, 0.1656, 0.7451])
+
+    * X.Retr(:obj:`se3`)
+    >>> a = pp.randn_se3(2) # lie algebra
+    >>> X = pp.identity_SE3(2)
+        SE3Type LieTensor:
+        tensor([[ 0.5777, -0.5815, -0.3694,  0.3861,  0.1730, -0.1701,  0.8900],
+                [-0.2148, -0.3699, -1.1094,  0.1382, -0.5171, -0.3116,  0.7852]])
+    """
     return X.Retr(a)
 
 
 @assert_ltype
 def Act(X, p):
+    r""""
+    Apply the transform :math:`X` to a vector :math:`p \in \mathbb{R^3}` or :math:`p \in \mathbb{R^4}`.
+
+    .. math::
+        out = X * p
+
+    Args:
+        X (LieTensor): the input LieTensor (Lie Group). The :obj:`ltype` should be in [:obj:`SO3`, :obj:`SE3`, :obj:`Ssim3`, :obj:`RxSO3`, :obj:`SE3`]
+
+        p (Tensor): the vector to be transformed which :math:`p \in \mathbb{R^3}` or :math:`p \in \mathbb{R^4}`
+
+    Return:
+        Tensor: Pytorch tensor with the same shape as the input :obj:`p`
+
+    Examples:
+
+    * :math:`a \in \mathbb{R^3}`
+    >>> a = torch.tensor([0,0,0])
+    >>> X = pp.identity_SO3()
+    >>> X.Act(a)
+        tensor([0., 0., 0.])
+
+    * :math:`a \in \mathbb{R^4}`
+    >>> p = p = torch.tensor([[0.0,0.0,0.0,1.0],[0.0,0.0,0.0,1.0]])
+    >>> X = pp.identity_SE3(1,2)
+    >>> X.Act(p)
+        tensor([[[0., 0., 0., 1.],
+                [0., 0., 0., 1.]]])
+    """
     return X.Act(p)
 
 
