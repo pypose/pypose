@@ -129,11 +129,8 @@ def randn_like(input, sigma=1, **kwargs):
 
 def randn_so3(*size, sigma=1, **kwargs):
     r'''
-    Returns :obj:`so3_type` LieTensor filled with random numbers from a normal
-    distribution with mean 0 and variance :obj:`sigma` (also called the standard normal distribution).
-
-    .. math::
-        \mathrm{out}_i = \mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma}_{3\times 1})
+    Returns :obj:`so3_type` LieTensor filled with random numbers satisfying the expected distance 
+    between the corresponding state and :math:`\mathbf{0}_{3\times 1}` is :obj:`sigma`.
 
     The shape of the tensor is defined by the variable argument size.
 
@@ -141,7 +138,7 @@ def randn_so3(*size, sigma=1, **kwargs):
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float, optional): variance of the normal distribution. Default: 1.
+        sigma (float, optional): expected distance between the generated state and zero. Default: 1.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
@@ -161,6 +158,25 @@ def randn_so3(*size, sigma=1, **kwargs):
 
     Returns:
         LieTensor: a :obj:`so3_type` LieTensor
+
+    Given the expected distance :obj:`sigma`, we first calculte the standard deviation of the 
+    individual components of the tangent perturbation :math:`\sigma_{\mathrm{r}}` as:
+
+    .. math::
+        \sigma_{\mathrm{r}} = \frac{2*\sigma}{\sqrt{3}}.
+
+    The factor is due to the way we define distance (see also `Matt Mason's lecture on quaternions <https://doi.org/10.1016/j.inffus.2011.08.003>`_)
+    The :math:`1/\sqrt{3}` factor is necessary because the distribution in the tangent space is a 3-dimensional Gaussian, so that the *length* of a tangent vector needs to be scaled by :math:`1/\sqrt{3}`.
+
+    Then the output can be written as:
+
+    .. math::
+        \mathrm{out}_i = \mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma_{\mathrm{r}}}_{3\times 1}),
+
+    where :math:`\mathcal{N}` denotes Gaussian distribution.
+
+    Note:
+        The detailed explanation of the above implementation can be found in the `OMPL code <https://ompl.kavrakilab.org/SO3StateSpace_8cpp_source.html>`_, line 119.
 
     Example:
         >>> pp.randn_so3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
@@ -736,16 +752,16 @@ def Exp(input):
             \mathbf{y}_i = \left[\mathbf{J}_i\bm{\tau}_i, \mathrm{Exp}(\bm{\phi}_i)\right],
         
         where :math:`\mathrm{Exp}` is the Exponential map for :obj:`so3_type` input and
-        :math:`\mathbf{J}_i` is the left Jacobian.
+        :math:`\mathbf{J}_i` is the left Jacobian for :obj:`so3_type` input.
 
     * Input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`rxso3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`rxso3`):
 
-        Let :math:`\bm{\phi}_i`, :math:`s_i` be the rotation and scale parts of
+        Let :math:`\bm{\phi}_i`, :math:`\sigma_i` be the rotation and scale parts of
         :math:`\mathbf{x}_i`, respectively; :math:`\mathbf{y}` be the output.
 
         .. math::
-            \mathbf{y}_i = \left[\mathrm{Exp}(\bm{\phi}_i), \mathrm{exp}(s_i)\right],
+            \mathbf{y}_i = \left[\mathrm{Exp}(\bm{\phi}_i), \mathrm{exp}(\sigma_i)\right],
 
         where :math:`\mathrm{exp}` is the exponential function.
 
@@ -753,12 +769,87 @@ def Exp(input):
       (input :math:`\mathbf{x}` is an instance of :meth:`sim3`):
 
         Let :math:`\bm{\tau}_i`, :math:`^{s}\bm{\phi}_i` be the translation and
-        :meth:`rxso3` parts of :math:`\mathbf{x}_i`, respectively; :math:`\mathbf{y}` be the output.
+        :meth:`rxso3` parts of :math:`\mathbf{x}_i`, respectively. :math:`\bm{\phi}_i = \theta_i\mathbf{n}_i`, :math:`\sigma_i` be the rotation and scale parts of
+        :math:`^{s}\bm{\phi}_i`, :math:`\boldsymbol{\Phi}_i` be the skew matrix of :math:`\bm{\phi}_i`; :math:`s_i = e^\sigma_i`, :math:`\mathbf{y}` be the output.
 
         .. math::
-            \mathbf{y}_i = \left[^{s}\mathbf{J}_i\bm{\tau}_i, \mathrm{Exp}(^{s}\bm{\phi}_i)\right],
+            \mathbf{y}_i = \left[^{s}\mathbf{W}_i\bm{\tau}_i, \mathrm{Exp}(^{s}\bm{\phi}_i)\right],
         
-        where :math:`^{s}\mathbf{J}` is the similarity transformed left Jacobian.
+        where
+
+        .. math::
+            ^s\mathbf{W}_i = A\boldsymbol{\Phi}_i + B\boldsymbol{\Phi}_i^2 + C\mathbf{I}
+
+        in which if :math:`\|\sigma_i\| \geq \text{eps}`:
+
+        .. math::
+            A = \left\{
+                    \begin{array}{ll} 
+                        \frac{s_i\sin\theta_i\sigma_i + (1-s_i\cos\theta_i)\theta_i}
+                        {\theta_i(\sigma_i^2 + \theta_i^2)}, \quad \|\theta_i\| \geq \text{eps}, \\
+                        \frac{(\sigma_i-1)s_i+1}{\sigma_i^2}, \quad \|\theta_i\| < \text{eps},
+                    \end{array}
+                \right.
+
+        .. math::
+            B = 
+            \left\{
+                \begin{array}{ll} 
+                    \left( C - \frac{(s_i\cos\theta_i-1)\sigma+ s_i\sin\theta_i\sigma_i}
+                    {\theta_i^2+\sigma_i^2}\right)\frac{1}{\theta_i^2}, \quad \|\theta_i\| \geq \text{eps}, \\
+                    \frac{s_i\sigma_i^2/2 + s_i-1-\sigma_i s_i}{\sigma_i^3}, \quad \|\theta_i\| < \text{eps},
+                \end{array}
+            \right.
+
+        .. math::
+            C = \frac{e^{\sigma_i} - 1}{\sigma_i}\mathbf{I}
+
+        otherwise:
+
+        .. math::
+            A = \left\{
+                    \begin{array}{ll} 
+                        \frac{1-\cos\theta_i}{\theta_i^2}, \quad \|\theta_i\| \geq \text{eps}, \\
+                        \frac{1}{2}, \quad \|\theta_i\| < \text{eps},
+                    \end{array}
+                \right.
+
+        .. math::
+            B = \left\{
+                    \begin{array}{ll} 
+                        \frac{\theta_i - \sin\theta_i}{\theta_i^3}, \quad \|\theta_i\| \geq \text{eps}, \\
+                        \frac{1}{6}, \quad \|\theta_i\| < \text{eps},
+                    \end{array}
+                \right.
+
+        .. math::
+            C = 1
+    
+    Note:
+        The detailed explanation of the above :math:`\mathrm{Exp}`: calculation can be found in the paper:
+
+        * Grassia, F. Sebastian., `Practical Parameterization of Rotations using the Exponential Map. <https://www.tandfonline.com/doi/pdf/10.1080/10867651.1998.10487493?casa_token=haAJOZZZa3UAAAAA:wW_6VJU-q5G6ytS-_frhOZPvUPLjR0N5y2tXWiNEI0PMdWFf4sZqwDWG2ZGbnsCDqQIWmyeL1H5G7A>`_, Journal of graphics tools, 1998
+
+        Assume we have a unit rotation axis :math:`\mathbf{n}~(\|\mathbf{n}\|=1)` and rotation angle :math:`\theta~(0\leq\theta<2\pi)`, let :math:`\mathbf{x}=\theta\mathbf{n}`, then the corresponding quaternion with unit norm :math:`\mathbf{q}` can be represented as
+
+            .. math::
+                \mathbf{q} = \left[\frac{\sin(\theta/2)}{\theta} \mathbf{x}, \cos(\theta/2) \right].
+
+        Given :math:`\mathbf{x}=\theta\mathbf{n}`, to find its corresponding quaternion :math:`\mathbf{q}`, we first calculate the rotation angle :math:`\theta` using
+
+            .. math::
+                \theta = \|\mathbf{x}\|, 
+
+        Then, the corresponding quaternion is 
+        
+            .. math::
+                \mathbf{q} = \left[\frac{\sin(\|\mathbf{x}\|/2)}{\|\mathbf{x}\|} \mathbf{x}, \cos(\|\mathbf{x}\|/2) \right].
+
+        If :math:`\|\mathbf{x}\|` is small (:math:`\|\mathbf{x}\|\le \text{eps}`), we use the Taylor Expansion form of :math:`\sin(\|\mathbf{x}\|/2)` and :math:`\cos(\|\mathbf{x}\|/2)`.
+
+        More details about :math:`^s\mathbf{W}_i` in :obj:`sim3_type` can be found in Eq. (5.7):
+
+        * H. Strasdat, `Local accuracy and global consistency for efficient visual SLAM. <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.640.199&rep=rep1&type=pdf>`_, Dissertation. Department of Computing, Imperial College London, 2012.
 
     Example:
     
