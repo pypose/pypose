@@ -672,7 +672,7 @@ class LieTensor(torch.Tensor):
             tensor([[ 0.1196,  0.2339, -0.6824,  0.6822],
                     [ 0.9198, -0.2704, -0.2395,  0.1532]])
         '''
-        return torch.Tensor(self)
+        return torch.Tensor.as_subclass(self, torch.Tensor)
 
     def matrix(self) -> torch.Tensor:
         r'''
