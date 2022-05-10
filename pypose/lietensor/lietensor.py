@@ -1,5 +1,6 @@
 
 import torch, warnings
+import math
 from torch import nn, linalg
 from torch.utils._pytree import tree_map
 from .backends import exp, log, inv, mul, adj
@@ -144,7 +145,8 @@ class LieType:
         return self.randn(*args, sigma=1, **kwargs)
 
     def randn(self, *args, sigma=1., **kwargs):
-        return sigma * torch.randn(*(tuple(args)+self.manifold), **kwargs)
+        scaled_sigma = 2.*sigma/math.sqrt(3)
+        return scaled_sigma * torch.randn(*(tuple(args)+self.manifold), **kwargs)
 
     @classmethod
     def __op__(cls, lid, op, x, y=None):
