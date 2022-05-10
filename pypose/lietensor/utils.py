@@ -165,7 +165,7 @@ def randn_so3(*size, sigma=1, **kwargs):
     .. math::
         \sigma_{\mathrm{r}} = \frac{2*\sigma}{\sqrt{3}}.
 
-    The factor is due to the way we define distance (see also `Matt Mason's lecture on quaternions <https://doi.org/10.1016/j.inffus.2011.08.003>`_)
+    The factor 2 is due to the way we define distance (see also `Matt Mason's lecture on quaternions <http://www.cs.cmu.edu/afs/cs/academic/class/16741-s07/www/lectures/Lecture8.pdf>`_)
     The :math:`1/\sqrt{3}` factor is necessary because the distribution in the tangent space is a 3-dimensional Gaussian, so that the *length* of a tangent vector needs to be scaled by :math:`1/\sqrt{3}`.
 
     Then the output can be written as:
