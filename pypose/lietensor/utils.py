@@ -165,8 +165,10 @@ def randn_so3(*size, sigma=1, **kwargs):
     .. math::
         \sigma_{\mathrm{r}} = \frac{2*\sigma}{\sqrt{3}}.
 
-    The factor 2 is due to the way we define distance (see also `Matt Mason's lecture on quaternions <http://www.cs.cmu.edu/afs/cs/academic/class/16741-s07/www/lectures/Lecture8.pdf>`_)
-    The :math:`1/\sqrt{3}` factor is necessary because the distribution in the tangent space is a 3-dimensional Gaussian, so that the *length* of a tangent vector needs to be scaled by :math:`1/\sqrt{3}`.
+    The factor 2 is due to the way we define distance (see also `Matt Mason's lecture on 
+    quaternions <http://www.cs.cmu.edu/afs/cs/academic/class/16741-s07/www/lectures/Lecture8.pdf>`_)
+    The :math:`1/\sqrt{3}` factor is necessary because the distribution in the tangent space is 
+    a 3-dimensional Gaussian, so that the *length* of a tangent vector needs to be scaled by :math:`1/\sqrt{3}`.
 
     Then the output can be written as:
 
@@ -176,7 +178,8 @@ def randn_so3(*size, sigma=1, **kwargs):
     where :math:`\mathcal{N}` denotes Gaussian distribution.
 
     Note:
-        The detailed explanation of the above implementation can be found in the `OMPL code <https://ompl.kavrakilab.org/SO3StateSpace_8cpp_source.html>`_, line 119.
+        The detailed explanation of the above implementation can be found in the 
+        `OMPL code <https://ompl.kavrakilab.org/SO3StateSpace_8cpp_source.html>`_, line 119.
 
     Example:
         >>> pp.randn_so3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
@@ -769,8 +772,10 @@ def Exp(input):
       (input :math:`\mathbf{x}` is an instance of :meth:`sim3`):
 
         Let :math:`\bm{\tau}_i`, :math:`^{s}\bm{\phi}_i` be the translation and
-        :meth:`rxso3` parts of :math:`\mathbf{x}_i`, respectively. :math:`\bm{\phi}_i = \theta_i\mathbf{n}_i`, :math:`\sigma_i` be the rotation and scale parts of
-        :math:`^{s}\bm{\phi}_i`, :math:`\boldsymbol{\Phi}_i` be the skew matrix of :math:`\bm{\phi}_i`; :math:`s_i = e^\sigma_i`, :math:`\mathbf{y}` be the output.
+        :meth:`rxso3` parts of :math:`\mathbf{x}_i`, respectively. 
+        :math:`\bm{\phi}_i = \theta_i\mathbf{n}_i`, :math:`\sigma_i` be the rotation 
+        and scale parts of :math:`^{s}\bm{\phi}_i`, :math:`\boldsymbol{\Phi}_i` be the skew matrix 
+        of :math:`\bm{\phi}_i`; :math:`s_i = e^\sigma_i`, :math:`\mathbf{y}` be the output.
 
         .. math::
             \mathbf{y}_i = \left[^{s}\mathbf{W}_i\bm{\tau}_i, \mathrm{Exp}(^{s}\bm{\phi}_i)\right],
@@ -828,14 +833,19 @@ def Exp(input):
     Note:
         The detailed explanation of the above :math:`\mathrm{Exp}`: calculation can be found in the paper:
 
-        * Grassia, F. Sebastian., `Practical Parameterization of Rotations using the Exponential Map. <https://www.tandfonline.com/doi/pdf/10.1080/10867651.1998.10487493?casa_token=haAJOZZZa3UAAAAA:wW_6VJU-q5G6ytS-_frhOZPvUPLjR0N5y2tXWiNEI0PMdWFf4sZqwDWG2ZGbnsCDqQIWmyeL1H5G7A>`_, Journal of graphics tools, 1998
+        * Grassia, F. Sebastian., `Practical Parameterization of Rotations using the Exponential Map. 
+        <https://www.tandfonline.com/doi/pdf/10.1080/10867651.1998.10487493?casa_token=haAJOZZZa3UAAAAA:wW_6VJU-q5G6ytS-_frhOZPvUPLjR0N5y2tXWiNEI0PMdWFf4sZqwDWG2ZGbnsCDqQIWmyeL1H5G7A>`_, 
+        Journal of graphics tools, 1998
 
-        Assume we have a unit rotation axis :math:`\mathbf{n}~(\|\mathbf{n}\|=1)` and rotation angle :math:`\theta~(0\leq\theta<2\pi)`, let :math:`\mathbf{x}=\theta\mathbf{n}`, then the corresponding quaternion with unit norm :math:`\mathbf{q}` can be represented as
+        Assume we have a unit rotation axis :math:`\mathbf{n}~(\|\mathbf{n}\|=1)` and rotation angle 
+        :math:`\theta~(0\leq\theta<2\pi)`, let :math:`\mathbf{x}=\theta\mathbf{n}`, then the corresponding 
+        quaternion with unit norm :math:`\mathbf{q}` can be represented as:
 
             .. math::
                 \mathbf{q} = \left[\frac{\sin(\theta/2)}{\theta} \mathbf{x}, \cos(\theta/2) \right].
 
-        Given :math:`\mathbf{x}=\theta\mathbf{n}`, to find its corresponding quaternion :math:`\mathbf{q}`, we first calculate the rotation angle :math:`\theta` using
+        Given :math:`\mathbf{x}=\theta\mathbf{n}`, to find its corresponding quaternion 
+        :math:`\mathbf{q}`, we first calculate the rotation angle :math:`\theta` using:
 
             .. math::
                 \theta = \|\mathbf{x}\|, 
@@ -845,11 +855,14 @@ def Exp(input):
             .. math::
                 \mathbf{q} = \left[\frac{\sin(\|\mathbf{x}\|/2)}{\|\mathbf{x}\|} \mathbf{x}, \cos(\|\mathbf{x}\|/2) \right].
 
-        If :math:`\|\mathbf{x}\|` is small (:math:`\|\mathbf{x}\|\le \text{eps}`), we use the Taylor Expansion form of :math:`\sin(\|\mathbf{x}\|/2)` and :math:`\cos(\|\mathbf{x}\|/2)`.
+        If :math:`\|\mathbf{x}\|` is small (:math:`\|\mathbf{x}\|\le \text{eps}`), 
+        we use the Taylor Expansion form of :math:`\sin(\|\mathbf{x}\|/2)` and :math:`\cos(\|\mathbf{x}\|/2)`.
 
         More details about :math:`^s\mathbf{W}_i` in :obj:`sim3_type` can be found in Eq. (5.7):
 
-        * H. Strasdat, `Local accuracy and global consistency for efficient visual SLAM. <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.640.199&rep=rep1&type=pdf>`_, Dissertation. Department of Computing, Imperial College London, 2012.
+        * H. Strasdat, `Local accuracy and global consistency for efficient visual SLAM. 
+        <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.640.199&rep=rep1&type=pdf>`_, 
+        Dissertation. Department of Computing, Imperial College London, 2012.
 
     Example:
     
