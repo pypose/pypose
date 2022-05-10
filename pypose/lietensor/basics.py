@@ -134,7 +134,7 @@ def cummul(input, dim):
     return cumops(input, dim, lambda a, b : a * b)
 
 
-def cumprod(input, dim):
+def cumprod(input, dim, left = True):
     r"""Returns the cumulative product (@) of LieTensor along a dimension.
 
     .. math::
@@ -161,4 +161,7 @@ def cumprod(input, dim):
         tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
                 [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
     """
-    return cumops(input, dim, lambda a, b : a @ b)
+    if left:
+        return cumops(input, dim, lambda a, b : a @ b)
+    else:
+        return cumops(input, dim, lambda a, b : b @ a)
