@@ -10,11 +10,11 @@ from .lietensor import RxSO3_type, rxso3_type
 
 def _LieTensor_wrapper_add_docstr(wrapper: functools.partial, embedding_doc):
     ltype: LieType = wrapper.keywords['ltype']
-    type_name = type(ltype).__name__.removesuffix('Type')
+    type_name = type(ltype).__name__[:-4]
     type_dim = ltype.dimension[0]
     see_method = ['Exp', 'Inv'] if ltype.on_manifold else \
         ['Log', 'Inv', 'Act', 'Retr', 'Adj', 'AdjT', 'Jinvp']
-    wrapper.__doc__ = fr'''Creates a {type_name} :obj:`LieTensor`.
+    wrapper.__doc__ = fr'''Creates a(n) {type_name} :obj:`LieTensor`.
 
     Args:
         data (:obj:`Tensor`, or :obj:`list`, or ':obj:`int`...'): A
