@@ -14,7 +14,7 @@ def _LieTensor_wrapper_add_docstr(wrapper: functools.partial, embedding_doc):
     type_dim = ltype.dimension[0]
     see_method = ['Exp', 'Inv'] if ltype.on_manifold else \
         ['Log', 'Inv', 'Act', 'Retr', 'Adj', 'AdjT', 'Jinvp']
-    wrapper.__doc__ = fr'''Creates a(n) {type_name} :obj:`LieTensor`.
+    wrapper.__doc__ = fr'''Alias of {type_name} type :obj:`LieTensor`.
 
     Args:
         data (:obj:`Tensor`, or :obj:`list`, or ':obj:`int`...'): A
