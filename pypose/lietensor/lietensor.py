@@ -1,7 +1,8 @@
-import math
-from multiprocessing import Condition
-import torch
-from torch import nn
+
+
+import torch, warnings
+from torch import nn, linalg
+from torch.utils._pytree import tree_map
 from .backends import exp, log, inv, mul, adj
 from .backends import adjT, jinvp, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
@@ -19,7 +20,6 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
                      'index_select', 'masked_select', 'index_copy', 'index_copy_',
                      'select', 'select_scatter', 'index_put','index_put_']
 
-LIETENSOR_EPS = 1e-6
 
 class LieType:
     '''LieTensor Type Base Class'''
@@ -219,6 +219,12 @@ class SO3Type(LieType):
         X.index_fill_(dim=-1, index=torch.tensor([-1], device=X.device), value=1)
         return X
 
+    def Jr(self, X):
+        """
+        Right jacobian of SO(3)
+        """
+        return X.Log().Jr()
+
 
 class so3Type(LieType):
     def __init__(self):
@@ -226,23 +232,21 @@ class so3Type(LieType):
 
     def Exp(self, x):
         # X = self.__op__(self.lid, exp, x)
-        if(len(x.shape) == 1):
-            x = x.unsqueeze(0)
-
-        theta = torch.norm(x, 2, 1)
+        theta = torch.norm(x, 2, dim=-1, keepdim=True)
         theta_half = 0.5 * theta
         theta2 = theta * theta
         theta4 = theta2 * theta2
 
-        imag_factor_larger = torch.sin(theta_half) / theta
-        real_factor_larger = torch.cos(theta_half)
-        imag_factor_smaller = 0.5 - (1.0/48.0) * theta2 + (1.0/3840.0) * theta4
-        real_factor_smaller = 1.0 - (1.0/8.0) * theta2 + (1.0/384.0) * theta4
-        imag_factor = torch.where((theta > LIETENSOR_EPS), imag_factor_larger, imag_factor_smaller)
-        real_factor = torch.where((theta > LIETENSOR_EPS), real_factor_larger, real_factor_smaller)
-       
-        imag_factor = x * imag_factor.unsqueeze(1)
-        X = torch.cat([imag_factor, real_factor.unsqueeze(1)], 1)        
+        imag_factor = torch.zeros_like(theta, requires_grad=False)
+        real_factor = torch.zeros_like(theta, requires_grad=False)
+        idx = (theta > torch.finfo(theta.dtype).eps)
+        imag_factor[idx] = torch.sin(theta_half[idx]) / theta[idx]
+        real_factor[idx] = torch.cos(theta_half[idx])
+        imag_factor[~idx] = 0.5 - (1.0/48.0) * theta2[~idx] + (1.0/3840.0) * theta4[~idx]
+        real_factor[~idx] = 1.0 - (1.0/8.0) * theta2[~idx] + (1.0/384.0) * theta4[~idx]
+
+        imag_factor = x * imag_factor
+        X = torch.cat([imag_factor, real_factor], -1)        
         return LieTensor(X, ltype=SO3_type)
 
     @classmethod
@@ -262,17 +266,15 @@ class so3Type(LieType):
 
     def Jr(self, x):
         """
-        Right jacobian of SO(3)
+        Right jacobian of so(3)
         The code is taken from the Sophus codebase :
         https://github.com/XueLianjie/BA_schur/blob/3af9a94248d4a272c53cfc7acccea4d0208b77f7/thirdparty/Sophus/sophus/so3.hpp#L113
         """
-        I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.shape[:-1]+(3,3))
-        theta = torch.linalg.norm(x, dim=-1)
-        theta = theta.unsqueeze(1).unsqueeze(2)
         K = vec2skew(x)
-        J_larger = I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/theta**3 * K@K
-        J = torch.where(theta>LIETENSOR_EPS, J_larger, I)
-        return J
+        theta = torch.linalg.norm(x, dim=-1, keepdim=True).unsqueeze(-1)
+        I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.lshape+(3, 3))
+        Jr = I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/theta**3 * K@K
+        return torch.where(theta>torch.finfo(theta.dtype).eps, Jr, I)
 
 
 class SE3Type(LieType):
@@ -299,14 +301,22 @@ class se3Type(LieType):
 
     def Exp(self, x):
         # X = self.__op__(self.lid, exp, x)
-        x = x.tensor()
-        if(len(x.shape) == 1):
-            x = x.unsqueeze(0)
-        translation_left_jacobian = so3_type.Jr(-x[:, 3:])
-        translation_Exp = torch.matmul(translation_left_jacobian, x[:, :3].unsqueeze(2)).squeeze(2)
-        rotation_Exp = so3_type.Exp(x[:, 3:]).tensor()
-        X = torch.cat([translation_Exp, rotation_Exp], 1)
+        x = x.tensor() if hasattr(x, 'ltype') else x
+        Jl = so3_type.Jr(LieTensor((-x[..., 3:]), ltype=so3_type))
+        t = torch.matmul(Jl, x[..., :3].unsqueeze(-1)).squeeze(-1)
+        r = so3_type.Exp(x[..., 3:]).tensor()
+        X = torch.cat([t, r], -1)
         return LieTensor(X, ltype=SE3_type)
+        # x = x.tensor()
+        # if(len(x.shape) == 1):
+        #     x = x.unsqueeze(0)
+        # # translation_left_jacobian = so3_type.Jr(LieTensor((-x[:, 3:]), ltype=so3_type))
+        # translation_left_jacobian = so3_type.Jr(-x[:, 3:])
+        # translation_Exp = torch.matmul(translation_left_jacobian, x[:, :3].unsqueeze(2)).squeeze(2)
+        # print(translation_Exp)
+        # rotation_Exp = so3_type.Exp(x[:, 3:]).tensor()
+        # X = torch.cat([translation_Exp, rotation_Exp], 1)
+        # return LieTensor(X, ltype=SE3_type)
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -410,8 +420,8 @@ class rxso3Type(LieType):
         B = torch.zeros_like(theta, requires_grad=False)
         C = torch.zeros_like(theta, requires_grad=False)
       
-        sigma_larger = (sigma.abs() > LIETENSOR_EPS)
-        theta_larger = (theta > LIETENSOR_EPS)
+        sigma_larger = (sigma.abs() > torch.finfo(sigma.dtype).eps)
+        theta_larger = (theta > torch.finfo(theta.dtype).eps)
         condition1 = (~sigma_larger) & (~theta_larger)
         condition2 = (~sigma_larger) & theta_larger
         condition3 = sigma_larger & (~theta_larger)
@@ -604,7 +614,8 @@ class LieTensor(torch.Tensor):
                 grad_fn=<AliasBackward0>)
     """
     def __init__(self, *data, ltype:LieType):
-        assert self.shape[-1:] == ltype.dimension, 'Dimension Invalid.'
+        assert self.shape[-1:] == ltype.dimension, 'Dimension Invalid. Go to{}'.format(
+            'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor')
         self.ltype = ltype
 
     @staticmethod
@@ -627,10 +638,16 @@ class LieTensor(torch.Tensor):
             lietensor = args
             while not isinstance(lietensor, LieTensor):
                 lietensor = lietensor[0]
-            if isinstance(data, (tuple, list)):
-                return (LieTensor(item, ltype=lietensor.ltype)
-                        if isinstance(item, torch.Tensor) else item for item in data)
-            return LieTensor(data, ltype=lietensor.ltype)
+            def warp(t):
+                if isinstance(t, torch.Tensor) and not isinstance(t, cls):
+                    lt = torch.Tensor.as_subclass(t, LieTensor)
+                    lt.ltype = lietensor.ltype
+                    if lt.shape[-1:] != lt.ltype.dimension:
+                        link = 'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor'
+                        warnings.warn('Tensor Shape Invalid by calling {}, go to {}'.format(func, link))
+                    return lt
+                return t
+            return tree_map(warp, data)
         return data
 
     @property
@@ -759,7 +776,7 @@ class LieTensor(torch.Tensor):
             tensor([[ 0.1196,  0.2339, -0.6824,  0.6822],
                     [ 0.9198, -0.2704, -0.2395,  0.1532]])
         '''
-        return self.data
+        return torch.Tensor(self)
 
     def matrix(self) -> torch.Tensor:
         r'''

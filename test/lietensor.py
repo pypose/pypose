@@ -235,3 +235,16 @@ pp.Jr(x)
 x = pp.randn_SO3(2)
 p = pp.randn_so3(2)
 x.Jinvp(p)
+
+from torch.autograd.functional import jacobian
+
+def func(x):
+    return x.Exp()
+
+J = jacobian(func, p)
+print(J)
+
+x = pp.randn_so3(2,1,2, requires_grad=True)
+J = x.Jr()
+print(x.shape, J.shape)
+assert J.requires_grad is True
