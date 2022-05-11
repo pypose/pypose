@@ -309,16 +309,6 @@ class se3Type(LieType):
         r = so3_type.Exp(x[..., 3:]).tensor()
         X = torch.cat([t, r], -1)
         return LieTensor(X, ltype=SE3_type)
-        # x = x.tensor()
-        # if(len(x.shape) == 1):
-        #     x = x.unsqueeze(0)
-        # # translation_left_jacobian = so3_type.Jr(LieTensor((-x[:, 3:]), ltype=so3_type))
-        # translation_left_jacobian = so3_type.Jr(-x[:, 3:])
-        # translation_Exp = torch.matmul(translation_left_jacobian, x[:, :3].unsqueeze(2)).squeeze(2)
-        # print(translation_Exp)
-        # rotation_Exp = so3_type.Exp(x[:, 3:]).tensor()
-        # X = torch.cat([translation_Exp, rotation_Exp], 1)
-        # return LieTensor(X, ltype=SE3_type)
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -354,12 +344,10 @@ class sim3Type(LieType):
     def Exp(self, x):
         # X = self.__op__(self.lid, exp, x)
         x = x.tensor()
-        if(len(x.shape) == 1):
-            x = x.unsqueeze(0)
-        translation_Js = rxso3_type.Js(x[:, 3:]) 
-        translation_Exp = torch.matmul(translation_Js, x[:, :3].unsqueeze(2)).squeeze(2)
-        rotation_Exp = rxso3_type.Exp(LieTensor(x[:, 3:], ltype=rxso3_type)).tensor()
-        X = torch.cat([translation_Exp, rotation_Exp], 1)
+        Js = rxso3_type.Js(LieTensor((x[..., 3:]), ltype=rxso3_type)) 
+        t = torch.matmul(Js, x[..., :3].unsqueeze(-1)).squeeze(-1)
+        r = rxso3_type.Exp(LieTensor(x[..., 3:], ltype=rxso3_type)).tensor()
+        X = torch.cat([t, r], -1)
         return LieTensor(X, ltype=Sim3_type)
 
     @classmethod
@@ -396,11 +384,9 @@ class rxso3Type(LieType):
     def Exp(self, x):
         # X = self.__op__(self.lid, exp, x)
         x = x.tensor()
-        if(len(x.shape) == 1):
-            x = x.unsqueeze(0)
-        rotation_Exp = so3_type.Exp(x[:, :3]).tensor()
-        scale_Exp = torch.exp(x[:, 3:])
-        X = torch.cat([rotation_Exp, scale_Exp], 1)
+        r = so3_type.Exp(x[..., :3]).tensor()
+        s = torch.exp(x[..., 3:])
+        X = torch.cat([r, s], -1)
         return LieTensor(X, ltype=RxSO3_type)
 
     @classmethod
@@ -412,11 +398,10 @@ class rxso3Type(LieType):
         return LieTensor(data, ltype=rxso3_type).requires_grad_(requires_grad)
 
     def Js(self, x):
-        if(len(x.shape) == 1):
-            x = x.unsqueeze(0)
-        rotation = x[:, :3]
-        sigma = x[:, 3]
-        theta = torch.norm(rotation, 2, 1)
+        x = x.tensor()
+        rotation = x[..., :3]
+        sigma = x[..., 3]
+        theta = torch.norm(rotation, 2, -1)
 
         A = torch.zeros_like(theta, requires_grad=False)
         B = torch.zeros_like(theta, requires_grad=False)
@@ -430,6 +415,7 @@ class rxso3Type(LieType):
         condition4 = sigma_larger & theta_larger
 
         scale = sigma.exp()
+        sigma2 = sigma * sigma
         theta2 = theta * theta
         theta2_inv = 1.0 / theta2
 
@@ -447,13 +433,13 @@ class rxso3Type(LieType):
         C[sigma_larger] = (scale[sigma_larger] - 1.0) / sigma[sigma_larger]
         sigma_c3 = sigma[condition3]
         scale_c3 = scale[condition3]
-        sigma2_c3 = sigma_c3 * sigma_c3
+        sigma2_c3 = sigma2[condition3]
         A[condition3] = (1.0 + (sigma_c3 - 1.0) * scale_c3) / sigma2_c3
         B[condition3] = (0.5 * sigma2_c3 * scale_c3 + scale_c3 - 1.0 - sigma2_c3 * scale_c3) / (sigma2_c3 * sigma_c3)
 
         # condition4
         sigma_c4 = sigma[condition4]
-        sigma2_c4 = sigma_c4 * sigma_c4
+        sigma2_c4 = sigma2[condition4]
         scale_c4 = scale[condition4]
         theta_c4 = theta[condition4]
         theta2_c4 = theta2[condition4]
@@ -465,9 +451,9 @@ class rxso3Type(LieType):
         B[condition4] = (C[condition4] - ((b_c4 - 1) * sigma_c4 + a_c4 * theta_c4) / c_c4) * theta2_inv_c4
 
         K = vec2skew(rotation)
-        A = A.unsqueeze(1).unsqueeze(2)
-        B = B.unsqueeze(1).unsqueeze(2)
-        C = C.unsqueeze(1).unsqueeze(2)
+        A = A.unsqueeze(-1).unsqueeze(-1)
+        B = B.unsqueeze(-1).unsqueeze(-1)
+        C = C.unsqueeze(-1).unsqueeze(-1)
         I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.shape[:-1]+(3,3))
         return A * K + B * (K@K) + C * I
 
