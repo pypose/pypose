@@ -174,8 +174,8 @@ class LieType:
         return cummul(X, dim)
 
     @classmethod
-    def cumprod(self, X, dim):
-        return cumprod(X, dim)
+    def cumprod(self, X, dim, left = True):
+        return cumprod(X, dim, left)
 
     @classmethod
     def cumops_(self, X, dim, ops):
@@ -672,7 +672,7 @@ class LieTensor(torch.Tensor):
             tensor([[ 0.1196,  0.2339, -0.6824,  0.6822],
                     [ 0.9198, -0.2704, -0.2395,  0.1532]])
         '''
-        return torch.Tensor(self)
+        return torch.Tensor.as_subclass(self, torch.Tensor)
 
     def matrix(self) -> torch.Tensor:
         r'''
@@ -747,11 +747,11 @@ class LieTensor(torch.Tensor):
         """
         return self.ltype.cummul(self, dim)
 
-    def cumprod(self, dim):
+    def cumprod(self, dim, left = True):
         r"""
         See :func:`pypose.cumprod`
         """
-        return self.ltype.cumprod(self, dim)
+        return self.ltype.cumprod(self, dim, left)
 
     def cumops_(self, dim, ops):
         r"""
