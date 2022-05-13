@@ -40,7 +40,7 @@ def _LieTensor_wrapper_add_docstr(wrapper: functools.partial, embedding_doc):
         :obj:`pypose.identity_{type_name}` instead.
 
     See {', '.join([f':obj:`pypose.{m}`' for m in see_method])} for
-    implementations of relavant operations.
+    implementations of relevant operations.
     '''
     return wrapper
 
@@ -1335,8 +1335,8 @@ def Act(X, p):
 @assert_ltype
 def Adj(X, a):
     r"""
-    The way of representing the elements of the Lie Group (input) as 
-    linear transformations of the group's Lie algebra (second point), considered as a vector space.
+    The dot product between the Adjoint matrix at the point given by an input (Lie Group) and 
+    the second point (Lie Algebra).
 
     .. math::
         \mathrm{Adj}: (\mathcal{G}, \mathcal{g}) \mapsto \mathcal{g}
@@ -1378,52 +1378,52 @@ def Adj(X, a):
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :obj:`rxso3_type` 
 
-    * If input (:math:`\mathbf{X}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`SO3_type` and :obj:`so3_type`
-      (input :math:`\mathbf{X}` is an instance of :meth:`SO3`, :math:`\mathbf{a}` is an instance of :meth:`so3`).
-      Given :math:`\mathbf{X} ∈ \mathbf{SO3}`.
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`SO3_type` and :obj:`so3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`SO3`, :math:`\mathbf{a}` is an instance of :meth:`so3`).
+      Given :math:`\mathbf{x}_i ∈` :math:`\textrm{SO3}`.
       The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}_X = \mathbf{X} 
+            \mathbf{Adj}_i(\mathbf{x}_i) = \mathbf{x}_i 
 
-        In the case of SO3, the adjoint transformation for an element is the same
+        In the case of :math:`\textrm{SO3}`, the adjoint transformation for an element is the same
         rotation matrix used to represent the element. Rotating a tangent vector by an element "moves" it
         from the tangent space on the right side of the element to the tangent space on the left.
 
-    * If input (:math:`\mathbf{X}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`SE3_type` and :obj:`se3_type`
-      (input :math:`\mathbf{X}` is an instance of :meth:`SE3`, :math:`\mathbf{a}` is an instance of :meth:`se3`).
-      Let :math:`\mathbf{R} ∈ \mathbf{SO3}` and :math:`\mathbf{t} ∈ \mathbf{ℝ}^{3×3}` represent the rotation and 
-      translation part of the group. The adjoint transformation is given by:
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`SE3_type` and :obj:`se3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`SE3`, :math:`\mathbf{a}` is an instance of :meth:`se3`).
+      Let :math:`\mathbf{R}_i ∈` :math:`\textrm{SO3}` and :math:`\mathbf{t}_i ∈ \mathbf{ℝ}^{3×3}` represent the 
+      rotation and translation part of the group. The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}_X = \left[
+            \mathbf{Adj}_i(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
-                                    \mathbf{R} & \mathbf{t}_\mathbf{×}\mathbf{R} \\
-                                    \mathbf{0} & \mathbf{R}
+                                    \mathbf{R}_i & \mathbf{t}_{i×}\mathbf{R}_i \\
+                                    \mathbf{0} & \mathbf{R}_i
                                 \end{array}
                              \right] ∈ \mathbf{ℝ}^{6×6}
 
         where,
 
         .. math::
-            \mathbf{X} = \left[
+            \mathbf{x}_i = \left[
                                 \begin{array}{cc} 
-                                    \mathbf{R} & \mathbf{t} \\
+                                    \mathbf{R}_i& \mathbf{t}_i \\
                                     \mathbf{0} & \mathbf{1}
                                 \end{array}
-                             \right] ∈ \mathbf{SE3}   
+                             \right] ∈ \mathrm{SE3}  
 
-    * If input (:math:`\mathbf{X}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`Sim3_type` and :obj:`sim3_type`
-      (input :math:`\mathbf{X}` is an instance of :meth:`Sim3`, :math:`\mathbf{a}` is an instance of :meth:`sim3`).
-      Let :math:`\mathbf{R} ∈ \mathbf{SO3}`, :math:`\mathbf{t} ∈ \mathbf{R}^{3×3}`, and 
-      :math:`s ∈ \mathbf{R}^+` represent the rotation, translation, and scale parts of the group. The adjoint transformation 
-      is given by:
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`Sim3_type` and :obj:`sim3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`Sim3`, :math:`\mathbf{a}` is an instance of :meth:`sim3`).
+      Let :math:`\mathbf{R}_i∈` :math:`\textrm{SO3}`, :math:`\mathbf{t}_i ∈ \mathbf{R}^{3×3}`, and 
+      :math:`\mathbf{s}_i ∈ \mathbf{R}^+` represent the rotation, translation, and scale parts of the group. 
+      The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}_X = \left[
+            \mathbf{Adj}_i(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
-                                    s\mathbf{R} & s\mathbf{t}_\mathbf{×}\mathbf{R} & -s\mathbf{t} \\
-                                    \mathbf{0} & \mathbf{R} & \mathbf{0} \\
+                                    s\mathbf{R}_i& \mathbf{t}_{i×}\mathbf{R}_i& -\mathbf{t}_i \\
+                                    \mathbf{0} & \mathbf{R}_i& \mathbf{0} \\
                                     \mathbf{0} & \mathbf{0} & \mathbf{1}
                                 \end{array}
                              \right] ∈ \mathbf{ℝ}^{7×7}
@@ -1431,33 +1431,38 @@ def Adj(X, a):
         where, 
 
         .. math::
-            \mathbf{X} = \left[
+            \mathbf{x}_i = \left[
                                 \begin{array}{cc} 
-                                    \mathbf{R} & \mathbf{t} \\
-                                    \mathbf{0} & \mathbf{s}^{-1}
+                                    \mathbf{R}_i & \mathbf{t}_i \\
+                                    \mathbf{0} & \mathbf{s}^{-1}_i
                                 \end{array}
-                             \right] ∈ \mathbf{Sim3}  
+                             \right] ∈ \textrm{Sim3} 
         
-    * If input (:math:`\mathbf{X}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`RxSO3_type` and :obj:`rxso3_type`
-      (input :math:`\mathbf{X}` is an instance of :meth:`RxSO3`, :math:`\mathbf{a}` is an instance of :meth:`rxso3`).
-      Let :math:`\mathbf{R} ∈ \mathbf{SO3}`, and :math:`s ∈ \mathbf{R}^+` represent the rotation and scale parts
-      of the group. The adjoint transformation is given by:
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`RxSO3_type` and :obj:`rxso3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`, :math:`\mathbf{a}` is an instance of :meth:`rxso3`).
+      Let :math:`\mathbf{R}_i ∈` :math:`\textrm{SO3}`, and :math:`\mathbf{s}_i ∈ \mathbf{R}^+` represent the rotation 
+      and scale parts of the group. The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}_X = \mathbf{R}
+            \mathbf{Adj}_i(\mathbf{x}_i) = \left[
+                                \begin{array}{cc} 
+                                    \mathbf{R}_i & \mathbf{0} \\
+                                    \mathbf{0} & \mathbf{1}
+                                \end{array}
+                             \right] ∈ \mathbf{ℝ}^{4×4}
 
         where,
         
         .. math::
-            \mathbf{X} = \left[
+            \mathbf{x}_i = \left[
                                 \begin{array}{cc} 
-                                    \mathbf{R} & \mathbf{0} \\
-                                    \mathbf{0} & \mathbf{s}^{-1}
+                                    \mathbf{R}_i & \mathbf{0} \\
+                                    \mathbf{0} & \mathbf{s}^{-1}_i
                                 \end{array}
-                             \right] ∈ \mathbf{RxSO3}
+                             \right] ∈ \mathrm{RxSO3}
 
-        In the case of RxSO3 group, the adjoint transformation is the same as the rotation matrix of the group i.e. the 
-        SO3 part of the group.
+        In the case of :math:`\textrm{RxSO3}` group, the adjoint transformation is the same as the rotation 
+        matrix of the group i.e. the :math:`\textrm{SO3}` part of the group.
 
     Note:
         :math:`\mathrm{Adj}` is generally used to transform a tangent vector from the tangent space around one
@@ -1467,8 +1472,12 @@ def Adj(X, a):
         * J. Sola et al., `A micro Lie theory for state estimation in
           robotics <https://arxiv.org/abs/1812.01537>`_, arXiv preprint arXiv:1812.01537 (2018).
 
-        The following is an interesting tutorial to learn more about deriving the adjoint matrices for different
-        transformation groups. 
+        The following thesis and the tutorial serve as a good reading material to learn more about deriving the 
+        adjoint matrices for different transformation groups. 
+
+        * Strasdat, H., 2012. `Local accuracy and global consistency for efficient visual SLAM
+          <https://www.doc.ic.ac.uk/~ajd/Publications/Strasdat-H-2012-PhD-Thesis.pdf>`_, 
+          (Doctoral dissertation, Department of Computing, Imperial College London).
 
         * `Lie Groups for 2D and 3D Transformations.
           <https://www.ethaneade.org/lie.pdf>`_, by Ethan Eade.
@@ -1477,36 +1486,36 @@ def Adj(X, a):
 
         * :math:`\mathrm{Adj}`: (:obj:`SO3`, :obj:`so3`) :math:`\mapsto` :obj:`so3`
 
-        >>> X = pp.randn_SO3(2)
+        >>> x = pp.randn_SO3(2)
         >>> a = pp.randn_so3(2)
-        >>> X.Adj(a) # equivalent to: pp.Adj(X, a)
+        >>> x.Adj(a) # equivalent to: pp.Adj(x, a)
             so3Type LieTensor:
             tensor([[-0.4171,  2.1218,  0.9951],
                     [ 1.8415, -1.2185, -0.4082]])
 
         * :math:`\mathrm{Adj}`: (:obj:`SE3`, :obj:`se3`) :math:`\mapsto` :obj:`se3`
 
-        >>> X = pp.randn_SE3(2)
+        >>> x = pp.randn_SE3(2)
         >>> a = pp.randn_se3(2)
-        >>> X.Adj(a) # equivalent to: pp.Adj(X, a)
+        >>> x.Adj(a) # equivalent to: pp.Adj(x, a)
             se3Type LieTensor:
             tensor([[-0.8536, -0.1984, -0.4554, -0.4868,  0.3231,  0.8535],
                     [ 0.1577, -1.7625,  1.7997, -1.5085, -0.2098,  0.3538]])
 
         * :math:`\mathrm{Adj}`: (:obj:`Sim3`, :obj:`sim3`) :math:`\mapsto` :obj:`sim3`
 
-        >>> X = pp.randn_Sim3(2)
+        >>> x = pp.randn_Sim3(2)
         >>> a = pp.randn_sim3(2)
-        >>> X.Adj(a) # equivalent to: pp.Adj(X, a)
+        >>> x.Adj(a) # equivalent to: pp.Adj(x, a)
             sim3Type LieTensor:
             tensor([[ 0.1455, -0.5653, -0.1845,  0.0502,  1.3125,  1.5217, -0.8964],
                     [-4.8724, -0.5254,  3.9559,  1.5170,  1.7610,  0.4375,  0.4248]])
 
         * :math:`\mathrm{Adj}`: (:obj:`RxSO3`, :obj:`rxso3`) :math:`\mapsto` :obj:`rxso3`
 
-        >>> X = pp.randn_RxSO3(2)
+        >>> x = pp.randn_RxSO3(2)
         >>> a = pp.randn_rxso3(2)
-        >>> X.Adj(a) # equivalent to: pp.Adj(X, a)
+        >>> x.Adj(a) # equivalent to: pp.Adj(x, a)
             rxso3Type LieTensor:
             tensor([[-1.3590, -0.4314, -0.0297,  1.0166],
                     [-0.3378, -0.4942, -2.0083, -0.4321]])
