@@ -151,7 +151,7 @@ def cumprod(input, dim, left = True):
     Args:
         input (LieTensor): the input LieTensor
         dim (int): the dimension to do the operation over
-        left (bool, optional): whether perform left product in :obj:`cumprod`. /
+        left (bool, optional): whether perform left product in :obj:`cumprod`.
             If set it to :obj:`False`, this function performs right product. Defaul: True
 
     Returns:
