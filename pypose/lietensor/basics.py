@@ -164,18 +164,20 @@ def cumprod(input, dim, left = True):
     Examples:
 
     * Left product with :math:`input \in` :meth:`SE3`
-        >>> input = pp.randn_SE3(2)
-        >>> pp.cumprod(input, dim=0)
-        SE3Type LieTensor:
-        tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
-                [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
+
+    >>> input = pp.randn_SE3(2)
+    >>> pp.cumprod(input, dim=0)
+    SE3Type LieTensor:
+    tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
+            [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
 
     * Right product with :math:`input \in` :meth:`SO3`
-        >>> input = pp.randn_SO3(1,2)
-        >>> pp.cumprod(input, dim=1, left=False)
-        SO3Type LieTensor:
-        tensor([[[ 0.5798, -0.1189, -0.2429,  0.7686],
-                [ 0.7515, -0.1920,  0.5072,  0.3758]]])
+
+    >>> input = pp.randn_SO3(1,2)
+    >>> pp.cumprod(input, dim=1, left=False)
+    SO3Type LieTensor:
+    tensor([[[ 0.5798, -0.1189, -0.2429,  0.7686],
+            [ 0.7515, -0.1920,  0.5072,  0.3758]]])
     """
     if left:
         return cumops(input, dim, lambda a, b : a @ b)
