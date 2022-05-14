@@ -109,7 +109,7 @@ def cummul(input, dim):
 
     .. math::
         y_i = x_1 * x_2 * \cdots * x_i,
-
+        
     where :math:`x_i,~y_i` are the :math:`i`-th LieType item along the :obj:`dim`
     dimension of input and output, respectively.
 
@@ -138,10 +138,12 @@ def cumprod(input, dim, left = True):
     r"""Returns the cumulative product (@) of LieTensor along a dimension.
 
     * Left product:
+
     .. math::
         y_i = x_i ~@~ x_{i-1} ~@~ \cdots ~@~ x_1,
     
     * Right product:
+
     .. math::
         y_i = x_1 ~@~ x_2 ~@~ \cdots ~@~ x_i,
 
