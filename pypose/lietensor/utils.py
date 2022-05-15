@@ -307,8 +307,8 @@ def randn_like(input, sigma=1, **kwargs):
 
 def randn_so3(*size, sigma=1, **kwargs):
     r'''
-    Returns :obj:`so3_type` LieTensor filled with random numbers satisfying the expected distance 
-    between the corresponding state and :math:`\mathbf{0}_{3\times 1}` is :obj:`sigma`.
+    Returns :obj:`so3_type` LieTensor filled with random numbers satisfying the expected distance (quaternions distance)
+    between the generated state and :math:`\mathbf{0}` is :obj:`sigma`.
 
     The shape of the tensor is defined by the variable argument size.
 
@@ -372,18 +372,19 @@ def randn_so3(*size, sigma=1, **kwargs):
 def randn_SO3(*size, sigma=1, **kwargs):
     r'''
     Returns :obj:`SO3_type` LieTensor filled with the Exponential map of the random
-    :obj:`so3_type` LieTensor with normal distribution with mean 0 and variance :obj:`sigma`.
+    :obj:`so3_type` LieTensor, whose expected quaternions distance from :math:`\mathbf{0}` is :obj:`sigma`.
 
     .. math::
-        \mathrm{out}_i = \mathrm{Exp}(\mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma}_{3\times 1}))
+        \mathrm{out}_i = \mathrm{Exp}(\mathbf{0}_{3\times 1}, \mathbf{\sigma_{\mathrm{r}}}_{3\times 1})
 
+    For the definition and explanation of :math:`\mathbf{\sigma_{\mathrm{r}}}`, please see the documentation of :meth:`randn_so3`.
     The shape of the tensor is defined by the variable argument size.
 
     Args:
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float, optional): variance :math:`\sigma` of the normal distribution. Default: 1.
+        sigma (float, optional): expected distance between the generated state and zero. Default: 1.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.

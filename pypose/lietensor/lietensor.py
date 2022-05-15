@@ -138,8 +138,9 @@ class LieType:
         return self.randn(*args, sigma=1, **kwargs)
 
     def randn(self, *args, sigma=1., **kwargs):
+        # LieTensor.randn only samples rotation
         scaled_sigma = 2.*sigma/math.sqrt(3)
-        return scaled_sigma * torch.randn(*(tuple(args)+self.manifold), **kwargs)
+        return scaled_sigma * torch.randn(*(tuple(args)+torch.Size([3])), **kwargs)
 
     @classmethod
     def cumops(self, X, dim, ops):
@@ -398,7 +399,7 @@ class SE3Type(LieType):
         data = torch.tensor([0., 0., 0., 0., 0., 0., 1.], **kwargs)
         return LieTensor(data.repeat(size+(1,)), ltype=SE3_type)
 
-    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
+    def randn(self, *size, sigma=[1,1], requires_grad=False, **kwargs):
         data = se3_type.Exp(se3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=SE3_type).requires_grad_(requires_grad)
 
@@ -433,9 +434,16 @@ class se3Type(LieType):
     def identity(cls, *size, **kwargs):
         return SE3_type.Log(SE3_type.identity(*size, **kwargs))
 
-    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
-        data = super().randn(*size, sigma=sigma, **kwargs).detach()
-        return LieTensor(data, ltype=se3_type).requires_grad_(requires_grad)
+    def randn(self, *size, sigma=[1,1], requires_grad=False, **kwargs):
+        # rotation part
+        rotation_data = super().randn(*size, sigma=sigma[-1], **kwargs).detach()
+        # transation part
+        if len(sigma)==2:
+            transation_data = sigma[0] * torch.randn(*(tuple(*size)+self.manifold-3), **kwargs)
+        else:
+            assert len(sigma)==4, 'input sigma should be either 2-dimensional or 4-dimensional.'
+            transation_data = torch.cat([sigma[0] * torch.randn(*(tuple(*size)+1), **kwargs), sigma[1] * torch.randn(*(tuple(*size)+1), **kwargs), sigma[2] * torch.randn(*(tuple(*size)+1), **kwargs)], dim=1)
+        return LieTensor(torch.cat([transation_data, rotation_data], dim=1), ltype=se3_type).requires_grad_(requires_grad)
 
 
 class Sim3Type(LieType):
