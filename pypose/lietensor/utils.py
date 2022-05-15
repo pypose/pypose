@@ -1209,7 +1209,7 @@ def Mul(x, y):
 
 @assert_ltype
 def Retr(X, a):
-    r"""Perform a retraction for a LieGroup :math:`X` with a given direction :math:`a`.
+    r"""Perform batched retraction with a given direction.
 
     .. math::
         Y_i = \mathrm{Exp}(a_i) * X_i,
@@ -1263,12 +1263,13 @@ def Retr(X, a):
 
 @assert_ltype
 def Act(X, p):
-    r"""Apply the batched transform :math:`X` (Lie Group) to points :math:`p` in Euclidean or homogeneous coordinates.
+    r"""Apply the batched transform to points in Euclidean or homogeneous coordinates.
 
     .. math::
         y_i = X_i * p_i,
 
-    where :math:`p_i \in \mathbb{R^{*\times3}}` or :math:`p_i \in \mathbb{R^{*\times4}}` denotes the points to be transformed.
+    where :math:`X` is the batched transform and :math:`p_i \in \mathbb{R^{*\times3}}` or
+    :math:`p_i \in \mathbb{R^{*\times4}}` denotes the points to be transformed.
 
     Args:
         X (LieTensor): the input LieTensor (Lie Group).
