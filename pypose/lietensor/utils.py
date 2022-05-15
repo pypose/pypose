@@ -1212,7 +1212,9 @@ def Retr(X, a):
     r"""Perform a retraction for a LieGroup :math:`X` with a given direction :math:`a`.
 
     .. math::
-       \mathrm{Retr}: (X, a) \mapsto y
+        Y_i = \mathrm{Exp}(a_i) * X_i,
+
+    where :math:`\mathrm{Exp}` means the exponetial map. See :obj:`pypose.Exp` for more details. 
 
     Args:
         X (LieTensor): the input LieTensor to retract (Lie Group)
@@ -1220,117 +1222,95 @@ def Retr(X, a):
         a (LieTensor): the direction of the retraction (Lie Algebra)
 
     Return:
-        LieTensor: The corresponding LieGroup of the inputs.(Lie Group)
-
-
-    .. list-table:: List of supported :math:`\mathrm{Retr}`
-        :widths: 20 20 8 20 20
-        :header-rows: 1
-
-        * - input :obj:`ltype`
-          - :math:`({X}, \mathcal{a})` (Lie Group, Lie Algebra)
-          - :math:`\mapsto`
-          - :math:`{y}` (Lie Algebra)
-          - output :obj:`ltype`
-        * - (:obj:`SO3_type`, :obj:`so3_type`)
-          - :math:`({X}\in\mathbb{R}^{*\times4}, {a}\in\mathbb{R}^{*\times3})`
-          - :math:`\mapsto`
-          - :math:`{y}\in\mathbb{R}^{*\times4}`
-          - :obj:`SO3_type`
-        * - (:obj:`SE3_type`, :obj:`se3_type`)
-          - :math:`({X}\in\mathbb{R}^{*\times7}, {a}\in\mathbb{R}^{*\times6})`
-          - :math:`\mapsto`
-          - :math:`{y}\in\mathbb{R}^{*\times7}`
-          - :obj:`SE3_type`
-        * - (:obj:`Sim3_type`, :obj:`sim3_type`)
-          - :math:`({X}\in\mathbb{R}^{*\times8}, {a}\in\mathbb{R}^{*\times7})`
-          - :math:`\mapsto`
-          - :math:`{y}\in\mathbb{R}^{*\times8}`
-          - :obj:`Sim3_type`
-        * - (:obj:`RxSO3_type`, :obj:`rxso3_type`)
-          - :math:`({X}\in\mathbb{R}^{*\times5}, {a}\in\mathbb{R}^{*\times4})`
-          - :math:`\mapsto`
-          - :math:`{y}\in\mathbb{R}^{*\times5}`
-          - :obj:`RxSO3_type`
-
-    Let the input be (:math:`\mathbf{X}`, :math:`\mathbf{a}`), :math:`\mathbf{y}` be the output.
-
-    .. math::
-        \mathbf{y}_i = \mathrm{Exp}(\mathbf{a}_i) * \mathbf{X}_i
-
-    where the :math:`\mathrm{Exp}` means the exponetial map for :obj:`LieTensor`.
-    See :obj:`Exp` operation for details. 
-    
+        LieTensor: The retraction of the inputs (Lie Group)
 
     Examples:
 
-    * :math:`\mathrm{Retr}`: (:meth:`SO3`, :meth:`so3`) :math:`\mapsto` :meth:`SO3`
+        * :math:`\mathrm{Retr}`: (:obj:`SO3`, :obj:`so3`) :math:`\mapsto` :obj:`SO3`
 
-    >>> a = pp.randn_so3()
-    >>> X = pp.randn_SO3()
-    >>> X.Retr(a) # equivalent to: pp.Retr(X, a)
-        SO3Type LieTensor:
-        tensor([0.6399, 0.0898, 0.1656, 0.7451])
+            >>> a = pp.randn_so3()
+            >>> X = pp.randn_SO3()
+            >>> X.Retr(a) # equivalent to: pp.Retr(X, a)
+                SO3Type LieTensor:
+                tensor([0.6399, 0.0898, 0.1656, 0.7451])
 
-    * :math:`\mathrm{Retr}`: (:meth:`SE3`, :meth:`se3`) :math:`\mapsto` :meth:`SE3`
+        * :math:`\mathrm{Retr}`: (:obj:`SE3`, :obj:`se3`) :math:`\mapsto` :obj:`SE3`
 
-    >>> a = pp.randn_se3()
-    >>> X = pp.randn_SE3()
-    >>> X.Retr(a)  # equivalent to: pp.Retr(X, a)
-    SE3Type LieTensor:
-    tensor([-0.6754,  1.8240,  0.2109, -0.4649, -0.7254, -0.0943,  0.4987])
+            >>> a = pp.randn_se3()
+            >>> X = pp.randn_SE3()
+            >>> X.Retr(a)  # equivalent to: pp.Retr(X, a)
+            SE3Type LieTensor:
+            tensor([-0.6754,  1.8240,  0.2109, -0.4649, -0.7254, -0.0943,  0.4987])
 
-    * :math:`\mathrm{Retr}`: (:meth:`Sim3`, :meth:`sim3`) :math:`\mapsto` :meth:`Sim3`
+        * :math:`\mathrm{Retr}`: (:obj:`Sim3`, :obj:`sim3`) :math:`\mapsto` :obj:`Sim3`
 
-    >>> a = pp.randn_sim3()
-    >>> X = pp.randn_Sim3()
-    >>> X.Retr(a)  # equivalent to: pp.Retr(X, a)
-    Sim3Type LieTensor:
-    tensor([-0.6057, -1.6370,  1.1379,  0.7037,  0.6164,  0.3525, -0.0262,  0.3141])
+            >>> a = pp.randn_sim3()
+            >>> X = pp.randn_Sim3()
+            >>> X.Retr(a)  # equivalent to: pp.Retr(X, a)
+            Sim3Type LieTensor:
+            tensor([-0.6057, -1.6370,  1.1379,  0.7037,  0.6164,  0.3525, -0.0262,  0.3141])
 
-    * :math:`\mathrm{Retr}`: (:meth:`RxSO3`, :meth:`rxsso3`) :math:`\mapsto` :meth:`RxSO3`
+        * :math:`\mathrm{Retr}`: (:obj:`RxSO3`, :obj:`rxsso3`) :math:`\mapsto` :obj:`RxSO3`
 
-    >>> a = pp.randn_rxso3()
-    >>> X = pp.randn_RxSO3()
-    >>> X.Retr(a)  # equivalent to: pp.Retr(X, a)
-    RxSO3Type LieTensor:
-    tensor([-0.0787,  0.4052, -0.7509,  0.5155,  0.1217])
+            >>> a = pp.randn_rxso3()
+            >>> X = pp.randn_RxSO3()
+            >>> X.Retr(a)  # equivalent to: pp.Retr(X, a)
+            RxSO3Type LieTensor:
+            tensor([-0.0787,  0.4052, -0.7509,  0.5155,  0.1217])
     """
     return X.Retr(a)
 
 
 @assert_ltype
 def Act(X, p):
-    r"""Apply the transform :math:`X` to a vector in Euclidean coordinate :math:`p \in \mathbb{R^{*\times3}}`
-     or homography coordinate :math:`p \in \mathbb{R^{*\times4}}`.
+    r"""Apply the batched transform :math:`X` (Lie Group) to points :math:`p` in Euclidean or homogeneous coordinates.
 
     .. math::
-        y_i = X_i * p_i
+        y_i = X_i * p_i,
+
+    where :math:`p_i \in \mathbb{R^{*\times3}}` or :math:`p_i \in \mathbb{R^{*\times4}}` denotes the points to be transformed.
 
     Args:
-        X (LieTensor): the input LieTensor (Lie Group). The :obj:`ltype` should be :obj:`SO3`, :obj:`SE3`, :obj:`Sim3`, :obj:`RxSO3` or :obj:`SE3`.
+        X (LieTensor): the input LieTensor (Lie Group).
 
-        p (Tensor): the vector to be transformed which :math:`p \in \mathbb{R^{*\times3}}` or :math:`p \in \mathbb{R^{*\times4}}`
+        p (Tensor): the points to be transformed.
 
     Return:
-        Tensor: Pytorch Tensor with the same :obj:`device`, :obj:`dtype` and :obj:`shape` as the input :obj:`p`
+        Tensor: the transformed points in Euclidean or homogeneous coordinates.
 
     Examples:
 
-    * :math:`p \in \mathbb{R^{*\times3}}`
+        * :math:`\mathrm{Act}`: (:obj:`SO3`, :obj:`Tensor`) :math:`\mapsto` :obj:`Tensor`
 
-    >>> a = torch.tensor([0,0,0])
-    >>> X = pp.identity_SO3()
-    >>> X.Act(a)
-        tensor([0., 0., 0.])
+            >>> p = torch.randn(3)     # batch size 1, Euclidean coordinates
+            >>> X = pp.identity_SO3(2) # batch size 2
+            >>> X.Act(p)               # equivalent to: pp.Act(X, p)
+            tensor([[ 1.7576,  1.1503, -0.9920],
+                    [ 1.7576,  1.1503, -0.9920]])
 
-    * :math:`p \in \mathbb{R^{*\times4}}`
+        * :math:`\mathrm{Act}`: (:obj:`SE3`, :obj:`Tensor`) :math:`\mapsto` :obj:`Tensor`
 
-    >>> p = torch.tensor([[0.0,0.0,0.0,1.0],[0.0,0.0,0.0,1.0]])
-    >>> X = pp.identity_SE3(1,2)
-    >>> X.Act(p)
-        tensor([[[0., 0., 0., 1.],
-                [0., 0., 0., 1.]]])
+            >>> p = torch.tensor([[0, 0, 0, 1.], [0, 0, 0, 1.]]) # batch size 2, homogeneous coordinates
+            >>> X = pp.randn_SE3()                               # batch size 1
+            >>> X.Act(p)                                         # apply same transform
+            tensor([[-0.5676, -0.0452, -0.0929,  1.0000],
+                    [-0.5676, -0.0452, -0.0929,  1.0000]])
+
+        * :math:`\mathrm{Act}`: (:obj:`Sim3`, :obj:`Tensor`) :math:`\mapsto` :obj:`Tensor`
+
+            >>> p = torch.tensor([[0, 0, 0, 1.], [0, 0, 0, 1.]])  # batch size 2
+            >>> X = pp.randn_Sim3(2)                              # batch size 2
+            >>> X.Act(p)                                          # apply transform respectively.
+            tensor([[ 0.1551,  2.2930,  0.4531,  1.0000],
+                    [-0.6140, -1.1263,  2.7607,  1.0000]])
+
+        * :math:`\mathrm{Act}`: (:obj:`RxSO3`, :obj:`Tensor`) :math:`\mapsto` :obj:`Tensor`
+
+            >>> p = torch.tensor([[0, 0, 0.], [0, 0, 0.]])  # batch size 2, Euclidean coordinates
+            >>> X = pp.randn_RxSO3(2)                       # batch size 2
+            >>> X.Act(p)                                    # apply transform respectively.
+            tensor([[0., 0., 0.],
+                    [0., 0., 0.]])
     """
     return X.Act(p)
 
