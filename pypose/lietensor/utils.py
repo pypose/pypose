@@ -1220,10 +1220,10 @@ def Mul(x, y):
 
 @assert_ltype
 def Retr(X, a):
-    r"""Perform a retraction from a point :math:`X` on the manifold with a given direction :math:`a`.
+    r"""Perform a retraction for a LieGroup :math:`X` with a given direction :math:`a`.
 
     .. math::
-        y_i = \mathrm{Exp}(a_i) * X_i
+       \mathrm{Retr}: (X, a) \mapsto y
 
     Args:
         X (LieTensor): the input LieTensor to retract (Lie Group)
@@ -1231,7 +1231,7 @@ def Retr(X, a):
         a (LieTensor): the direction of the retraction (Lie Algebra)
 
     Return:
-        LieTensor: the output LieTensor (Lie Group)
+        LieTensor: The corresponding LieGroup of the inputs.(Lie Group)
 
 
     .. list-table:: List of supported :math:`\mathrm{Retr}`
@@ -1264,31 +1264,56 @@ def Retr(X, a):
           - :math:`{y}\in\mathbb{R}^{*\times5}`
           - :obj:`RxSO3_type`
 
+    Let the input be (:math:`\mathbf{X}`, :math:`\mathbf{a}`), :math:`\mathbf{y}` be the output.
+
+    .. math::
+        \mathbf{y}_i = \mathrm{Exp}(\mathbf{a}_i) * \mathbf{X}_i
+
+    where the :math:`\mathrm{Exp}` means the exponetial map for :obj:`LieTensor`.
+    See :obj:`Exp` operation for details. 
+    
+
     Examples:
 
-    * :code:`X.Retr(a)`
+    * :math:`\mathrm{Retr}`: (:meth:`SO3`, :meth:`so3`) :math:`\mapsto` :meth:`SO3`
 
     >>> a = pp.randn_so3()
-    >>> X = pp.identity_SO3()
-    >>> X.Retr(a)
+    >>> X = pp.randn_SO3()
+    >>> X.Retr(a) # equivalent to: pp.Retr(X, a)
         SO3Type LieTensor:
         tensor([0.6399, 0.0898, 0.1656, 0.7451])
 
-    * :code:`pp.Retr(X,a)`
+    * :math:`\mathrm{Retr}`: (:meth:`SE3`, :meth:`se3`) :math:`\mapsto` :meth:`SE3`
 
-    >>> a = pp.randn_se3(2)
-    >>> X = pp.identity_SE3(2)
-    >>> pp.Retr(X,a)
-        SE3Type LieTensor:
-        tensor([[ 0.5777, -0.5815, -0.3694,  0.3861,  0.1730, -0.1701,  0.8900],
-                [-0.2148, -0.3699, -1.1094,  0.1382, -0.5171, -0.3116,  0.7852]])
+    >>> a = pp.randn_se3()
+    >>> X = pp.randn_SE3()
+    >>> X.Retr(a)  # equivalent to: pp.Retr(X, a)
+    SE3Type LieTensor:
+    tensor([-0.6754,  1.8240,  0.2109, -0.4649, -0.7254, -0.0943,  0.4987])
+
+    * :math:`\mathrm{Retr}`: (:meth:`Sim3`, :meth:`sim3`) :math:`\mapsto` :meth:`Sim3`
+
+    >>> a = pp.randn_sim3()
+    >>> X = pp.randn_Sim3()
+    >>> X.Retr(a)  # equivalent to: pp.Retr(X, a)
+    Sim3Type LieTensor:
+    tensor([-0.6057, -1.6370,  1.1379,  0.7037,  0.6164,  0.3525, -0.0262,  0.3141])
+
+    * :math:`\mathrm{Retr}`: (:meth:`RxSO3`, :meth:`rxsso3`) :math:`\mapsto` :meth:`RxSO3`
+
+    >>> a = pp.randn_rxso3()
+    >>> X = pp.randn_RxSO3()
+    >>> X.Retr(a)  # equivalent to: pp.Retr(X, a)
+    RxSO3Type LieTensor:
+    tensor([-0.0787,  0.4052, -0.7509,  0.5155,  0.1217])
     """
     return X.Retr(a)
 
 
 @assert_ltype
 def Act(X, p):
-    r"""Apply the transform :math:`X` to a vector in Euclidean coordinate :math:`p \in \mathbb{R^{*\times3}}` or homography coordinate :math:`p \in \mathbb{R^{*\times4}}`.
+    r"""Apply the transform :math:`X` to a vector in Euclidean coordinate :math:`p \in \mathbb{R^{*\times3}}`
+     or homography coordinate :math:`p \in \mathbb{R^{*\times4}}`.
 
     .. math::
         y_i = X_i * p_i
