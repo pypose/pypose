@@ -1378,25 +1378,32 @@ def Adj(X, a):
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :obj:`rxso3_type` 
 
-    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`SO3_type` and :obj:`so3_type`
-      (input :math:`\mathbf{x}` is an instance of :meth:`SO3`, :math:`\mathbf{a}` is an instance of :meth:`so3`).
+    Let the input be (:math:`\mathbf{x}`, :math:`\mathbf{p}`), :math:`\mathbf{y}` be the output.
+
+        .. math::
+            \mathbf{y}_i = \mathbf{Adj}(\mathbf{x}_i)\mathbf{p}_i,
+
+        where :math:`\mathbf{Adj}(\mathbf{x}_i)` is the adjoint matrix of the Lie group of :math:`\mathbf{x}_i`.
+
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`SO3_type` and :obj:`so3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`SO3`, :math:`\mathbf{p}` is an instance of :meth:`so3`).
       Given :math:`\mathbf{x}_i ∈` :math:`\textrm{SO3}`.
       The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}_i(\mathbf{x}_i) = \mathbf{x}_i 
+            \mathbf{Adj}(\mathbf{x}_i) = \mathbf{x}_i 
 
         In the case of :math:`\textrm{SO3}`, the adjoint transformation for an element is the same
         rotation matrix used to represent the element. Rotating a tangent vector by an element "moves" it
         from the tangent space on the right side of the element to the tangent space on the left.
 
-    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`SE3_type` and :obj:`se3_type`
-      (input :math:`\mathbf{x}` is an instance of :meth:`SE3`, :math:`\mathbf{a}` is an instance of :meth:`se3`).
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`SE3_type` and :obj:`se3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`SE3`, :math:`\mathbf{p}` is an instance of :meth:`se3`).
       Let :math:`\mathbf{R}_i ∈` :math:`\textrm{SO3}` and :math:`\mathbf{t}_i ∈ \mathbf{ℝ}^{3×3}` represent the 
       rotation and translation part of the group. The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}_i(\mathbf{x}_i) = \left[
+            \mathbf{Adj}(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
                                     \mathbf{R}_i & \mathbf{t}_{i×}\mathbf{R}_i \\
                                     \mathbf{0} & \mathbf{R}_i
@@ -1413,14 +1420,14 @@ def Adj(X, a):
                                 \end{array}
                              \right] ∈ \mathrm{SE3}  
 
-    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`Sim3_type` and :obj:`sim3_type`
-      (input :math:`\mathbf{x}` is an instance of :meth:`Sim3`, :math:`\mathbf{a}` is an instance of :meth:`sim3`).
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`Sim3_type` and :obj:`sim3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`Sim3`, :math:`\mathbf{p}` is an instance of :meth:`sim3`).
       Let :math:`\mathbf{R}_i∈` :math:`\textrm{SO3}`, :math:`\mathbf{t}_i ∈ \mathbf{R}^{3×3}`, and 
       :math:`\mathbf{s}_i ∈ \mathbf{R}^+` represent the rotation, translation, and scale parts of the group. 
       The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}_i(\mathbf{x}_i) = \left[
+            \mathbf{Adj}(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
                                     s\mathbf{R}_i& \mathbf{t}_{i×}\mathbf{R}_i& -\mathbf{t}_i \\
                                     \mathbf{0} & \mathbf{R}_i& \mathbf{0} \\
@@ -1438,13 +1445,13 @@ def Adj(X, a):
                                 \end{array}
                              \right] ∈ \textrm{Sim3} 
         
-    * If input (:math:`\mathbf{x}`, :math:`\mathbf{a}`)'s :obj:`ltype` are :obj:`RxSO3_type` and :obj:`rxso3_type`
-      (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`, :math:`\mathbf{a}` is an instance of :meth:`rxso3`).
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`RxSO3_type` and :obj:`rxso3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`, :math:`\mathbf{p}` is an instance of :meth:`rxso3`).
       Let :math:`\mathbf{R}_i ∈` :math:`\textrm{SO3}`, and :math:`\mathbf{s}_i ∈ \mathbf{R}^+` represent the rotation 
       and scale parts of the group. The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}_i(\mathbf{x}_i) = \left[
+            \mathbf{Adj}(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
                                     \mathbf{R}_i & \mathbf{0} \\
                                     \mathbf{0} & \mathbf{1}
