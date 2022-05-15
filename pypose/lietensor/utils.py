@@ -1231,11 +1231,42 @@ def Retr(X, a):
         a (LieTensor): the direction of the retraction (Lie Algebra)
 
     Return:
-        LieTensor: LieTensor with the same :obj:`ltype` as :code:`a.Exp()` (Lie Group)
+        LieTensor: the output LieTensor (Lie Group)
+
+
+    .. list-table:: List of supported :math:`\mathrm{Retr}`
+        :widths: 20 20 8 20 20
+        :header-rows: 1
+
+        * - input :obj:`ltype`
+          - :math:`({X}, \mathcal{a})` (Lie Group, Lie Algebra)
+          - :math:`\mapsto`
+          - :math:`{y}` (Lie Algebra)
+          - output :obj:`ltype`
+        * - (:obj:`SO3_type`, :obj:`so3_type`)
+          - :math:`({X}\in\mathbb{R}^{*\times4}, {a}\in\mathbb{R}^{*\times3})`
+          - :math:`\mapsto`
+          - :math:`{y}\in\mathbb{R}^{*\times4}`
+          - :obj:`SO3_type`
+        * - (:obj:`SE3_type`, :obj:`se3_type`)
+          - :math:`({X}\in\mathbb{R}^{*\times7}, {a}\in\mathbb{R}^{*\times6})`
+          - :math:`\mapsto`
+          - :math:`{y}\in\mathbb{R}^{*\times7}`
+          - :obj:`SE3_type`
+        * - (:obj:`Sim3_type`, :obj:`sim3_type`)
+          - :math:`({X}\in\mathbb{R}^{*\times8}, {a}\in\mathbb{R}^{*\times7})`
+          - :math:`\mapsto`
+          - :math:`{y}\in\mathbb{R}^{*\times8}`
+          - :obj:`Sim3_type`
+        * - (:obj:`RxSO3_type`, :obj:`rxso3_type`)
+          - :math:`({X}\in\mathbb{R}^{*\times5}, {a}\in\mathbb{R}^{*\times4})`
+          - :math:`\mapsto`
+          - :math:`{y}\in\mathbb{R}^{*\times5}`
+          - :obj:`RxSO3_type`
 
     Examples:
 
-    * :math:`a \in` :meth:`so3`
+    * :code:`X.Retr(a)`
 
     >>> a = pp.randn_so3()
     >>> X = pp.identity_SO3()
@@ -1243,11 +1274,11 @@ def Retr(X, a):
         SO3Type LieTensor:
         tensor([0.6399, 0.0898, 0.1656, 0.7451])
 
-    * :math:`a \in` :meth:`se3`
+    * :code:`pp.Retr(X,a)`
 
     >>> a = pp.randn_se3(2)
     >>> X = pp.identity_SE3(2)
-    >>> X.Retr(a)
+    >>> pp.Retr(X,a)
         SE3Type LieTensor:
         tensor([[ 0.5777, -0.5815, -0.3694,  0.3861,  0.1730, -0.1701,  0.8900],
                 [-0.2148, -0.3699, -1.1094,  0.1382, -0.5171, -0.3116,  0.7852]])
@@ -1263,7 +1294,7 @@ def Act(X, p):
         y_i = X_i * p_i
 
     Args:
-        X (LieTensor): the input LieTensor (Lie Group). The :obj:`ltype` should be :obj:`SO3`, :obj:`SE3`, :obj:`Ssim3`, :obj:`RxSO3` or :obj:`SE3`.
+        X (LieTensor): the input LieTensor (Lie Group). The :obj:`ltype` should be :obj:`SO3`, :obj:`SE3`, :obj:`Sim3`, :obj:`RxSO3` or :obj:`SE3`.
 
         p (Tensor): the vector to be transformed which :math:`p \in \mathbb{R^{*\times3}}` or :math:`p \in \mathbb{R^{*\times4}}`
 
