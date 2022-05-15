@@ -185,7 +185,7 @@ Sim3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=Sim3_typ
     is the translation vector and
     :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` and
     :math:`s \in \mathbb{R}` are the unit quaternion and the scaling factor
-    as in :obj`pp.RxSO3`, respectively.
+    as in :obj:`pp.RxSO3`, respectively.
 
     Examples:
         >>> pp.Sim3(torch.randn(2, 8))
@@ -1434,7 +1434,7 @@ def Adj(X, p):
                                     \mathbf{0} & \mathbf{0} & \mathbf{1}
                                 \end{array}
                              \right] ∈ \mathbf{ℝ}^{7×7}
-        
+
         where
 
         .. math::
@@ -1444,7 +1444,7 @@ def Adj(X, p):
                                     \mathbf{0} & \mathbf{s}^{-1}_i
                                 \end{array}
                              \right] ∈ \textrm{Sim3} 
-        
+
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`RxSO3_type` and :obj:`rxso3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`, :math:`\mathbf{p}` is an instance of :meth:`rxso3`).
       Let :math:`\mathbf{R}_i ∈` :math:`\textrm{SO3}`, and :math:`\mathbf{s}_i ∈ \mathbf{R}^+` represent the rotation 
@@ -1459,14 +1459,14 @@ def Adj(X, p):
                              \right] ∈ \mathbb{R}^{4\times4}
 
         where
-        
+
         .. math::
             \mathbf{x}_i = \left[
                                 \begin{array}{cc} 
                                     \mathbf{R}_i & \mathbf{0} \\
                                     \mathbf{0} & \mathbf{s}^{-1}_i
                                 \end{array}
-                             \right] ∈ \mathrm{RxSO3}
+                             \right] \in \mathrm{RxSO3}
 
         In the case of :math:`\textrm{RxSO3}` group, the adjoint transformation is the same as the rotation 
         matrix of the group i.e. the :math:`\textrm{SO3}` part of the group.
