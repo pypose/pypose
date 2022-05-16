@@ -1488,13 +1488,14 @@ def Adj(X, p):
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`SE3_type` and :obj:`se3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`SE3`, :math:`\mathbf{p}` is an instance of :meth:`se3`).
       Let :math:`\mathbf{R}_i \in` :math:`\textrm{SO(3)}` and :math:`\mathbf{t}_i \in \mathbb{R}^{3\times3}` represent the 
-      rotation and translation part of the group. The adjoint transformation is given by:
+      rotation and translation part of the group. Let :math:`\mathbf{t}_{i\times}` be the skew matrix (:meth:`pypose.vec2skew`) 
+      of :math:`\mathbf{t}_i`. The adjoint transformation is given by:
 
         .. math::
             \mathbf{Adj}(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
                                     \mathbf{R}_i & \mathbf{t}_{i\times}\mathbf{R}_i \\
-                                    \mathbf{0} & \mathbf{R}_i
+                                    0 & \mathbf{R}_i
                                 \end{array}
                              \right] \in \mathbb{R}^{6\times6}
 
@@ -1504,27 +1505,23 @@ def Adj(X, p):
             \mathbf{x}_i = \left[
                                 \begin{array}{cc} 
                                     \mathbf{R}_i& \mathbf{t}_i \\
-                                    \mathbf{0} & \mathbf{1}
+                                    0 & 1
                                 \end{array}
                              \right] \in \mathrm{SE(3)}  
-
-        and,
-
-        .. math::
-            \mathbf{t}_{i\times}=\mathbf{R}_i\hat{t}_i.
 
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`Sim3_type` and :obj:`sim3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`Sim3`, :math:`\mathbf{p}` is an instance of :meth:`sim3`).
       Let :math:`\mathbf{R}_i\in` :math:`\textrm{SO(3)}`, :math:`\mathbf{t}_i \in \mathbb{R}^{3\times3}`, and 
-      :math:`s_i \in \mathbb{R}^+` represent the rotation, translation, and scale parts of the group. 
+      :math:`s_i \in \mathbb{R}^+` represent the rotation, translation, and scale parts of the group. Let 
+      :math:`\mathbf{t}_{i\times}` be the skew matrix (:meth:`pypose.vec2skew`) of :math:`\mathbf{t}_i`.
       The adjoint transformation is given by:
 
         .. math::
             \mathbf{Adj}(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
                                     s_i\mathbf{R}_i& \mathbf{t}_{i\times}\mathbf{R}_i& -\mathbf{t}_i \\
-                                    \mathbf{0} & \mathbf{R}_i& \mathbf{0} \\
-                                    \mathbf{0} & \mathbf{0} & \mathbf{1}
+                                    0 & \mathbf{R}_i& 0 \\
+                                    0 & 0 & 1
                                 \end{array}
                              \right] \in \mathbb{R}^{7\times7}
 
@@ -1534,14 +1531,9 @@ def Adj(X, p):
             \mathbf{x}_i = \left[
                                 \begin{array}{cc} 
                                     s_i\mathbf{R}_i & \mathbf{t}_i \\
-                                    \mathbf{0} & \mathbf{1}
+                                    0 & 1
                                 \end{array}
-                             \right] \in \textrm{Sim(3)}
-            
-        and,
-
-        .. math::
-            \mathbf{t}_{i\times}=\mathbf{R}_i\hat{t}_i.
+                             \right] \in \textrm{Sim(3)}    
 
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`RxSO3_type` and :obj:`rxso3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`, :math:`\mathbf{p}` is an instance of :meth:`rxso3`).
@@ -1551,8 +1543,8 @@ def Adj(X, p):
         .. math::
             \mathbf{Adj}(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
-                                    \mathbf{R}_i & \mathbf{0} \\
-                                    \mathbf{0} & \mathbf{1}
+                                    \mathbf{R}_i & 0 \\
+                                    0 & 1
                                 \end{array}
                              \right] \in \mathbb{R}^{4\times4}
 
@@ -1561,8 +1553,8 @@ def Adj(X, p):
         .. math::
             \mathbf{x}_i = \left[
                                 \begin{array}{cc} 
-                                    s_i\mathbf{R}_i & \mathbf{0} \\
-                                    \mathbf{0} & \mathbf{1}
+                                    s_i\mathbf{R}_i & 0 \\
+                                    0 & 1
                                 \end{array}
                              \right] \in \mathrm{RxSO(3)}
 
