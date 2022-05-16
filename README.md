@@ -12,7 +12,7 @@ Additionally, install:
     sudo apt-get update -y
     sudo apt-get install -y ninja-build
 
-To rebuild pypose, run`rm -rf build/ **/*.so` to clean the previous build first.
+To rebuild pypose, run`rm -rf build/ *.so` to clean the previous build first.
 
 1.2 Test locally:
 

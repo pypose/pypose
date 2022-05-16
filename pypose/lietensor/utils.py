@@ -1037,51 +1037,42 @@ def Exp(input):
           SLAM <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.640.199&rep=rep1&type=pdf>`_,
           Dissertation. Department of Computing, Imperial College London, 2012.
 
-    Example:
-    
-    * :math:`\mathrm{Exp}`: :meth:`so3` :math:`\mapsto` :meth:`SO3`
+    Examples:
 
-        >>> x = pp.randn_so3(2, requires_grad=True)
-        so3Type LieTensor:
-        tensor([[-0.2547, -0.4478,  0.0783],
-                [ 0.7381,  0.2163, -1.8465]], requires_grad=True)
-        >>> x.Exp() # equivalent to: pp.Exp(x)
-        SO3Type LieTensor:
-        tensor([[-0.1259, -0.2214,  0.0387,  0.9662],
-                [ 0.3105,  0.0910, -0.7769,  0.5402]], grad_fn=<AliasBackward0>)
+        * :math:`\mathrm{Exp}`: :obj:`so3` :math:`\mapsto` :obj:`SO3`
 
-    * :math:`\mathrm{Exp}`: :meth:`se3` :math:`\mapsto` :meth:`SE3`
+            >>> x = pp.randn_so3()
+            >>> x.Exp() # equivalent to: pp.Exp(x)
+            SO3Type LieTensor:
+            LieTensor([-0.6627, -0.0447,  0.3492,  0.6610])
 
-        >>> x = pp.randn_se3(2)
-        se3Type LieTensor:
-        tensor([[ 1.1912,  1.2425, -0.9696,  0.9540, -0.4061, -0.7204],
-                [ 0.5964, -1.1894,  0.6451,  1.1373, -2.6733,  0.4142]])
-        >>> x.Exp() # equivalent to: pp.Exp(x)
-        SE3Type LieTensor:
-        tensor([[ 1.6575,  0.8838, -0.1499,  0.4459, -0.1898, -0.3367,  0.8073],
-                [ 0.2654, -1.3860,  0.2852,  0.3855, -0.9061,  0.1404,  0.1034]])
+        * :math:`\mathrm{Exp}`: :obj:`se3` :math:`\mapsto` :obj:`SE3`
 
-    * :math:`\mathrm{Exp}`: :meth:`rxso3` :math:`\mapsto` :meth:`RxSO3`
+            >>> x = pp.randn_se3(2, requires_grad=True)
+            se3Type LieTensor:
+            tensor([[ 1.1912,  1.2425, -0.9696,  0.9540, -0.4061, -0.7204],
+                    [ 0.5964, -1.1894,  0.6451,  1.1373, -2.6733,  0.4142]])
+            >>> x.Exp() # equivalent to: pp.Exp(x)
+            SE3Type LieTensor:
+            tensor([[ 1.6575,  0.8838, -0.1499,  0.4459, -0.1898, -0.3367,  0.8073],
+                    [ 0.2654, -1.3860,  0.2852,  0.3855, -0.9061,  0.1404,  0.1034]],
+                    grad_fn=<AliasBackward0>)
 
-        >>> x = pp.randn_rxso3(2)
-        rxso3Type LieTensor:
-        tensor([[-1.2559, -0.9545,  0.2480, -0.3000],
-                [ 1.0867,  0.4305, -0.4303,  0.1563]])
-        >>> x.Exp() # equivalent to: pp.Exp(x)
-        RxSO3Type LieTensor:
-        tensor([[-0.5633, -0.4281,  0.1112,  0.6979,  0.7408],
-                [ 0.5089,  0.2016, -0.2015,  0.8122,  1.1692]])
+        * :math:`\mathrm{Exp}`: :obj:`rxso3` :math:`\mapsto` :obj:`RxSO3`
 
-    * :math:`\mathrm{Exp}`: :meth:`sim3` :math:`\mapsto` :meth:`Sim3`
+            >>> x = pp.randn_rxso3(2)
+            >>> x.Exp() # equivalent to: pp.Exp(x)
+            RxSO3Type LieTensor:
+            tensor([[-0.5633, -0.4281,  0.1112,  0.6979,  0.7408],
+                    [ 0.5089,  0.2016, -0.2015,  0.8122,  1.1692]])
 
-        >>> x = pp.randn_sim3(2)
-        sim3Type LieTensor:
-        tensor([[-1.2279,  0.0967, -1.1261,  1.2900,  0.2519, -0.7583,  0.8938],
-                [ 0.4278, -0.4025, -1.3189, -1.7345, -0.9196,  0.3332,  0.1777]])
-        >>> x.Exp() # equivalent to: pp.Exp(x)
-        Sim3Type LieTensor:
-        tensor([[-1.5811,  1.8128, -0.5835,  0.5849,  0.1142, -0.3438,  0.7257,  2.4443],
-                [ 0.9574, -0.9265, -0.2385, -0.7309, -0.3875,  0.1404,  0.5440,  1.1945]])
+        * :math:`\mathrm{Exp}`: :obj:`sim3` :math:`\mapsto` :obj:`Sim3`
+
+            >>> x = pp.randn_sim3(2)
+            >>> x.Exp() # equivalent to: pp.Exp(x)
+            Sim3Type LieTensor:
+            tensor([[-1.5811,  1.8128, -0.5835,  0.5849,  0.1142, -0.3438,  0.7257,  2.4443],
+                    [ 0.9574, -0.9265, -0.2385, -0.7309, -0.3875,  0.1404,  0.5440,  1.1945]])
     """
     return input.Exp()
 
@@ -1278,36 +1269,34 @@ def Log(input):
 
         * :math:`\mathrm{Log}`: :obj:`SO3` :math:`\mapsto` :obj:`so3`
 
-        >>> x = pp.randn_SO3(2)
-        >>> x.Log() # equivalent to: pp.Log(x)
-        so3Type LieTensor:
-        tensor([[-0.3060,  0.2344,  1.2724],
-                [ 0.3012, -0.6817,  0.1187]])
+            >>> x = pp.randn_SO3()
+            >>> x.Log() # equivalent to: pp.Log(x)
+            so3Type LieTensor:
+            tensor([-0.3060,  0.2344,  1.2724])
 
         * :math:`\mathrm{Log}`: :obj:`SE3` :math:`\mapsto` :obj:`se3`
 
-        >>> x = pp.randn_SE3(2)
-        >>> x.Log() # equivalent to: pp.Log(x)
-        se3Type LieTensor:
-        tensor([[ 0.2958, -0.0840, -1.4733,  0.7004,  0.4483, -0.9009],
-                [ 0.0850, -0.1020, -1.2616, -1.0524, -1.2031,  0.8377]])
-
+            >>> x = pp.randn_SE3(2)
+            >>> x.Log() # equivalent to: pp.Log(x)
+            se3Type LieTensor:
+            tensor([[ 0.2958, -0.0840, -1.4733,  0.7004,  0.4483, -0.9009],
+                    [ 0.0850, -0.1020, -1.2616, -1.0524, -1.2031,  0.8377]])
 
         * :math:`\mathrm{Log}`: :obj:`RxSO3` :math:`\mapsto` :obj:`rxso3`
 
-        >>> x = pp.randn_RxSO3(2)
-        >>> x.Log() # equivalent to: pp.Log(x)
-        rxso3Type LieTensor:
-        tensor([[-1.3755,  0.3525, -2.2367,  0.5409],
-                [ 0.5929, -0.3250, -0.7394,  1.0965]])
+            >>> x = pp.randn_RxSO3(2)
+            >>> x.Log() # equivalent to: pp.Log(x)
+            rxso3Type LieTensor:
+            tensor([[-1.3755,  0.3525, -2.2367,  0.5409],
+                    [ 0.5929, -0.3250, -0.7394,  1.0965]])
 
         * :math:`\mathrm{Log}`: :obj:`Sim3` :math:`\mapsto` :obj:`sim3`
 
-        >>> x = pp.randn_Sim3(2)
-        >>> x.Log() # equivalent to: pp.Log(x)
-        sim3Type LieTensor:
-        tensor([[-0.1747, -0.3698,  0.2000,  0.1735,  0.6220,  1.1852, -0.6402],
-                [-0.8685, -0.1717,  1.2139, -0.8385, -2.2957, -1.9545,  0.8474]])
+            >>> x = pp.randn_Sim3(2)
+            >>> x.Log() # equivalent to: pp.Log(x)
+            sim3Type LieTensor:
+            tensor([[-0.1747, -0.3698,  0.2000,  0.1735,  0.6220,  1.1852, -0.6402],
+                    [-0.8685, -0.1717,  1.2139, -0.8385, -2.2957, -1.9545,  0.8474]])
     """
     return input.Log()
 
@@ -1324,11 +1313,110 @@ def Mul(x, y):
 
 @assert_ltype
 def Retr(X, a):
+    r"""Perform batched retraction with a given direction.
+
+    .. math::
+        Y_i = \mathrm{Exp}(a_i) * X_i,
+
+    where :math:`\mathrm{Exp}` means the exponetial map. See :obj:`pypose.Exp` for more details. 
+
+    Args:
+        X (LieTensor): the input LieTensor to retract (Lie Group)
+
+        a (LieTensor): the direction of the retraction (Lie Algebra)
+
+    Return:
+        LieTensor: The retraction of the inputs (Lie Group)
+
+    Examples:
+
+        * :math:`\mathrm{Retr}`: (:obj:`SO3`, :obj:`so3`) :math:`\mapsto` :obj:`SO3`
+
+            >>> a = pp.randn_so3()
+            >>> X = pp.randn_SO3()
+            >>> X.Retr(a) # equivalent to: pp.Retr(X, a)
+                SO3Type LieTensor:
+                tensor([0.6399, 0.0898, 0.1656, 0.7451])
+
+        * :math:`\mathrm{Retr}`: (:obj:`SE3`, :obj:`se3`) :math:`\mapsto` :obj:`SE3`
+
+            >>> a = pp.randn_se3()
+            >>> X = pp.randn_SE3()
+            >>> X.Retr(a)  # equivalent to: pp.Retr(X, a)
+            SE3Type LieTensor:
+            tensor([-0.6754,  1.8240,  0.2109, -0.4649, -0.7254, -0.0943,  0.4987])
+
+        * :math:`\mathrm{Retr}`: (:obj:`Sim3`, :obj:`sim3`) :math:`\mapsto` :obj:`Sim3`
+
+            >>> a = pp.randn_sim3()
+            >>> X = pp.randn_Sim3()
+            >>> X.Retr(a)  # equivalent to: pp.Retr(X, a)
+            Sim3Type LieTensor:
+            tensor([-0.6057, -1.6370,  1.1379,  0.7037,  0.6164,  0.3525, -0.0262,  0.3141])
+
+        * :math:`\mathrm{Retr}`: (:obj:`RxSO3`, :obj:`rxsso3`) :math:`\mapsto` :obj:`RxSO3`
+
+            >>> a = pp.randn_rxso3()
+            >>> X = pp.randn_RxSO3()
+            >>> X.Retr(a)  # equivalent to: pp.Retr(X, a)
+            RxSO3Type LieTensor:
+            tensor([-0.0787,  0.4052, -0.7509,  0.5155,  0.1217])
+    """
     return X.Retr(a)
 
 
 @assert_ltype
 def Act(X, p):
+    r"""Apply the batched transform to points in Euclidean or homogeneous coordinates.
+
+    .. math::
+        y_i = X_i * p_i,
+
+    where :math:`X` is the batched transform and :math:`p_i \in \mathbb{R^{*\times3}}` or
+    :math:`p_i \in \mathbb{R^{*\times4}}` denotes the points to be transformed.
+
+    Args:
+        X (LieTensor): the input LieTensor (Lie Group).
+
+        p (Tensor): the points to be transformed.
+
+    Return:
+        Tensor: the transformed points in Euclidean or homogeneous coordinates.
+
+    Examples:
+
+        * :math:`\mathrm{Act}`: (:obj:`SO3`, :obj:`Tensor`) :math:`\mapsto` :obj:`Tensor`
+
+            >>> p = torch.randn(3)     # batch size 1, Euclidean coordinates
+            >>> X = pp.identity_SO3(2) # batch size 2
+            >>> X.Act(p)               # equivalent to: pp.Act(X, p)
+            tensor([[ 1.7576,  1.1503, -0.9920],
+                    [ 1.7576,  1.1503, -0.9920]])
+
+        * :math:`\mathrm{Act}`: (:obj:`SE3`, :obj:`Tensor`) :math:`\mapsto` :obj:`Tensor`
+
+            >>> p = torch.tensor([[0, 0, 0, 1.], [0, 0, 0, 1.]]) # batch size 2, homogeneous coordinates
+            >>> X = pp.randn_SE3()                               # batch size 1
+            >>> X.Act(p)                                         # apply same transform
+            tensor([[-0.5676, -0.0452, -0.0929,  1.0000],
+                    [-0.5676, -0.0452, -0.0929,  1.0000]])
+
+        * :math:`\mathrm{Act}`: (:obj:`Sim3`, :obj:`Tensor`) :math:`\mapsto` :obj:`Tensor`
+
+            >>> p = torch.tensor([[0, 0, 0, 1.], [0, 0, 0, 1.]])  # batch size 2
+            >>> X = pp.randn_Sim3(2)                              # batch size 2
+            >>> X.Act(p)                                          # apply transform respectively.
+            tensor([[ 0.1551,  2.2930,  0.4531,  1.0000],
+                    [-0.6140, -1.1263,  2.7607,  1.0000]])
+
+        * :math:`\mathrm{Act}`: (:obj:`RxSO3`, :obj:`Tensor`) :math:`\mapsto` :obj:`Tensor`
+
+            >>> p = torch.tensor([[0, 0, 0.], [0, 0, 0.]])  # batch size 2, Euclidean coordinates
+            >>> X = pp.randn_RxSO3(2)                       # batch size 2
+            >>> X.Act(p)                                    # apply transform respectively.
+            tensor([[0., 0., 0.],
+                    [0., 0., 0.]])
+    """
     return X.Act(p)
 
 
@@ -1729,35 +1817,38 @@ def Jinvp(input, p):
 
         * :math:`\mathrm{Jinvp}`: (:obj:`SO3`, :obj:`so3`) :math:`\mapsto` :obj:`so3`
 
-        >>> x = pp.randn_SO3(2)
-        >>> a = pp.randn_so3(2)
+        >>> x = pp.randn_SO3()
+        >>> a = pp.randn_so3()
         >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
-            tensor([[-0.1068,  1.6051, -2.0121],
-                    [-0.6726, -0.0345,  0.2493]])
+        so3Type LieTensor:
+        tensor([-2.0248,  1.1116, -0.0251])
 
         * :math:`\mathrm{Jinvp}`: (:obj:`SE3`, :obj:`se3`) :math:`\mapsto` :obj:`se3`
 
         >>> x = pp.randn_SE3(2)
         >>> a = pp.randn_se3(2)
         >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
-            tensor([[-1.3803,  0.7891, -0.4268,  0.6917, -0.2167,  0.3333],
-                    [-1.4517, -0.8059,  0.9343,  1.7398,  0.6579,  0.4785]])
+        se3Type LieTensor:
+        tensor([[ 0.4304,  2.0565,  1.0256,  0.0666, -0.2252, -0.7425],
+                [-0.9317, -1.7806,  0.8660, -2.0028,  0.6098, -0.6517]])
 
         * :math:`\mathrm{Jinvp}`: (:obj:`Sim3`, :obj:`sim3`) :math:`\mapsto` :obj:`sim3`
 
         >>> x = pp.randn_Sim3(2)
         >>> a = pp.randn_sim3(2)
         >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
-            tensor([[ 0.3943, -1.2546,  0.3209,  0.2298, -1.1028, -1.4039,  0.3704],
-                    [-0.3591,  0.4190,  0.2833, -0.3121,  1.6293, -0.8617, -0.7911]])
+        sim3Type LieTensor:
+        tensor([[-1.7231, -1.6650, -0.0202, -0.3731,  0.8441, -0.5438,  0.2879],
+                [ 0.9965,  0.6337, -0.7320, -0.1874,  0.6312,  0.3919,  0.6938]])
 
         * :math:`\mathrm{Jinvp}`: (:obj:`RxSO3`, :obj:`rxso3`) :math:`\mapsto` :obj:`rxso3`
 
         >>> x = pp.randn_RxSO3(2)
         >>> a = pp.randn_rxso3(2)
         >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
-            tensor([[ 0.1730, -1.3778,  0.1657,  0.1820],
-                    [-1.0347,  1.6627,  0.3992,  0.1227]])
+        rxso3Type LieTensor:
+        tensor([[ 0.9308, -1.4965, -0.1347,  0.4894],
+                [ 0.6558,  1.2221, -0.8190,  0.2108]])
     """
     return input.Jinvp(p)
 
@@ -1773,14 +1864,14 @@ def Jr(x):
     Return:
         Tensor: the right Jocobian Matrices
 
-    Example:
+    Examples:
 
-    * :math:`\mathrm{Jr}`: :meth:`so3` :math:`\mapsto` :math:`\mathcal{R}^{*\times 3\times 3}`
+        * :math:`\mathrm{Jr}`: :meth:`so3` :math:`\mapsto` :math:`\mathcal{R}^{*\times 3\times 3}`
 
-    >>> x = pp.randn_so3(requires_grad=True)
-    >>> x.Jr()
-    tensor([[ 0.9289, -0.3053, -0.0895],
-            [ 0.3180,  0.9082,  0.1667],
-            [ 0.0104, -0.1889,  0.9757]], grad_fn=<SWhereBackward0>)
+            >>> x = pp.randn_so3(requires_grad=True)
+            >>> x.Jr()
+            tensor([[ 0.9289, -0.3053, -0.0895],
+                    [ 0.3180,  0.9082,  0.1667],
+                    [ 0.0104, -0.1889,  0.9757]], grad_fn=<SWhereBackward0>)
     """
     return x.Jr()
