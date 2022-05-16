@@ -1493,36 +1493,36 @@ def Adj(X, p):
 
         * :math:`\mathrm{Adj}`: (:obj:`SO3`, :obj:`so3`) :math:`\mapsto` :obj:`so3`
 
-        >>> x = pp.randn_SO3(2)
-        >>> p = pp.randn_so3(2)
-        >>> x.Adj(p) # equivalent to: pp.Adj(x, p)
+            >>> x = pp.randn_SO3(2)
+            >>> p = pp.randn_so3(2)
+            >>> x.Adj(p) # equivalent to: pp.Adj(x, p)
             so3Type LieTensor:
             tensor([[-0.4171,  2.1218,  0.9951],
                     [ 1.8415, -1.2185, -0.4082]])
 
         * :math:`\mathrm{Adj}`: (:obj:`SE3`, :obj:`se3`) :math:`\mapsto` :obj:`se3`
 
-        >>> x = pp.randn_SE3(2)
-        >>> p = pp.randn_se3(2)
-        >>> x.Adj(p) # equivalent to: pp.Adj(x, p)
+            >>> x = pp.randn_SE3(2)
+            >>> p = pp.randn_se3(2)
+            >>> x.Adj(p) # equivalent to: pp.Adj(x, p)
             se3Type LieTensor:
             tensor([[-0.8536, -0.1984, -0.4554, -0.4868,  0.3231,  0.8535],
                     [ 0.1577, -1.7625,  1.7997, -1.5085, -0.2098,  0.3538]])
 
         * :math:`\mathrm{Adj}`: (:obj:`Sim3`, :obj:`sim3`) :math:`\mapsto` :obj:`sim3`
 
-        >>> x = pp.randn_Sim3(2)
-        >>> p = pp.randn_sim3(2)
-        >>> x.Adj(p) # equivalent to: pp.Adj(x, p)
+            >>> x = pp.randn_Sim3(2)
+            >>> p = pp.randn_sim3(2)
+            >>> x.Adj(p) # equivalent to: pp.Adj(x, p)
             sim3Type LieTensor:
             tensor([[ 0.1455, -0.5653, -0.1845,  0.0502,  1.3125,  1.5217, -0.8964],
                     [-4.8724, -0.5254,  3.9559,  1.5170,  1.7610,  0.4375,  0.4248]])
 
         * :math:`\mathrm{Adj}`: (:obj:`RxSO3`, :obj:`rxso3`) :math:`\mapsto` :obj:`rxso3`
 
-        >>> x = pp.randn_RxSO3(2)
-        >>> p = pp.randn_rxso3(2)
-        >>> x.Adj(p) # equivalent to: pp.Adj(x, p)
+            >>> x = pp.randn_RxSO3(2)
+            >>> p = pp.randn_rxso3(2)
+            >>> x.Adj(p) # equivalent to: pp.Adj(x, p)
             rxso3Type LieTensor:
             tensor([[-1.3590, -0.4314, -0.0297,  1.0166],
                     [-0.3378, -0.4942, -2.0083, -0.4321]])
