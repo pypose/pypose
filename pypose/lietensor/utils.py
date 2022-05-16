@@ -1335,8 +1335,8 @@ def Retr(X, a):
             >>> a = pp.randn_so3()
             >>> X = pp.randn_SO3()
             >>> X.Retr(a) # equivalent to: pp.Retr(X, a)
-                SO3Type LieTensor:
-                tensor([0.6399, 0.0898, 0.1656, 0.7451])
+            SO3Type LieTensor:
+            tensor([0.6399, 0.0898, 0.1656, 0.7451])
 
         * :math:`\mathrm{Retr}`: (:obj:`SE3`, :obj:`se3`) :math:`\mapsto` :obj:`SE3`
 
