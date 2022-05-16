@@ -1,6 +1,6 @@
 
+import math, numbers
 import torch, warnings
-import math
 from torch import nn, linalg
 from torch.utils._pytree import tree_map
 from .backends import exp, log, inv, mul, adj
@@ -80,11 +80,9 @@ class LieType:
         # Transform on points
         if not self.on_manifold and isinstance(y, torch.Tensor):
             return self.Act(x, y)
-        # scalar * manifold
-        if self.on_manifold and not isinstance(y, LieTensor):
-            if isinstance(y, torch.Tensor):
-                assert y.dim()==0 or y.shape[-1]==1, "Tensor Dimension Invalid"
-            return torch.mul(x, y)
+        # (scalar or tensor) * manifold
+        if self.on_manifold:
+            return LieTensor(torch.mul(x, y), ltype=x.ltype)
         raise NotImplementedError('Invalid __mul__ operation')
 
     def Retr(self, X, a):
