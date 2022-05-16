@@ -1520,35 +1520,38 @@ def Jinvp(input, p):
 
         * :math:`\mathrm{Jinvp}`: (:obj:`SO3`, :obj:`so3`) :math:`\mapsto` :obj:`so3`
 
-        >>> x = pp.randn_SO3(2)
-        >>> a = pp.randn_so3(2)
+        >>> x = pp.randn_SO3()
+        >>> a = pp.randn_so3()
         >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
-            tensor([[-0.1068,  1.6051, -2.0121],
-                    [-0.6726, -0.0345,  0.2493]])
+        so3Type LieTensor:
+        tensor([-2.0248,  1.1116, -0.0251])
 
         * :math:`\mathrm{Jinvp}`: (:obj:`SE3`, :obj:`se3`) :math:`\mapsto` :obj:`se3`
 
         >>> x = pp.randn_SE3(2)
         >>> a = pp.randn_se3(2)
         >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
-            tensor([[-1.3803,  0.7891, -0.4268,  0.6917, -0.2167,  0.3333],
-                    [-1.4517, -0.8059,  0.9343,  1.7398,  0.6579,  0.4785]])
+        se3Type LieTensor:
+        tensor([[ 0.4304,  2.0565,  1.0256,  0.0666, -0.2252, -0.7425],
+                [-0.9317, -1.7806,  0.8660, -2.0028,  0.6098, -0.6517]])
 
         * :math:`\mathrm{Jinvp}`: (:obj:`Sim3`, :obj:`sim3`) :math:`\mapsto` :obj:`sim3`
 
         >>> x = pp.randn_Sim3(2)
         >>> a = pp.randn_sim3(2)
         >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
-            tensor([[ 0.3943, -1.2546,  0.3209,  0.2298, -1.1028, -1.4039,  0.3704],
-                    [-0.3591,  0.4190,  0.2833, -0.3121,  1.6293, -0.8617, -0.7911]])
+        sim3Type LieTensor:
+        tensor([[-1.7231, -1.6650, -0.0202, -0.3731,  0.8441, -0.5438,  0.2879],
+                [ 0.9965,  0.6337, -0.7320, -0.1874,  0.6312,  0.3919,  0.6938]])
 
         * :math:`\mathrm{Jinvp}`: (:obj:`RxSO3`, :obj:`rxso3`) :math:`\mapsto` :obj:`rxso3`
 
         >>> x = pp.randn_RxSO3(2)
         >>> a = pp.randn_rxso3(2)
         >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
-            tensor([[ 0.1730, -1.3778,  0.1657,  0.1820],
-                    [-1.0347,  1.6627,  0.3992,  0.1227]])
+        rxso3Type LieTensor:
+        tensor([[ 0.9308, -1.4965, -0.1347,  0.4894],
+                [ 0.6558,  1.2221, -0.8190,  0.2108]])
     """
     return input.Jinvp(p)
 
