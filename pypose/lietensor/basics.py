@@ -135,21 +135,21 @@ def cummul(input, dim, left = True):
 
     Example:
     
-        * Left multiplication with :math:`\text{input} \in` :meth:`SE3`
+        * Left multiplication with :math:`\text{input} \in` :obj:`SE3`
 
         >>> input = pp.randn_SE3(2)
         >>> pp.cummul(input, dim=0)
-            SE3Type LieTensor:
-            tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
-                    [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
+        SE3Type LieTensor:
+        tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
+                [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
 
-        * Left multiplication with :math:`\text{input} \in` :meth:`SO3`
+        * Left multiplication with :math:`\text{input} \in` :obj:`SO3`
 
         >>> input = pp.randn_SO3(1,2)
         >>> pp.cummul(input, dim=1, left=False)
-            SO3Type LieTensor:
-            tensor([[[-1.8252e-01,  1.6198e-01,  8.3683e-01,  4.9007e-01],
-                    [ 2.0905e-04,  5.2031e-01,  8.4301e-01, -1.3642e-01]]])
+        SO3Type LieTensor:
+        tensor([[[-1.8252e-01,  1.6198e-01,  8.3683e-01,  4.9007e-01],
+                [ 2.0905e-04,  5.2031e-01,  8.4301e-01, -1.3642e-01]]])
     """
     if left:
         return cumops(input, dim, lambda a, b : a * b)
@@ -188,21 +188,21 @@ def cumprod(input, dim, left = True):
 
     Example:
 
-        * Left product with :math:`\text{input} \in` :meth:`SE3`
+        * Left product with :math:`\text{input} \in` :obj:`SE3`
 
         >>> input = pp.randn_SE3(2)
         >>> pp.cumprod(input, dim=0)
-            SE3Type LieTensor:
-            tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
-                    [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
+        SE3Type LieTensor:
+        tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
+                [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
 
-        * Right product with :math:`\text{input} \in` :meth:`SO3`
+        * Right product with :math:`\text{input} \in` :obj:`SO3`
 
         >>> input = pp.randn_SO3(1,2)
         >>> pp.cumprod(input, dim=1, left=False)
-            SO3Type LieTensor:
-            tensor([[[ 0.5798, -0.1189, -0.2429,  0.7686],
-                    [ 0.7515, -0.1920,  0.5072,  0.3758]]])
+        SO3Type LieTensor:
+        tensor([[[ 0.5798, -0.1189, -0.2429,  0.7686],
+                [ 0.7515, -0.1920,  0.5072,  0.3758]]])
     """
     if left:
         return cumops(input, dim, lambda a, b : a @ b)
