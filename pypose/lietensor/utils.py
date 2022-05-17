@@ -1563,7 +1563,7 @@ def Adj(input, p):
 
     Note:
         The adjoint operator is a linear map which moves an element :math:`\mathbf{p} \in \mathcal{g}`
-        in the right tangent space of :math:`\mathbf{x} in \mathcal{G}` to the left tangent space.
+        in the right tangent space of :math:`\mathbf{x} \in \mathcal{G}` to the left tangent space.
 
         .. math::
             \mathrm{Exp}(\mathbf{Adj}(\mathbf{x}) \mathbf{p}) * \mathbf{x} = \mathbf{x} * \mathrm{Exp}(\mathbf{p})
