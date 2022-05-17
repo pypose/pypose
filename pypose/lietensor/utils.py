@@ -1421,7 +1421,7 @@ def Act(X, p):
 
 
 @assert_ltype
-def Adj(X, p):
+def Adj(input, p):
     r"""
     The dot product between the Adjoint matrix at the point given by an input (Lie Group) and 
     the second point (Lie Algebra).
@@ -1469,9 +1469,9 @@ def Adj(X, p):
     Let the input be (:math:`\mathbf{x}`, :math:`\mathbf{p}`), :math:`\mathbf{y}` be the output.
 
         .. math::
-            \mathbf{y}_i = \mathbf{Adj}(\mathbf{x}_i)\mathbf{p}_i,
+            \mathbf{y}_i = \mathrm{Adj}(\mathbf{x}_i)\mathbf{p}_i,
 
-        where, :math:`\mathbf{Adj}(\mathbf{x}_i)` is the adjoint matrix of the Lie group of :math:`\mathbf{x}_i`.
+        where, :math:`\mathrm{Adj}(\mathbf{x}_i)` is the adjoint matrix of the Lie group of :math:`\mathbf{x}_i`.
 
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`SO3_type` and :obj:`so3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`SO3`, :math:`\mathbf{p}` is an instance of :meth:`so3`).
@@ -1479,7 +1479,7 @@ def Adj(X, p):
       The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}(\mathbf{x}_i) = \mathbf{x}_i 
+            \mathrm{Adj}(\mathbf{x}_i) = \mathbf{x}_i 
 
         In the case of :math:`\textrm{SO3}`, the adjoint transformation for an element is the same
         rotation matrix used to represent the element. Rotating a tangent vector by an element "moves" it
@@ -1492,7 +1492,7 @@ def Adj(X, p):
       of :math:`\mathbf{t}_i`. The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}(\mathbf{x}_i) = \left[
+            \mathrm{Adj}(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
                                     \mathbf{R}_i & \mathbf{t}_{i\times}\mathbf{R}_i \\
                                     0 & \mathbf{R}_i
@@ -1517,7 +1517,7 @@ def Adj(X, p):
       The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}(\mathbf{x}_i) = \left[
+            \mathrm{Adj}(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
                                     s_i\mathbf{R}_i& \mathbf{t}_{i\times}\mathbf{R}_i& -\mathbf{t}_i \\
                                     0 & \mathbf{R}_i& 0 \\
@@ -1541,7 +1541,7 @@ def Adj(X, p):
       and scale parts of the group. The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}(\mathbf{x}_i) = \left[
+            \mathrm{Adj}(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
                                     \mathbf{R}_i & 0 \\
                                     0 & 1
@@ -1560,6 +1560,25 @@ def Adj(X, p):
 
         In the case of :math:`\textrm{RxSO3}` group, the adjoint transformation is the same as the rotation 
         matrix of the group i.e. the :math:`\textrm{SO3}` part of the group.
+
+    Note:
+        The adjoint operator is a linear map which moves an element :math:`\mathbf{p} \in \mathcal{g}`
+        in the right tangent space of :math:`\mathbf{x} \in \mathcal{G}` to the left tangent space.
+
+        .. math::
+            \mathrm{Exp}(\mathrm{Adj}(\mathbf{x}) \mathbf{p}) * \mathbf{x} = \mathbf{x} * \mathrm{Exp}(\mathbf{p})
+        
+        It can be easily verified:
+
+            >>> x, p = pp.randn_SO3(), pp.randn_so3()
+            >>> torch.allclose(x*p.Exp(), x.Adj(p).Exp()*x)
+            True
+        
+        One can refer to Eq. (8) of the following paper:
+
+        * Zachary Teed et al., `Tangent Space Backpropagation for 3D Transformation Groups
+          <https://arxiv.org/pdf/2103.12032.pdf>`_, IEEE/CVF Conference on Computer Vision
+          and Pattern Recognition (CVPR), 2021.
 
     Note:
         :math:`\mathrm{Adj}` is generally used to transform a tangent vector from the tangent space around one
@@ -1617,7 +1636,7 @@ def Adj(X, p):
             tensor([[-1.3590, -0.4314, -0.0297,  1.0166],
                     [-0.3378, -0.4942, -2.0083, -0.4321]])
     """
-    return X.Adj(p)
+    return input.Adj(p)
 
 
 @assert_ltype
