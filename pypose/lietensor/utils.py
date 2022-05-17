@@ -1421,7 +1421,7 @@ def Act(X, p):
 
 
 @assert_ltype
-def Adj(X, p):
+def Adj(input, p):
     r"""
     The dot product between the Adjoint matrix at the point given by an input (Lie Group) and 
     the second point (Lie Algebra).
@@ -1562,6 +1562,24 @@ def Adj(X, p):
         matrix of the group i.e. the :math:`\textrm{SO3}` part of the group.
 
     Note:
+        One interesting truth of adjoint matrix is:
+
+        .. math::
+            x * \mathrm{Exp}(a) = \mathrm{Exp}(\mathrm{Adj}(x, a)) * x
+        
+        It can be easily verified that:
+
+            >>> x, p = pp.randn_SO3(), pp.randn_so3()
+            >>> torch.allclose(x*a.Exp(), x.Adj(a).Exp()*x)
+            True
+        
+        One can refer to Eq. (8) of the following paper:
+
+        * Zachary Teed et al., `Tangent Space Backpropagation for 3D Transformation Groups
+          <https://arxiv.org/pdf/2103.12032.pdf>`_, IEEE/CVF Conference on Computer Vision
+          and Pattern Recognition (CVPR), 2021.
+
+    Note:
         :math:`\mathrm{Adj}` is generally used to transform a tangent vector from the tangent space around one
         element to the tangent space of another.
         One can refer to this paper for more details:
@@ -1617,7 +1635,7 @@ def Adj(X, p):
             tensor([[-1.3590, -0.4314, -0.0297,  1.0166],
                     [-0.3378, -0.4942, -2.0083, -0.4321]])
     """
-    return X.Adj(p)
+    return input.Adj(p)
 
 
 @assert_ltype
