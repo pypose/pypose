@@ -1469,9 +1469,9 @@ def Adj(input, p):
     Let the input be (:math:`\mathbf{x}`, :math:`\mathbf{p}`), :math:`\mathbf{y}` be the output.
 
         .. math::
-            \mathbf{y}_i = \mathbf{Adj}(\mathbf{x}_i)\mathbf{p}_i,
+            \mathbf{y}_i = \mathrm{Adj}(\mathbf{x}_i)\mathbf{p}_i,
 
-        where, :math:`\mathbf{Adj}(\mathbf{x}_i)` is the adjoint matrix of the Lie group of :math:`\mathbf{x}_i`.
+        where, :math:`\mathrm{Adj}(\mathbf{x}_i)` is the adjoint matrix of the Lie group of :math:`\mathbf{x}_i`.
 
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`SO3_type` and :obj:`so3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`SO3`, :math:`\mathbf{p}` is an instance of :meth:`so3`).
@@ -1479,7 +1479,7 @@ def Adj(input, p):
       The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}(\mathbf{x}_i) = \mathbf{x}_i 
+            \mathrm{Adj}(\mathbf{x}_i) = \mathbf{x}_i 
 
         In the case of :math:`\textrm{SO3}`, the adjoint transformation for an element is the same
         rotation matrix used to represent the element. Rotating a tangent vector by an element "moves" it
@@ -1492,7 +1492,7 @@ def Adj(input, p):
       of :math:`\mathbf{t}_i`. The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}(\mathbf{x}_i) = \left[
+            \mathrm{Adj}(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
                                     \mathbf{R}_i & \mathbf{t}_{i\times}\mathbf{R}_i \\
                                     0 & \mathbf{R}_i
@@ -1517,7 +1517,7 @@ def Adj(input, p):
       The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}(\mathbf{x}_i) = \left[
+            \mathrm{Adj}(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
                                     s_i\mathbf{R}_i& \mathbf{t}_{i\times}\mathbf{R}_i& -\mathbf{t}_i \\
                                     0 & \mathbf{R}_i& 0 \\
@@ -1541,7 +1541,7 @@ def Adj(input, p):
       and scale parts of the group. The adjoint transformation is given by:
 
         .. math::
-            \mathbf{Adj}(\mathbf{x}_i) = \left[
+            \mathrm{Adj}(\mathbf{x}_i) = \left[
                                 \begin{array}{cc} 
                                     \mathbf{R}_i & 0 \\
                                     0 & 1
@@ -1566,7 +1566,7 @@ def Adj(input, p):
         in the right tangent space of :math:`\mathbf{x} \in \mathcal{G}` to the left tangent space.
 
         .. math::
-            \mathrm{Exp}(\mathbf{Adj}(\mathbf{x}) \mathbf{p}) * \mathbf{x} = \mathbf{x} * \mathrm{Exp}(\mathbf{p})
+            \mathrm{Exp}(\mathrm{Adj}(\mathbf{x}) \mathbf{p}) * \mathbf{x} = \mathbf{x} * \mathrm{Exp}(\mathbf{p})
         
         It can be easily verified:
 
