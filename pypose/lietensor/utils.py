@@ -1562,15 +1562,16 @@ def Adj(input, p):
         matrix of the group i.e. the :math:`\textrm{SO3}` part of the group.
 
     Note:
-        One interesting truth of adjoint matrix is:
+        The adjoint operator is a linear map which moves an element :math:`\mathbf{p} \in \mathcal{g}`
+        in the right tangent space of :math:`\mathbf{x} in \mathcal{G}` to the left tangent space.
 
         .. math::
-            x * \mathrm{Exp}(a) = \mathrm{Exp}(\mathrm{Adj}(x, a)) * x
+            \mathrm{Exp}(\mathbf{Adj}(\mathbf{x}) \mathbf{p}) * \mathbf{x} = \mathbf{x} * \mathrm{Exp}(\mathbf{p})
         
-        It can be easily verified that:
+        It can be easily verified:
 
             >>> x, p = pp.randn_SO3(), pp.randn_so3()
-            >>> torch.allclose(x*a.Exp(), x.Adj(a).Exp()*x)
+            >>> torch.allclose(x*p.Exp(), x.Adj(p).Exp()*x)
             True
         
         One can refer to Eq. (8) of the following paper:
