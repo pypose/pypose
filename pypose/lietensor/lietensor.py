@@ -337,7 +337,7 @@ class sim3Type(LieType):
 
     def Exp(self, x):
         x = x.tensor() if hasattr(x, 'ltype') else x
-        Ws = rxso3_type.Ws(LieTensor((x[..., 3:]), ltype=rxso3_type)) 
+        Ws = rxso3_type._Ws(LieTensor((x[..., 3:]), ltype=rxso3_type)) 
         t = (Ws @ x[..., :3].unsqueeze(-1)).squeeze(-1)
         r = rxso3_type.Exp(LieTensor(x[..., 3:], ltype=rxso3_type)).tensor()
         X = torch.cat([t, r], -1)
@@ -389,7 +389,7 @@ class rxso3Type(LieType):
         data = super().randn(*size, sigma=sigma, **kwargs).detach()
         return LieTensor(data, ltype=rxso3_type).requires_grad_(requires_grad)
 
-    def Ws(self, x):
+    def _Ws(self, x):
         x = x.tensor() if hasattr(x, 'ltype') else x
         rotation = x[..., :3]
         sigma = x[..., 3]
