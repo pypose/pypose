@@ -552,6 +552,8 @@ def identity_SO3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`SO3_type` LieTensor with the given :obj:`lsize`.
 
+    See :obj:`SO3()` for implementation details.
+
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
             the output LieTensor. Can be a variable number of arguments or a collection like a
@@ -598,6 +600,8 @@ def identity_SO3(*lsize, **kwargs):
 def identity_so3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`so3_type` LieTensor with the given :obj:`lsize`.
+    
+    See :obj:`so3()` for implementation details.
 
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
@@ -645,6 +649,8 @@ def identity_so3(*lsize, **kwargs):
 def identity_SE3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`SE3_type` LieTensor with the given :obj:`lsize`.
+    
+    See :obj:`SE3()` for implementation details.
 
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
@@ -694,6 +700,8 @@ def identity_se3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`se3_type` LieTensor with the given :obj:`lsize`.
     
+    See :obj:`se3()` for implementation details.
+    
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
             the output LieTensor. Can be a variable number of arguments or a collection like a
@@ -740,6 +748,8 @@ def identity_se3(*lsize, **kwargs):
 def identity_sim3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`sim3_type` LieTensor with the given :obj:`lsize`.
+    
+    See :obj:`sim3()` for implementation details.
 
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
@@ -787,6 +797,8 @@ def identity_sim3(*lsize, **kwargs):
 def identity_Sim3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`Sim3_type` LieTensor with the given :obj:`lsize`.
+    
+    See :obj:`Sim3()` for implementation details.
 
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
@@ -834,6 +846,8 @@ def identity_Sim3(*lsize, **kwargs):
 def identity_rxso3(*size, **kwargs):
     r'''
     Returns identity :obj:`rxso3_type` LieTensor with the given :obj:`lsize`.
+    
+    See :obj:`rxSO3()` for implementation details.
 
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
@@ -880,6 +894,8 @@ def identity_rxso3(*size, **kwargs):
 
 def identity_RxSO3(*size, **kwargs):
     r'''Returns identity :obj:`RxSO3_type` LieTensor with the given :obj:`lsize`.
+    
+    See :obj:`RxSO3()` for implementation details.
 
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
