@@ -232,8 +232,8 @@ x = pp.randn_so3(2,2)
 x.Jr()
 pp.Jr(x)
 
-x = pp.randn_SO3(2)
-p = pp.randn_so3(2)
+x = pp.randn_SO3(2, device='cuda')
+p = pp.randn_so3(2, device='cuda')
 x.Jinvp(p)
 
 from torch.autograd.functional import jacobian
@@ -241,8 +241,8 @@ from torch.autograd.functional import jacobian
 def func(x):
     return x.Exp()
 
-J = jacobian(func, p)
-print(J)
+J = jacobian(func, p, vectorize=True, strategy='reverse-mode')
+print("j:", J)
 
 x = pp.randn_so3(2,1,2, requires_grad=True)
 J = x.Jr()

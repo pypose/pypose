@@ -2,7 +2,7 @@
 import math, numbers
 import torch, warnings
 from torch import nn, linalg
-from torch.utils._pytree import tree_map
+from torch.utils._pytree import tree_map, tree_flatten
 from .backends import exp, log, inv, mul, adj
 from .backends import adjT, jinvp, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
@@ -603,13 +603,12 @@ class LieTensor(torch.Tensor):
         ltypes = (torch.Tensor if t is LieTensor or Parameter else t for t in types)
         data = torch.Tensor.__torch_function__(func, ltypes, args, kwargs)
         if data is not None and func.__name__ in HANDLED_FUNCTIONS:
-            lietensor = args
-            while not isinstance(lietensor, LieTensor):
-                lietensor = lietensor[0]
+            args, spec = tree_flatten(args)
+            ltype = [arg.ltype for arg in args if isinstance(arg, LieTensor)][0]
             def warp(t):
                 if isinstance(t, torch.Tensor) and not isinstance(t, cls):
                     lt = torch.Tensor.as_subclass(t, LieTensor)
-                    lt.ltype = lietensor.ltype
+                    lt.ltype = ltype
                     if lt.shape[-1:] != lt.ltype.dimension:
                         link = 'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor'
                         warnings.warn('Tensor Shape Invalid by calling {}, go to {}'.format(func, link))
