@@ -230,7 +230,22 @@ class so3Type(LieType):
         super().__init__(1, 3, 4, 3)
 
     def Exp(self, x):
-        X = self.__op__(self.lid, exp, x)
+        # X = self.__op__(self.lid, exp, x)
+        theta = torch.norm(x, 2, dim=-1, keepdim=True)
+        theta_half = 0.5 * theta
+        theta2 = theta * theta
+        theta4 = theta2 * theta2
+
+        imag_factor = torch.zeros_like(theta, requires_grad=False)
+        real_factor = torch.zeros_like(theta, requires_grad=False)
+        idx = (theta > torch.finfo(theta.dtype).eps)
+        imag_factor[idx] = torch.sin(theta_half[idx]) / theta[idx]
+        real_factor[idx] = torch.cos(theta_half[idx])
+        imag_factor[~idx] = 0.5 - (1.0/48.0) * theta2[~idx] + (1.0/3840.0) * theta4[~idx]
+        real_factor[~idx] = 1.0 - (1.0/8.0) * theta2[~idx] + (1.0/384.0) * theta4[~idx]
+
+        imag_factor = x * imag_factor
+        X = torch.cat([imag_factor, real_factor], -1)        
         return LieTensor(X, ltype=SO3_type)
 
     @classmethod
@@ -258,7 +273,7 @@ class so3Type(LieType):
         theta = torch.linalg.norm(x, dim=-1, keepdim=True).unsqueeze(-1)
         I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.lshape+(3, 3))
         Jr = I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/theta**3 * K@K
-        return torch.where(theta>torch.finfo(x.dtype).eps, Jr, I)
+        return torch.where(theta>torch.finfo(theta.dtype).eps, Jr, I)
 
 
 class SE3Type(LieType):
@@ -284,7 +299,12 @@ class se3Type(LieType):
         super().__init__(3, 6, 7, 6)
 
     def Exp(self, x):
-        X = self.__op__(self.lid, exp, x)
+        # X = self.__op__(self.lid, exp, x)
+        x = x.tensor() if hasattr(x, 'ltype') else x
+        Jl = so3_type.Jr(LieTensor((-x[..., 3:]), ltype=so3_type))
+        t = torch.matmul(Jl, x[..., :3].unsqueeze(-1)).squeeze(-1)
+        r = so3_type.Exp(x[..., 3:]).tensor()
+        X = torch.cat([t, r], -1)
         return LieTensor(X, ltype=SE3_type)
 
     @classmethod
@@ -319,7 +339,12 @@ class sim3Type(LieType):
         super().__init__(4, 7, 8, 7)
 
     def Exp(self, x):
-        X = self.__op__(self.lid, exp, x)
+        # X = self.__op__(self.lid, exp, x)
+        x = x.tensor()
+        Js = rxso3_type.Js(LieTensor((x[..., 3:]), ltype=rxso3_type)) 
+        t = torch.matmul(Js, x[..., :3].unsqueeze(-1)).squeeze(-1)
+        r = rxso3_type.Exp(LieTensor(x[..., 3:], ltype=rxso3_type)).tensor()
+        X = torch.cat([t, r], -1)
         return LieTensor(X, ltype=Sim3_type)
 
     @classmethod
@@ -354,7 +379,11 @@ class rxso3Type(LieType):
         super().__init__(2, 4, 5, 4)
 
     def Exp(self, x):
-        X = self.__op__(self.lid, exp, x)
+        # X = self.__op__(self.lid, exp, x)
+        x = x.tensor()
+        r = so3_type.Exp(x[..., :3]).tensor()
+        s = torch.exp(x[..., 3:])
+        X = torch.cat([r, s], -1)
         return LieTensor(X, ltype=RxSO3_type)
 
     @classmethod
@@ -364,6 +393,66 @@ class rxso3Type(LieType):
     def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
         data = super().randn(*size, sigma=sigma, **kwargs).detach()
         return LieTensor(data, ltype=rxso3_type).requires_grad_(requires_grad)
+
+    def Js(self, x):
+        x = x.tensor()
+        rotation = x[..., :3]
+        sigma = x[..., 3]
+        theta = torch.norm(rotation, 2, -1)
+
+        A = torch.zeros_like(theta, requires_grad=False)
+        B = torch.zeros_like(theta, requires_grad=False)
+        C = torch.zeros_like(theta, requires_grad=False)
+      
+        sigma_larger = (sigma.abs() > torch.finfo(sigma.dtype).eps)
+        theta_larger = (theta > torch.finfo(theta.dtype).eps)
+        condition1 = (~sigma_larger) & (~theta_larger)
+        condition2 = (~sigma_larger) & theta_larger
+        condition3 = sigma_larger & (~theta_larger)
+        condition4 = sigma_larger & theta_larger
+
+        scale = sigma.exp()
+        sigma2 = sigma * sigma
+        theta2 = theta * theta
+        theta2_inv = 1.0 / theta2
+
+        # condition1
+        C[(~sigma_larger)] = 1.0
+        A[condition1] = 0.5
+        B[condition1] = 1.0 / 6
+
+        # condition2
+        theta_c2 = theta[condition2]      
+        A[condition2] = (1.0 - theta_c2.cos()) * theta2_inv[condition2]
+        B[condition2] = (theta_c2 - theta_c2.sin()) / (theta2[condition2] * theta_c2)
+
+        # condition3        
+        C[sigma_larger] = (scale[sigma_larger] - 1.0) / sigma[sigma_larger]
+        sigma_c3 = sigma[condition3]
+        scale_c3 = scale[condition3]
+        sigma2_c3 = sigma2[condition3]
+        A[condition3] = (1.0 + (sigma_c3 - 1.0) * scale_c3) / sigma2_c3
+        B[condition3] = (0.5 * sigma2_c3 * scale_c3 + scale_c3 - 1.0 - sigma2_c3 * scale_c3) / (sigma2_c3 * sigma_c3)
+
+        # condition4
+        sigma_c4 = sigma[condition4]
+        sigma2_c4 = sigma2[condition4]
+        scale_c4 = scale[condition4]
+        theta_c4 = theta[condition4]
+        theta2_c4 = theta2[condition4]
+        theta2_inv_c4 = theta2_inv[condition4]
+        a_c4 = scale_c4 * theta_c4.sin()
+        b_c4 = scale_c4 * theta_c4.cos()
+        c_c4 = theta2_c4 + sigma2_c4
+        A[condition4] = (a_c4 * sigma_c4 + (1 - b_c4) * theta_c4) / (theta_c4 * c_c4)
+        B[condition4] = (C[condition4] - ((b_c4 - 1) * sigma_c4 + a_c4 * theta_c4) / c_c4) * theta2_inv_c4
+
+        K = vec2skew(rotation)
+        A = A.unsqueeze(-1).unsqueeze(-1)
+        B = B.unsqueeze(-1).unsqueeze(-1)
+        C = C.unsqueeze(-1).unsqueeze(-1)
+        I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.shape[:-1]+(3,3))
+        return A * K + B * (K@K) + C * I
 
 
 SO3_type, so3_type = SO3Type(), so3Type()
