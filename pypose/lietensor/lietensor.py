@@ -230,10 +230,9 @@ class so3Type(LieType):
         super().__init__(1, 3, 4, 3)
 
     def Exp(self, x):
-        # X = self.__op__(self.lid, exp, x)
+        x = x.tensor() if hasattr(x, 'ltype') else x
         theta = torch.norm(x, 2, dim=-1, keepdim=True)
-        theta_half = 0.5 * theta
-        theta2 = theta * theta
+        theta_half, theta2 = 0.5 * theta, theta * theta
         theta4 = theta2 * theta2
 
         imag_factor = torch.zeros_like(theta, requires_grad=False)
@@ -244,8 +243,7 @@ class so3Type(LieType):
         imag_factor[~idx] = 0.5 - (1.0/48.0) * theta2[~idx] + (1.0/3840.0) * theta4[~idx]
         real_factor[~idx] = 1.0 - (1.0/8.0) * theta2[~idx] + (1.0/384.0) * theta4[~idx]
 
-        imag_factor = x * imag_factor
-        X = torch.cat([imag_factor, real_factor], -1)        
+        X = torch.cat([x * imag_factor, real_factor], -1)        
         return LieTensor(X, ltype=SO3_type)
 
     @classmethod
@@ -299,10 +297,9 @@ class se3Type(LieType):
         super().__init__(3, 6, 7, 6)
 
     def Exp(self, x):
-        # X = self.__op__(self.lid, exp, x)
         x = x.tensor() if hasattr(x, 'ltype') else x
         Jl = so3_type.Jr(LieTensor((-x[..., 3:]), ltype=so3_type))
-        t = torch.matmul(Jl, x[..., :3].unsqueeze(-1)).squeeze(-1)
+        t = (Jl @ x[..., :3].unsqueeze(-1)).squeeze(-1)
         r = so3_type.Exp(x[..., 3:]).tensor()
         X = torch.cat([t, r], -1)
         return LieTensor(X, ltype=SE3_type)
@@ -339,10 +336,9 @@ class sim3Type(LieType):
         super().__init__(4, 7, 8, 7)
 
     def Exp(self, x):
-        # X = self.__op__(self.lid, exp, x)
-        x = x.tensor()
-        Js = rxso3_type.Js(LieTensor((x[..., 3:]), ltype=rxso3_type)) 
-        t = torch.matmul(Js, x[..., :3].unsqueeze(-1)).squeeze(-1)
+        x = x.tensor() if hasattr(x, 'ltype') else x
+        Ws = rxso3_type.Ws(LieTensor((x[..., 3:]), ltype=rxso3_type)) 
+        t = (Ws @ x[..., :3].unsqueeze(-1)).squeeze(-1)
         r = rxso3_type.Exp(LieTensor(x[..., 3:], ltype=rxso3_type)).tensor()
         X = torch.cat([t, r], -1)
         return LieTensor(X, ltype=Sim3_type)
@@ -379,8 +375,7 @@ class rxso3Type(LieType):
         super().__init__(2, 4, 5, 4)
 
     def Exp(self, x):
-        # X = self.__op__(self.lid, exp, x)
-        x = x.tensor()
+        x = x.tensor() if hasattr(x, 'ltype') else x
         r = so3_type.Exp(x[..., :3]).tensor()
         s = torch.exp(x[..., 3:])
         X = torch.cat([r, s], -1)
@@ -394,8 +389,8 @@ class rxso3Type(LieType):
         data = super().randn(*size, sigma=sigma, **kwargs).detach()
         return LieTensor(data, ltype=rxso3_type).requires_grad_(requires_grad)
 
-    def Js(self, x):
-        x = x.tensor()
+    def Ws(self, x):
+        x = x.tensor() if hasattr(x, 'ltype') else x
         rotation = x[..., :3]
         sigma = x[..., 3]
         theta = torch.norm(rotation, 2, -1)
@@ -411,15 +406,11 @@ class rxso3Type(LieType):
         condition3 = sigma_larger & (~theta_larger)
         condition4 = sigma_larger & theta_larger
 
-        scale = sigma.exp()
-        sigma2 = sigma * sigma
-        theta2 = theta * theta
+        scale, sigma2, theta2 = sigma.exp(), sigma * sigma, theta * theta
         theta2_inv = 1.0 / theta2
 
         # condition1
-        C[(~sigma_larger)] = 1.0
-        A[condition1] = 0.5
-        B[condition1] = 1.0 / 6
+        C[(~sigma_larger)], A[condition1], B[condition1] = 1.0, 0.5, 1.0 / 6
 
         # condition2
         theta_c2 = theta[condition2]      
@@ -428,22 +419,14 @@ class rxso3Type(LieType):
 
         # condition3        
         C[sigma_larger] = (scale[sigma_larger] - 1.0) / sigma[sigma_larger]
-        sigma_c3 = sigma[condition3]
-        scale_c3 = scale[condition3]
-        sigma2_c3 = sigma2[condition3]
+        sigma_c3, scale_c3, sigma2_c3 = sigma[condition3], scale[condition3], sigma2[condition3]
         A[condition3] = (1.0 + (sigma_c3 - 1.0) * scale_c3) / sigma2_c3
         B[condition3] = (0.5 * sigma2_c3 * scale_c3 + scale_c3 - 1.0 - sigma2_c3 * scale_c3) / (sigma2_c3 * sigma_c3)
 
         # condition4
-        sigma_c4 = sigma[condition4]
-        sigma2_c4 = sigma2[condition4]
-        scale_c4 = scale[condition4]
-        theta_c4 = theta[condition4]
-        theta2_c4 = theta2[condition4]
-        theta2_inv_c4 = theta2_inv[condition4]
-        a_c4 = scale_c4 * theta_c4.sin()
-        b_c4 = scale_c4 * theta_c4.cos()
-        c_c4 = theta2_c4 + sigma2_c4
+        sigma_c4, sigma2_c4, scale_c4 = sigma[condition4], sigma2[condition4], scale[condition4]
+        theta_c4, theta2_c4, theta2_inv_c4 = theta[condition4], theta2[condition4], theta2_inv[condition4]
+        a_c4, b_c4, c_c4 = scale_c4 * theta_c4.sin(), scale_c4 * theta_c4.cos(), (theta2_c4 + sigma2_c4)
         A[condition4] = (a_c4 * sigma_c4 + (1 - b_c4) * theta_c4) / (theta_c4 * c_c4)
         B[condition4] = (C[condition4] - ((b_c4 - 1) * sigma_c4 + a_c4 * theta_c4) / c_c4) * theta2_inv_c4
 
