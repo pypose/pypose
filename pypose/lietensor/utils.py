@@ -552,6 +552,8 @@ def identity_SO3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`SO3_type` LieTensor with the given :obj:`lsize`.
 
+    See :obj:`SO3()` for implementation details.
+
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
             the output LieTensor. Can be a variable number of arguments or a collection like a
@@ -598,6 +600,8 @@ def identity_SO3(*lsize, **kwargs):
 def identity_so3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`so3_type` LieTensor with the given :obj:`lsize`.
+    
+    See :obj:`so3()` for implementation details.
 
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
@@ -645,6 +649,8 @@ def identity_so3(*lsize, **kwargs):
 def identity_SE3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`SE3_type` LieTensor with the given :obj:`lsize`.
+    
+    See :obj:`SE3()` for implementation details.
 
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
@@ -694,6 +700,8 @@ def identity_se3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`se3_type` LieTensor with the given :obj:`lsize`.
     
+    See :obj:`se3()` for implementation details.
+    
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
             the output LieTensor. Can be a variable number of arguments or a collection like a
@@ -739,7 +747,9 @@ def identity_se3(*lsize, **kwargs):
 
 def identity_sim3(*lsize, **kwargs):
     r'''
-     Returns identity :obj:`sim3_type` LieTensor with the given :obj:`lsize`. 
+    Returns identity :obj:`sim3_type` LieTensor with the given :obj:`lsize`.
+    
+    See :obj:`sim3()` for implementation details.
 
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
@@ -771,12 +781,12 @@ def identity_sim3(*lsize, **kwargs):
         sim3Type LieTensor:
         tensor([0., 0., 0., 0., 0., 0., 0.])
 
-        >>> identity_sim3(2)
+        >>> pp.identity_sim3(2)
         sim3Type LieTensor:
         tensor([[0., 0., 0., 0., 0., 0., 0.],
                 [0., 0., 0., 0., 0., 0., 0.]])
 
-        >>> identity_sim3(2,1)
+        >>> pp.identity_sim3(2,1)
         sim3Type LieTensor:
         tensor([[[0., 0., 0., 0., 0., 0., 0.]],
                 [[0., 0., 0., 0., 0., 0., 0.]]])
@@ -787,6 +797,8 @@ def identity_sim3(*lsize, **kwargs):
 def identity_Sim3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`Sim3_type` LieTensor with the given :obj:`lsize`.
+    
+    See :obj:`Sim3()` for implementation details.
 
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
@@ -818,12 +830,12 @@ def identity_Sim3(*lsize, **kwargs):
         Sim3Type LieTensor:
         tensor([0., 0., 0., 0., 0., 0., 1., 1.])
 
-        >>> identity_Sim3(2)
+        >>> pp.identity_Sim3(2)
         Sim3Type LieTensor:
         tensor([[0., 0., 0., 0., 0., 0., 1., 1.],
                 [0., 0., 0., 0., 0., 0., 1., 1.]])
 
-        >>> identity_Sim3(2,1)
+        >>> pp.identity_Sim3(2, 1)
         Sim3Type LieTensor:
         tensor([[[0., 0., 0., 0., 0., 0., 1., 1.]],
                 [[0., 0., 0., 0., 0., 0., 1., 1.]]])
@@ -832,10 +844,99 @@ def identity_Sim3(*lsize, **kwargs):
 
 
 def identity_rxso3(*size, **kwargs):
+    r'''
+    Returns identity :obj:`rxso3_type` LieTensor with the given :obj:`lsize`.
+    
+    See :obj:`rxSO3()` for implementation details.
+
+    Args:
+        lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
+            the output LieTensor. Can be a variable number of arguments or a collection like a
+            list or tuple. If not given, a single :obj:`rxso3_type` item will be returned.
+
+    Args:
+        requires_grad (bool, optional): If autograd should record operations on
+            the returned tensor. Default: False.
+
+        generator (torch.Generator, optional): a pseudorandom number generator for sampling
+
+        dtype (torch.dtype, optional): the desired data type of returned tensor.
+            Default: if None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+
+        layout (torch.layout, optional): the desired layout of returned Tensor.
+            Default: torch.strided.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, uses the current device for the default tensor
+            type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
+            for CPU tensor types and the current CUDA device for CUDA tensor types.
+
+    Returns:
+        LieTensor: a :obj:`rxso3_type` LieTensor
+
+    Example:
+        >>> pp.identity_rxso3()
+        rxso3Type LieTensor:
+        tensor([0., 0., 0., 0.])
+
+        >>> pp.identity_rxso3(2)
+        rxso3Type LieTensor:
+        tensor([[0., 0., 0., 0.],
+                [0., 0., 0., 0.]])
+
+        >>> pp.identity_rxso3(2, 1)
+        rxso3Type LieTensor:
+        tensor([[[0., 0., 0., 0.]],
+                [[0., 0., 0., 0.]]])
+    '''
     return rxso3_type.identity(*size, **kwargs)
 
 
 def identity_RxSO3(*size, **kwargs):
+    r'''Returns identity :obj:`RxSO3_type` LieTensor with the given :obj:`lsize`.
+    
+    See :obj:`RxSO3()` for implementation details.
+
+    Args:
+        lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
+            the output LieTensor. Can be a variable number of arguments or a collection like a
+            list or tuple. If not given, a single :obj:`RxSO3_type` item will be returned.
+
+    Args:
+        requires_grad (bool, optional): If autograd should record operations on
+            the returned tensor. Default: False.
+
+        generator (torch.Generator, optional): a pseudorandom number generator for sampling
+
+        dtype (torch.dtype, optional): the desired data type of returned tensor.
+            Default: if None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+
+        layout (torch.layout, optional): the desired layout of returned Tensor.
+            Default: torch.strided.
+
+        device (torch.device, optional): the desired device of returned tensor.
+            Default: if None, uses the current device for the default tensor
+            type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
+            for CPU tensor types and the current CUDA device for CUDA tensor types.
+
+    Returns:
+        LieTensor: a :obj:`RxSO3_type` LieTensor
+
+    Example:
+        >>> pp.identity_RxSO3()
+        RxSO3Type LieTensor:
+        tensor([0., 0., 0., 1., 1.])
+
+        >>> pp.identity_RxSO3(2)
+        RxSO3Type LieTensor:
+        tensor([[0., 0., 0., 1., 1.],
+                [0., 0., 0., 1., 1.]])
+
+        >>> pp.identity_RxSO3(2, 1)
+        RxSO3Type LieTensor:
+        tensor([[[0., 0., 0., 1., 1.]],
+                [[0., 0., 0., 1., 1.]]])
+    '''
     return RxSO3_type.identity(*size, **kwargs)
 
 
