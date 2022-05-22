@@ -16,7 +16,7 @@ def sbm_to_torch_sparse_coo(sbm):
     indices = sbm.block_indices[:, :2].permute((1, 0))
 
     return torch.sparse_coo_tensor( 
-        indices, sbm.block_values, s_shape, dtype=sbm.dtype, device=sbm.device)
+        indices, sbm.block_storage, s_shape, dtype=sbm.dtype, device=sbm.device)
 
 def torch_sparse_coo_to_sbm(s):
     assert ( s.is_sparse ), f's must be a sparse tensor. '

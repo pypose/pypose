@@ -17,6 +17,28 @@ from tests.unit_tests.common import ( torch_equal, show_delimeter )
 # PyTorch
 import torch
 
+def torch_lexsort(a, dim=-1):
+    '''
+    Found at https://discuss.pytorch.org/t/numpy-lexsort-equivalent-in-pytorch/47850/2
+    '''
+    assert dim == -1  # Transpose if you want differently
+    assert a.ndim == 2  # Not sure what is numpy behaviour with > 2 dim
+
+    sorted_values = torch.unique(a, dim=dim, sorted=True, return_inverse=False)
+    return sorted_values
+
+def sort_indices(indices: torch.Tensor):
+    '''
+    indices: 2D tensor.
+
+    Returns:
+    The sorted indices.
+    '''
+
+    assert ( indices.ndim == 2 and indices.shape[0] == 2), f'indices.shape = {indices.shape}'
+
+    return torch_lexsort(indices)
+
 class Test_SparseBlockMatrix(unittest.TestCase):
 
     @classmethod
@@ -195,6 +217,13 @@ class Test_SparseBlockMatrix(unittest.TestCase):
         print()
         show_delimeter('Test sbm_to_torch_sparse_coo(). ')
 
+        shape = ( *Test_SparseBlockMatrix.shape_blocks, *Test_SparseBlockMatrix.block_shape )
+
+        raw_true_scoo = torch.sparse_coo_tensor( 
+           Test_SparseBlockMatrix.block_indices,
+           Test_SparseBlockMatrix.values_raw,
+           shape)
+
         test_entries = [
             { 'device': 'cpu'  },
             { 'device': 'cuda' }
@@ -202,6 +231,63 @@ class Test_SparseBlockMatrix(unittest.TestCase):
 
         for entry in test_entries:
             print(entry)
+
+            device = entry['device']
+            values = Test_SparseBlockMatrix.values_raw.to(device)
+
+            sbm = SparseBlockMatrix(Test_SparseBlockMatrix.block_shape, dtype=torch.float32, device=device)
+            sbm.create(shape_blocks=Test_SparseBlockMatrix.shape_blocks, block_indices=Test_SparseBlockMatrix.block_indices)
+            sbm.set_block_storage(values, clone=False)
+
+            scoo = sbm_to_torch_sparse_coo(sbm)
+
+            print(f'scoo.to_dense() = \n{scoo.to_dense()}')
+
+            true_scoo = raw_true_scoo.to(device=device)
+
+            try:
+                torch_equal( scoo.to_dense(), true_scoo.to_dense() )
+            except Exception as exc:
+                print(exc)
+                self.assertTrue(False, f'test_sbm_to_torch_sparse_coo failed with entry {entry}')
+
+    def test_torch_sparse_coo_to_sbm(self):
+        print()
+        show_delimeter('torch_sparse_coo_to_sbm. ')
+
+        shape = ( *Test_SparseBlockMatrix.shape_blocks, *Test_SparseBlockMatrix.block_shape )
+
+        raw_true_scoo = torch.sparse_coo_tensor( 
+           Test_SparseBlockMatrix.block_indices,
+           Test_SparseBlockMatrix.values_raw,
+           shape)
+
+        raw_sbm = SparseBlockMatrix(Test_SparseBlockMatrix.block_shape, dtype=torch.float32)
+        raw_sbm.create(shape_blocks=Test_SparseBlockMatrix.shape_blocks, block_indices=Test_SparseBlockMatrix.block_indices)
+        raw_sbm.set_block_storage(Test_SparseBlockMatrix.values_raw, clone=False)
+
+        test_entries = [
+            { 'device': 'cpu'  },
+            { 'device': 'cuda' }
+        ]
+
+        for entry in test_entries:
+            print(entry)
+
+            device = entry['device']
+
+            true_scoo = raw_true_scoo.to(device=device)
+            true_scoo = true_scoo.coalesce()
+
+            sbm = raw_sbm.to(device=device)
+
+            sbm_indices = sort_indices(sbm.block_indices[:, :2].permute(1,0))
+
+            try:
+                torch_equal( sbm_indices, true_scoo.indices() )
+            except Exception as exc:
+                print(exc)
+                self.assertTrue(False, f'test_torch_sparse_coo_to_sbm failed with entry {entry}')
 
 if __name__ == '__main__':
     import os
