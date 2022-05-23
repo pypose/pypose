@@ -225,7 +225,7 @@ sim3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=sim3_typ
         tensor([0., 0., 0., 0., 0., 0., 1.])
     ''')
 
-def randn_like(input, sigma=1, **kwargs):
+def randn_like(input, sigma=[1.0], **kwargs):
     r'''
     Returns a LieTensor with the same size as input that is filled with random
     LieTensor that satisfies the corresponding :obj:`input.ltype`.
@@ -302,10 +302,28 @@ def randn_like(input, sigma=1, **kwargs):
         so3Type LieTensor:
         tensor([0.8970, 0.0943, 0.1399])
     '''
+    if input.ltype == so3_type or input.ltype == SO3_type:
+        assert len(sigma)==1, 'input sigma should be 1-dimensional list ([rotation_sigma]).'
+        sigma = sigma[0]
+    elif input.ltype == se3_type or input.ltype == SE3_type:
+        if len(sigma)==1:
+            sigma = [sigma[0], sigma[0]]
+        else:
+            assert len(sigma)==2 or len(sigma)==4, 'input sigma should be either 2-dimensional list ([transation_sigma, rotation_sigma]) or 4-dimensional list ([transation_sigma_x, transation_sigma_y, transation_sigma_z, rotation_sigma]).'
+    elif input.ltype == rxso3_type or input.ltype == RxSO3_type:
+        if len(sigma)==1:
+            sigma = [sigma[0], sigma[0]]
+        else:
+            assert len(sigma)==2, 'input sigma should be 2-dimensional list ([transation_sigma, rotation_sigma]).'
+    elif input.ltype == sim3_type or input.ltype == Sim3_type:
+        if len(sigma)==1:
+            sigma = [sigma[0], sigma[0], sigma[0]]
+        else:
+            assert len(sigma)==3 or len(sigma)==5, 'input sigma should be either 3-dimensional list ([transation_sigma, rotation_sigma, scale_sigma]) or 5-dimensional list ([transation_sigma_x, transation_sigma_y, transation_sigma_z, rotation_sigma, scale_sigma]).'
     return input.ltype.randn_like(*input.lshape, sigma=sigma, **kwargs)
 
 
-def randn_so3(*size, sigma=1, **kwargs):
+def randn_so3(*size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`so3_type` LieTensor filled with random numbers satisfying the expected distance (quaternions distance)
     between the generated state and :math:`\mathbf{0}` is :obj:`sigma`.
@@ -369,7 +387,7 @@ def randn_so3(*size, sigma=1, **kwargs):
     return so3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_SO3(*size, sigma=1, **kwargs):
+def randn_SO3(*size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`SO3_type` LieTensor filled with the Exponential map of the random
     :obj:`so3_type` LieTensor, whose expected quaternions distance from :math:`\mathbf{0}` is :obj:`sigma`.
@@ -415,7 +433,7 @@ def randn_SO3(*size, sigma=1, **kwargs):
     return SO3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_se3(*size, sigma=1, **kwargs):
+def randn_se3(*size, sigma=[1.0,1.0], **kwargs):
     r'''
     Returns :obj:`se3_type` LieTensor filled with random numbers from a normal
     distribution with mean 0 and variance :obj:`sigma` (also called the standard normal distribution).
@@ -460,7 +478,7 @@ def randn_se3(*size, sigma=1, **kwargs):
     return se3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_SE3(*size, sigma=1, **kwargs):
+def randn_SE3(*size, sigma=[1.0,1.0], **kwargs):
     r'''
     Returns :obj:`SE3_type` LieTensor filled with the Exponential map of the random
     :obj:`se3_type` LieTensor with normal distribution with mean 0 and variance :obj:`sigma`.
@@ -504,19 +522,19 @@ def randn_SE3(*size, sigma=1, **kwargs):
     return SE3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_sim3(*size, sigma=1, **kwargs):
+def randn_sim3(*size, sigma=[1.0,1.0,1.0], **kwargs):
     return sim3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_Sim3(*size, sigma=1, **kwargs):
+def randn_Sim3(*size, sigma=[1.0,1.0,1.0], **kwargs):
     return Sim3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_rxso3(*size, sigma=1, **kwargs):
+def randn_rxso3(*size, sigma=[1.0,1.0], **kwargs):
     return rxso3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_RxSO3(*size, sigma=1, **kwargs):
+def randn_RxSO3(*size, sigma=[1.0,1.0], **kwargs):
     return RxSO3_type.randn(*size, sigma=sigma, **kwargs)
 
 
