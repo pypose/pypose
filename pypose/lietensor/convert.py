@@ -1,5 +1,7 @@
 import torch
-from .utils import SO3, so3
+
+from pypose.lietensor.lietensor import SE3_type
+from .utils import SO3, SE3, RxSO3, Sim3, identity_Sim3, identity_RxSO3, identity_SE3, so3
 
 
 def mat2SO3(rotation_matrix):
@@ -85,6 +87,83 @@ def mat2SO3(rotation_matrix):
     q = q.index_select(-1, torch.tensor([1,2,3,0], device=q.device)) # wxyz -> xyzw
 
     return SO3(q)
+
+
+def mat2SE3(transformation_matrix):
+    # nx3x4 or nx4x4 matrix to nx7 [tx, ty, tz, qx, qy, qz, qw] lietensor 
+    if not torch.is_tensor(transformation_matrix):
+        transformation_matrix = torch.tensor(transformation_matrix)
+
+    if len(transformation_matrix.shape) > 3:
+        raise ValueError(
+            "Input size must be a three dimensional tensor. Got {}".format(
+                transformation_matrix.shape))
+    if not (transformation_matrix.shape[-2:] == (3, 4) or transformation_matrix.shape[-2:] == (4, 4)):
+        raise ValueError(
+            "Input size must be a * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
+                transformation_matrix.shape))
+
+    q = mat2SO3(transformation_matrix[:,:3,:3]).tensor()
+    t = transformation_matrix[:,:3,3]
+    vec = torch.cat([t,q],dim=1)
+
+    return SE3(vec)
+
+
+def mat2Sim3(transformation_matrix):
+    # nx3x4 or nx4x4 matrix to nx8 [tx, ty, tz, qx, qy, qz, qw, s] lietensor
+    if not torch.is_tensor(transformation_matrix):
+        transformation_matrix = torch.tensor(transformation_matrix)
+
+    if len(transformation_matrix.shape) > 3:
+        raise ValueError(
+            "Input size must be a three dimensional tensor. Got {}".format(
+                transformation_matrix.shape))
+    if not (transformation_matrix.shape[-2:] == (3, 4) or transformation_matrix.shape[-2:] == (4, 4)):
+        raise ValueError(
+            "Input size must be a * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
+                transformation_matrix.shape))
+                
+    rotation_matrix = transformation_matrix[:,:3,:3]
+
+    s = torch.linalg.norm(rotation_matrix[:,0],dim=1)
+    q = mat2SO3(rotation_matrix/s.view(-1,1,1)).tensor()
+    t = transformation_matrix[:,:3,3]
+
+    vec = torch.cat([t,q,s.view(-1,1)],dim=1)
+
+    return vec
+
+
+def mat2RxSO3(rotation_matrix):
+    # nx3x3 or nx3x4 matrix to nx5 [qx, qy, qz, qx, s] lietensor
+    if not torch.is_tensor(rotation_matrix):
+        rotation_matrix = torch.tensor(rotation_matrix)
+
+    if len(rotation_matrix.shape) > 3:
+        raise ValueError(
+            "Input size must be a three dimensional tensor. Got {}".format(
+                rotation_matrix.shape))
+    if not (rotation_matrix.shape[-2:] == (3, 4) or rotation_matrix.shape[-2:] == (4, 4)):
+        raise ValueError(
+            "Input size must be a * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
+                rotation_matrix.shape))
+
+    rotation_matrix = rotation_matrix[:,:3,:3]
+
+    s = torch.linalg.norm(rotation_matrix[:,0],dim=1)
+    q = mat2SO3(rotation_matrix/s.view(-1,1,1)).tensor()
+    vec = torch.cat([q,s.view(-1,1)],dim=1)
+
+    return RxSO3(vec)
+
+
+def from_matrix(rotation_matrix):
+    pass
+
+
+def matrix(lietensor):
+    pass
 
 
 def euler2SO3(euler:torch.Tensor):
