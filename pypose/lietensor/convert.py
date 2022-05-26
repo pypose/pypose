@@ -1,7 +1,7 @@
 import torch
 
-from pypose.lietensor.lietensor import SE3_type
-from .utils import SO3, SE3, RxSO3, Sim3, identity_Sim3, identity_RxSO3, identity_SE3, so3
+from pypose.lietensor.lietensor import LieTensor, SE3_type
+from .utils import SO3, SE3, RxSO3, Sim3
 
 
 def mat2SO3(rotation_matrix):
@@ -90,7 +90,27 @@ def mat2SO3(rotation_matrix):
 
 
 def mat2SE3(transformation_matrix):
-    # nx3x4 or nx4x4 matrix to nx7 [tx, ty, tz, qx, qy, qz, qw] lietensor 
+    r"""Convert batched 3x3 or 3x4 tranformation matrices to SO3Type LieTensor.
+
+    Args:
+        transformation_matrix (Tensor): the tranformation matrix to convert.
+
+    Return:
+        LieTensor: the converted SE3Type LieTensor.
+
+    Shape:
+        Input: :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
+
+        Output: :obj:`(*, 7)`
+
+    Examples:
+
+        >>> input = torch.eye(4).repeat(2, 1, 1) # N x 3 x 3
+        >>> pp.mat2SE3(input)                    # N x 7
+        SE3Type LieTensor:
+        tensor([[0., 0., 0., 0., 0., 0., 1.],
+                [0., 0., 0., 0., 0., 0., 1.]])
+    """
     if not torch.is_tensor(transformation_matrix):
         transformation_matrix = torch.tensor(transformation_matrix)
 
@@ -111,7 +131,27 @@ def mat2SE3(transformation_matrix):
 
 
 def mat2Sim3(transformation_matrix):
-    # nx3x4 or nx4x4 matrix to nx8 [tx, ty, tz, qx, qy, qz, qw, s] lietensor
+    r"""Convert batched 3x4 or 4x4 tranformation matrices to Sim3Type LieTensor.
+
+    Args:
+        transformation_matrix (Tensor): the tranformation matrix to convert.
+
+    Return:
+        LieTensor: the converted Sim3Type LieTensor.
+
+    Shape:
+        Input: :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
+
+        Output: :obj:`(*, 8)`
+
+    Examples:
+
+        >>> input = torch.eye(4).repeat(2, 1, 1) # N x 3 x 3
+        >>> pp.mat2Sim3(input)                   # N x 8
+        Sim3Type LieTensor:
+        tensor([[0., 0., 0., 0., 0., 0., 1., 1.],
+                [0., 0., 0., 0., 0., 0., 1., 1.]])
+    """
     if not torch.is_tensor(transformation_matrix):
         transformation_matrix = torch.tensor(transformation_matrix)
 
@@ -123,7 +163,7 @@ def mat2Sim3(transformation_matrix):
         raise ValueError(
             "Input size must be a * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
                 transformation_matrix.shape))
-                
+
     rotation_matrix = transformation_matrix[:,:3,:3]
 
     s = torch.linalg.norm(rotation_matrix[:,0],dim=1)
@@ -132,11 +172,31 @@ def mat2Sim3(transformation_matrix):
 
     vec = torch.cat([t,q,s.view(-1,1)],dim=1)
 
-    return vec
+    return Sim3(vec)
 
 
 def mat2RxSO3(rotation_matrix):
-    # nx3x3 or nx3x4 matrix to nx5 [qx, qy, qz, qx, s] lietensor
+    r"""Convert batched 3x3 or 3x4 rotation matrices to RxSO3Type LieTensor.
+
+    Args:
+        rotation_matrix (Tensor): the rotation matrix to convert.
+
+    Return:
+        LieTensor: the converted RxSO3Type LieTensor.
+
+    Shape:
+        Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)`
+
+        Output: :obj:`(*, 5)`
+
+    Examples:
+
+        >>> input = torch.eye(3).repeat(2, 1, 1) # N x 3 x 3
+        >>> pp.mat2RxSO3(input)                    # N x 4
+            RxSO3Type LieTensor:
+            tensor([[0., 0., 0., 1., 1.],
+                    [0., 0., 0., 1., 1.]])
+    """
     if not torch.is_tensor(rotation_matrix):
         rotation_matrix = torch.tensor(rotation_matrix)
 
@@ -144,9 +204,9 @@ def mat2RxSO3(rotation_matrix):
         raise ValueError(
             "Input size must be a three dimensional tensor. Got {}".format(
                 rotation_matrix.shape))
-    if not (rotation_matrix.shape[-2:] == (3, 4) or rotation_matrix.shape[-2:] == (4, 4)):
+    if not (rotation_matrix.shape[-2:] == (3, 3) or rotation_matrix.shape[-2:] == (3, 4) or rotation_matrix.shape[-2:] == (4, 4)):
         raise ValueError(
-            "Input size must be a * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
+            "Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
                 rotation_matrix.shape))
 
     rotation_matrix = rotation_matrix[:,:3,:3]
@@ -158,12 +218,52 @@ def mat2RxSO3(rotation_matrix):
     return RxSO3(vec)
 
 
-def from_matrix(rotation_matrix):
-    pass
+def from_matrix(transformation_matrix):
+    r"""Convert batched 3x3 or 3x4 or 4x4 transformation matrices to LieTensor. The `ltype` will be automatically determined by the data.
+
+    Args:
+        transformation_matrix (Tensor): the transformation matrix to convert.
+
+    Return:
+        LieTensor: the converted LieTensor.
+    """
+    if not torch.is_tensor(transformation_matrix):
+        transformation_matrix = torch.tensor(transformation_matrix)
+
+    if len(transformation_matrix.shape) > 3:
+        raise ValueError(
+            "Input size must be a three dimensional tensor. Got {}".format(
+                transformation_matrix.shape))
+    if not (transformation_matrix.shape[-2:] == (3, 3) or transformation_matrix.shape[-2:] == (3, 4) or transformation_matrix.shape[-2:] == (4, 4)):
+        raise ValueError(
+            "Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
+                transformation_matrix.shape))
+
+    shape = transformation_matrix.shape
+    if shape[-2:] == torch.Size([3,3]):
+        # see if the determinant is all one
+        if torch.allclose(torch.linalg.det(transformation_matrix), torch.ones(shape[0]), atol=1e-6):
+            return mat2SO3(transformation_matrix)
+        else:
+            return mat2RxSO3(transformation_matrix)
+    else:
+        # see if the translation part is all zero
+        if torch.allclose(transformation_matrix[:,:3,3], torch.zeros(shape[0],3)):
+            if torch.allclose(torch.linalg.det(transformation_matrix), torch.ones(shape[0]), atol=1e-6):
+                return mat2SO3(transformation_matrix)
+            else:
+                return mat2RxSO3(transformation_matrix)
+        else:
+            if torch.allclose(torch.linalg.det(transformation_matrix), torch.ones(shape[0]), atol=1e-6):
+                return mat2SE3(transformation_matrix)
+            else:
+                return mat2Sim3(transformation_matrix)
+            
 
 
 def matrix(lietensor):
-    pass
+    assert isinstance(lietensor, LieTensor)
+    return lietensor.matrix()
 
 
 def euler2SO3(euler:torch.Tensor):
