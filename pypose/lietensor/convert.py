@@ -1,3 +1,4 @@
+import warnings
 import torch
 
 from pypose.lietensor.lietensor import LieTensor, SE3_type
@@ -17,6 +18,9 @@ def mat2SO3(rotation_matrix):
         Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)`
 
         Output: :obj:`(*, 4)`
+    
+    Warning:
+        Illegal input(not full rank or not orthogonal) triggers a warning, but will output a quaternion regardless. 
 
     Examples:
 
@@ -37,7 +41,17 @@ def mat2SO3(rotation_matrix):
         raise ValueError(
             "Input size must be a * x 3 x 4 or * x 3 x 3  tensor. Got {}".format(
                 rotation_matrix.shape))
+    
+    if not torch.all(torch.det(rotation_matrix) > 0):
+        warnings.warn("Input rotation matrices are not all full rank", RuntimeWarning)
+    
     shape = rotation_matrix.shape
+
+    if not (torch.allclose(torch.sum(rotation_matrix[:,0]*rotation_matrix[:,1], dim=1), torch.zeros(shape[0]), atol=1e-6)
+        and torch.allclose(torch.sum(rotation_matrix[:,0]*rotation_matrix[:,2], dim=1), torch.zeros(shape[0]), atol=1e-6)
+        and torch.allclose(torch.sum(rotation_matrix[:,1]*rotation_matrix[:,2], dim=1), torch.zeros(shape[0]), atol=1e-6)):
+        warnings.warn("Input rotation matrices are not all orthogonal matrix", RuntimeWarning)
+
     rotation_matrix = rotation_matrix.view(-1, shape[-2], shape[-1])
     rmat_t = torch.transpose(rotation_matrix, 1, 2)
 

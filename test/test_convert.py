@@ -1,20 +1,22 @@
 import torch
 import pypose as pp
 
-N = 10
+print("Test illegal input:")
+z = torch.zeros([1, 3, 3])
+z[0,0,2]=10
+print(z)
+print(pp.mat2SO3(z))
+
+x = torch.randn([1,3,3])
+print(x)
+print(pp.mat2SO3(x))
+
+N = 100
 # test logic: 
 # generate N random sample x0 with ltype
 # perform T = x0.matrix()
 # x1 = pp.mat2xxx(T)
 # compare x0 and x1 are the same LieTensor
-
-# TODO: should explain the result with illegal input in the doc
-# z = torch.zeros([3,3])
-# z[0,2]=2000
-# z.unsqueeze(0)
-# print(z)
-# print(pp.mat2SO3(z))
-
 
 def align_quaternion_sign(X0, X1, start_dim):
     assert(X0.shape==X1.shape)
