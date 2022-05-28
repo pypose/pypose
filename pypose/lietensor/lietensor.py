@@ -230,20 +230,7 @@ class so3Type(LieType):
         super().__init__(1, 3, 4, 3)
 
     def Exp(self, x):
-        x = x.tensor() if hasattr(x, 'ltype') else x
-        theta = torch.norm(x, 2, dim=-1, keepdim=True)
-        theta_half, theta2 = 0.5 * theta, theta * theta
-        theta4 = theta2 * theta2
-
-        imag_factor = torch.zeros_like(theta, requires_grad=False)
-        real_factor = torch.zeros_like(theta, requires_grad=False)
-        idx = (theta > torch.finfo(theta.dtype).eps)
-        imag_factor[idx] = torch.sin(theta_half[idx]) / theta[idx]
-        real_factor[idx] = torch.cos(theta_half[idx])
-        imag_factor[~idx] = 0.5 - (1.0/48.0) * theta2[~idx] + (1.0/3840.0) * theta4[~idx]
-        real_factor[~idx] = 1.0 - (1.0/8.0) * theta2[~idx] + (1.0/384.0) * theta4[~idx]
-
-        X = torch.cat([x * imag_factor, real_factor], -1)        
+        X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=SO3_type)
 
     @classmethod
@@ -297,11 +284,7 @@ class se3Type(LieType):
         super().__init__(3, 6, 7, 6)
 
     def Exp(self, x):
-        x = x.tensor() if hasattr(x, 'ltype') else x
-        Jl = so3_type.Jr(LieTensor((-x[..., 3:]), ltype=so3_type))
-        t = (Jl @ x[..., :3].unsqueeze(-1)).squeeze(-1)
-        r = so3_type.Exp(x[..., 3:]).tensor()
-        X = torch.cat([t, r], -1)
+        X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=SE3_type)
 
     @classmethod
@@ -336,11 +319,7 @@ class sim3Type(LieType):
         super().__init__(4, 7, 8, 7)
 
     def Exp(self, x):
-        x = x.tensor() if hasattr(x, 'ltype') else x
-        Ws = rxso3_type._Ws(LieTensor((x[..., 3:]), ltype=rxso3_type)) 
-        t = (Ws @ x[..., :3].unsqueeze(-1)).squeeze(-1)
-        r = rxso3_type.Exp(LieTensor(x[..., 3:], ltype=rxso3_type)).tensor()
-        X = torch.cat([t, r], -1)
+        X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=Sim3_type)
 
     @classmethod
@@ -375,10 +354,7 @@ class rxso3Type(LieType):
         super().__init__(2, 4, 5, 4)
 
     def Exp(self, x):
-        x = x.tensor() if hasattr(x, 'ltype') else x
-        r = so3_type.Exp(x[..., :3]).tensor()
-        s = torch.exp(x[..., 3:])
-        X = torch.cat([r, s], -1)
+        X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=RxSO3_type)
 
     @classmethod
