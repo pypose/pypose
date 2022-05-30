@@ -109,7 +109,7 @@ X = pp.randn_SE3(8, requires_grad=True, dtype=torch.double)
 a = pp.randn_se3(8, dtype=torch.double)
 b = X.Adj(a)
 assert (b.Exp() * X - X * a.Exp()).abs().mean() < 1e-7
-J = X.Jinv(a)
+J = X.Jinvp(a)
 print(J)
 
 X = pp.randn_SE3(6, requires_grad=True)
@@ -117,7 +117,7 @@ a = pp.randn_se3(6)
 b = X.AdjT(a)
 assert (X * b.Exp() - a.Exp() * X).abs().mean() < 1e-6
 
-J = pp.Jinv(X, a)
+J = pp.Jinvp(X, a)
 print(J)
 
 
@@ -227,3 +227,24 @@ print(x)
 generator = torch.Generator()
 x = pp.randn_so3(1, 2, sigma= 0.1, generator=generator, dtype=torch.float16)
 print(x)
+
+x = pp.randn_so3(2,2)
+x.Jr()
+pp.Jr(x)
+
+x = pp.randn_SO3(2, device='cuda')
+p = pp.randn_so3(2, device='cuda')
+x.Jinvp(p)
+
+from torch.autograd.functional import jacobian
+
+def func(x):
+    return x.Exp()
+
+J = jacobian(func, p, vectorize=True, strategy='reverse-mode')
+print("j:", J)
+
+x = pp.randn_so3(2,1,2, requires_grad=True)
+J = x.Jr()
+print(x.shape, J.shape)
+assert J.requires_grad is True

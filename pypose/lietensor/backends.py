@@ -54,7 +54,7 @@ class act4(GroupOp):
     """ action on point """
     forward_op, backward_op = backend.act4, backend.act4_backward
 
-class jinv(GroupOp):
+class jinvp(GroupOp):
     """ adjoint operator """
     forward_op, backward_op = backend.Jinv, None
 

@@ -67,7 +67,7 @@ if __name__ == '__main__':
     for drive in args.datadrive:
         dataset = KITTI_IMU(args.dataroot, args.dataname, drive)
         p, r, v = dataset.init_value()
-        integrator = pp.IMUPreintegrator(p, r, v).to(args.device)
+        integrator = pp.module.IMUPreintegrator(p, r, v).to(args.device)
         loader = Data.DataLoader(dataset=dataset, batch_size=args.batch_size)
         poses, poses_gt = [p.to(args.device)], [p.to(args.device)]
         covs = [torch.zeros(9, 9, device=args.device)]

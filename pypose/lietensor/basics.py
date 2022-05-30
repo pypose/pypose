@@ -4,22 +4,23 @@ import torch
 
 def vec2skew(input:torch.Tensor) -> torch.Tensor:
     r"""
-    Batched Skew Matrices.
+    Convert batched vectors to skew matrices.
+
+    Args:
+        input (Tensor): the tensor :math:`\mathbf{x}` to convert.
+
+    Return:
+        Tensor: the skew matrices :math:`\mathbf{y}`.
+
+    Shape:
+        Input: :obj:`(*, 3)`
+
+        Output: :obj:`(*, 3, 3)`
 
     .. math::
         {\displaystyle \mathbf{y}_i={\begin{bmatrix}\,\,
         0&\!-x_{i,3}&\,\,\,x_{i,2}\\\,\,\,x_{i,3}&0&\!-x_{i,1}
-        \\\!-x_{i,2}&\,\,x_{i,1}&\,\,0\end{bmatrix}},}
-
-    Args:
-        input (Tensor): the tensor :math:`\mathbf{x}` to convert
-
-    Return:
-        Tensor: the skew matrices :math:`\mathbf{y}`
-
-    Shape:
-        - Input: :code:`(*, 3)`
-        - Output: :code:`(*, 3, 3)`
+        \\\!-x_{i,2}&\,\,x_{i,1}&\,\,0\end{bmatrix}}}
 
     Note:
         The last dimension of the input tensor has to be 3.
@@ -30,13 +31,12 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
                 [ 2.2059,  0.0000,  0.2929],
                 [ 1.2761, -0.2929,  0.0000]]])
     """
-    assert input.shape[-1] == 3, "Last dim should be 3"
-    shape, v = input.shape, input.view(-1,3)
-    S = torch.zeros(v.shape[:-1]+(3,3), device=v.device, dtype=v.dtype)
-    S[:,0,1], S[:,0,2] = -v[:,2],  v[:,1]
-    S[:,1,0], S[:,1,2] =  v[:,2], -v[:,0]
-    S[:,2,0], S[:,2,1] = -v[:,1],  v[:,0]
-    return S.view(shape[:-1]+(3,3))
+    v = input.tensor() if hasattr(input, 'ltype') else input
+    assert v.shape[-1] == 3, "Last dim should be 3"
+    O = torch.zeros(v.shape[:-1], device=v.device, dtype=v.dtype, requires_grad=v.requires_grad)
+    return torch.stack([torch.stack([        O, -v[...,2],  v[...,1]], dim=-1),
+                        torch.stack([ v[...,2],         O, -v[...,0]], dim=-1),
+                        torch.stack([-v[...,1],  v[...,0],         O], dim=-1)], dim=-2)
 
 
 def cumops_(input, dim, ops):
@@ -66,25 +66,29 @@ def cumprod_(input, dim):
 
 
 def cumops(input, dim, ops):
-    r"""Returns the cumulative customized operation of LieTensor elements of input in the dimension dim.
-
-    For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
+    r"""Returns the cumulative user-defined operation of LieTensor along a dimension.
 
     .. math::
-        y_i = x_1~\mathrm{ops}~x_2 ~\mathrm{ops}~ \cdots ~\mathrm{ops}~ x_i
+        y_i = x_1~\mathrm{\circ}~x_2 ~\mathrm{\circ}~ \cdots ~\mathrm{\circ}~ x_i,
+
+    where :math:`\mathrm{\circ}` is the user-defined operation and :math:`x_i,~y_i`
+    are the :math:`i`-th LieType item along the :obj:`dim` dimension of input and
+    output, respectively.
 
     Args:
         input (LieTensor): the input LieTensor
         dim (int): the dimension to do the operation over
-        ops (func): the function to be customized
+        ops (func): the user-defined operation or function
 
     Returns:
         LieTensor: LieTensor
 
     Note:
-        - The users are supposed to provide meaningful customized operation.
-        - It doesn't check whether the results are valid for mathematical
+        - The users are supposed to provide meaningful operation.
+        - This function doesn't check whether the results are valid for mathematical
           definition of LieTensor, e.g., quaternion.
+        - The time complexity of the function is :math:`\mathcal{O}(\log N)`, where
+          :math:`N` is the LieTensor size along the :obj:`dim` dimension.
 
     Examples:
         >>> input = pp.randn_SE3(2)
@@ -100,51 +104,107 @@ def cumops(input, dim, ops):
     return cumops_(input.clone(), dim, ops)
 
 
-def cummul(input, dim):
-    r"""Returns the cumulative multiplication (*) of LieTensor elements of input in the dimension dim.
+def cummul(input, dim, left = True):
+    r"""Returns the cumulative multiplication (*) of LieTensor along a dimension.
 
-    For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
+    * Left multiplication:
 
     .. math::
-        y_i = x_1 * x_2 * \cdots @ x_i
+        y_i = x_i * x_{i-1} * \cdots * x_1,
+
+    * Right multiplication:
+
+    .. math::
+        y_i = x_1 * x_2 * \cdots * x_i,
+        
+    where :math:`x_i,~y_i` are the :math:`i`-th LieType item along the :obj:`dim`
+    dimension of input and output, respectively.
 
     Args:
-        input (LieTensor): the input tenso
-        dim (int): the dimension to do the operation over
+        input (LieTensor): the input LieTensor
+        dim (int): the dimension to do the multiplication over
+        left (bool, optional): whether perform left multiplication in :obj:`cummul`.
+            If set it to :obj:`False`, this function performs right multiplication. Defaul: True
 
     Returns:
         LieTensor: The LieTensor
 
-    Examples:
+    Note:
+        - The time complexity of the function is :math:`\mathcal{O}(\log N)`, where
+          :math:`N` is the LieTensor size along the :obj:`dim` dimension.
+
+    Example:
+    
+        * Left multiplication with :math:`\text{input} \in` :obj:`SE3`
+
+        >>> input = pp.randn_SE3(2)
+        >>> pp.cummul(input, dim=0)
+        SE3Type LieTensor:
+        tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
+                [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
+
+        * Left multiplication with :math:`\text{input} \in` :obj:`SO3`
+
+        >>> input = pp.randn_SO3(1,2)
+        >>> pp.cummul(input, dim=1, left=False)
+        SO3Type LieTensor:
+        tensor([[[-1.8252e-01,  1.6198e-01,  8.3683e-01,  4.9007e-01],
+                [ 2.0905e-04,  5.2031e-01,  8.4301e-01, -1.3642e-01]]])
+    """
+    if left:
+        return cumops(input, dim, lambda a, b : a * b)
+    else: 
+        return cumops(input, dim, lambda a, b : b * a)
+
+
+def cumprod(input, dim, left = True):
+    r"""Returns the cumulative product (@) of LieTensor along a dimension.
+
+    * Left product:
+
+    .. math::
+        y_i = x_i ~@~ x_{i-1} ~@~ \cdots ~@~ x_1,
+    
+    * Right product:
+
+    .. math::
+        y_i = x_1 ~@~ x_2 ~@~ \cdots ~@~ x_i,
+
+    where :math:`x_i,~y_i` are the :math:`i`-th LieType item along the :obj:`dim`
+    dimension of input and output, respectively.
+
+    Args:
+        input (LieTensor): the input LieTensor
+        dim (int): the dimension to do the operation over
+        left (bool, optional): whether perform left product in :obj:`cumprod`.
+            If set it to :obj:`False`, this function performs right product. Defaul: True
+
+    Returns:
+        LieTensor: The LieTensor
+
+    Note:
+        - The time complexity of the function is :math:`\mathcal{O}(\log N)`, where
+          :math:`N` is the LieTensor size along the :obj:`dim` dimension.
+
+    Example:
+
+        * Left product with :math:`\text{input} \in` :obj:`SE3`
+
         >>> input = pp.randn_SE3(2)
         >>> pp.cumprod(input, dim=0)
         SE3Type LieTensor:
         tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
                 [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
+
+        * Right product with :math:`\text{input} \in` :obj:`SO3`
+
+        >>> input = pp.randn_SO3(1,2)
+        >>> pp.cumprod(input, dim=1, left=False)
+        SO3Type LieTensor:
+        tensor([[[ 0.5798, -0.1189, -0.2429,  0.7686],
+                [ 0.7515, -0.1920,  0.5072,  0.3758]]])
     """
-    return cumops(input, dim, lambda a, b : a * b)
-
-
-def cumprod(input, dim):
-    r"""Returns the cumulative product (@) of LieTensor elements of input in the dimension dim.
-
-    For example, if input is a vector of size N, the result will also be a vector of size N, with elements.
-
-    .. math::
-        y_i = x_1 @ x_2 @ \cdots @ x_i
-
-    Args:
-        input (LieTensor): the input tenso
-        dim (int): the dimension to do the operation over
-
-    Returns:
-        LieTensor: The LieTensor
-
-    Examples:
-        >>> input = pp.randn_SE3(2)
-        >>> pp.cumprod(input, dim=0)
-        SE3Type LieTensor:
-        tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
-                [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
-    """
-    return cumops(input, dim, lambda a, b : a @ b)
+    if left:
+        return cumops(input, dim, lambda a, b : a @ b)
+    else:
+        return cumops(input, dim, lambda a, b : b @ a)

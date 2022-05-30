@@ -1,7 +1,10 @@
-import torch
-from torch import nn
+
+import math, numbers
+import torch, warnings
+from torch import nn, linalg
+from torch.utils._pytree import tree_map, tree_flatten
 from .backends import exp, log, inv, mul, adj
-from .backends import adjT, jinv, act3, act4, toMatrix
+from .backends import adjT, jinvp, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
 from .basics import cumops_, cummul_, cumprod_
 
@@ -19,16 +22,16 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
 
 
 class LieType:
-    '''Lie Group Type Base Class'''
-    def __init__(self, groud, dimension, embedding, manifold):
-        self._group     = groud     # Group ID
+    '''LieTensor Type Base Class'''
+    def __init__(self, lid, dimension, embedding, manifold):
+        self._lid       = lid                     # LieType ID
         self._dimension = torch.Size([dimension]) # Data dimension
         self._embedding = torch.Size([embedding]) # Embedding dimension
         self._manifold  = torch.Size([manifold])  # Manifold dimension
 
     @property
-    def group(self):
-        return self._group
+    def lid(self):
+        return self._lid
 
     @property
     def dimension(self):
@@ -48,18 +51,18 @@ class LieType:
 
     def Log(self, X):
         if self.on_manifold:
-            raise AttributeError("Manifold Type has no Log attribute")
+            raise AttributeError("Lie Algebra has no Log attribute")
         raise NotImplementedError("Instance has no Log attribute.")
 
     def Exp(self, x):
         if not self.on_manifold:
-            raise AttributeError("Embedding Type has no Exp attribute")
+            raise AttributeError("Lie Group has no Exp attribute")
         raise NotImplementedError("Instance has no Exp attribute.")
 
     def Inv(self, x):
         if self.on_manifold:
             return LieTensor(-x, ltype=x.ltype)
-        out = self.__op__(self.group, inv, x)
+        out = self.__op__(self.lid, inv, x)
         return LieTensor(out, ltype=x.ltype)
 
     def Act(self, x, p):
@@ -67,65 +70,65 @@ class LieType:
         assert not self.on_manifold and isinstance(p, torch.Tensor)
         assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
         act = act3 if p.shape[-1]==3 else act4
-        return self.__op__(self.group, act, x, p)
+        return self.__op__(self.lid, act, x, p)
 
     def Mul(self, x, y):
         # Transform on transform
         if not self.on_manifold and isinstance(y, LieTensor) and not y.ltype.on_manifold:
-            out = self.__op__(self.group, mul, x, y)
+            out = self.__op__(self.lid, mul, x, y)
             return LieTensor(out, ltype=x.ltype)
         # Transform on points
         if not self.on_manifold and isinstance(y, torch.Tensor):
             return self.Act(x, y)
-        # scalar * manifold
-        if self.on_manifold and not isinstance(y, LieTensor):
-            if isinstance(y, torch.Tensor):
-                assert y.dim()==0 or y.shape[-1]==1, "Tensor Dimension Invalid"
-            return torch.mul(x, y)
+        # (scalar or tensor) * manifold
+        if self.on_manifold:
+            return LieTensor(torch.mul(x, y), ltype=x.ltype)
         raise NotImplementedError('Invalid __mul__ operation')
 
     def Retr(self, X, a):
         if self.on_manifold:
-            raise AttributeError("Gtype has no Retr attribute")
+            raise AttributeError("Has no Retr attribute")
         return a.Exp() * X
 
     def Adj(self, X, a):
         ''' X * Exp(a) = Exp(Adj) * X '''
         if self.on_manifold:
-            raise AttributeError("Gtype has no Adj attribute")
+            raise AttributeError("Has no Adj attribute")
         assert not X.ltype.on_manifold and a.ltype.on_manifold
-        assert X.ltype.group == a.ltype.group
-        out = self.__op__(self.group, adj, X, a)
+        assert X.ltype.lid == a.ltype.lid
+        out = self.__op__(self.lid, adj, X, a)
         return LieTensor(out, ltype=a.ltype)
 
     def AdjT(self, X, a):
         ''' Exp(a) * X = X * Exp(AdjT) '''
         if self.on_manifold:
-            raise AttributeError("Gtype has no AdjT attribute")
-        assert not X.ltype.on_manifold and a.ltype.on_manifold, "Gtype Invalid"
-        assert X.ltype.group == a.ltype.group, "Gtype Invalid"
-        out = self.__op__(self.group, adjT, X, a)
+            raise AttributeError("Has no AdjT attribute")
+        assert not X.ltype.on_manifold and a.ltype.on_manifold, "ltype Invalid"
+        assert X.ltype.lid == a.ltype.lid, "ltype Invalid"
+        out = self.__op__(self.lid, adjT, X, a)
         return LieTensor(out, ltype=a.ltype)
 
-    def Jinv(self, X, a):
+    def Jinvp(self, X, p):
         if self.on_manifold:
-            raise AttributeError("Gtype has no Jinv attribute")
-        return self.__op__(self.group, jinv, X, a)
+            raise AttributeError("ltype has no Jinvp attribute")
+        assert isinstance(p, LieTensor) and p.ltype.on_manifold, "Args p has to be Lie Algebra"
+        out = self.__op__(self.lid, jinvp, X, p)
+        return LieTensor(out, ltype=p.ltype)
 
-    def matrix(self, gtensor):
+    def matrix(self, lietensor):
         """ To 4x4 matrix """
-        X = gtensor.Exp() if self.on_manifold else gtensor
+        X = lietensor.Exp() if self.on_manifold else lietensor
         I = torch.eye(4, dtype=X.dtype, device=X.device)
         I = I.view([1] * (X.dim() - 1) + [4, 4])
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
 
-    def translation(self, gtensor):
+    def translation(self, lietensor):
         """ To translation """
-        X = gtensor.Exp() if self.on_manifold else gtensor
+        X = lietensor.Exp() if self.on_manifold else lietensor
         p = torch.tensor([0., 0., 0.], dtype=X.dtype, device=X.device)
         return X.Act(p.view([1] * (X.dim() - 1) + [3,]))
 
-    def quaternion(self, gtensor):
+    def quaternion(self, lietensor):
         raise NotImplementedError('quaternion not implemented yet')
 
     @classmethod
@@ -140,12 +143,13 @@ class LieType:
         return self.randn(*args, sigma=1, **kwargs)
 
     def randn(self, *args, sigma=1., **kwargs):
-        return sigma * torch.randn(*(tuple(args)+self.manifold), **kwargs)
+        scaled_sigma = 2.*sigma/math.sqrt(3)
+        return scaled_sigma * torch.randn(*(tuple(args)+self.manifold), **kwargs)
 
     @classmethod
-    def __op__(cls, group, op, x, y=None):
+    def __op__(cls, lid, op, x, y=None):
         inputs, out_shape = cls.__broadcast_inputs(x, y)
-        out = op.apply(group, *inputs)
+        out = op.apply(lid, *inputs)
         dim = -1 if out.nelement() != 0 else x.shape[-1]
         return out.view(out_shape + (dim,))
 
@@ -170,8 +174,8 @@ class LieType:
         return cummul(X, dim)
 
     @classmethod
-    def cumprod(self, X, dim):
-        return cumprod(X, dim)
+    def cumprod(self, X, dim, left = True):
+        return cumprod(X, dim, left)
 
     @classmethod
     def cumops_(self, X, dim, ops):
@@ -191,7 +195,7 @@ class SO3Type(LieType):
         super().__init__(1, 4, 4, 3)
 
     def Log(self, X):
-        x = self.__op__(self.group, log, X)
+        x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=so3_type)
 
     @classmethod
@@ -214,13 +218,19 @@ class SO3Type(LieType):
         X.index_fill_(dim=-1, index=torch.tensor([-1], device=X.device), value=1)
         return X
 
+    def Jr(self, X):
+        """
+        Right jacobian of SO(3)
+        """
+        return X.Log().Jr()
+
 
 class so3Type(LieType):
     def __init__(self):
         super().__init__(1, 3, 4, 3)
 
     def Exp(self, x):
-        X = self.__op__(self.group, exp, x)
+        X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=SO3_type)
 
     @classmethod
@@ -231,25 +241,24 @@ class so3Type(LieType):
         data = super().randn(*size, sigma=sigma, **kwargs).detach()
         return LieTensor(data, ltype=so3_type).requires_grad_(requires_grad)
 
-    def matrix(self, gtensor):
+    def matrix(self, lietensor):
         """ To 3x3 matrix """
-        X = gtensor.Exp()
+        X = lietensor.Exp()
         I = torch.eye(3, dtype=X.dtype, device=X.device)
         I = I.view([1] * (X.dim() - 1) + [3, 3])
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
 
     def Jr(self, x):
         """
-        Right jacobian of SO(3)
+        Right jacobian of so(3)
         The code is taken from the Sophus codebase :
         https://github.com/XueLianjie/BA_schur/blob/3af9a94248d4a272c53cfc7acccea4d0208b77f7/thirdparty/Sophus/sophus/so3.hpp#L113
         """
-        I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.shape[:-1]+(3,3))
-        theta = torch.linalg.norm(x)
-        if theta < 1e-5:
-            return I
-        K = vec2skew(torch.nn.functional.normalize(x, dim=-1))
-        return I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/torch.linalg.norm(x**3) * K@K
+        K = vec2skew(x)
+        theta = torch.linalg.norm(x, dim=-1, keepdim=True).unsqueeze(-1)
+        I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.lshape+(3, 3))
+        Jr = I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/theta**3 * K@K
+        return torch.where(theta>torch.finfo(theta.dtype).eps, Jr, I)
 
 
 class SE3Type(LieType):
@@ -257,7 +266,7 @@ class SE3Type(LieType):
         super().__init__(3, 7, 7, 6)
 
     def Log(self, X):
-        x = self.__op__(self.group, log, X)
+        x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=se3_type)
 
     @classmethod
@@ -275,7 +284,7 @@ class se3Type(LieType):
         super().__init__(3, 6, 7, 6)
 
     def Exp(self, x):
-        X = self.__op__(self.group, exp, x)
+        X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=SE3_type)
 
     @classmethod
@@ -292,7 +301,7 @@ class Sim3Type(LieType):
         super().__init__(4, 8, 8, 7)
 
     def Log(self, X):
-        x = self.__op__(self.group, log, X)
+        x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=sim3_type)
 
     @classmethod
@@ -310,7 +319,7 @@ class sim3Type(LieType):
         super().__init__(4, 7, 8, 7)
 
     def Exp(self, x):
-        X = self.__op__(self.group, exp, x)
+        X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=Sim3_type)
 
     @classmethod
@@ -327,13 +336,13 @@ class RxSO3Type(LieType):
         super().__init__(2, 5, 5, 4)
 
     def Log(self, X):
-        x = self.__op__(self.group, log, X)
+        x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=rxso3_type)
 
     @classmethod
     def identity(cls, *size, **kwargs):
         data = torch.tensor([0., 0., 0., 1., 1.], **kwargs)
-        return LieTensor(data.expand(size+(-1,)), ltype=rxso3_type)
+        return LieTensor(data.expand(size+(-1,)), ltype=RxSO3_type)
 
     def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
         data = rxso3_type.Exp(rxso3_type.randn(*size, sigma=sigma, **kwargs)).detach()
@@ -345,7 +354,7 @@ class rxso3Type(LieType):
         super().__init__(2, 4, 5, 4)
 
     def Exp(self, x):
-        X = self.__op__(self.group, exp, x)
+        X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=RxSO3_type)
 
     @classmethod
@@ -356,6 +365,54 @@ class rxso3Type(LieType):
         data = super().randn(*size, sigma=sigma, **kwargs).detach()
         return LieTensor(data, ltype=rxso3_type).requires_grad_(requires_grad)
 
+    def _Ws(self, x):
+        x = x.tensor() if hasattr(x, 'ltype') else x
+        rotation = x[..., :3]
+        sigma = x[..., 3]
+        theta = torch.norm(rotation, 2, -1)
+
+        A = torch.zeros_like(theta, requires_grad=False)
+        B = torch.zeros_like(theta, requires_grad=False)
+        C = torch.zeros_like(theta, requires_grad=False)
+      
+        sigma_larger = (sigma.abs() > torch.finfo(sigma.dtype).eps)
+        theta_larger = (theta > torch.finfo(theta.dtype).eps)
+        condition1 = (~sigma_larger) & (~theta_larger)
+        condition2 = (~sigma_larger) & theta_larger
+        condition3 = sigma_larger & (~theta_larger)
+        condition4 = sigma_larger & theta_larger
+
+        scale, sigma2, theta2 = sigma.exp(), sigma * sigma, theta * theta
+        theta2_inv = 1.0 / theta2
+
+        # condition1
+        C[(~sigma_larger)], A[condition1], B[condition1] = 1.0, 0.5, 1.0 / 6
+
+        # condition2
+        theta_c2 = theta[condition2]      
+        A[condition2] = (1.0 - theta_c2.cos()) * theta2_inv[condition2]
+        B[condition2] = (theta_c2 - theta_c2.sin()) / (theta2[condition2] * theta_c2)
+
+        # condition3        
+        C[sigma_larger] = (scale[sigma_larger] - 1.0) / sigma[sigma_larger]
+        sigma_c3, scale_c3, sigma2_c3 = sigma[condition3], scale[condition3], sigma2[condition3]
+        A[condition3] = (1.0 + (sigma_c3 - 1.0) * scale_c3) / sigma2_c3
+        B[condition3] = (0.5 * sigma2_c3 * scale_c3 + scale_c3 - 1.0 - sigma2_c3 * scale_c3) / (sigma2_c3 * sigma_c3)
+
+        # condition4
+        sigma_c4, sigma2_c4, scale_c4 = sigma[condition4], sigma2[condition4], scale[condition4]
+        theta_c4, theta2_c4, theta2_inv_c4 = theta[condition4], theta2[condition4], theta2_inv[condition4]
+        a_c4, b_c4, c_c4 = scale_c4 * theta_c4.sin(), scale_c4 * theta_c4.cos(), (theta2_c4 + sigma2_c4)
+        A[condition4] = (a_c4 * sigma_c4 + (1 - b_c4) * theta_c4) / (theta_c4 * c_c4)
+        B[condition4] = (C[condition4] - ((b_c4 - 1) * sigma_c4 + a_c4 * theta_c4) / c_c4) * theta2_inv_c4
+
+        K = vec2skew(rotation)
+        A = A.unsqueeze(-1).unsqueeze(-1)
+        B = B.unsqueeze(-1).unsqueeze(-1)
+        C = C.unsqueeze(-1).unsqueeze(-1)
+        I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.shape[:-1]+(3,3))
+        return A * K + B * (K@K) + C * I
+
 
 SO3_type, so3_type = SO3Type(), so3Type()
 SE3_type, se3_type = SE3Type(), se3Type()
@@ -364,76 +421,85 @@ RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
 
 
 class LieTensor(torch.Tensor):
-    r""" The Base Class for LieTensor
-
-    Returns:
-        LieTensor in form of Lie Type (Inherited from torch.Tensor)
+    r""" A sub-class of :obj:`torch.Tensor` to represent Lie Algebra and Lie Group.
 
     Args:
-        data (:code:`Tensor`, or :code:`list`, or ':code:`int`...'): A
-            :code:`Tensor` object, or constructing a :code:`Tensor`
-            object from :code:`list`, which defines tensor data, or from
-            ':code:`int`...', which defines tensor shape.
+        data (:obj:`Tensor`, or :obj:`list`, or ':obj:`int`...'): A
+            :obj:`Tensor` object, or constructing a :obj:`Tensor`
+            object from :obj:`list`, which defines tensor data, or from
+            ':obj:`int`...', which defines tensor shape.
 
-            The shape of :code:`Tensor` object should be compatible
-            with Lie Type :code:`ltype`, otherwise error will be raised.
+            The shape of :obj:`Tensor` object should be compatible
+            with Lie Type :obj:`ltype`, otherwise error will be raised.
 
-        ltype (ltype): Lie Type, either **Lie Group** or **Lie Algebra** is listed below:
+        ltype (:obj:`ltype`): Lie Type, either **Lie Group** or **Lie Algebra** is listed below:
 
-    .. list-table:: List of :code:`ltype` for **Lie Group**
+    Returns:
+        LieTensor corresponding to Lie Type :obj:`ltype`.
+
+    .. list-table:: List of :obj:`ltype` for **Lie Group**
         :widths: 25 25 30 30
         :header-rows: 1
 
-        * - Operations
-          - :code:`ltype`
-          - :code:`shape`
+        * - Representation
+          - :obj:`ltype`
+          - :obj:`shape`
           - Alias Class
         * - Rotation
-          - :code:`SO3_type`
-          - :code:`(*, 4)`
+          - :obj:`SO3_type`
+          - :obj:`(*, 4)`
           - :meth:`SO3`
         * - Rotation + Translation
-          - :code:`SE3_type`
-          - :code:`(*, 7)`
+          - :obj:`SE3_type`
+          - :obj:`(*, 7)`
           - :meth:`SE3`
         * - Rotation + Translation + Scale
-          - :code:`Sim3_type`
-          - :code:`(*, 8)`
+          - :obj:`Sim3_type`
+          - :obj:`(*, 8)`
           - :meth:`Sim3`
         * - Rotation + Scale
-          - :code:`RxSO3_type`
-          - :code:`(*, 5)`
+          - :obj:`RxSO3_type`
+          - :obj:`(*, 5)`
           - :meth:`RxSO3`
 
-    .. list-table:: List of :code:`ltype` for **Lie Algebra**
+    .. list-table:: List of :obj:`ltype` for **Lie Algebra**
         :widths: 25 25 30 30
         :header-rows: 1
 
-        * - Operations
-          - :code:`ltype`
-          - :code:`shape`
+        * - Representation
+          - :obj:`ltype`
+          - :obj:`shape`
           - Alias Class
         * - Rotation
-          - :code:`so3_type`
-          - :code:`(*, 3)`
+          - :obj:`so3_type`
+          - :obj:`(*, 3)`
           - :meth:`so3`
         * - Rotation + Translation
-          - :code:`se3_type`
-          - :code:`(*, 6)`
+          - :obj:`se3_type`
+          - :obj:`(*, 6)`
           - :meth:`se3`
         * - Rotation + Translation + Scale
-          - :code:`sim3_type`
-          - :code:`(*, 7)`
+          - :obj:`sim3_type`
+          - :obj:`(*, 7)`
           - :meth:`sim3`
         * - Rotation + Scale
-          - :code:`rxso3_type`
-          - :code:`(*, 4)`
+          - :obj:`rxso3_type`
+          - :obj:`(*, 4)`
           - :meth:`rxso3`
 
     Note:
-        Two attributs :code:`shape` and :code:`lshape` are available for LieTensor.
-        The only differece is the :code:`lshape` takes the last dimension
-        of :code:`shape` as a single :code:`ltype` item, i.e., :code:`lshape=shape[:-1]`.
+        In most of the cases, Lie Group should be used. Lie Algebra is used only
+        when it needs to be optimized by back-propagation via gradients: in this
+        case, LieTensor is taken as :meth:`pypose.Parameter` in a module, which follows
+        PyTorch traditions.
+
+
+    Note:
+        Two attributes :obj:`shape` and :obj:`lshape` are available for LieTensor.
+        The only differece is the :obj:`lshape` hides the last dimension of :obj:`shape`,
+        since :obj:`lshape` takes the data in the last dimension as a single :obj:`ltype` item.
+
+        See LieTensor method :meth:`lview` for more details.
 
     Examples:
         >>> import torch
@@ -445,7 +511,7 @@ class LieTensor(torch.Tensor):
                 [-0.8106,  0.8197,  0.7077],
                 [-0.5743,  0.8182, -1.2104]], device='cuda:0', grad_fn=<AliasBackward0>)
 
-        Alias for specific LieTensor is recommended:
+        Alias class for specific LieTensor is recommended:
 
         >>> pp.so3(data)
         so3Type LieTensor:
@@ -453,49 +519,58 @@ class LieTensor(torch.Tensor):
                 [-0.8106,  0.8197,  0.7077],
                 [-0.5743,  0.8182, -1.2104]], device='cuda:0', grad_fn=<AliasBackward0>)
 
-        Other available constructors:
+        See more alias classes at `Table 1 for Lie Group <#id1>`_  and `Table 2 for Lie Algebra <#id2>`_.
 
-        >>> pp.so3([0, 0, 0])
-        so3Type LieTensor:
-        tensor([0., 0., 0.])
+        Other constructors:
 
-        >>> pp.so3(2, 3)
-        so3Type LieTensor:
-        tensor([[0., 0., 0.],
-                [0., 0., 0.]])
+            - From list.
+
+            >>> pp.so3([0, 0, 0])
+            so3Type LieTensor:
+            tensor([0., 0., 0.])
+
+            - From ints.
+
+            >>> pp.so3(2, 3)
+            so3Type LieTensor:
+            tensor([[0., 0., 0.],
+                    [0., 0., 0.]])
 
     Note:
         Alias class for LieTensor is recommended.
         For example, the following usage is equivalent:
 
-        - :code:`pp.LieTensor(tensor, ltype=pp.so3_type)`
+        - :obj:`pp.LieTensor(tensor, ltype=pp.so3_type)`
 
-        - :code:`pp.so3(tensor)` (This is preferred).
+        - :obj:`pp.so3(tensor)` (This is preferred).
 
     Note:
-        LieTensor constructor from tensor is recommended, since many useful attributes from
-        torch.tensor, such as :code:`dtype`, :code:`device`, and :code:`requires_grad`
-        as can be used. See more details at
+        All attributes from Tensor are available for LieTensor, e.g., :obj:`dtype`,
+        :obj:`device`, and :obj:`requires_grad`. See more details at
         `tensor attributes <https://pytorch.org/docs/stable/tensor_attributes.html>`_.
 
-        >>> data = torch.randn(1, 3, dtype=torch.float64, device="cuda", requires_grad=True)
-        >>> pp.so3(data)
-        so3Type LieTensor:
-        tensor([[-1.5948,  0.3113, -0.9807]], device='cuda:0', dtype=torch.float64,
-            grad_fn=<AliasBackward0>)
+        Example:
+
+            >>> data = torch.randn(1, 3, dtype=torch.float64, device="cuda", requires_grad=True)
+            >>> pp.so3(data) # All Tensor attributes are available for LieTensor
+            so3Type LieTensor:
+            tensor([[-1.5948,  0.3113, -0.9807]], device='cuda:0', dtype=torch.float64,
+                grad_fn=<AliasBackward0>)
     """
     def __init__(self, *data, ltype:LieType):
-        tensor = data[0] if isinstance(data[0], torch.Tensor) else torch.Tensor(*data)
-        assert tensor.shape[-1:] == ltype.dimension, 'Dimension Invalid.'
+        assert self.shape[-1:] == ltype.dimension, 'Dimension Invalid. Go to{}'.format(
+            'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor')
         self.ltype = ltype
 
+    @staticmethod
     def __new__(cls, *data, ltype):
         tensor = data[0] if isinstance(data[0], torch.Tensor) else torch.Tensor(*data)
         return torch.Tensor.as_subclass(tensor, LieTensor)
 
     def __repr__(self):
         if hasattr(self, 'ltype'):
-            return self.ltype.__class__.__name__ + " LieTensor:\n" + super().__repr__()
+            return self.ltype.__class__.__name__ + \
+                   ' %s:\n'%(self.__class__.__name__) + super().__repr__()
         else:
             return super().__repr__()
 
@@ -504,13 +579,18 @@ class LieTensor(torch.Tensor):
         ltypes = (torch.Tensor if t is LieTensor or Parameter else t for t in types)
         data = torch.Tensor.__torch_function__(func, ltypes, args, kwargs)
         if data is not None and func.__name__ in HANDLED_FUNCTIONS:
-            liegroup = args
-            while not isinstance(liegroup, LieTensor):
-                liegroup = liegroup[0]
-            if isinstance(data, (tuple, list)):
-                return (LieTensor(item, ltype=liegroup.ltype)
-                        if isinstance(item, torch.Tensor) else item for item in data)
-            return LieTensor(data, ltype=liegroup.ltype)
+            args, spec = tree_flatten(args)
+            ltype = [arg.ltype for arg in args if isinstance(arg, LieTensor)][0]
+            def warp(t):
+                if isinstance(t, torch.Tensor) and not isinstance(t, cls):
+                    lt = torch.Tensor.as_subclass(t, LieTensor)
+                    lt.ltype = ltype
+                    if lt.shape[-1:] != lt.ltype.dimension:
+                        link = 'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor'
+                        warnings.warn('Tensor Shape Invalid by calling {}, go to {}'.format(func, link))
+                    return lt
+                return t
+            return tree_map(warp, data)
         return data
 
     @property
@@ -522,9 +602,10 @@ class LieTensor(torch.Tensor):
             torch.Size
 
         Note:
-            - The only difference from :code:`tensor.shape` is the last dimension is hidden.
+            - The only difference from :obj:`shape` is the last dimension is hidden,
+              since :obj:`lshape` takes the last dimension as a single :obj:`ltype` item.
 
-            - The last dimension can also be accessed via :code:`LieTensor.ltype.dimension`.
+            - The last dimension can also be accessed via :obj:`LieTensor.ltype.dimension`.
 
         Examples:
             >>> x = pp.randn_SE3(2)
@@ -539,7 +620,7 @@ class LieTensor(torch.Tensor):
 
     def lview(self, *shape):
         r'''
-        Returns a new LieTensor with the same data as the self tensor but of a different :code:`lshape`.
+        Returns a new LieTensor with the same data as the self tensor but of a different :obj:`lshape`.
 
         Args:
             shape (torch.Size or int...): the desired size
@@ -548,7 +629,10 @@ class LieTensor(torch.Tensor):
             A new lieGroup tensor sharing with the same data as the self tensor but of a different shape.
 
         Note:
-            The only difference from :code:`tensor.view` is the last dimension is hidden.
+            The only difference from :meth:`view` is the last dimension is hidden.
+
+            See `Tensor.view <https://pytorch.org/docs/stable/generated/torch.Tensor.view.html?highlight=view#torch.Tensor.view>`_
+            for its usage.
 
         Examples:
             >>> x = pp.randn_so3(2,2)
@@ -610,11 +694,11 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.AdjT(self, a)
 
-    def Jinv(self, a):
+    def Jinvp(self, p):
         r'''
-        See :meth:`pypose.Jinv`
+        See :meth:`pypose.Jinvp`
         '''
-        return self.ltype.Jinv(self, a)
+        return self.ltype.Jinvp(self, p)
 
     def Jr(self):
         r'''
@@ -635,7 +719,7 @@ class LieTensor(torch.Tensor):
             tensor([[ 0.1196,  0.2339, -0.6824,  0.6822],
                     [ 0.9198, -0.2704, -0.2395,  0.1532]])
         '''
-        return self.data
+        return torch.Tensor.as_subclass(self, torch.Tensor)
 
     def matrix(self) -> torch.Tensor:
         r'''
@@ -679,7 +763,7 @@ class LieTensor(torch.Tensor):
         Inplace set the LieTensor to identity.
 
         Return:
-            LieTensor: the :code:`self` LieTensor
+            LieTensor: the :obj:`self` LieTensor
 
         Note:
             The translation part, if there is, is set to zeros, while the
@@ -710,11 +794,11 @@ class LieTensor(torch.Tensor):
         """
         return self.ltype.cummul(self, dim)
 
-    def cumprod(self, dim):
+    def cumprod(self, dim, left = True):
         r"""
         See :func:`pypose.cumprod`
         """
-        return self.ltype.cumprod(self, dim)
+        return self.ltype.cumprod(self, dim, left)
 
     def cumops_(self, dim, ops):
         r"""
@@ -742,13 +826,18 @@ class Parameter(LieTensor, nn.Parameter):
     Parameters are of :meth:`LieTensor` and :meth:`torch.nn.Parameter`,
     that have a very special property when used with Modules: when
     they are assigned as Module attributes they are automatically
-    added to the list of its parameters, and will appear e.g., in
+    added to the list of its parameters, and will appear, e.g., in
     :meth:`parameters()` iterator.
 
     Args:
         data (LieTensor): parameter LieTensor.
         requires_grad (bool, optional): if the parameter requires
             gradient. Default: True
+
+    Note:
+        :meth:`Parameter` is **highly recommended** to use with LieTensor for
+        **Lie Algebra types**, e.g., :meth:`so3`, :meth:`se3`, :meth:`sim3`,
+        and :meth:`rxso3`, although Lie Group types are also applicable.
 
     Examples:
         >>> x = pp.Parameter(pp.randn_so3(2))

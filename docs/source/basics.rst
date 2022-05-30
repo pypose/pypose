@@ -14,12 +14,22 @@ Basics
     Act
     Adj
     AdjT
-    Jinv
+    Jinvp
+    Jr
     randn_so3
     randn_SO3
     randn_se3
     randn_SE3
     randn_like
+    identity_so3
+    identity_SO3
+    identity_se3
+    identity_SE3
+    identity_sim3
+    identity_Sim3
+    identity_rxso3
+    identity_RxSO3
+    identity_like
     cumprod
     cumprod_
     cummul
