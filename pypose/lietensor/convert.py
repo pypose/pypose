@@ -16,6 +16,25 @@ def mat2SO3(rotation_matrix):
 
         Output: :obj:`(*, 4)`
 
+    Suppose the input rotation matrix :math:`\mathbf{R}` is
+
+    .. math::
+        \mathbf{R} = \begin{bmatrix}
+            R_{11} & R_{12} & R_{13} \\
+            R_{21} & R_{22} & R_{23} \\
+            R_{31} & R_{32} & R_{33}
+        \end{bmatrix},
+
+    the corresponding quaternion :math:`\mathbf{q}=\begin{bmatrix} q_x & q_y & q_z & q_w \end{bmatrix}` can be calculated by
+
+    .. math::
+        \left\{\begin{aligned}
+        q_w &= \frac{1}{2} \sqrt{1 + R_{11} + R_{22} + R_{33}} \\
+        q_x &= sign(R_{23} - R_{32}) \frac{1}{2} \sqrt{1 + R_{11} - R_{22} - R_{33}} \\
+        q_y &= sign(R_{31} - R_{13}) \frac{1}{2} \sqrt{1 - R_{11} + R_{22} - R_{33}} \\
+        q_z &= sign(R_{12} - R_{21}) \frac{1}{2} \sqrt{1 - R_{11} - R_{22} + R_{33}}
+        \end{aligned}\right..
+
     Examples:
 
         >>> input = torch.eye(3).repeat(2, 1, 1) # N x 3 x 3
