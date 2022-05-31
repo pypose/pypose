@@ -137,8 +137,8 @@ def module_jacobian(module, inputs, create_graph=False, strict=False, vectorize=
         >>> J.shape
         torch.Size([2, 2, 2, 6])
     '''
-    all_params, name = extract_weights(module) # deparameterize weights
-    numels, shapes, params = zip(*[(p.numel(), p.shape, p.view(-1)) for p in all_params])
+    params, name = extract_weights(module) # deparameterize weights
+    numels, shapes, params = zip(*[(p.numel(), p.shape, p.view(-1)) for p in params])
     param = torch.cat(params, dim=-1)
 
     def param_as_input(module, param):
