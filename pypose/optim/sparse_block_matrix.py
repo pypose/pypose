@@ -203,6 +203,21 @@ class SparseBlockMatrix(object):
         else:
             return m
 
+    def coalesce(self):
+        '''
+        Use PyTorch's sparse matrix to perform the coalesce operation.
+        This might not be memory-efficient since a copy of the matrix is created during the operation.
+        '''
+
+        # Convert the sparse block matrix to torch sparse matrix.
+        scoo = sbm_to_torch_sparse_coo(self)
+
+        # coalesce.
+        scoo = scoo.coalesce()
+
+        # Convert the torch sparse matrix back to the sparse block matrix.
+        return torch_sparse_coo_to_sbm(scoo)
+
     def rows_of_block(self, idx: int):
         assert ( idx >= 0 ), \
             f'idx must be a positive integer. idx = {idx}'

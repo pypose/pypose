@@ -17,6 +17,19 @@ from tests.unit_tests.common import ( torch_equal, show_delimeter )
 # PyTorch
 import torch
 
+class DummyClass(object):
+    def __init__(self, value, device=None) -> None:
+        super().__init__()
+
+        self.tensor = torch.Tensor([value]).to(device=device)
+
+    def overwrite(self, value):
+        # Create a temporary object.
+        temp = DummyClass( value=value, device=self.tensor.device )
+        
+        # Overwrite the current instance's member.
+        self.tensor = temp.tensor
+
 def torch_lexsort(a, dim=-1):
     '''
     Found at https://discuss.pytorch.org/t/numpy-lexsort-equivalent-in-pytorch/47850/2
@@ -24,15 +37,15 @@ def torch_lexsort(a, dim=-1):
     assert dim == -1  # Transpose if you want differently
     assert a.ndim == 2  # Not sure what is numpy behaviour with > 2 dim
 
-    sorted_values = torch.unique(a, dim=dim, sorted=True, return_inverse=False)
-    return sorted_values
+    sorted_values, inverse_indices = torch.unique(a, dim=dim, sorted=True, return_inverse=True)
+    return sorted_values, inverse_indices
 
 def sort_indices(indices: torch.Tensor):
     '''
     indices: 2D tensor.
 
     Returns:
-    The sorted indices.
+    The sorted indices and the inverse indices.
     '''
 
     assert ( indices.ndim == 2 and indices.shape[0] == 2), f'indices.shape = {indices.shape}'
@@ -51,6 +64,9 @@ class Test_SparseBlockMatrix(unittest.TestCase):
         # 3 |  x,  x,  x, 15, 16, 17,  x,  x,  x
         # 4 | 18, 19, 20,  x,  x,  x, 24, 25, 26
         # 5 | 21, 22, 23,  x,  x,  x, 27, 28, 29
+
+        #     30, 32, 34 = 0,  1,  2 + 30, 31, 32
+        #     36, 38, 40   3,  4,  5   33, 34, 35
 
         cls.block_shape = (2, 3)
         cls.layout = [
@@ -85,6 +101,54 @@ class Test_SparseBlockMatrix(unittest.TestCase):
 
         shape_values = ( len(cls.layout[0]), *cls.block_shape )
         cls.values_raw = torch.arange(30, dtype=torch.float32).view( shape_values )
+
+    def test_overwrite(self):
+        print()
+        show_delimeter('Test overwrite of a class member. ')
+
+        test_entries = [
+            { 'device': 'cpu'  },
+            { 'device': 'cuda' }
+        ]
+
+        for entry in test_entries:
+            print(f'entry = {entry}')
+
+            device = entry['device']
+
+            obj = DummyClass(1, device=device)
+            obj.overwrite(2)
+
+            true_tensor = torch.Tensor([2]).to(device=device)
+
+            self.assertEqual( obj.tensor, true_tensor, f'test_overwrite fails with entry = f{entry}' )
+
+    def test_torch_sparse_matrix(self):
+        print()
+        show_delimeter('Test PyTorch sparse matrix. ')
+
+        shape = ( *Test_SparseBlockMatrix.shape_blocks, *Test_SparseBlockMatrix.block_shape )
+
+        test_entries = [
+            { 'device': 'cpu'  },
+            { 'device': 'cuda' }
+        ]
+
+        for entry in test_entries:
+            print(f'entry = {entry}')
+
+            device = entry['device']
+
+            indices = Test_SparseBlockMatrix.block_indices
+            values = Test_SparseBlockMatrix.values_raw.detach().clone().to(device=device)
+
+            scoo = torch.sparse_coo_tensor(indices, values, shape).to(device=device)
+            values[0, 0, 0] = -1
+
+            # This will make a copy of scoo
+            scoo = scoo.coalesce()
+
+            self.assertEqual(scoo.values()[0, 0, 0], -1, f'test_torch_sparse_matrix failed with entry = {entry}')
 
     def test_creation_empty(self):
         print()
@@ -281,10 +345,20 @@ class Test_SparseBlockMatrix(unittest.TestCase):
 
             sbm = raw_sbm.to(device=device)
 
-            sbm_indices = sort_indices(sbm.block_indices[:, :2].permute(1,0))
+            sbm_indices, inverse_indices = sort_indices(sbm.block_indices[:, :2].permute(1,0))
 
             try:
                 torch_equal( sbm_indices, true_scoo.indices() )
+            except Exception as exc:
+                print(exc)
+                self.assertTrue(False, f'test_torch_sparse_coo_to_sbm failed with entry {entry}')
+
+            # rearange block_storage.
+            print(inverse_indices)
+            block_storage = torch.index_select(sbm.block_storage, 0, inverse_indices)
+
+            try:
+                torch_equal( block_storage, true_scoo.values() )
             except Exception as exc:
                 print(exc)
                 self.assertTrue(False, f'test_torch_sparse_coo_to_sbm failed with entry {entry}')
