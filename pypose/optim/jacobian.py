@@ -116,12 +116,15 @@ def module_jacobian(module, inputs, create_graph=False, strict=False, vectorize=
         therefore the last dimension of Jacobian is the number of total parameters
         in the module.
 
+    Warning:
+        This function is in contrast to PyTorch's function `jacobian
+        <https://pytorch.org/docs/stable/generated/torch.autograd.functional.jacobian.html>`_,
+        which computes the Jacobian of a given Python function.
+
     Example:
-        >>> from torch import nn
-        >>> import pypose as pp
         >>> inputs = torch.randn(2, 2, 2)
         >>> module = nn.Conv2d(in_channels=2, out_channels=2, kernel_size=1)
-        >>> J = module_jacobian(module, inputs)
+        >>> J = pp.optim.module_jacobian(module, inputs)
         tensor([[[[-1.1571, -1.6217,  0.0000,  0.0000,  1.0000,  0.0000],
                   [ 0.2917, -1.1545,  0.0000,  0.0000,  1.0000,  0.0000]],
                 [[-1.4052,  0.7642,  0.0000,  0.0000,  1.0000,  0.0000],
