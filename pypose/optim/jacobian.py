@@ -136,14 +136,14 @@ def modjac(model, inputs, create_graph=False, strict=False, vectorize=False, str
         >>> J.shape
         torch.Size([2, 2, 2, 6])
     '''
-    params, names = extract_weights(module) # deparameterize weights
+    params, names = extract_weights(model) # deparameterize weights
     numels, shapes, params = zip(*[(p.numel(), p.shape, p.view(-1)) for p in params])
     param = torch.cat(params, dim=-1)
 
     def param_as_input(param):
         param = torch.split(param, numels)
         params = [p.view(s) for p, s in zip(param, shapes)]
-        load_weights(module, names, params)
-        return module(inputs)
+        load_weights(model, names, params)
+        return model(inputs)
 
     return jacobian(param_as_input, param, create_graph, strict, vectorize, strategy)
