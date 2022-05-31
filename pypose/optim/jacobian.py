@@ -135,6 +135,27 @@ def modjac(model, inputs, create_graph=False, strict=False, vectorize=False, str
                   [ 0.0000,  0.0000,  0.7777, -1.5251,  0.0000,  1.0000]]]])
         >>> J.shape
         torch.Size([2, 2, 2, 6])
+
+    Example:
+
+        >>> class PoseTransform(torch.nn.Module):
+        ...     def __init__(self):
+        ...         super().__init__()
+        ...         self.p = pp.Parameter(pp.randn_so3(2))
+        ...
+        ...     def forward(self, x):
+        ...         return self.p.Exp() * x
+        ...
+        >>> model, inputs = PoseTransform(), pp.randn_SO3()
+        >>> J = pp.optim.modjac(model, inputs)
+        tensor([[[ 0.6769,  0.4854,  0.3703,  0.0000,  0.0000,  0.0000],
+                 [-0.6020,  0.6618,  0.1506,  0.0000,  0.0000,  0.0000],
+                 [-0.1017, -0.3866,  0.8824,  0.0000,  0.0000,  0.0000],
+                 [ 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]],
+                [[ 0.0000,  0.0000,  0.0000,  0.9671,  0.1685, -0.1407],
+                 [ 0.0000,  0.0000,  0.0000, -0.2092,  0.9203, -0.2629],
+                 [ 0.0000,  0.0000,  0.0000,  0.0665,  0.2907,  0.9380],
+                 [ 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]]])
     '''
     params, names = extract_weights(model) # deparameterize weights
     numels, shapes, params = zip(*[(p.numel(), p.shape, p.view(-1)) for p in params])
