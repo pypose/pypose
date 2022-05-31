@@ -1,1 +1,1 @@
-from .jacobian import module_jacobian
+from .jacobian import modjac

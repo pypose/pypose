@@ -66,9 +66,9 @@ def load_weights(mod: nn.Module, names: List[str], params: Tuple[Tensor, ...]) -
         _set_nested_attr(mod, name.split("."), p)
 
 
-def module_jacobian(module, inputs, create_graph=False, strict=False, vectorize=False, strategy='reverse-mode'):
+def modjac(module, inputs, create_graph=False, strict=False, vectorize=False, strategy='reverse-mode'):
     r'''
-    Compute the Jacobian of module output with respect to module parameters.
+    Compute the module Jacobian with respect to the module parameters.
 
     Args:
         module (torch.nn.Module): a PyTorch module that takes Tensor inputs and
@@ -124,7 +124,7 @@ def module_jacobian(module, inputs, create_graph=False, strict=False, vectorize=
     Example:
         >>> inputs = torch.randn(2, 2, 2)
         >>> module = nn.Conv2d(in_channels=2, out_channels=2, kernel_size=1)
-        >>> J = pp.optim.module_jacobian(module, inputs)
+        >>> J = pp.optim.modjac(module, inputs)
         tensor([[[[-1.1571, -1.6217,  0.0000,  0.0000,  1.0000,  0.0000],
                   [ 0.2917, -1.1545,  0.0000,  0.0000,  1.0000,  0.0000]],
                  [[-1.4052,  0.7642,  0.0000,  0.0000,  1.0000,  0.0000],

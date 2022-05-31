@@ -261,7 +261,7 @@ class Net(nn.Module):
 model = Net()
 
 x = torch.randn(3, 3)
-J = pp.optim.module_jacobian(model, x, vectorize=True, strategy='forward-mode')
+J = pp.optim.modjac(model, x, vectorize=True, strategy='forward-mode')
 y = model(x)
 
 print(J, J.shape, y)
