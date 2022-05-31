@@ -83,11 +83,7 @@ def module_jacobian(module, inputs, create_graph=False, strict=False, vectorize=
             independent of it. If ``False``, we return a Tensor of zeros as the
             jacobian for said inputs, which is the expected mathematical value.
             Defaults to ``False``.
-        vectorize (bool, optional): This feature is experimental.
-            Please consider using
-            `functorch's jacrev or jacfwd <https://github.com/pytorch/functorch#what-are-the-transforms>`_
-            instead if you are looking for something less experimental and more performant.
-            When computing the jacobian, usually we invoke
+        vectorize (bool, optional): When computing the jacobian, usually we invoke
             ``autograd.grad`` once per row of the jacobian. If this flag is
             ``True``, we perform only a single ``autograd.grad`` call with
             ``batched_grad=True`` which uses the vmap prototype feature.
@@ -137,15 +133,14 @@ def module_jacobian(module, inputs, create_graph=False, strict=False, vectorize=
         >>> J.shape
         torch.Size([2, 2, 2, 6])
     '''
-    params, name = extract_weights(module) # deparameterize weights
+    params, names = extract_weights(module) # deparameterize weights
     numels, shapes, params = zip(*[(p.numel(), p.shape, p.view(-1)) for p in params])
     param = torch.cat(params, dim=-1)
 
-    def param_as_input(module, param):
+    def param_as_input(param):
         param = torch.split(param, numels)
-        param = [p.view(s) for p, s in zip(param, shapes)]
-        load_weights(module, name, param)
+        params = [p.view(s) for p, s in zip(param, shapes)]
+        load_weights(module, names, params)
         return module(inputs)
 
-    func = lambda param: param_as_input(module, param)
-    return jacobian(func, param, create_graph, strict, vectorize, strategy)
+    return jacobian(param_as_input, param, create_graph, strict, vectorize, strategy)
