@@ -241,10 +241,27 @@ from torch.autograd.functional import jacobian
 def func(x):
     return x.Exp()
 
-J = jacobian(func, p, vectorize=True, strategy='reverse-mode')
-print("j:", J)
+# J = jacobian(func, p, vectorize=True, strategy='reverse-mode')
+# print("j:", J)
 
-x = pp.randn_so3(2,1,2, requires_grad=True)
-J = x.Jr()
-print(x.shape, J.shape)
-assert J.requires_grad is True
+# x = pp.randn_so3(2,1,2, requires_grad=True)
+# J = x.Jr()
+# print(x.shape, J.shape)
+# assert J.requires_grad is True
+
+class Net(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.w = nn.Parameter(torch.randn(3, 3))
+        self.n = nn.Parameter(torch.randn(1))
+
+    def forward(self, x):
+        return (self.w + self.n).sum(dim=-1)**2 + self.n
+
+model = Net()
+
+x = torch.randn(3, 3)
+J = pp.optim.module_jacobian(model, x, vectorize=True, strategy='forward-mode')
+y = model(x)
+
+print(J, J.shape, y)
