@@ -53,7 +53,7 @@ def extract_weights(mod: nn.Module) -> Tuple[Tuple[Tensor, ...], List[str]]:
 
     # Make params regular Tensors instead of nn.Parameter
     params = tuple(p.detach().requires_grad_() for p in orig_params)
-    return params, names
+    return names, params
 
 
 def load_weights(mod: nn.Module, names: List[str], params: Tuple[Tensor, ...]) -> None:
@@ -157,7 +157,7 @@ def modjac(model, inputs, create_graph=False, strict=False, vectorize=False, str
                  [ 0.0000,  0.0000,  0.0000,  0.0665,  0.2907,  0.9380],
                  [ 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]]])
     '''
-    params, names = extract_weights(model) # deparameterize weights
+    names, params = extract_weights(model) # deparameterize weights
     numels, shapes, params = zip(*[(p.numel(), p.shape, p.view(-1)) for p in params])
     param = torch.cat(params, dim=-1)
 
