@@ -66,12 +66,12 @@ def load_weights(mod: nn.Module, names: List[str], params: Tuple[Tensor, ...]) -
         _set_nested_attr(mod, name.split("."), p)
 
 
-def modjac(module, inputs, create_graph=False, strict=False, vectorize=False, strategy='reverse-mode'):
+def modjac(model, inputs, create_graph=False, strict=False, vectorize=False, strategy='reverse-mode'):
     r'''
-    Compute the module Jacobian with respect to the module parameters.
+    Compute the model Jacobian with respect to the model parameters.
 
     Args:
-        module (torch.nn.Module): a PyTorch module that takes Tensor inputs and
+        model (torch.nn.Module): a PyTorch model that takes Tensor inputs and
             returns a tuple of Tensors or a Tensor.
         inputs (tuple of Tensors or Tensor): inputs to the function ``func``.
         create_graph (bool, optional): If ``True``, the Jacobian will be
@@ -112,9 +112,9 @@ def modjac(module, inputs, create_graph=False, strict=False, vectorize=False, st
         that of the output; otherwise, the input.
 
     Note:
-        Multiple module parameters are flattened to support parallel computing,
+        Multiple model parameters are flattened to support parallel computing,
         therefore the last dimension of Jacobian is the number of total parameters
-        in the module.
+        in the model.
 
     Warning:
         This function is in contrast to PyTorch's function `jacobian
@@ -123,8 +123,8 @@ def modjac(module, inputs, create_graph=False, strict=False, vectorize=False, st
 
     Example:
         >>> inputs = torch.randn(2, 2, 2)
-        >>> module = nn.Conv2d(in_channels=2, out_channels=2, kernel_size=1)
-        >>> J = pp.optim.modjac(module, inputs)
+        >>> model = nn.Conv2d(in_channels=2, out_channels=2, kernel_size=1)
+        >>> J = pp.optim.modjac(model, inputs)
         tensor([[[[-1.1571, -1.6217,  0.0000,  0.0000,  1.0000,  0.0000],
                   [ 0.2917, -1.1545,  0.0000,  0.0000,  1.0000,  0.0000]],
                  [[-1.4052,  0.7642,  0.0000,  0.0000,  1.0000,  0.0000],
