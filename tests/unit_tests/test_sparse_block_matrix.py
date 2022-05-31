@@ -1,4 +1,5 @@
 # Unit test tools.
+from cgi import test
 import functools
 import inspect
 import unittest
@@ -326,9 +327,9 @@ class Test_SparseBlockMatrix(unittest.TestCase):
            Test_SparseBlockMatrix.values_raw,
            shape)
 
-        raw_sbm = SparseBlockMatrix(Test_SparseBlockMatrix.block_shape, dtype=torch.float32)
-        raw_sbm.create(shape_blocks=Test_SparseBlockMatrix.shape_blocks, block_indices=Test_SparseBlockMatrix.block_indices)
-        raw_sbm.set_block_storage(Test_SparseBlockMatrix.values_raw, clone=False)
+        raw_true_sbm = SparseBlockMatrix(Test_SparseBlockMatrix.block_shape, dtype=torch.float32)
+        raw_true_sbm.create(shape_blocks=Test_SparseBlockMatrix.shape_blocks, block_indices=Test_SparseBlockMatrix.block_indices)
+        raw_true_sbm.set_block_storage(Test_SparseBlockMatrix.values_raw, clone=False)
 
         test_entries = [
             { 'device': 'cpu'  },
@@ -343,25 +344,68 @@ class Test_SparseBlockMatrix(unittest.TestCase):
             true_scoo = raw_true_scoo.to(device=device)
             true_scoo = true_scoo.coalesce()
 
-            sbm = raw_sbm.to(device=device)
+            true_sbm = raw_true_sbm.to(device=device)
 
-            sbm_indices, inverse_indices = sort_indices(sbm.block_indices[:, :2].permute(1,0))
+            true_sbm_indices, inverse_indices = sort_indices(true_sbm.block_indices[:, :2].permute(1,0))
+
+            sbm = torch_sparse_coo_to_sbm(true_scoo)
 
             try:
-                torch_equal( sbm_indices, true_scoo.indices() )
+                torch_equal( sbm.block_indices[:, :2], true_sbm_indices.permute((1, 0)) )
             except Exception as exc:
                 print(exc)
                 self.assertTrue(False, f'test_torch_sparse_coo_to_sbm failed with entry {entry}')
 
             # rearange block_storage.
             print(inverse_indices)
-            block_storage = torch.index_select(sbm.block_storage, 0, inverse_indices)
+            true_block_storage = torch.index_select(true_sbm.block_storage, 0, inverse_indices)
 
             try:
-                torch_equal( block_storage, true_scoo.values() )
+                torch_equal( sbm.block_storage, true_block_storage )
             except Exception as exc:
                 print(exc)
                 self.assertTrue(False, f'test_torch_sparse_coo_to_sbm failed with entry {entry}')
+
+    def test_add_sbm(self):
+        print()
+        show_delimeter('test add with another sbm. ')
+
+        # The main sbm.
+        raw_main_sbm = SparseBlockMatrix(Test_SparseBlockMatrix.block_shape, dtype=torch.float32)
+        raw_main_sbm.create(shape_blocks=Test_SparseBlockMatrix.shape_blocks, block_indices=Test_SparseBlockMatrix.block_indices)
+        raw_main_sbm.set_block_storage(Test_SparseBlockMatrix.values_raw, clone=False)
+
+        # The other smb.
+        other_block_storage = torch.rand_like(Test_SparseBlockMatrix.values_raw)
+        raw_other_sbm = SparseBlockMatrix(Test_SparseBlockMatrix.block_shape, dtype=torch.float32)
+        raw_other_sbm.create(shape_blocks=Test_SparseBlockMatrix.shape_blocks, block_indices=Test_SparseBlockMatrix.block_indices)
+        raw_other_sbm.set_block_storage(other_block_storage, clone=False)
+
+        # The result.
+        raw_true_result_block_storage = raw_main_sbm.block_storage + raw_other_sbm.block_storage
+
+        test_entries = [
+            { 'device': 'cpu'  },
+            { 'device': 'cuda' }
+        ]
+
+        for entry in test_entries:
+            print(f'entry = {entry}')
+            device = entry['device']
+
+            main_sbm = raw_main_sbm.to(device=device)
+            other_sbm = raw_other_sbm.to(device=device)
+            true_result_block_storage = raw_true_result_block_storage.to(device=device)
+
+            result = main_sbm + other_sbm
+            result = result.coalesce()
+
+            try:
+                torch_equal( result.block_storage, true_result_block_storage )
+            except Exception as exc:
+                print(exc)
+                self.assertTrue(False, f'test_add_sbm failed with entry {entry}')
+
 
 if __name__ == '__main__':
     import os

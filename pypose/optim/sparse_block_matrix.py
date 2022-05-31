@@ -27,13 +27,17 @@ def torch_sparse_coo_to_sbm(s):
         s = s.coalesce()
     
     shape_blocks = s.shape[:2]
-    block_shape  = s.values.shape[1:3]
+    block_shape  = s.values().shape[1:3]
 
     sbm = SparseBlockMatrix( block_shape, dtype=s.dtype, device=s.device )
-    sbm.create(shape_blocks=shape_blocks, device=s.device)
-    sbm.block_indices[:, :2] = s.indices().detach().clone().permute((1, 0))
+    sbm.create(
+        shape_blocks=shape_blocks, 
+        block_indices=s.indices().detach().clone(), 
+        device=s.device)
     sbm.block_storage = s.values().detach().clone()
     sbm.dtype = s.dtype
+
+    return sbm
 
 class SparseBlockMatrix(object):
     def __init__(self, 
@@ -72,7 +76,7 @@ class SparseBlockMatrix(object):
         '''
         Argument definitions are copied from g2o:
         shape_blocks: number of blocks along vertical (number of block rows) and horizontal (number of block columns) directions.
-        block_indices: 2D list or Tensor. 2 columns. Every row records the block index of a single block.
+        block_indices: 2D list or Tensor. 2 rows. Every colume records the block index of a single block.
         device: Tensor device.
         '''
 
@@ -209,6 +213,9 @@ class SparseBlockMatrix(object):
         This might not be memory-efficient since a copy of the matrix is created during the operation.
         '''
 
+        # TODO: make a flag system shownig the status of coalesce. 
+        # May need also to wrap some member variables by accessor functions.
+
         # Convert the sparse block matrix to torch sparse matrix.
         scoo = sbm_to_torch_sparse_coo(self)
 
@@ -295,13 +302,10 @@ class SparseBlockMatrix(object):
         new_matrix = self.clone()
         return new_matrix.transpose_()
 
-    def __add__(self, other):
+    def add_sparse_block_matrix(self, other):
         '''
-        othet: must be a SparseBlockMatrix object.
+        Currently only supports adding two sparse block matrices with the same block_shape.
         '''
-
-        assert ( isinstance(other, SparseBlockMatrix) ), \
-            f'Only supports adding two SparseBlockMatrix objects. type(other) = {type(other)}'
 
         assert ( self.rows == other.rows and self.cols == other.cols), \
             f'Incompatible dimensions: self: [{self.rows}, {self.cols}], other: [{other.rows}, {other.cols}]. '
@@ -311,9 +315,40 @@ class SparseBlockMatrix(object):
         c_block_storage = torch.cat( ( self.block_storage, other.block_storage ), dim=0 )
 
         # Perform add by converting to a PyTorch sparse tensor.
-        s = sbm_to_torch_sparse_coo( c_block_indices, c_block_storage, ( self.rows, self.cols ) )
+        s_shape = ( *self.shape_blocks, *self.block_shape )
+        indices = c_block_indices[:, :2].permute((1, 0))
 
-        raise NotImplementedError()
+        s = torch.sparse_coo_tensor( 
+            indices, c_block_storage, s_shape, 
+            dtype=self.dtype, device=self.device)
+
+        return torch_sparse_coo_to_sbm(s)
+
+    def add_broadcast(self, other):
+        sbm = self.clone()
+        sbm.block_storage.add_(other)
+        return sbm
+    
+    def add_tensor(self, other):
+        '''
+        Currently only supports adding a Tensor that can be broadcasted to self.block_storage.
+        '''
+        return self.add_broadcast(other)
+
+    def __add__(self, other):
+        '''
+        othet: must be a SparseBlockMatrix object, or a tensor, or a scalar value.
+        '''
+
+        if isinstance(other, SparseBlockMatrix):
+            return self.add_sparse_block_matrix(other)
+        elif isinstance(other, torch.Tensor):
+            return self.add_tensor(other)
+        elif isinstance(other, ( int, long, float, )):
+            return self.add_broadcast(other)
+        else:
+            raise Exception(
+                f'Currently only supports SparseBlockMatrix, torch.Tensor, or scalar type. type(other) = {type(other)}' )
 
     def __matmul__(self, other):
         '''
