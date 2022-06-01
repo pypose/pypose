@@ -129,7 +129,13 @@ class LieType:
         return X.Act(p.view([1] * (X.dim() - 1) + [3,]))
 
     def quaternion(self, lietensor):
-        raise NotImplementedError('quaternion not implemented yet')
+        """ To quaternion """
+        X = lietensor.Exp() if self.on_manifold else lietensor
+        if self.lid == 1 or self.lid == 2:      # X is SO3 or RxSO3 type
+            return LieTensor(X.tensor().view(-1, X.size()[-1])[:, 0:4].view(X.size()[:-1] + (-1,)), ltype=SO3_type)
+        elif self.lid == 3 or self.lid == 4:    # X is SE3 or Sim3 type
+            return LieTensor(X.tensor().view(-1, X.size()[-1])[:, 3:7].view(X.size()[:-1] + (-1,)), ltype=SO3_type)
+
 
     @classmethod
     def identity(cls, *args, **kwargs):
