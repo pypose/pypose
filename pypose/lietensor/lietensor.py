@@ -768,7 +768,7 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.translation(self)
 
-    def quaternion(self) -> torch.Tensor:
+    def quaternion(self):
         r'''
         Extract the quaternion from a LieTensor.
 
