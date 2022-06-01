@@ -136,6 +136,13 @@ class LieType:
         elif self.lid == 3 or self.lid == 4:    # X is SE3 or Sim3 type
             return LieTensor(X.tensor().view(-1, X.size()[-1])[:, 3:7].view(X.size()[:-1] + (-1,)), ltype=SO3_type)
 
+    def scale(self, lietensor):
+        """ Get scale """
+        if self.lid == 1 or self.lid == 3:      # SO3, so3, SE3, se3 type, scale = 1
+            return torch.ones(lietensor.size()[:-1])
+        elif self.lid == 3 or self.lid == 4:    # Sim3, sim3, RxSO3, rxso3 type
+            X = lietensor.Exp() if self.on_manifold else lietensor
+            return X.tensor().view(-1, X.size()[-1])[:, -1].view(X.size()[:-1] + (-1,))
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -763,6 +770,9 @@ class LieTensor(torch.Tensor):
 
     def quaternion(self) -> torch.Tensor:
         return self.ltype.quaternion(self)
+
+    def scale(self) -> torch.Tensor:
+        return self.ltype.scale(self)
 
     def identity_(self):
         r'''
