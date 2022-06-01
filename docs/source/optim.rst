@@ -1,0 +1,12 @@
+Optimization
+============
+
+.. currentmodule:: pypose
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+
+   :template: autosummary/class-no-inherit.rst
+   optim.modjac
+   optim.modjacrev
+   optim.modjacfwd

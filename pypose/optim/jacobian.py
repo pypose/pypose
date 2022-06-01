@@ -3,6 +3,7 @@ import math
 import copy
 import torch
 import warnings
+import functorch
 from torch import nn, Tensor
 from torch.autograd.functional import jacobian
 from typing import List, Tuple, Dict, Union, Callable
@@ -66,7 +67,7 @@ def load_weights(mod: nn.Module, names: List[str], params: Tuple[Tensor, ...]) -
         _set_nested_attr(mod, name.split("."), p)
 
 
-def modjac(model, inputs, create_graph=False, strict=False, vectorize=False, strategy='reverse-mode'):
+def modjac(model, inputs, flatten=False, create_graph=False, strict=False, vectorize=False, strategy='reverse-mode'):
     r'''
     Compute the model Jacobian with respect to the model parameters.
 
@@ -74,6 +75,9 @@ def modjac(model, inputs, create_graph=False, strict=False, vectorize=False, str
         model (torch.nn.Module): a PyTorch model that takes Tensor inputs and
             returns a tuple of Tensors or a Tensor.
         inputs (tuple of Tensors or Tensor): inputs to the function ``func``.
+        flatten (bool, optional): If ``True``, all module parameters are flattened
+            and concatenated to form a single vector. The Jacobian will be computed
+            with respect to this single flattened parameter.
         create_graph (bool, optional): If ``True``, the Jacobian will be
             computed in a differentiable manner. Note that when ``strict`` is
             ``False``, the result can not require gradients or be disconnected
@@ -100,31 +104,39 @@ def modjac(model, inputs, create_graph=False, strict=False, vectorize=False, str
 
     Returns:
         Jacobian (Tensor or nested tuple of Tensors): if there is a single
-        input and output, this will be a single Tensor containing the
-        Jacobian for the linearized inputs and output. If one of the two is
-        a tuple, then the Jacobian will be a tuple of Tensors. If both of
-        them are tuples, then the Jacobian will be a tuple of tuple of
+        output and ``flatten=True``, this will be a single Tensor containing the
+        Jacobian for the linearized inputs and output. If either one doesn't
+        hold, then the Jacobian will be a tuple of Tensors. If both of
+        them don't hold, then the Jacobian will be a tuple of tuple of
         Tensors where ``Jacobian[i][j]`` will contain the Jacobian of the
-        ``i``\th output and ``j``\th input and will have as size the
+        ``i``\th output and ``j``\th parameter and will have as size the
         concatenation of the sizes of the corresponding output and the
-        corresponding input and will have same dtype and device as the
+        corresponding parameter and will have same dtype and device as the
         corresponding input. If strategy is ``forward-mode``, the dtype will be
-        that of the output; otherwise, the input.
-
-    Note:
-        Multiple model parameters are flattened to support parallel computing,
-        therefore the last dimension of Jacobian is the number of total parameters
-        in the model.
+        that of the output; otherwise, the parameter.
 
     Warning:
-        This function is in contrast to PyTorch's function `jacobian
+        The function :obj:`modjac` calculate Jacobian of model parameters.
+        This is in contrast to PyTorch's function `jacobian
         <https://pytorch.org/docs/stable/generated/torch.autograd.functional.jacobian.html>`_,
         which computes the Jacobian of a given Python function.
 
     Example:
+
+        Calculates Jacobian with respect to all model parameters.
+
+        >>> model = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=1)
+        >>> inputs = torch.randn(1, 1, 1)
+        >>> J = pp.optim.modjac(model, inputs)
+        (tensor([[[[[[[0.3365]]]]]]]), tensor([[[[1.]]]]))
+        >>> [j.shape for j in J]
+        [torch.Size([1, 1, 1, 1, 1, 1, 1]), torch.Size([1, 1, 1, 1])]
+
+        Function with flattened parameters returns a combined Jacobian.
+
         >>> inputs = torch.randn(2, 2, 2)
         >>> model = nn.Conv2d(in_channels=2, out_channels=2, kernel_size=1)
-        >>> J = pp.optim.modjac(model, inputs)
+        >>> J = pp.optim.modjac(model, inputs, flatten=True)
         tensor([[[[-1.1571, -1.6217,  0.0000,  0.0000,  1.0000,  0.0000],
                   [ 0.2917, -1.1545,  0.0000,  0.0000,  1.0000,  0.0000]],
                  [[-1.4052,  0.7642,  0.0000,  0.0000,  1.0000,  0.0000],
@@ -136,7 +148,7 @@ def modjac(model, inputs, create_graph=False, strict=False, vectorize=False, str
         >>> J.shape
         torch.Size([2, 2, 2, 6])
 
-    Example:
+        Calculate Jacobian with respect to :obj:`pypose.LieTensor`.
 
         >>> class PoseTransform(torch.nn.Module):
         ...     def __init__(self):
@@ -147,7 +159,7 @@ def modjac(model, inputs, create_graph=False, strict=False, vectorize=False, str
         ...         return self.p.Exp() * x
         ...
         >>> model, inputs = PoseTransform(), pp.randn_SO3()
-        >>> J = pp.optim.modjac(model, inputs)
+        >>> J = pp.optim.modjac(model, inputs, flatten=True)
         tensor([[[ 0.6769,  0.4854,  0.3703,  0.0000,  0.0000,  0.0000],
                  [-0.6020,  0.6618,  0.1506,  0.0000,  0.0000,  0.0000],
                  [-0.1017, -0.3866,  0.8824,  0.0000,  0.0000,  0.0000],
@@ -158,13 +170,28 @@ def modjac(model, inputs, create_graph=False, strict=False, vectorize=False, str
                  [ 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]]])
     '''
     names, params = extract_weights(model) # deparameterize weights
-    numels, shapes, params = zip(*[(p.numel(), p.shape, p.view(-1)) for p in params])
-    param = torch.cat(params, dim=-1)
 
-    def param_as_input(param):
-        param = torch.split(param, numels)
-        params = [p.view(s) for p, s in zip(param, shapes)]
+    if flatten is True:
+        numels, shapes, params = zip(*[(p.numel(), p.shape, p.view(-1)) for p in params])
+        params = torch.cat(params, dim=-1)
+
+    def param_as_input(*params):
+        if flatten is True:
+            params = torch.split(*params, numels)
+            params = [p.view(s) for p, s in zip(params, shapes)]
         load_weights(model, names, params)
         return model(inputs)
 
-    return jacobian(param_as_input, param, create_graph, strict, vectorize, strategy)
+    return jacobian(param_as_input, params, create_graph, strict, vectorize, strategy)
+
+
+def modjacrev(model, inputs, argnums=0, *, has_aux=False):
+    func, params = functorch.make_functional(model)
+    jacrev = functorch.jacrev(func, argnums=argnums, has_aux=has_aux)
+    return jacrev(params, inputs)
+
+
+def modjacfwd(model, inputs, argnums=0, *, has_aux=False):
+    func, params = functorch.make_functional(model)
+    jacfwd = functorch.jacfwd(func, argnums=argnums, has_aux=has_aux)
+    return jacfwd(params, inputs)
