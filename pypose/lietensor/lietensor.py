@@ -769,6 +769,19 @@ class LieTensor(torch.Tensor):
         return self.ltype.translation(self)
 
     def quaternion(self) -> torch.Tensor:
+        r'''
+        Extract the quaternion from a LieTensor.
+
+        Return:
+            SO3: the batched quaternion.
+
+        Example:
+            >>> x = pp.randn_SE3(2)
+            >>> x.quaternion()
+            SO3Type LieTensor:
+            tensor([[-0.8302,  0.5200, -0.0056,  0.2006],
+                    [-0.2541, -0.3184,  0.6305,  0.6607]])
+        '''
         return self.ltype.quaternion(self)
 
     def scale(self) -> torch.Tensor:
