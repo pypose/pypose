@@ -139,10 +139,10 @@ class LieType:
     def scale(self, lietensor):
         """ Get scale """
         if self.lid == 1 or self.lid == 3:      # SO3, so3, SE3, se3 type, scale = 1
-            return torch.ones(lietensor.size()[:-1])
+            return torch.ones(lietensor.size()[:-1] + (1,))
         elif self.lid == 3 or self.lid == 4:    # Sim3, sim3, RxSO3, rxso3 type
             X = lietensor.Exp() if self.on_manifold else lietensor
-            return X.tensor().view(-1, X.size()[-1])[:, -1].view(X.size()[:-1] + (-1,))
+            return X.tensor().view(-1, X.size()[-1])[:, -1].view(X.size()[:-1] + (1,))
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -785,6 +785,24 @@ class LieTensor(torch.Tensor):
         return self.ltype.quaternion(self)
 
     def scale(self) -> torch.Tensor:
+        r'''
+        Extract the scale from a LieTensor.
+
+        Return:
+            Tensor: the batched scale.
+
+        Example:
+            >>> x = pp.randn_SE3(2)
+            >>> x.scale()
+            tensor([[1.],
+                    [1.]])
+            >>> y = pp.randn_sim3(4)
+            >>> y.scale()
+            tensor([[3.6778],
+                    [1.5872],
+                    [0.1861],
+                    [0.6795]])
+        '''
         return self.ltype.scale(self)
 
     def identity_(self):
