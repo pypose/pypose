@@ -140,7 +140,7 @@ class LieType:
         """ Get scale """
         if self.lid == 1 or self.lid == 3:      # SO3, so3, SE3, se3 type, scale = 1
             return torch.ones(lietensor.size()[:-1] + (1,))
-        elif self.lid == 3 or self.lid == 4:    # Sim3, sim3, RxSO3, rxso3 type
+        elif self.lid == 2 or self.lid == 4:    # Sim3, sim3, RxSO3, rxso3 type
             X = lietensor.Exp() if self.on_manifold else lietensor
             return X.tensor().view(-1, X.size()[-1])[:, -1].view(X.size()[:-1] + (1,))
 
