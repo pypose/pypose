@@ -258,5 +258,5 @@ class PoseTransform(torch.nn.Module):
         return self.p.Exp() * x
 
 model, inputs = PoseTransform(), pp.randn_SO3()
-J = pp.optim.modjac(model, inputs)
+J = pp.optim.modjac(model, inputs, flatten=True)
 print(J, J.shape)
