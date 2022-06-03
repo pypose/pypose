@@ -22,6 +22,25 @@ def mat2SO3(rotation_matrix):
     Warning:
         Illegal input(not full rank or not orthogonal) triggers a warning, but will output a quaternion regardless. 
 
+    Suppose the input rotation matrix :math:`\mathbf{R}_i` is
+
+    .. math::
+        \mathbf{R}_i = \begin{bmatrix}
+            R_{11} & R_{12} & R_{13} \\
+            R_{21} & R_{22} & R_{23} \\
+            R_{31} & R_{32} & R_{33}
+        \end{bmatrix},
+
+    the corresponding quaternion :math:`\mathbf{q}_i=\begin{bmatrix} q_x & q_y & q_z & q_w \end{bmatrix}` can be calculated by
+
+    .. math::
+        \left\{\begin{aligned}
+        q_w &= \frac{1}{2} \sqrt{1 + R_{11} + R_{22} + R_{33}} \\
+        q_x &= \mathrm{sign}(R_{23} - R_{32}) \frac{1}{2} \sqrt{1 + R_{11} - R_{22} - R_{33}} \\
+        q_y &= \mathrm{sign}(R_{31} - R_{13}) \frac{1}{2} \sqrt{1 - R_{11} + R_{22} - R_{33}} \\
+        q_z &= \mathrm{sign}(R_{12} - R_{21}) \frac{1}{2} \sqrt{1 - R_{11} - R_{22} + R_{33}}
+        \end{aligned}\right..
+
     Examples:
 
         >>> input = torch.eye(3).repeat(2, 1, 1) # N x 3 x 3
@@ -30,6 +49,7 @@ def mat2SO3(rotation_matrix):
         tensor([[0., 0., 0., 1.],
                 [0., 0., 0., 1.]])
     """
+
     if not torch.is_tensor(rotation_matrix):
         rotation_matrix = torch.tensor(rotation_matrix)
 
