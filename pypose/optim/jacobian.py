@@ -4,7 +4,8 @@ from torch import nn, Tensor
 from torch.autograd.functional import jacobian
 
 
-def modjac(model, inputs, flatten=False, create_graph=False, strict=False, vectorize=False, strategy='reverse-mode'):
+def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False, \
+                    strategy='reverse-mode', flatten=False):
     r'''
     Compute the model Jacobian with respect to the model parameters.
 
@@ -12,11 +13,7 @@ def modjac(model, inputs, flatten=False, create_graph=False, strict=False, vecto
         model (torch.nn.Module): a PyTorch model that takes Tensor or LieTensor
             inputs and returns a tuple of Tensor/LieTensor or a Tensor/LieTensor.
         inputs (tuple of Tensors/LieTensor or Tensor/LieTensor): inputs to the
-            module ``model``.
-        flatten (bool, optional): If ``True``, all module parameters and outputs
-            are flattened and concatenated to form a single vector. The Jacobian
-            will be computed with respect to this single flattened vectors, thus
-            a single Tensor will be returned.
+            model. Defaults to ``None``.
         create_graph (bool, optional): If ``True``, the Jacobian will be
             computed in a differentiable manner. Note that when ``strict`` is
             ``False``, the result can not require gradients or be disconnected
@@ -40,6 +37,10 @@ def modjac(model, inputs, flatten=False, create_graph=False, strict=False, vecto
             Defaults to ``"reverse-mode"``. If ``func`` has more outputs than
             inputs, ``"forward-mode"`` tends to be more performant. Otherwise,
             prefer to use ``"reverse-mode"``.
+        flatten (bool, optional): If ``True``, all module parameters and outputs
+            are flattened and concatenated to form a single vector. The Jacobian
+            will be computed with respect to this single flattened vectors, thus
+            a single Tensor will be returned.
 
     Returns:
         Jacobian (Tensor or nested tuple of Tensors): if there is a single
@@ -111,8 +112,8 @@ def modjac(model, inputs, flatten=False, create_graph=False, strict=False, vecto
         torch.Size([8, 6])
     '''
     func, params = functorch.make_functional(model)
-    func_of_param = lambda *param: func(param, inputs)
-    J = jacobian(func_of_param, params, create_graph, strict, vectorize, strategy)
+    func_param = lambda *p: func(p) if inputs is None else lambda *p: func(p, inputs)
+    J = jacobian(func_param, params, create_graph, strict, vectorize, strategy)
 
     if flatten and isinstance(J, tuple):
         if any(isinstance(j, tuple) for j in J):
