@@ -17,7 +17,6 @@ make html
 3. To clean and rebuild the doc:
 ```
 make clean
-rm -r source/generated
 ```
 
 
