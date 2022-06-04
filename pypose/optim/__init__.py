@@ -1,1 +1,1 @@
-from .jacobian import modjac, modjacrev, modjacfwd
+from .jacobian import modjac

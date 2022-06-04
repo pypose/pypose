@@ -853,3 +853,11 @@ class Parameter(LieTensor, nn.Parameter):
         if data is None:
             data = torch.tensor([])
         return LieTensor._make_subclass(cls, data, requires_grad)
+
+    def __deepcopy__(self, memo):
+        if id(self) in memo:
+            return memo[id(self)]
+        else:
+            result = type(self)(self.clone(memory_format=torch.preserve_format))
+            memo[id(self)] = result
+            return result

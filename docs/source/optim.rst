@@ -8,5 +8,3 @@ Optimization
 
    :template: autosummary/class-no-inherit.rst
    optim.modjac
-   optim.modjacrev
-   optim.modjacfwd
