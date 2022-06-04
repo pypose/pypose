@@ -449,11 +449,11 @@ class LieTensor(torch.Tensor):
           - :obj:`SO3_type`
           - :obj:`(*, 4)`
           - :meth:`SO3`
-        * - Rotation + Translation
+        * - Translation + Rotation
           - :obj:`SE3_type`
           - :obj:`(*, 7)`
           - :meth:`SE3`
-        * - Rotation + Translation + Scale
+        * - Translation + Rotation + Scale
           - :obj:`Sim3_type`
           - :obj:`(*, 8)`
           - :meth:`Sim3`
@@ -474,11 +474,11 @@ class LieTensor(torch.Tensor):
           - :obj:`so3_type`
           - :obj:`(*, 3)`
           - :meth:`so3`
-        * - Rotation + Translation
+        * - Translation + Rotation
           - :obj:`se3_type`
           - :obj:`(*, 6)`
           - :meth:`se3`
-        * - Rotation + Translation + Scale
+        * - Translation + Rotation + Scale
           - :obj:`sim3_type`
           - :obj:`(*, 7)`
           - :meth:`sim3`
