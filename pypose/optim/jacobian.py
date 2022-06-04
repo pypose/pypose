@@ -9,6 +9,20 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
     r'''
     Compute the model Jacobian with respect to the model parameters.
 
+    For a parametric model :math:`\mathbf{f(p, x)}`, where :math:`\mathbf{p}` is
+    the learnable parameter and :math:`\mathbf{x}` is the input, it computes the
+    Jacobian of the :math:`i`-th output and :math:`j`-th parameter as
+
+    .. math::
+        {\displaystyle \mathbf{J}_{i,j} =
+        {\begin{bmatrix}
+            {\dfrac {\partial \mathbf{f}_{i,1}}{\partial \mathbf{p}_{j,1}}} &amp;
+            \cdots&amp;{\dfrac {\partial \mathbf{f}_{i,1}}{\partial \mathbf{p}_{j,n}}}\\
+            \vdots &amp;\ddots &amp;\vdots \\
+            {\dfrac {\partial \mathbf{f}_{i,m}}{\partial \mathbf{p}_{j,1}}}&amp;
+            \cdots &amp;{\dfrac {\partial \mathbf{f}_{i,m}}{\partial \mathbf{p}_{j,n}}}
+        \end{bmatrix}}}.
+
     Args:
         model (torch.nn.Module): a PyTorch model that takes Tensor or LieTensor
             inputs and returns a tuple of Tensor/LieTensor or a Tensor/LieTensor.
