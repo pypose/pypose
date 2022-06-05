@@ -9,18 +9,18 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
     r'''
     Compute the model Jacobian with respect to the model parameters.
 
-    For a parametric model :math:`\mathbf{f(p, x)}`, where :math:`\mathbf{p}` is
-    the learnable parameter and :math:`\mathbf{x}` is the input, it computes the
+    For a parametric model :math:`\bm{f}(\bm{\theta}, \bm{x})`, where :math:`\bm{\theta}` is
+    the learnable parameter and :math:`\bm{x}` is the input, it computes the
     Jacobian of the :math:`i`-th output and :math:`j`-th parameter as
 
     .. math::
         {\displaystyle \mathbf{J}_{i,j} =
         {\begin{bmatrix}
-            {\dfrac {\partial \mathbf{f}_{i,1}}{\partial \mathbf{p}_{j,1}}} &amp;
-            \cdots&amp;{\dfrac {\partial \mathbf{f}_{i,1}}{\partial \mathbf{p}_{j,n}}}\\
+            {\dfrac {\partial \bm{f}_{i,1}}{\partial \bm{\theta}_{j,1}}} &amp;
+            \cdots&amp;{\dfrac {\partial \bm{f}_{i,1}}{\partial \bm{\theta}_{j,n}}}\\
             \vdots &amp;\ddots &amp;\vdots \\
-            {\dfrac {\partial \mathbf{f}_{i,m}}{\partial \mathbf{p}_{j,1}}}&amp;
-            \cdots &amp;{\dfrac {\partial \mathbf{f}_{i,m}}{\partial \mathbf{p}_{j,n}}}
+            {\dfrac {\partial \bm{f}_{i,m}}{\partial \bm{\theta}_{j,1}}}&amp;
+            \cdots &amp;{\dfrac {\partial \bm{f}_{i,m}}{\partial \bm{\theta}_{j,n}}}
         \end{bmatrix}}}.
 
     Args:
@@ -126,8 +126,14 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
         torch.Size([8, 6])
     '''
     func, params = functorch.make_functional(model)
-    func_param = lambda *p: func(p) if inputs is None else lambda *p: func(p, inputs)
-    J = jacobian(func_param, params, create_graph, strict, vectorize, strategy)
+
+    if inputs is None:
+        func_param = lambda *p: func(p)
+    else:
+        func_param = lambda *p: func(p, inputs)
+
+    J = jacobian(func_param, params, create_graph=create_graph, strict=strict, \
+                    vectorize=vectorize, strategy=strategy)
 
     if flatten and isinstance(J, tuple):
         if any(isinstance(j, tuple) for j in J):
