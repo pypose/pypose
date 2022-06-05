@@ -25,8 +25,8 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
 
     Args:
         model (torch.nn.Module): a PyTorch model that takes Tensor or LieTensor
-            inputs and returns a tuple of Tensor/LieTensor or a Tensor/LieTensor.
-        inputs (tuple of Tensors/LieTensor or Tensor/LieTensor): inputs to the
+            inputs and returns a tuple of Tensors/LieTensors or a Tensor/LieTensor.
+        inputs (tuple of Tensors/LieTensors or Tensor/LieTensor): inputs to the
             model. Defaults to ``None``.
         create_graph (bool, optional): If ``True``, the Jacobian will be
             computed in a differentiable manner. Note that when ``strict`` is
