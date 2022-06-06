@@ -49,7 +49,7 @@ def mat2SO3(mat):
         >>> pp.mat2SO3(input)
         SO3Type LieTensor:
         tensor([0.0000, 0.0000, 0.7071, 0.7071])
-    
+
     See :meth:`pypose.SO3` for more details of the output LieTensor format.
     """
 
@@ -65,17 +65,18 @@ def mat2SO3(mat):
             "Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
                 mat.shape))
 
-    if not torch.all(torch.det(mat) > 0):
-        warnings.warn(
-            "Input rotation matrices are not all full rank", RuntimeWarning)
-
     mat = mat[..., :3, :3]
     shape = mat.shape
-    if not (torch.allclose(torch.sum(mat[..., 0]*mat[..., 1], dim=-1), torch.zeros(shape[0]), atol=1e-6)
-            and torch.allclose(torch.sum(mat[..., 0]*mat[..., 2], dim=-1), torch.zeros(shape[0]), atol=1e-6)
-            and torch.allclose(torch.sum(mat[..., 1]*mat[..., 2], dim=-1), torch.zeros(shape[0]), atol=1e-6)):
+
+    e0 = torch.matmul(mat, torch.transpose(mat, -1, -2))
+    e1 = torch.eye(3, dtype=mat.dtype).repeat(shape[:-2]+(1, 1))
+    if not torch.allclose(e0, e1, atol=1e-6):
         warnings.warn(
-            "Input rotation matrices are not all orthogonal matrix", RuntimeWarning)
+            "Input rotation matrices are not all orthogonal matrix, the result is very likely to be wrong", RuntimeWarning)
+    
+    if not torch.all(torch.det(mat) > 0):
+        warnings.warn(
+            "Input rotation matrices are not all full rank, the result is very likely to be wrong", RuntimeWarning)
 
     rmat_t = torch.transpose(mat, -1, -2)
 
@@ -151,7 +152,7 @@ def mat2SE3(mat):
         >>> pp.mat2SE3(input)
         SE3Type LieTensor:
         tensor([0.1000, 0.2000, 0.3000, 0.0000, 0.0000, 0.7071, 0.7071])
-    
+
     See :meth:`pypose.SE3` for more details of the output LieTensor format.
     """
     if not torch.is_tensor(mat):
@@ -199,7 +200,7 @@ def mat2Sim3(mat):
         >>> pp.mat2Sim3(input)
         Sim3Type LieTensor:
         tensor([0.1000, 0.2000, 0.3000, 0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
-    
+
     See :meth:`pypose.Sim3` for more details of the output LieTensor format.
     """
     if not torch.is_tensor(mat):
@@ -250,7 +251,7 @@ def mat2RxSO3(mat):
         >>> pp.mat2RxSO3(input)
         RxSO3Type LieTensor:
         tensor([0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
-    
+
     See :meth:`pypose.RxSO3` for more details of the output LieTensor format.
     """
     if not torch.is_tensor(mat):
