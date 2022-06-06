@@ -1,15 +1,15 @@
 import warnings
 import torch
 
-from pypose.lietensor.lietensor import LieTensor, SE3_type
+from pypose.lietensor.lietensor import LieTensor, SE3_type, SO3_type, Sim3_type, RxSO3_type
 from .utils import SO3, SE3, RxSO3, Sim3
 
 
-def mat2SO3(rotation_matrix):
+def mat2SO3(mat):
     r"""Convert batched 3x3 or 3x4 rotation matrices to SO3Type LieTensor.
 
     Args:
-        rotation_matrix (Tensor): the rotation matrix to convert.
+        mat (Tensor): the rotation matrix to convert.
 
     Return:
         LieTensor: the converted SO3Type LieTensor.
@@ -18,7 +18,7 @@ def mat2SO3(rotation_matrix):
         Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)`
 
         Output: :obj:`(*, 4)`
-    
+
     Warning:
         Illegal input(not full rank or not orthogonal) triggers a warning, but will output a quaternion regardless. 
 
@@ -50,84 +50,86 @@ def mat2SO3(rotation_matrix):
                 [0., 0., 0., 1.]])
     """
 
-    if not torch.is_tensor(rotation_matrix):
-        rotation_matrix = torch.tensor(rotation_matrix)
+    if not torch.is_tensor(mat):
+        mat = torch.tensor(mat)
 
-    if len(rotation_matrix.shape) > 3:
+    if len(mat.shape) < 2:
         raise ValueError(
-            "Input size must be a three dimensional tensor. Got {}".format(
-                rotation_matrix.shape))
-    if not (rotation_matrix.shape[-2:] == (3, 3) or rotation_matrix.shape[-2:] == (3, 4)):
+            "Input size must be at least 2 dimensions. Got {}".format(
+                mat.shape))
+    if not (mat.shape[-2:] == (3, 3) or mat.shape[-2:] == (3, 4) or mat.shape[-2:] == (4, 4)):
         raise ValueError(
-            "Input size must be a * x 3 x 4 or * x 3 x 3  tensor. Got {}".format(
-                rotation_matrix.shape))
-    
-    if not torch.all(torch.det(rotation_matrix) > 0):
-        warnings.warn("Input rotation matrices are not all full rank", RuntimeWarning)
-    
-    shape = rotation_matrix.shape
+            "Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
+                mat.shape))
 
-    if not (torch.allclose(torch.sum(rotation_matrix[:,0]*rotation_matrix[:,1], dim=1), torch.zeros(shape[0]), atol=1e-6)
-        and torch.allclose(torch.sum(rotation_matrix[:,0]*rotation_matrix[:,2], dim=1), torch.zeros(shape[0]), atol=1e-6)
-        and torch.allclose(torch.sum(rotation_matrix[:,1]*rotation_matrix[:,2], dim=1), torch.zeros(shape[0]), atol=1e-6)):
-        warnings.warn("Input rotation matrices are not all orthogonal matrix", RuntimeWarning)
+    if not torch.all(torch.det(mat) > 0):
+        warnings.warn(
+            "Input rotation matrices are not all full rank", RuntimeWarning)
 
-    rotation_matrix = rotation_matrix.view(-1, shape[-2], shape[-1])
-    rmat_t = torch.transpose(rotation_matrix, 1, 2)
+    mat = mat[..., :3, :3]
+    shape = mat.shape
+    if not (torch.allclose(torch.sum(mat[..., 0]*mat[..., 1], dim=-1), torch.zeros(shape[0]), atol=1e-6)
+            and torch.allclose(torch.sum(mat[..., 0]*mat[..., 2], dim=-1), torch.zeros(shape[0]), atol=1e-6)
+            and torch.allclose(torch.sum(mat[..., 1]*mat[..., 2], dim=-1), torch.zeros(shape[0]), atol=1e-6)):
+        warnings.warn(
+            "Input rotation matrices are not all orthogonal matrix", RuntimeWarning)
 
-    mask_d2 = rmat_t[:, 2, 2] < 1e-6
+    rmat_t = torch.transpose(mat, -1, -2)
 
-    mask_d0_d1 = rmat_t[:, 0, 0] > rmat_t[:, 1, 1]
-    mask_d0_nd1 = rmat_t[:, 0, 0] < -rmat_t[:, 1, 1]
+    mask_d2 = rmat_t[..., 2, 2] < 1e-6
 
-    t0 = 1 + rmat_t[:, 0, 0] - rmat_t[:, 1, 1] - rmat_t[:, 2, 2]
-    q0 = torch.stack([rmat_t[:, 1, 2] - rmat_t[:, 2, 1],
-                      t0, rmat_t[:, 0, 1] + rmat_t[:, 1, 0],
-                      rmat_t[:, 2, 0] + rmat_t[:, 0, 2]], -1)
-    t0_rep = t0.repeat(4, 1).t()
+    mask_d0_d1 = rmat_t[..., 0, 0] > rmat_t[..., 1, 1]
+    mask_d0_nd1 = rmat_t[..., 0, 0] < -rmat_t[..., 1, 1]
 
-    t1 = 1 - rmat_t[:, 0, 0] + rmat_t[:, 1, 1] - rmat_t[:, 2, 2]
-    q1 = torch.stack([rmat_t[:, 2, 0] - rmat_t[:, 0, 2],
-                      rmat_t[:, 0, 1] + rmat_t[:, 1, 0],
-                      t1, rmat_t[:, 1, 2] + rmat_t[:, 2, 1]], -1)
-    t1_rep = t1.repeat(4, 1).t()
+    t0 = 1 + rmat_t[..., 0, 0] - rmat_t[..., 1, 1] - rmat_t[..., 2, 2]
+    q0 = torch.stack([rmat_t[..., 1, 2] - rmat_t[..., 2, 1],
+                      t0, rmat_t[..., 0, 1] + rmat_t[..., 1, 0],
+                      rmat_t[..., 2, 0] + rmat_t[..., 0, 2]], -1)
+    t0_rep = t0.unsqueeze(-1).repeat((len(list(shape))-2)*(1,)+(4,))
 
-    t2 = 1 - rmat_t[:, 0, 0] - rmat_t[:, 1, 1] + rmat_t[:, 2, 2]
-    q2 = torch.stack([rmat_t[:, 0, 1] - rmat_t[:, 1, 0],
-                      rmat_t[:, 2, 0] + rmat_t[:, 0, 2],
-                      rmat_t[:, 1, 2] + rmat_t[:, 2, 1], t2], -1)
-    t2_rep = t2.repeat(4, 1).t()
+    t1 = 1 - rmat_t[..., 0, 0] + rmat_t[..., 1, 1] - rmat_t[..., 2, 2]
+    q1 = torch.stack([rmat_t[..., 2, 0] - rmat_t[..., 0, 2],
+                      rmat_t[..., 0, 1] + rmat_t[..., 1, 0],
+                      t1, rmat_t[..., 1, 2] + rmat_t[..., 2, 1]], -1)
+    t1_rep = t1.unsqueeze(-1).repeat((len(list(shape))-2)*(1,)+(4,))
 
-    t3 = 1 + rmat_t[:, 0, 0] + rmat_t[:, 1, 1] + rmat_t[:, 2, 2]
-    q3 = torch.stack([t3, rmat_t[:, 1, 2] - rmat_t[:, 2, 1],
-                      rmat_t[:, 2, 0] - rmat_t[:, 0, 2],
-                      rmat_t[:, 0, 1] - rmat_t[:, 1, 0]], -1)
-    t3_rep = t3.repeat(4, 1).t()
+    t2 = 1 - rmat_t[..., 0, 0] - rmat_t[..., 1, 1] + rmat_t[..., 2, 2]
+    q2 = torch.stack([rmat_t[..., 0, 1] - rmat_t[..., 1, 0],
+                      rmat_t[..., 2, 0] + rmat_t[..., 0, 2],
+                      rmat_t[..., 1, 2] + rmat_t[..., 2, 1], t2], -1)
+    t2_rep = t2.unsqueeze(-1).repeat((len(list(shape))-2)*(1,)+(4,))
+
+    t3 = 1 + rmat_t[..., 0, 0] + rmat_t[..., 1, 1] + rmat_t[..., 2, 2]
+    q3 = torch.stack([t3, rmat_t[..., 1, 2] - rmat_t[..., 2, 1],
+                      rmat_t[..., 2, 0] - rmat_t[..., 0, 2],
+                      rmat_t[..., 0, 1] - rmat_t[..., 1, 0]], -1)
+    t3_rep = t3.unsqueeze(-1).repeat((len(list(shape))-2)*(1,)+(4,))
 
     mask_c0 = mask_d2 * mask_d0_d1
     mask_c1 = mask_d2 * ~mask_d0_d1
     mask_c2 = ~mask_d2 * mask_d0_nd1
     mask_c3 = ~mask_d2 * ~mask_d0_nd1
-    mask_c0 = mask_c0.view(-1, 1).type_as(q0)
-    mask_c1 = mask_c1.view(-1, 1).type_as(q1)
-    mask_c2 = mask_c2.view(-1, 1).type_as(q2)
-    mask_c3 = mask_c3.view(-1, 1).type_as(q3)
+    mask_c0 = mask_c0.unsqueeze(-1).type_as(q0)
+    mask_c1 = mask_c1.unsqueeze(-1).type_as(q1)
+    mask_c2 = mask_c2.unsqueeze(-1).type_as(q2)
+    mask_c3 = mask_c3.unsqueeze(-1).type_as(q3)
 
     q = q0 * mask_c0 + q1 * mask_c1 + q2 * mask_c2 + q3 * mask_c3
     q /= 2*torch.sqrt(t0_rep * mask_c0 + t1_rep * mask_c1 +  # noqa
                     t2_rep * mask_c2 + t3_rep * mask_c3)  # noqa
 
     q = q.view(shape[:-2]+(4,))
-    q = q.index_select(-1, torch.tensor([1,2,3,0], device=q.device)) # wxyz -> xyzw
+    # wxyz -> xyzw
+    q = q.index_select(-1, torch.tensor([1, 2, 3, 0], device=q.device))
 
     return SO3(q)
 
 
-def mat2SE3(transformation_matrix):
+def mat2SE3(mat):
     r"""Convert batched 3x3 or 3x4 tranformation matrices to SO3Type LieTensor.
 
     Args:
-        transformation_matrix (Tensor): the tranformation matrix to convert.
+        mat (Tensor): the tranformation matrix to convert.
 
     Return:
         LieTensor: the converted SE3Type LieTensor.
@@ -145,30 +147,34 @@ def mat2SE3(transformation_matrix):
         tensor([[0., 0., 0., 0., 0., 0., 1.],
                 [0., 0., 0., 0., 0., 0., 1.]])
     """
-    if not torch.is_tensor(transformation_matrix):
-        transformation_matrix = torch.tensor(transformation_matrix)
+    if not torch.is_tensor(mat):
+        mat = torch.tensor(mat)
 
-    if len(transformation_matrix.shape) > 3:
+    if len(mat.shape) < 2:
         raise ValueError(
-            "Input size must be a three dimensional tensor. Got {}".format(
-                transformation_matrix.shape))
-    if not (transformation_matrix.shape[-2:] == (3, 4) or transformation_matrix.shape[-2:] == (4, 4)):
+            "Input size must be at least 2 dimensions. Got {}".format(
+                mat.shape))
+    if not (mat.shape[-2:] == (3, 3) or mat.shape[-2:] == (3, 4) or mat.shape[-2:] == (4, 4)):
         raise ValueError(
-            "Input size must be a * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
-                transformation_matrix.shape))
+            "Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
+                mat.shape))
 
-    q = mat2SO3(transformation_matrix[:,:3,:3]).tensor()
-    t = transformation_matrix[:,:3,3]
-    vec = torch.cat([t,q],dim=1)
+    q = mat2SO3(mat[..., :3, :3]).tensor()
+    if mat.shape[-1] == 3:
+        t = torch.zeros(mat.shape[:-2]+torch.Size((3,)))
+    else:
+        t = mat[..., :3, 3]
+    print(t.shape, q.shape)
+    vec = torch.cat([t, q], dim=-1)
 
     return SE3(vec)
 
 
-def mat2Sim3(transformation_matrix):
+def mat2Sim3(mat):
     r"""Convert batched 3x4 or 4x4 tranformation matrices to Sim3Type LieTensor.
 
     Args:
-        transformation_matrix (Tensor): the tranformation matrix to convert.
+        mat (Tensor): the tranformation matrix to convert.
 
     Return:
         LieTensor: the converted Sim3Type LieTensor.
@@ -186,34 +192,37 @@ def mat2Sim3(transformation_matrix):
         tensor([[0., 0., 0., 0., 0., 0., 1., 1.],
                 [0., 0., 0., 0., 0., 0., 1., 1.]])
     """
-    if not torch.is_tensor(transformation_matrix):
-        transformation_matrix = torch.tensor(transformation_matrix)
+    if not torch.is_tensor(mat):
+        mat = torch.tensor(mat)
 
-    if len(transformation_matrix.shape) > 3:
+    if len(mat.shape) < 2:
         raise ValueError(
-            "Input size must be a three dimensional tensor. Got {}".format(
-                transformation_matrix.shape))
-    if not (transformation_matrix.shape[-2:] == (3, 4) or transformation_matrix.shape[-2:] == (4, 4)):
+            "Input size must be at least 2 dimensions. Got {}".format(
+                mat.shape))
+    if not (mat.shape[-2:] == (3, 3) or mat.shape[-2:] == (3, 4) or mat.shape[-2:] == (4, 4)):
         raise ValueError(
-            "Input size must be a * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
-                transformation_matrix.shape))
+            "Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
+                mat.shape))
 
-    rotation_matrix = transformation_matrix[:,:3,:3]
+    rot = mat[..., :3, :3]
 
-    s = torch.linalg.norm(rotation_matrix[:,0],dim=1)
-    q = mat2SO3(rotation_matrix/s.view(-1,1,1)).tensor()
-    t = transformation_matrix[:,:3,3]
+    s = torch.linalg.norm(rot[..., 0], dim=-1).unsqueeze(-1)
+    q = mat2SO3(rot/s.unsqueeze(-1)).tensor()
+    if mat.shape[-1] == 3:
+        t = torch.zeros(mat.shape[:-2]+torch.Size((3,)))
+    else:
+        t = mat[..., :3, 3]
 
-    vec = torch.cat([t,q,s.view(-1,1)],dim=1)
+    vec = torch.cat([t, q, s], dim=-1)
 
     return Sim3(vec)
 
 
-def mat2RxSO3(rotation_matrix):
+def mat2RxSO3(mat):
     r"""Convert batched 3x3 or 3x4 rotation matrices to RxSO3Type LieTensor.
 
     Args:
-        rotation_matrix (Tensor): the rotation matrix to convert.
+        mat (Tensor): the rotation matrix to convert.
 
     Return:
         LieTensor: the converted RxSO3Type LieTensor.
@@ -231,68 +240,61 @@ def mat2RxSO3(rotation_matrix):
             tensor([[0., 0., 0., 1., 1.],
                     [0., 0., 0., 1., 1.]])
     """
-    if not torch.is_tensor(rotation_matrix):
-        rotation_matrix = torch.tensor(rotation_matrix)
+    if not torch.is_tensor(mat):
+        mat = torch.tensor(mat)
 
-    if len(rotation_matrix.shape) > 3:
+    if len(mat.shape) < 2:
         raise ValueError(
-            "Input size must be a three dimensional tensor. Got {}".format(
-                rotation_matrix.shape))
-    if not (rotation_matrix.shape[-2:] == (3, 3) or rotation_matrix.shape[-2:] == (3, 4) or rotation_matrix.shape[-2:] == (4, 4)):
+            "Input size must be at least 2 dimensions. Got {}".format(
+                mat.shape))
+    if not (mat.shape[-2:] == (3, 3) or mat.shape[-2:] == (3, 4) or mat.shape[-2:] == (4, 4)):
         raise ValueError(
             "Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
-                rotation_matrix.shape))
+                mat.shape))
 
-    rotation_matrix = rotation_matrix[:,:3,:3]
+    rot = mat[..., :3, :3]
 
-    s = torch.linalg.norm(rotation_matrix[:,0],dim=1)
-    q = mat2SO3(rotation_matrix/s.view(-1,1,1)).tensor()
-    vec = torch.cat([q,s.view(-1,1)],dim=1)
+    s = torch.linalg.norm(rot[..., 0], dim=-1).unsqueeze(-1)
+    q = mat2SO3(rot/s.unsqueeze(-1)).tensor()
+    vec = torch.cat([q, s], dim=-1)
 
     return RxSO3(vec)
 
 
-def from_matrix(transformation_matrix):
+def from_matrix(mat, ltype):
     r"""Convert batched 3x3 or 3x4 or 4x4 transformation matrices to LieTensor. The `ltype` will be automatically determined by the data.
 
     Args:
-        transformation_matrix (Tensor): the transformation matrix to convert.
+        mat (Tensor): the transformation matrix to convert.
 
     Return:
         LieTensor: the converted LieTensor.
     """
-    if not torch.is_tensor(transformation_matrix):
-        transformation_matrix = torch.tensor(transformation_matrix)
+    if not torch.is_tensor(mat):
+        mat = torch.tensor(mat)
 
-    if len(transformation_matrix.shape) > 3:
+    if len(mat.shape) < 2:
         raise ValueError(
-            "Input size must be a three dimensional tensor. Got {}".format(
-                transformation_matrix.shape))
-    if not (transformation_matrix.shape[-2:] == (3, 3) or transformation_matrix.shape[-2:] == (3, 4) or transformation_matrix.shape[-2:] == (4, 4)):
+            "Input size must be at least 2 dimensions. Got {}".format(
+                mat.shape))
+    if not (mat.shape[-2:] == (3, 3) or mat.shape[-2:] == (3, 4) or mat.shape[-2:] == (4, 4)):
         raise ValueError(
             "Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
-                transformation_matrix.shape))
+                mat.shape))
 
-    shape = transformation_matrix.shape
-    if shape[-2:] == torch.Size([3,3]):
-        # see if the determinant is all one
-        if torch.allclose(torch.linalg.det(transformation_matrix), torch.ones(shape[0]), atol=1e-6):
-            return mat2SO3(transformation_matrix)
-        else:
-            return mat2RxSO3(transformation_matrix)
+    if ltype == SO3_type:
+        return mat2SO3(mat)
+    elif ltype == SE3_type:
+        return mat2SE3(mat)
+    elif ltype == Sim3_type:
+        return mat2Sim3(mat)
+    elif ltype == RxSO3_type:
+        return mat2RxSO3(mat)
     else:
-        # see if the translation part is all zero
-        if torch.allclose(transformation_matrix[:,:3,3], torch.zeros(shape[0],3)):
-            if torch.allclose(torch.linalg.det(transformation_matrix), torch.ones(shape[0]), atol=1e-6):
-                return mat2SO3(transformation_matrix)
-            else:
-                return mat2RxSO3(transformation_matrix)
-        else:
-            if torch.allclose(torch.linalg.det(transformation_matrix), torch.ones(shape[0]), atol=1e-6):
-                return mat2SE3(transformation_matrix)
-            else:
-                return mat2Sim3(transformation_matrix)
-            
+        raise ValueError(
+            "Input ltype must be one of SO3_type, SE3_type, Sim3_type or RxSO3_type. Got {}".format(
+                ltype)
+        )
 
 
 def matrix(lietensor):
@@ -300,7 +302,7 @@ def matrix(lietensor):
     return lietensor.matrix()
 
 
-def euler2SO3(euler:torch.Tensor):
+def euler2SO3(euler: torch.Tensor):
     r"""Convert batched Euler angles (roll, pitch, and yaw) to SO3Type LieTensor.
 
     Args:
@@ -338,7 +340,7 @@ def euler2SO3(euler:torch.Tensor):
         euler = torch.tensor(euler)
     assert euler.shape[-1] == 3
     shape, euler = euler.shape, euler.view(-1, 3)
-    roll, pitch, yaw = euler[:,0], euler[:,1], euler[:,2]
+    roll, pitch, yaw = euler[:, 0], euler[:, 1], euler[:, 2]
     cy, sy = (yaw * 0.5).cos(), (yaw * 0.5).sin()
     cp, sp = (pitch * 0.5).cos(), (pitch * 0.5).sin()
     cr, sr = (roll * 0.5).cos(), (roll * 0.5).sin()
