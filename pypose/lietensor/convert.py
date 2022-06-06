@@ -6,16 +6,16 @@ from .utils import SO3, SE3, RxSO3, Sim3
 
 
 def mat2SO3(mat):
-    r"""Convert batched 3x3 or 3x4 rotation matrices to SO3Type LieTensor.
+    r"""Convert batched 3x3 or 3x4 or 4x4 matrices to SO3Type LieTensor.
 
     Args:
-        mat (Tensor): the rotation matrix to convert.
+        mat (Tensor): the matrix to convert.
 
     Return:
         LieTensor: the converted SO3Type LieTensor.
 
     Shape:
-        Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)`
+        Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
 
         Output: :obj:`(*, 4)`
 
@@ -43,11 +43,14 @@ def mat2SO3(mat):
 
     Examples:
 
-        >>> input = torch.eye(3).repeat(2, 1, 1) # N x 3 x 3
-        >>> pp.mat2SO3(input)                    # N x 4
+        >>> input = torch.tensor([[0., -1., 0.],
+        ...                       [1., 0., 0.],
+        ...                       [0., 0., 1.]])
+        >>> pp.mat2SO3(input)
         SO3Type LieTensor:
-        tensor([[0., 0., 0., 1.],
-                [0., 0., 0., 1.]])
+        tensor([0.0000, 0.0000, 0.7071, 0.7071])
+    
+    See :meth:`pypose.SO3` for more details of the output LieTensor format.
     """
 
     if not torch.is_tensor(mat):
@@ -126,26 +129,30 @@ def mat2SO3(mat):
 
 
 def mat2SE3(mat):
-    r"""Convert batched 3x3 or 3x4 tranformation matrices to SO3Type LieTensor.
+    r"""Convert batched 3x3 or 3x4 or 4x4 matrices to SO3Type LieTensor.
 
     Args:
-        mat (Tensor): the tranformation matrix to convert.
+        mat (Tensor): the matrix to convert. If input is of shape :obj:`(*, 3, 3)`, then translation will be filled with zero.
 
     Return:
         LieTensor: the converted SE3Type LieTensor.
 
     Shape:
-        Input: :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
+        Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
 
         Output: :obj:`(*, 7)`
 
     Examples:
 
-        >>> input = torch.eye(4).repeat(2, 1, 1) # N x 3 x 3
-        >>> pp.mat2SE3(input)                    # N x 7
+        >>> input = torch.tensor([[0., -1., 0., 0.1],
+        ...                       [1., 0., 0., 0.2],
+        ...                       [0., 0., 1., 0.3],
+        ...                       [0., 0., 0., 1.]])
+        >>> pp.mat2SE3(input)
         SE3Type LieTensor:
-        tensor([[0., 0., 0., 0., 0., 0., 1.],
-                [0., 0., 0., 0., 0., 0., 1.]])
+        tensor([0.1000, 0.2000, 0.3000, 0.0000, 0.0000, 0.7071, 0.7071])
+    
+    See :meth:`pypose.SE3` for more details of the output LieTensor format.
     """
     if not torch.is_tensor(mat):
         mat = torch.tensor(mat)
@@ -161,36 +168,39 @@ def mat2SE3(mat):
 
     q = mat2SO3(mat[..., :3, :3]).tensor()
     if mat.shape[-1] == 3:
-        t = torch.zeros(mat.shape[:-2]+torch.Size((3,)))
+        t = torch.zeros(mat.shape[:-2]+(3,))
     else:
         t = mat[..., :3, 3]
-    print(t.shape, q.shape)
     vec = torch.cat([t, q], dim=-1)
 
     return SE3(vec)
 
 
 def mat2Sim3(mat):
-    r"""Convert batched 3x4 or 4x4 tranformation matrices to Sim3Type LieTensor.
+    r"""Convert batched 3x3 or 3x4 or 4x4 matrices to Sim3Type LieTensor.
 
     Args:
-        mat (Tensor): the tranformation matrix to convert.
+        mat (Tensor): the matrix to convert. If input is of shape :obj:`(*, 3, 3)`, then translation will be filled with zero.
 
     Return:
         LieTensor: the converted Sim3Type LieTensor.
 
     Shape:
-        Input: :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
+        Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
 
         Output: :obj:`(*, 8)`
 
     Examples:
 
-        >>> input = torch.eye(4).repeat(2, 1, 1) # N x 3 x 3
-        >>> pp.mat2Sim3(input)                   # N x 8
+        >>> input = torch.tensor([[0., -0.5, 0., 0.1],
+        ...                       [0.5, 0., 0., 0.2],
+        ...                       [0., 0., 0.5, 0.3],
+        ...                       [0., 0., 0., 1.]])
+        >>> pp.mat2Sim3(input)
         Sim3Type LieTensor:
-        tensor([[0., 0., 0., 0., 0., 0., 1., 1.],
-                [0., 0., 0., 0., 0., 0., 1., 1.]])
+        tensor([0.1000, 0.2000, 0.3000, 0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
+    
+    See :meth:`pypose.Sim3` for more details of the output LieTensor format.
     """
     if not torch.is_tensor(mat):
         mat = torch.tensor(mat)
@@ -209,7 +219,7 @@ def mat2Sim3(mat):
     s = torch.linalg.norm(rot[..., 0], dim=-1).unsqueeze(-1)
     q = mat2SO3(rot/s.unsqueeze(-1)).tensor()
     if mat.shape[-1] == 3:
-        t = torch.zeros(mat.shape[:-2]+torch.Size((3,)))
+        t = torch.zeros(mat.shape[:-2]+(3,))
     else:
         t = mat[..., :3, 3]
 
@@ -219,26 +229,29 @@ def mat2Sim3(mat):
 
 
 def mat2RxSO3(mat):
-    r"""Convert batched 3x3 or 3x4 rotation matrices to RxSO3Type LieTensor.
+    r"""Convert batched 3x3 or 3x4 or 4x4 matrices to RxSO3Type LieTensor.
 
     Args:
-        mat (Tensor): the rotation matrix to convert.
+        mat (Tensor): the matrix to convert.
 
     Return:
         LieTensor: the converted RxSO3Type LieTensor.
 
     Shape:
-        Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)`
+        Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
 
         Output: :obj:`(*, 5)`
 
     Examples:
 
-        >>> input = torch.eye(3).repeat(2, 1, 1) # N x 3 x 3
-        >>> pp.mat2RxSO3(input)                    # N x 4
-            RxSO3Type LieTensor:
-            tensor([[0., 0., 0., 1., 1.],
-                    [0., 0., 0., 1., 1.]])
+        >>> input = torch.tensor([[0., -0.5, 0.],
+        ...                       [0.5, 0., 0.],
+        ...                       [0., 0., 0.5]])
+        >>> pp.mat2RxSO3(input)
+        RxSO3Type LieTensor:
+        tensor([0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
+    
+    See :meth:`pypose.RxSO3` for more details of the output LieTensor format.
     """
     if not torch.is_tensor(mat):
         mat = torch.tensor(mat)
@@ -262,10 +275,11 @@ def mat2RxSO3(mat):
 
 
 def from_matrix(mat, ltype):
-    r"""Convert batched 3x3 or 3x4 or 4x4 transformation matrices to LieTensor. The `ltype` will be automatically determined by the data.
+    r"""Convert batched 3x3 or 3x4 or 4x4 matrices to LieTensor. The `ltype` will be automatically determined by the data.
 
     Args:
-        mat (Tensor): the transformation matrix to convert.
+        mat (Tensor): the matrix to convert.
+        ltype (class): one of :meth:`pypose.SO3`, :meth:`pypose.SE3`, :meth:`pypose.Sim3` or :meth:`pypose.RxSO3`.
 
     Return:
         LieTensor: the converted LieTensor.

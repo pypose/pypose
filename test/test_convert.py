@@ -1,5 +1,37 @@
+from numpy import float32
 import torch
 import pypose as pp
+
+# sample input
+
+# rotation 90 degree around the z axis
+input = torch.tensor([[0., -1., 0.],
+                      [1., 0., 0.],
+                      [0., 0., 1.]])
+x = pp.mat2SO3(input)
+print(x)
+
+input = torch.tensor([[0., -1., 0., 0.1],
+                      [1., 0., 0., 0.2],
+                      [0., 0., 1., 0.3],
+                      [0., 0., 0., 1.]])
+x = pp.mat2SE3(input)
+print(x)
+
+input = torch.tensor([[0., -0.5, 0., 0.1],
+                      [0.5, 0., 0., 0.2],
+                      [0., 0., 0.5, 0.3],
+                      [0., 0., 0., 1.]])
+x = pp.mat2Sim3(input)
+print(x)
+
+input = torch.tensor([[0., -0.5, 0.],
+                      [0.5, 0., 0.],
+                      [0., 0., 0.5]])
+x = pp.mat2RxSO3(input)
+print(x)
+
+exit()
 
 print("Test illegal input:")
 z = torch.zeros([3, 3])
@@ -26,9 +58,9 @@ b = pp.mat2SO3(t)
 b = pp.mat2RxSO3(t)
 # print(a,b)
 
-exit()
+
 N = 100
-shape = torch.Size([10,10])
+shape = torch.Size([10, 10])
 # test logic:
 # generate N random sample x0 with ltype
 # perform T = x0.matrix()
