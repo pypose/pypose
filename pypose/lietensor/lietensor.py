@@ -132,9 +132,9 @@ class LieType:
         """ To quaternion """
         X = lietensor.Exp() if self.on_manifold else lietensor
         if self.lid == 1 or self.lid == 2:      # X is SO3 or RxSO3 type
-            return LieTensor(X.tensor().view(-1, X.size()[-1])[:, 0:4].view(X.size()[:-1] + (-1,)), ltype=SO3_type)
+            return LieTensor(X.tensor()[..., 0:4], ltype=SO3_type)
         elif self.lid == 3 or self.lid == 4:    # X is SE3 or Sim3 type
-            return LieTensor(X.tensor().view(-1, X.size()[-1])[:, 3:7].view(X.size()[:-1] + (-1,)), ltype=SO3_type)
+            return LieTensor(X.tensor()[..., 3:7], ltype=SO3_type)
 
     def scale(self, lietensor):
         """ Get scale """
@@ -142,7 +142,7 @@ class LieType:
             return torch.ones(lietensor.size()[:-1] + (1,))
         elif self.lid == 2 or self.lid == 4:    # Sim3, sim3, RxSO3, rxso3 type
             X = lietensor.Exp() if self.on_manifold else lietensor
-            return X.tensor().view(-1, X.size()[-1])[:, -1].view(X.size()[:-1] + (1,))
+            return X.tensor()[..., -1].view(X.size()[:-1] + (1,))
 
     @classmethod
     def identity(cls, *args, **kwargs):
