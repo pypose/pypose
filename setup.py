@@ -1,6 +1,5 @@
 import os.path as osp
-from setuptools import setup
-from setuptools import setup
+from setuptools import setup, find_packages
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 
 ROOT = osp.dirname(osp.abspath(__file__))
@@ -10,7 +9,7 @@ setup(
     version='0.1.1',
     description='PyPose = (GTSAM | G2O) x PyTorch',
     author='Chen Wang',
-    packages=['pypose'],
+    packages=find_packages(),
     license = 'BSD 3-Clause License',
     url = 'pypose.org',
     author_email = 'chenwang@dr.com',
