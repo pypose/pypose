@@ -73,10 +73,10 @@ def mat2SO3(mat):
     if not torch.allclose(e0, e1, atol=1e-6):
         warnings.warn(
             "Input rotation matrices are not all orthogonal matrix, the result is very likely to be wrong", RuntimeWarning)
-    
-    if not torch.all(torch.det(mat) > 0):
+
+    if not torch.allclose(torch.det(mat), torch.ones(shape[:-2], dtype=mat.dtype)):
         warnings.warn(
-            "Input rotation matrices are not all full rank, the result is very likely to be wrong", RuntimeWarning)
+            "Input rotation matrices' determinant are not all equal to 1, the result is very likely to be wrong", RuntimeWarning)
 
     rmat_t = torch.transpose(mat, -1, -2)
 
@@ -143,6 +143,23 @@ def mat2SE3(mat):
 
         Output: :obj:`(*, 7)`
 
+    Suppose the input transformation matrix :math:`\mathbf{T}_i` is
+
+    .. math::
+        \mathbf{T}_i = \begin{bmatrix}
+            R_{11} & R_{12} & R_{13} & t_x\\
+            R_{21} & R_{22} & R_{23} & t_y\\
+            R_{31} & R_{32} & R_{33} & t_z\\
+            0 & 0 & 0 & 1
+        \end{bmatrix},
+
+    Output LieTensor should be of format:
+
+    .. math::
+        \mathrm{vec}[*, :] = [t_x, t_y, t_z, q_x, q_y, q_z, q_w]
+
+    where :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` is computed by :meth:`pypose.mat2SO3`.
+
     Examples:
 
         >>> input = torch.tensor([[0., -1., 0., 0.1],
@@ -190,6 +207,24 @@ def mat2Sim3(mat):
         Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
 
         Output: :obj:`(*, 8)`
+
+    Suppose the input transformation matrix :math:`\mathbf{T}_i` is
+
+    .. math::
+        \mathbf{T}_i = \begin{bmatrix}
+            sR_{11} & sR_{12} & sR_{13} & t_x\\
+            sR_{21} & sR_{22} & sR_{23} & t_y\\
+            sR_{31} & sR_{32} & sR_{33} & t_z\\
+            0 & 0 & 0 & 1
+        \end{bmatrix},
+
+
+    Output LieTensor should be of format:
+
+    .. math::
+        \mathrm{vec}[*, :] = [t_x, t_y, t_z, q_x, q_y, q_z, q_w, s]
+
+    where :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` is computed by :meth:`pypose.mat2SO3`.
 
     Examples:
 
@@ -243,6 +278,23 @@ def mat2RxSO3(mat):
 
         Output: :obj:`(*, 5)`
 
+    Suppose the input transformation matrix :math:`\mathbf{R}_i` is
+
+    .. math::
+        \mathbf{R}_i = \begin{bmatrix}
+            sR_{11} & sR_{12} & sR_{13}\\
+            sR_{21} & sR_{22} & sR_{23}\\
+            sR_{31} & sR_{32} & sR_{33}
+        \end{bmatrix},
+
+
+    Output LieTensor should be of format:
+
+    .. math::
+        \mathrm{vec}[*, :] = [q_x, q_y, q_z, q_w, s]
+
+    where :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` is computed by :meth:`pypose.mat2SO3`.
+
     Examples:
 
         >>> input = torch.tensor([[0., -0.5, 0.],
@@ -276,7 +328,7 @@ def mat2RxSO3(mat):
 
 
 def from_matrix(mat, ltype):
-    r"""Convert batched 3x3 or 3x4 or 4x4 matrices to LieTensor. The `ltype` will be automatically determined by the data.
+    r"""Convert batched 3x3 or 3x4 or 4x4 matrices to LieTensor.
 
     Args:
         mat (Tensor): the matrix to convert.
