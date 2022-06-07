@@ -222,7 +222,7 @@ class IMUPreintegrator(nn.Module):
 
         self.cov = A @ self.cov @ A.mT + Bg @ Cg @ Bg.mT / dt + Ba @ Ca @ Ba.mT / dt
 
-    def forward(self, reset=True):
+    def forward(self, reset=False):
         r"""
         Propagated IMU status.
 
@@ -260,12 +260,15 @@ class IMUPreintegrator(nn.Module):
 
         Refer to Eq. (38) in `this TRO paper <http://rpg.ifi.uzh.ch/docs/TRO16_forster.pdf>`_ for more details.
         """
-        self.pos = self.pos + self.rot @ self._dp + self.vel * self._dt
-        self.vel = self.vel + self.rot @ self._dv
-        self.rot = self.rot * self._dr
+        pos = self.pos + self.rot @ self._dp + self.vel * self._dt
+        vel = self.vel + self.rot @ self._dv
+        rot = self.rot * self._dr
         if reset is True:
+            self.pos = pos
+            self.vel = vel
+            self.rot = rot
             self.reset()
-        return {'rot':self.rot.clone(),
-                'vel':self.vel.clone(),
-                'pos':self.pos.clone(),
+        return {'rot':rot.clone(),
+                'vel':vel.clone(),
+                'pos':pos.clone(),
                 'cov':self.cov.clone()}
