@@ -760,11 +760,19 @@ class LieTensor(torch.Tensor):
         Return:
             Tensor: the batched translation.
 
+        Warning:
+            The :obj:`SO3`, :obj:`so3`, :obj:`RxSO3`, and :obj:`rxso3` types do not contain translation. 
+            Calling :obj:`translation()` on these types will return zero vector(s).
+
         Example:
             >>> x = pp.randn_SE3(2)
             >>> x.translation()
             tensor([[-0.5358, -1.5421, -0.7224],
                     [ 0.8331, -1.4412,  0.0863]])
+            >>> y = pp.randn_SO3(2)
+            >>> y.translation()
+            tensor([[0., 0., 0.],
+                    [0., 0., 0.]])
         '''
         return self.ltype.translation(self)
 
@@ -791,17 +799,21 @@ class LieTensor(torch.Tensor):
         Return:
             Tensor: the batched scale.
 
+        Warning:
+            The :obj:`SO3`, :obj:`so3`, :obj:`SE3`, and :obj:`se3` types do not contain scale. 
+            Calling :obj:`scale()` on these types will return one(s).
+
         Example:
-            >>> x = pp.randn_SE3(2)
+            >>> x = pp.randn_Sim3(4)
             >>> x.scale()
+            tensor([[10.9577],
+                    [ 1.0248],
+                    [ 0.0947],
+                    [ 1.1989]])
+            >>> y = pp.randn_SE3(2)
+            >>> y.scale()
             tensor([[1.],
                     [1.]])
-            >>> y = pp.randn_sim3(4)
-            >>> y.scale()
-            tensor([[3.6778],
-                    [1.5872],
-                    [0.1861],
-                    [0.6795]])
         '''
         return self.ltype.scale(self)
 
