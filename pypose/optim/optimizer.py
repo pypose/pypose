@@ -8,12 +8,14 @@ class LM(Optimizer):
     r'''
     The `Levenberg-Marquardt (LM) algorithm
     <https://en.wikipedia.org/wiki/Levenberg-Marquardt_algorithm>`_, which also known as the damped
-    least-squares (DLS) method for solving non-linear least squares problems.
+    least-squares (DLS) method for solving non-linear least squares problems. This implementation
+    is for optmizing the model parameters to minimize (maximize) model output, which can be a
+    Tensor/LieTensor or a tuple of Tensors/LieTensors.
 
     .. math::
        \begin{aligned}
             &\rule{110mm}{0.4pt}                                                                 \\
-            &\textbf{input}: \lambda > 0~\text{(dampening)}, \bm{\theta}_0 \text{ (params)},
+            &\textbf{input}: \lambda \geq 0~\text{(dampening)}, \bm{\theta}_0 \text{ (params)},
                 \bm{f}(\bm{\theta}) \text{ (model)}, \text{maximize}                             \\
             &\rule{110mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
@@ -30,14 +32,26 @@ class LM(Optimizer):
             &\bf{return} \:  \theta_t                                                     \\[-1.ex]
             &\rule{110mm}{0.4pt}                                                          \\[-1.ex]
        \end{aligned}
-    
+
     Args:
-        model (torch.nn.Module): a PyTorch model that takes Tensor or LieTensor inputs
-            and parameters and returns a tuple of Tensors/LieTensors or a Tensor/LieTensor.
+        params (iterable): iterable of parameters to optimize or dicts defining parameter groups
         dampening (float): Levenberg's dampening factor (non-negative number) to prevent
             singularity.
         maximize (bool, optional): maximize the params based on the objective, instead of
             minimizing (default: False)
+
+    Note:
+        The (non-negative) damping factor :math:`\lambda` can be adjusted at each iteration. If
+        reduction of the residual is rapid, a smaller value can be used, bringing the algorithm
+        closer to the Gauss-Newton algorithm, whereas if an iteration gives insufficient reduction
+        in the residual, :math:`\lambda` can be increased, giving a step closer to the gradient
+        descent direction.
+
+    Note:
+        Different from PyTorch optimizers like
+        `SGD <https://pytorch.org/docs/stable/generated/torch.optim.SGD.html>`_, where the model
+        loss has to be a scalar, the model loss of :obj:`LM` can be a Tensor/LieTensor or a
+        tuple of Tensors/LieTensors.
     '''
     def __init__(self, model, dampening, maximize=False):
         self.model = model
@@ -46,29 +60,15 @@ class LM(Optimizer):
         super().__init__(model.parameters(), defaults)
 
     @torch.no_grad()
-    def step(self, closure=None, inputs=None, loss=None):
+    def step(self, inputs=None):
         r'''
         Performs a single optimization step.
 
         Args:
-            closure (callable, optional): A closure that reevaluates the model and returns the
-                loss. Defaults to ``None``. Either closure or loss cannot be ``None``.
             inputs (tuple of Tensors/LieTensors or Tensor/LieTensor): inputs to the model. Defaults
                 to ``None``. Cannot be ``None`` if the model requires inputs.
-            loss (tuple of Tensors/LieTensors or Tensor/LieTensor): error of the model to an
-                objective. Defaults to ``None``. If sets to ``None``, then model error will be
-                computed by calling ``closure``.
-
-        Note:
-            Different from PyTorch optimizers like
-            `SGD <https://pytorch.org/docs/stable/generated/torch.optim.SGD.html>`_, where the model
-            loss has to be a scalar, the model loss of :obj:`LM`  can be a Tensor/LieTensor or a
-            tuple of Tensors/LieTensors.
-
-        Example:
-
         '''
-        loss = closure() if loss is None else loss
+        loss = self.model(inputs)
         for group in self.param_groups:
             numels = [p.numel() for p in group['params'] if p.requires_grad]
             J = modjac(self.model, inputs, flatten=True)
@@ -80,5 +80,6 @@ class LM(Optimizer):
                 warnings.warn("Using pseudo inverse due to singular matrix.", UserWarning)
             D = torch.split(D, numels)
             maximize = 1 if group['maximize'] else -1
-            [p.add_(maximize * (d@loss.view(-1, 1)).view(p.shape))  \
+            [p.add_(maximize * (d @ loss.view(-1, 1)).view(p.shape)) \
                         for p, d in zip(group['params'], D) if p.requires_grad]
+        return loss
