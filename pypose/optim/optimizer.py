@@ -7,10 +7,10 @@ import torch.autograd.functional as F
 class LM(Optimizer):
     r'''
     The `Levenberg-Marquardt (LM) algorithm
-    <https://en.wikipedia.org/wiki/Levenberg-Marquardt_algorithm>`_, which also known as the damped
-    least-squares (DLS) method for solving non-linear least squares problems. This implementation
-    is for optmizing the model parameters to minimize (maximize) model output, which can be a
-    Tensor/LieTensor or a tuple of Tensors/LieTensors.
+    <https://en.wikipedia.org/wiki/Levenberg-Marquardt_algorithm>`_, which isalso known as the
+    damped least-squares (DLS) method for solving non-linear least squares problems. This
+    implementation is for solving the model parameters to minimize (or maximize) the model output,
+    which can be a Tensor/LieTensor or a tuple of Tensors/LieTensors.
 
     .. math::
        \begin{aligned}
