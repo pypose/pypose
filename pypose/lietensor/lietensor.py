@@ -462,11 +462,11 @@ class LieTensor(torch.Tensor):
           - :obj:`SO3_type`
           - :obj:`(*, 4)`
           - :meth:`SO3`
-        * - Rotation + Translation
+        * - Translation + Rotation
           - :obj:`SE3_type`
           - :obj:`(*, 7)`
           - :meth:`SE3`
-        * - Rotation + Translation + Scale
+        * - Translation + Rotation + Scale
           - :obj:`Sim3_type`
           - :obj:`(*, 8)`
           - :meth:`Sim3`
@@ -487,11 +487,11 @@ class LieTensor(torch.Tensor):
           - :obj:`so3_type`
           - :obj:`(*, 3)`
           - :meth:`so3`
-        * - Rotation + Translation
+        * - Translation + Rotation
           - :obj:`se3_type`
           - :obj:`(*, 6)`
           - :meth:`se3`
-        * - Rotation + Translation + Scale
+        * - Translation + Rotation + Scale
           - :obj:`sim3_type`
           - :obj:`(*, 7)`
           - :meth:`sim3`
@@ -912,3 +912,11 @@ class Parameter(LieTensor, nn.Parameter):
         if data is None:
             data = torch.tensor([])
         return LieTensor._make_subclass(cls, data, requires_grad)
+
+    def __deepcopy__(self, memo):
+        if id(self) in memo:
+            return memo[id(self)]
+        else:
+            result = type(self)(self.clone(memory_format=torch.preserve_format))
+            memo[id(self)] = result
+            return result
