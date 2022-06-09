@@ -1,7 +1,7 @@
 import torch, sys, math, warnings
 from .jacobian import modjac
+from ..lietensor import LieTensor
 from torch.optim import Optimizer
-import torch.autograd.functional as F
 
 
 class LM(Optimizer):
@@ -69,6 +69,11 @@ class LM(Optimizer):
                 to ``None``. Cannot be ``None`` if the model requires inputs.
         '''
         loss = self.model(inputs)
+        if isinstance(loss, tuple):
+            L = torch.cat([l.tensor().view(-1, 1) if isinstance(l, LieTensor) \
+                            else l.view(-1, 1) for l in loss])
+        else:
+            L = loss.tensor().view(-1, 1) if isinstance(loss, LieTensor) else loss.view(-1, 1)
         for group in self.param_groups:
             numels = [p.numel() for p in group['params'] if p.requires_grad]
             J = modjac(self.model, inputs, flatten=True)
@@ -80,6 +85,6 @@ class LM(Optimizer):
                 warnings.warn("Using pseudo inverse due to singular matrix.", UserWarning)
             D = torch.split(D, numels)
             maximize = 1 if group['maximize'] else -1
-            [p.add_(maximize * (d @ loss.view(-1, 1)).view(p.shape)) \
-                        for p, d in zip(group['params'], D) if p.requires_grad]
+            [p.add_(maximize * (d @ L).view(p.shape)) \
+                for p, d in zip(group['params'], D) if p.requires_grad]
         return loss
