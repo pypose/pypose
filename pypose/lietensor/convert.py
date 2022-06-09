@@ -5,11 +5,14 @@ from pypose.lietensor.lietensor import LieTensor, SE3_type, SO3_type, Sim3_type,
 from .utils import SO3, SE3, RxSO3, Sim3
 
 
-def mat2SO3(mat):
-    r"""Convert batched 3x3 or 3x4 or 4x4 matrices to SO3Type LieTensor.
+def mat2SO3(mat, check=False):
+    r"""Convert batched rotation or transformation matrices to SO3Type LieTensor.
 
     Args:
         mat (Tensor): the matrix to convert.
+        check (bool, optional): flag to check if the input is valid rotation matrices (orthogonal
+            and and with a determinant of one). More computation is needed if ``True``.
+            Default: ``False``.
 
     Return:
         LieTensor: the converted SO3Type LieTensor.
@@ -19,33 +22,26 @@ def mat2SO3(mat):
 
         Output: :obj:`(*, 4)`
 
-    Warning:
-        Illegal input(not full rank or not orthogonal) triggers a warning, but will output a quaternion regardless. 
-
-    Suppose the input rotation matrix :math:`\mathbf{R}_i` is
-
     .. math::
-        \mathbf{R}_i = \begin{bmatrix}
-            R_{11} & R_{12} & R_{13} \\
-            R_{21} & R_{22} & R_{23} \\
-            R_{31} & R_{32} & R_{33}
-        \end{bmatrix},
-
-    the corresponding quaternion :math:`\mathbf{q}_i=\begin{bmatrix} q_x & q_y & q_z & q_w \end{bmatrix}` can be calculated by
-
-    .. math::
+        \mathbf{q}_i = 
         \left\{\begin{aligned}
-        q_w &= \frac{1}{2} \sqrt{1 + R_{11} + R_{22} + R_{33}} \\
-        q_x &= \mathrm{sign}(R_{23} - R_{32}) \frac{1}{2} \sqrt{1 + R_{11} - R_{22} - R_{33}} \\
-        q_y &= \mathrm{sign}(R_{31} - R_{13}) \frac{1}{2} \sqrt{1 - R_{11} + R_{22} - R_{33}} \\
-        q_z &= \mathrm{sign}(R_{12} - R_{21}) \frac{1}{2} \sqrt{1 - R_{11} - R_{22} + R_{33}}
-        \end{aligned}\right..
+        &\frac{1}{2} \sqrt{1 + R^{11}_i + R^{22}_i + R^{33}_i} \\
+        &\mathrm{sign}(R^{23}_i - R^{32}_i) \frac{1}{2} \sqrt{1 + R^{11}_i - R^{22}_i - R^{33}_i}\\
+        &\mathrm{sign}(R^{31}_i - R^{13}_i) \frac{1}{2} \sqrt{1 - R^{11}_i + R^{22}_i - R^{33}_i}\\
+        &\mathrm{sign}(R^{12}_i - R^{21}_i) \frac{1}{2} \sqrt{1 - R^{11}_i - R^{22}_i + R^{33}_i}
+        \end{aligned}\right.,
+    
+    where :math:`R` and :math:`\mathbf{q}=[]` are the input matrices and output LieTensor, respectively.
+
+    Warning:
+        Illegal input (not full rank or not orthogonal) triggers a warning, but will output a
+        quaternion regardless.
 
     Examples:
 
-        >>> input = torch.tensor([[0., -1., 0.],
-        ...                       [1., 0., 0.],
-        ...                       [0., 0., 1.]])
+        >>> input = torch.tensor([[0., -1.,  0.],
+        ...                       [1.,  0.,  0.],
+        ...                       [0.,  0.,  1.]])
         >>> pp.mat2SO3(input)
         SO3Type LieTensor:
         tensor([0.0000, 0.0000, 0.7071, 0.7071])
@@ -57,28 +53,27 @@ def mat2SO3(mat):
         mat = torch.tensor(mat)
 
     if len(mat.shape) < 2:
-        raise ValueError(
-            "Input size must be at least 2 dimensions. Got {}".format(
-                mat.shape))
+        raise ValueError("Input size must be at least 2 dimensions. Got {}".format(mat.shape))
+
     if not (mat.shape[-2:] == (3, 3) or mat.shape[-2:] == (3, 4) or mat.shape[-2:] == (4, 4)):
-        raise ValueError(
-            "Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
-                mat.shape))
+        raise ValueError("Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4 tensor. \
+                Got {}".format(mat.shape))
 
     mat = mat[..., :3, :3]
     shape = mat.shape
 
-    e0 = torch.matmul(mat, torch.transpose(mat, -1, -2))
-    e1 = torch.eye(3, dtype=mat.dtype).repeat(shape[:-2]+(1, 1))
-    if not torch.allclose(e0, e1, atol=1e-6):
-        warnings.warn(
-            "Input rotation matrices are not all orthogonal matrix, the result is very likely to be wrong", RuntimeWarning)
+    if check:
+        e0 = mat @ mat.mT
+        e1 = torch.eye(3, dtype=mat.dtype).repeat(shape[:-2] + (1, 1))
+        if not torch.allclose(e0, e1, atol=torch.finfo(e0.dtype).resolution):
+            warnings.warn("Input rotation matrices are not all orthogonal matrix, \
+                the result is likely to be wrong", RuntimeWarning)
 
-    if not torch.allclose(torch.det(mat), torch.ones(shape[:-2], dtype=mat.dtype)):
-        warnings.warn(
-            "Input rotation matrices' determinant are not all equal to 1, the result is very likely to be wrong", RuntimeWarning)
+        if not torch.allclose(torch.det(mat), torch.ones(shape[:-2], dtype=mat.dtype)):
+            warnings.warn("Input rotation matrices' determinant are not all equal to 1, \
+                the result is likely to be wrong", RuntimeWarning)
 
-    rmat_t = torch.transpose(mat, -1, -2)
+    rmat_t = mat.mT
 
     mask_d2 = rmat_t[..., 2, 2] < 1e-6
 
@@ -133,7 +128,8 @@ def mat2SE3(mat):
     r"""Convert batched 3x3 or 3x4 or 4x4 matrices to SO3Type LieTensor.
 
     Args:
-        mat (Tensor): the matrix to convert. If input is of shape :obj:`(*, 3, 3)`, then translation will be filled with zero.
+        mat (Tensor): the matrix to convert. If input is of shape :obj:`(*, 3, 3)`, then translation
+            will be filled with zero.
 
     Return:
         LieTensor: the converted SE3Type LieTensor.
@@ -176,13 +172,11 @@ def mat2SE3(mat):
         mat = torch.tensor(mat)
 
     if len(mat.shape) < 2:
-        raise ValueError(
-            "Input size must be at least 2 dimensions. Got {}".format(
-                mat.shape))
+        raise ValueError("Input size must be at least 2 dimensions. Got {}".format(mat.shape))
+
     if not (mat.shape[-2:] == (3, 3) or mat.shape[-2:] == (3, 4) or mat.shape[-2:] == (4, 4)):
-        raise ValueError(
-            "Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
-                mat.shape))
+        raise ValueError("Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. \
+                            Got {}".format(mat.shape))
 
     q = mat2SO3(mat[..., :3, :3]).tensor()
     if mat.shape[-1] == 3:
@@ -228,10 +222,10 @@ def mat2Sim3(mat):
 
     Examples:
 
-        >>> input = torch.tensor([[0., -0.5, 0., 0.1],
-        ...                       [0.5, 0., 0., 0.2],
-        ...                       [0., 0., 0.5, 0.3],
-        ...                       [0., 0., 0., 1.]])
+        >>> input = torch.tensor([[0., -0.5,  0., 0.1],
+        ...                       [0.5,  0.,  0., 0.2],
+        ...                       [ 0.,  0., 0.5, 0.3],
+        ...                       [ 0.,  0.,  0.,  1.]])
         >>> pp.mat2Sim3(input)
         Sim3Type LieTensor:
         tensor([0.1000, 0.2000, 0.3000, 0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
