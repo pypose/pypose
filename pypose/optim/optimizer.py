@@ -50,7 +50,7 @@ class LM(Optimizer):
     Note:
         Different from PyTorch optimizers like
         `SGD <https://pytorch.org/docs/stable/generated/torch.optim.SGD.html>`_, where the model
-        loss has to be a scalar, the model loss of :obj:`LM` can be a Tensor/LieTensor or a
+        loss has to be a scalar, the model output of :obj:`LM` can be a Tensor/LieTensor or a
         tuple of Tensors/LieTensors.
 
     Example:
@@ -60,16 +60,18 @@ class LM(Optimizer):
         ...     def __init__(self, *dim):
         ...         super().__init__()
         ...         self.pose = pp.Parameter(pp.randn_se3(*dim))
+        ...
         ...     def forward(self, inputs):
         ...         return (self.pose.Exp() @ inputs).Log().abs()
         ...
         >>> posnet, pose = PoseInv(2, 2), pp.randn_SE3(2, 2)
         >>> optimizer = pp.optim.LM(posnet, dampening=1e-6)
+        ...
         >>> for idx in range(10):
         ...     loss = optimizer.step(pose)
         ...     error = loss.mean()
         ...     print('Pose Inversion error %.7f @ %d it'%(error, idx))
-        ...     if loss.mean() < 1e-5:
+        ...     if error < 1e-5:
         ...         print('Early Stoping with error:', error.item())
         ...         break
         ...
