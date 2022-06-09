@@ -52,6 +52,33 @@ class LM(Optimizer):
         `SGD <https://pytorch.org/docs/stable/generated/torch.optim.SGD.html>`_, where the model
         loss has to be a scalar, the model loss of :obj:`LM` can be a Tensor/LieTensor or a
         tuple of Tensors/LieTensors.
+
+    Example:
+        Optimizing a simple module to **approximate pose inversion**.
+
+        >>> class PoseInv(nn.Module):
+        ...     def __init__(self, *dim):
+        ...         super().__init__()
+        ...         self.pose = pp.Parameter(pp.randn_se3(*dim))
+        ...     def forward(self, inputs):
+        ...         return (self.pose.Exp() @ inputs).Log().abs()
+        ...
+        >>> posnet, pose = PoseInv(2, 2), pp.randn_SE3(2, 2)
+        >>> optimizer = pp.optim.LM(posnet, dampening=1e-6)
+        >>> for idx in range(10):
+        ...     loss = optimizer.step(pose)
+        ...     error = loss.mean()
+        ...     print('Pose Inversion error %.7f @ %d it'%(error, idx))
+        ...     if loss.mean() < 1e-5:
+        ...         print('Early Stoping with error:', error.item())
+        ...         break
+        ...
+        Pose Inversion error 1.1270601 @ 0 it
+        Pose Inversion error 0.2298058 @ 1 it
+        Pose Inversion error 0.0203174 @ 2 it
+        Pose Inversion error 0.0001056 @ 3 it
+        Pose Inversion error 0.0000001 @ 4 it
+        Early Stoping with error: 7.761021691976566e-08
     '''
     def __init__(self, model, dampening, maximize=False):
         self.model = model
@@ -65,8 +92,12 @@ class LM(Optimizer):
         Performs a single optimization step.
 
         Args:
-            inputs (tuple of Tensors/LieTensors or Tensor/LieTensor): inputs to the model. Defaults
+            inputs (Tensor/LieTensor or tuple of Tensors/LieTensors): inputs to the model. Defaults
                 to ``None``. Cannot be ``None`` if the model requires inputs.
+
+        Return:
+            Tensor/LieTensor or tuple of Tensors/LieTensors: the minimized (maximized) model output
+            that is taken as a loss or an objective.
         '''
         loss = self.model(inputs)
         if isinstance(loss, tuple):
