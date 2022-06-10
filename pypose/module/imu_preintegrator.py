@@ -272,3 +272,111 @@ class IMUPreintegrator(nn.Module):
                 'vel':vel.clone(),
                 'pos':pos.clone(),
                 'cov':self.cov.clone()}
+
+    @classmethod
+    def batch_imu_update(self, init_state, dt, ang, acc, rot:pp.SO3=None, gravity=9.81007):
+
+        B, F = dt.shape[:2]
+        gravity = torch.tensor([0, 0, gravity], dtype = dt.dtype, device = dt.device)
+        dr = pp.identity_SO3(B,1,dtype=dt.dtype, device=dt.device)
+        dr = torch.cat([dr,pp.so3(ang*dt).Exp()], dim=1)
+        incre_r = pp.cumprod(dr, dim = 1, left=False)
+        inte_rot = init_state["r"] * incre_r
+
+        if isinstance(rot, pp.LieTensor):
+            a = acc - rot.Inv() @ gravity
+        else:
+            a = acc - inte_rot[:,1:,:].Inv() @ gravity
+
+        dv = torch.zeros(B,1,3,dtype=dt.dtype, device=dt.device)
+        dv = torch.cat([dv, incre_r[:,:F,:] @ a * dt], dim=1)
+        incre_v = torch.cumsum(dv, dim =1)
+
+        dp = torch.zeros(B,1,3,dtype=dt.dtype, device=dt.device)
+        dp = torch.cat([dp, incre_v[:,:F,:] * dt + incre_r[:,:F,:] @ a * 0.5 * dt**2], dim =1)
+        incre_p = torch.cumsum(dp, dim =1)
+
+        incre_t = torch.cumsum(dt, dim = 1)
+        incre_t = torch.cat([torch.zeros(B,1,1,dtype=dt.dtype, device=dt.device), incre_t], dim =1)
+
+        return {"incre_v":incre_v[:,1:,:], "incre_p":incre_p[:,1:,:], "incre_r":incre_r[:,1:,:], 
+                "incre_t":incre_t[:,1:,:], "dr": dr[:,1:,:]}
+
+    @classmethod
+    def cov_propogate(self, dt, acc, dr, incre_r, init_cov=None, ang_cov=(1.6968*10**-4)**2, acc_cov=(2.0*10**-3)**2):
+        """
+        Batched covariance propogation
+        """
+        B = dt.shape[0]
+
+        Cg = torch.eye(3, device=dt.device, dtype=dt.dtype) * ang_cov
+        Cg = Cg.expand(B,3,3).clone()
+        Ca = torch.eye(3, device=dt.device, dtype=dt.dtype) * acc_cov
+        Ca = Ca.expand(B,3,3).clone()
+
+        if init_cov is None:
+            init_cov = torch.zeros((B,9,9), device=dt.device, dtype=dt.dtype)
+
+        Ha = pp.vec2skew(acc) # (B, 3, 3)
+
+        A = torch.eye(9, device=dt.device, dtype=dt.dtype).expand(B, 9, 9).clone()
+        A[:, 0:3, 0:3] = dr.matrix().mT
+        A[:, 3:6, 0:3] = torch.einsum('bxy,bt -> bxy', - incre_r.matrix() @ Ha, dt)
+        A[:, 6:9, 0:3] = torch.einsum('bxy,bt -> bxy', - 0.5 * incre_r.matrix() @ Ha, dt**2)
+        A[:, 6:9, 3:6] = torch.einsum('bxy,bt -> bxy', torch.eye(3, device=dt.device, dtype=dt.dtype).expand(B, 3, 3).clone(), dt)
+
+        Bg = torch.zeros(B, 9, 3, device=dt.device, dtype=dt.dtype)
+        Bg[..., 0:3, 0:3] = torch.einsum('bxy,bt -> bxy', dr.Log().Jr(), dt)
+
+        Ba = torch.zeros(B, 9, 3, device=dt.device, dtype=dt.dtype)
+        Ba[..., 3:6, 0:3] = torch.einsum('bxy,bt -> bxy', incre_r.matrix(), dt)
+        Ba[..., 6:9, 0:3] = 0.5 * torch.einsum('bxy,bt -> bxy', dr.matrix(), dt**2)
+
+        B =  torch.einsum('bxy,bt -> bxy', Bg @ Cg @ Bg.mT + Ba @ Ca @ Ba.mT, 1 / dt)
+        cov = A @ init_cov @ A.mT + B
+
+        return cov
+
+    @classmethod
+    def batch_imu_forward(self, init_state, incre_state):
+        return {
+            'rot': init_state['r'] * incre_state["incre_r"],
+            'velo': init_state['v'] + init_state['r'] * incre_state["incre_v"],
+            'pos': init_state['p'] + init_state['r'] * incre_state["incre_p"] + init_state['v'] * incre_state["incre_t"],
+        }
+
+
+    @classmethod
+    def batch_imu_integrate(self, init_state, dt, ang, acc, rot:pp.SO3=None, cov=None, gravity=9.81007):
+        """
+        Args:
+            acc: (B, Frames, 3)
+            ang: (B, Frames, 3)
+            dt: (B, Frames, 1)
+            rot: (B, Frames, 4)
+            init_state: dict
+
+        dr, dp, dv: represents the incremental of one small interval 
+        incre_r, incre_p, incre_v: represents the incremental starting from the first frame
+        """
+        assert(len(acc.shape) == 3)
+        assert(len(dt.shape) == 3)
+        assert(len(ang.shape) == 3)
+
+        if rot is not None:
+            assert(len(rot.shape) == 3)
+        
+        B, F = acc.shape[:2] 
+
+        incre_state = self.batch_imu_update(init_state, dt, ang, acc, rot)
+        inte_state = self.batch_imu_forward(init_state, incre_state)
+        cov_state = []
+
+        for i in range(F):
+            cov = self.cov_propogate(dt = dt[:,i], acc = acc[:,i], dr = incre_state["dr"][:,i], 
+                                        incre_r = incre_state["incre_r"][:,i], init_cov = cov)
+            cov_state.append(cov)
+        
+        cov_state = torch.stack(cov_state, dim = 1)
+
+        return inte_state, cov_state
