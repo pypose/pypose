@@ -131,7 +131,7 @@ jobs:
               \"client_payload\": {
                 \"job_num\": \"${CIRCLE_BUILD_NUM}\",
                 \"file_name\": \"docs.tar.gz\",
-                \"pr_num\": \"${CIRCLE_PR_NUMBER}\"
+                \"pr_num\": \"${CIRCLE_PULL_REQUEST##*/}\"
               }
             }"
 
