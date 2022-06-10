@@ -40,7 +40,7 @@ def _LieTensor_wrapper_add_docstr(wrapper: functools.partial, embedding_doc):
         :obj:`pypose.identity_{type_name}` instead.
 
     See {', '.join([f':obj:`pypose.{m}`' for m in see_method])} for
-    implementations of relavant operations.
+    implementations of relevant operations.
     '''
     return wrapper
 
@@ -185,7 +185,7 @@ Sim3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=Sim3_typ
     is the translation vector and
     :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` and
     :math:`s \in \mathbb{R}` are the unit quaternion and the scaling factor
-    as in :obj`pp.RxSO3`, respectively.
+    as in :obj:`pp.RxSO3`, respectively.
 
     Examples:
         >>> pp.Sim3(torch.randn(2, 8))
@@ -1522,13 +1522,227 @@ def Act(X, p):
 
 
 @assert_ltype
-def Adj(X, a):
-    return X.Adj(a)
+def Adj(input, p):
+    r"""
+    The dot product between the Adjoint matrix at the point given by an input (Lie Group) and 
+    the second point (Lie Algebra).
+
+    .. math::
+        \mathrm{Adj}: (\mathcal{G}, \mathcal{g}) \mapsto \mathcal{g}
+
+    Args:
+        input (LieTensor): the input LieTensor (Lie Group)
+        p (LieTensor): the second LieTensor (Lie Algebra)
+
+    Return:
+        LieTensor: the output LieTensor (Lie Algebra)
+
+    .. list-table:: List of supported :math:`\mathrm{Adj}` map
+        :widths: 20 20 8 20 20
+        :header-rows: 1
+
+        * - input :obj:`ltype`
+          - :math:`(\mathcal{G}, \mathcal{g})` (Lie Group, Lie Algebra)
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}` (Lie Algebra)
+          - output :obj:`ltype`
+        * - (:obj:`SO3_type`, :obj:`so3_type`)
+          - :math:`(\mathcal{G}\in\mathbb{R}^{*\times4}, \mathcal{g}\in\mathbb{R}^{*\times3})`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :obj:`so3_type`
+        * - (:obj:`SE3_type`, :obj:`se3_type`)
+          - :math:`(\mathcal{G}\in\mathbb{R}^{*\times7}, \mathcal{g}\in\mathbb{R}^{*\times6})`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times6}`
+          - :obj:`se3_type`
+        * - (:obj:`Sim3_type`, :obj:`sim3_type`)
+          - :math:`(\mathcal{G}\in\mathbb{R}^{*\times8}, \mathcal{g}\in\mathbb{R}^{*\times7})`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times7}`
+          - :obj:`sim3_type`
+        * - (:obj:`RxSO3_type`, :obj:`rxso3_type`)
+          - :math:`(\mathcal{G}\in\mathbb{R}^{*\times5}, \mathcal{g}\in\mathbb{R}^{*\times4})`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
+          - :obj:`rxso3_type` 
+
+    Let the input be (:math:`\mathbf{x}`, :math:`\mathbf{p}`), :math:`\mathbf{y}` be the output.
+
+        .. math::
+            \mathbf{y}_i = \mathrm{Adj}(\mathbf{x}_i)\mathbf{p}_i,
+
+        where, :math:`\mathrm{Adj}(\mathbf{x}_i)` is the adjoint matrix of the Lie group of :math:`\mathbf{x}_i`.
+
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`SO3_type` and :obj:`so3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`SO3`, :math:`\mathbf{p}` is an instance of :meth:`so3`).
+      Given :math:`\mathbf{x}_i \in` :math:`\textrm{SO(3)}`.
+      The adjoint transformation is given by:
+
+        .. math::
+            \mathrm{Adj}(\mathbf{x}_i) = \mathbf{x}_i 
+
+        In the case of :math:`\textrm{SO3}`, the adjoint transformation for an element is the same
+        rotation matrix used to represent the element. Rotating a tangent vector by an element "moves" it
+        from the tangent space on the right side of the element to the tangent space on the left.
+
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`SE3_type` and :obj:`se3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`SE3`, :math:`\mathbf{p}` is an instance of :meth:`se3`).
+      Let :math:`\mathbf{R}_i \in` :math:`\textrm{SO(3)}` and :math:`\mathbf{t}_i \in \mathbb{R}^{3\times3}` represent the 
+      rotation and translation part of the group. Let :math:`\mathbf{t}_{i\times}` be the skew matrix (:meth:`pypose.vec2skew`) 
+      of :math:`\mathbf{t}_i`. The adjoint transformation is given by:
+
+        .. math::
+            \mathrm{Adj}(\mathbf{x}_i) = \left[
+                                \begin{array}{cc} 
+                                    \mathbf{R}_i & \mathbf{t}_{i\times}\mathbf{R}_i \\
+                                    0 & \mathbf{R}_i
+                                \end{array}
+                             \right] \in \mathbb{R}^{6\times6}
+
+        where,
+
+        .. math::
+            \mathbf{x}_i = \left[
+                                \begin{array}{cc} 
+                                    \mathbf{R}_i& \mathbf{t}_i \\
+                                    0 & 1
+                                \end{array}
+                             \right] \in \mathrm{SE(3)}  
+
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`Sim3_type` and :obj:`sim3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`Sim3`, :math:`\mathbf{p}` is an instance of :meth:`sim3`).
+      Let :math:`\mathbf{R}_i\in` :math:`\textrm{SO(3)}`, :math:`\mathbf{t}_i \in \mathbb{R}^{3\times3}`, and 
+      :math:`s_i \in \mathbb{R}^+` represent the rotation, translation, and scale parts of the group. Let 
+      :math:`\mathbf{t}_{i\times}` be the skew matrix (:meth:`pypose.vec2skew`) of :math:`\mathbf{t}_i`.
+      The adjoint transformation is given by:
+
+        .. math::
+            \mathrm{Adj}(\mathbf{x}_i) = \left[
+                                \begin{array}{cc} 
+                                    s_i\mathbf{R}_i& \mathbf{t}_{i\times}\mathbf{R}_i& -\mathbf{t}_i \\
+                                    0 & \mathbf{R}_i& 0 \\
+                                    0 & 0 & 1
+                                \end{array}
+                             \right] \in \mathbb{R}^{7\times7}
+
+        where,
+
+        .. math::
+            \mathbf{x}_i = \left[
+                                \begin{array}{cc} 
+                                    s_i\mathbf{R}_i & \mathbf{t}_i \\
+                                    0 & 1
+                                \end{array}
+                             \right] \in \textrm{Sim(3)}    
+
+    * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`RxSO3_type` and :obj:`rxso3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`, :math:`\mathbf{p}` is an instance of :meth:`rxso3`).
+      Let :math:`\mathbf{R}_i \in` :math:`\textrm{SO(3)}`, and :math:`s_i \in \mathbb{R}^+` represent the rotation 
+      and scale parts of the group. The adjoint transformation is given by:
+
+        .. math::
+            \mathrm{Adj}(\mathbf{x}_i) = \left[
+                                \begin{array}{cc} 
+                                    \mathbf{R}_i & 0 \\
+                                    0 & 1
+                                \end{array}
+                             \right] \in \mathbb{R}^{4\times4}
+
+        where,
+
+        .. math::
+            \mathbf{x}_i = \left[
+                                \begin{array}{cc} 
+                                    s_i\mathbf{R}_i & 0 \\
+                                    0 & 1
+                                \end{array}
+                             \right] \in \mathrm{RxSO(3)}
+
+        In the case of :math:`\textrm{RxSO3}` group, the adjoint transformation is the same as the rotation 
+        matrix of the group i.e. the :math:`\textrm{SO3}` part of the group.
+
+    Note:
+        The adjoint operator is a linear map which moves an element :math:`\mathbf{p} \in \mathcal{g}`
+        in the right tangent space of :math:`\mathbf{x} \in \mathcal{G}` to the left tangent space.
+
+        .. math::
+            \mathrm{Exp}(\mathrm{Adj}(\mathbf{x}) \mathbf{p}) * \mathbf{x} = \mathbf{x} * \mathrm{Exp}(\mathbf{p})
+        
+        It can be easily verified:
+
+            >>> x, p = pp.randn_SO3(), pp.randn_so3()
+            >>> torch.allclose(x*p.Exp(), x.Adj(p).Exp()*x)
+            True
+        
+        One can refer to Eq. (8) of the following paper:
+
+        * Zachary Teed et al., `Tangent Space Backpropagation for 3D Transformation Groups
+          <https://arxiv.org/pdf/2103.12032.pdf>`_, IEEE/CVF Conference on Computer Vision
+          and Pattern Recognition (CVPR), 2021.
+
+    Note:
+        :math:`\mathrm{Adj}` is generally used to transform a tangent vector from the tangent space around one
+        element to the tangent space of another.
+        One can refer to this paper for more details:
+
+        * J. Sola et al., `A micro Lie theory for state estimation in
+          robotics <https://arxiv.org/abs/1812.01537>`_, arXiv preprint arXiv:1812.01537 (2018).
+
+        The following thesis and the tutorial serve as a good reading material to learn more about deriving the 
+        adjoint matrices for different transformation groups. 
+
+        * Strasdat, H., 2012. `Local accuracy and global consistency for efficient visual SLAM
+          <https://www.doc.ic.ac.uk/~ajd/Publications/Strasdat-H-2012-PhD-Thesis.pdf>`_, 
+          (Doctoral dissertation, Department of Computing, Imperial College London).
+
+        * `Lie Groups for 2D and 3D Transformations.
+          <https://www.ethaneade.org/lie.pdf>`_, by Ethan Eade.
+
+    Example:
+
+        * :math:`\mathrm{Adj}`: (:obj:`SO3`, :obj:`so3`) :math:`\mapsto` :obj:`so3`
+
+            >>> x = pp.randn_SO3(2)
+            >>> p = pp.randn_so3(2)
+            >>> x.Adj(p) # equivalent to: pp.Adj(x, p)
+            so3Type LieTensor:
+            tensor([[-0.4171,  2.1218,  0.9951],
+                    [ 1.8415, -1.2185, -0.4082]])
+
+        * :math:`\mathrm{Adj}`: (:obj:`SE3`, :obj:`se3`) :math:`\mapsto` :obj:`se3`
+
+            >>> x = pp.randn_SE3(2)
+            >>> p = pp.randn_se3(2)
+            >>> x.Adj(p) # equivalent to: pp.Adj(x, p)
+            se3Type LieTensor:
+            tensor([[-0.8536, -0.1984, -0.4554, -0.4868,  0.3231,  0.8535],
+                    [ 0.1577, -1.7625,  1.7997, -1.5085, -0.2098,  0.3538]])
+
+        * :math:`\mathrm{Adj}`: (:obj:`Sim3`, :obj:`sim3`) :math:`\mapsto` :obj:`sim3`
+
+            >>> x = pp.randn_Sim3(2)
+            >>> p = pp.randn_sim3(2)
+            >>> x.Adj(p) # equivalent to: pp.Adj(x, p)
+            sim3Type LieTensor:
+            tensor([[ 0.1455, -0.5653, -0.1845,  0.0502,  1.3125,  1.5217, -0.8964],
+                    [-4.8724, -0.5254,  3.9559,  1.5170,  1.7610,  0.4375,  0.4248]])
+
+        * :math:`\mathrm{Adj}`: (:obj:`RxSO3`, :obj:`rxso3`) :math:`\mapsto` :obj:`rxso3`
+
+            >>> x = pp.randn_RxSO3(2)
+            >>> p = pp.randn_rxso3(2)
+            >>> x.Adj(p) # equivalent to: pp.Adj(x, p)
+            rxso3Type LieTensor:
+            tensor([[-1.3590, -0.4314, -0.0297,  1.0166],
+                    [-0.3378, -0.4942, -2.0083, -0.4321]])
+    """
+    return input.Adj(p)
 
 
 @assert_ltype
-def AdjT(X, a):
-    return X.AdjT(a)
+def AdjT(X, p):
+    return X.AdjT(p)
 
 
 @assert_ltype
@@ -1726,16 +1940,16 @@ def Jinvp(input, p):
         * :math:`\mathrm{Jinvp}`: (:obj:`SO3`, :obj:`so3`) :math:`\mapsto` :obj:`so3`
 
         >>> x = pp.randn_SO3()
-        >>> a = pp.randn_so3()
-        >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
+        >>> p = pp.randn_so3()
+        >>> x.Jinvp(p) # equivalent to: pp.Jinvp(x, p)
         so3Type LieTensor:
         tensor([-2.0248,  1.1116, -0.0251])
 
         * :math:`\mathrm{Jinvp}`: (:obj:`SE3`, :obj:`se3`) :math:`\mapsto` :obj:`se3`
 
         >>> x = pp.randn_SE3(2)
-        >>> a = pp.randn_se3(2)
-        >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
+        >>> p = pp.randn_se3(2)
+        >>> x.Jinvp(p) # equivalent to: pp.Jinvp(x, p)
         se3Type LieTensor:
         tensor([[ 0.4304,  2.0565,  1.0256,  0.0666, -0.2252, -0.7425],
                 [-0.9317, -1.7806,  0.8660, -2.0028,  0.6098, -0.6517]])
@@ -1743,8 +1957,8 @@ def Jinvp(input, p):
         * :math:`\mathrm{Jinvp}`: (:obj:`Sim3`, :obj:`sim3`) :math:`\mapsto` :obj:`sim3`
 
         >>> x = pp.randn_Sim3(2)
-        >>> a = pp.randn_sim3(2)
-        >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
+        >>> p = pp.randn_sim3(2)
+        >>> x.Jinvp(p) # equivalent to: pp.Jinvp(x, p)
         sim3Type LieTensor:
         tensor([[-1.7231, -1.6650, -0.0202, -0.3731,  0.8441, -0.5438,  0.2879],
                 [ 0.9965,  0.6337, -0.7320, -0.1874,  0.6312,  0.3919,  0.6938]])
@@ -1752,8 +1966,8 @@ def Jinvp(input, p):
         * :math:`\mathrm{Jinvp}`: (:obj:`RxSO3`, :obj:`rxso3`) :math:`\mapsto` :obj:`rxso3`
 
         >>> x = pp.randn_RxSO3(2)
-        >>> a = pp.randn_rxso3(2)
-        >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
+        >>> p = pp.randn_rxso3(2)
+        >>> x.Jinvp(p) # equivalent to: pp.Jinvp(x, p)
         rxso3Type LieTensor:
         tensor([[ 0.9308, -1.4965, -0.1347,  0.4894],
                 [ 0.6558,  1.2221, -0.8190,  0.2108]])

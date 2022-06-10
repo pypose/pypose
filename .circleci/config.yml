@@ -126,7 +126,14 @@ jobs:
             curl -X POST -H "Authorization: token ${PYPOSE_ORG_AUTH}" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/pypose/pypose.github.io/dispatches \
-            -d "{\"event_type\": \"circle-ci-build\", \"client_payload\": {\"job_num\": \"${CIRCLE_BUILD_NUM}\", \"file_name\": \"docs.tar.gz\"}}"
+            -d "{
+              \"event_type\": \"circle-ci-build\",
+              \"client_payload\": {
+                \"job_num\": \"${CIRCLE_BUILD_NUM}\",
+                \"file_name\": \"docs.tar.gz\",
+                \"pr_num\": \"${CIRCLE_PULL_REQUEST##*/}\"
+              }
+            }"
 
 
 ##############################################################################
@@ -137,17 +144,11 @@ workflows:
   build:
     jobs:
       - linux_build_wheel:
-          filters:
-            branches:
-              only: [main]
           cuda_version: "11.3.1"
-          torch_version: "1.10.0"
+          torch_version: "1.11.0"
           python_version: "3.8"
       - build_docs:
           requires: [linux_build_wheel]
           cuda_version: "11.3.1"
-          torch_version: "1.10.0"
+          torch_version: "1.11.0"
           python_version: "3.8"
-  # docs:
-  #   jobs:
-  #     - build_docs

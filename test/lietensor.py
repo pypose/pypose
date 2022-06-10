@@ -232,8 +232,8 @@ x = pp.randn_so3(2,2)
 x.Jr()
 pp.Jr(x)
 
-x = pp.randn_SO3(2)
-p = pp.randn_so3(2)
+x = pp.randn_SO3(2, device='cuda')
+p = pp.randn_so3(2, device='cuda')
 x.Jinvp(p)
 
 from torch.autograd.functional import jacobian
@@ -242,9 +242,21 @@ def func(x):
     return x.Exp()
 
 J = jacobian(func, p)
-print(J)
+print("j:", J)
 
 x = pp.randn_so3(2,1,2, requires_grad=True)
 J = x.Jr()
 print(x.shape, J.shape)
 assert J.requires_grad is True
+
+class PoseTransform(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.p = pp.Parameter(pp.randn_so3(2))
+
+    def forward(self, x):
+        return self.p.Exp() * x
+
+model, inputs = PoseTransform(), pp.randn_SO3()
+J = pp.optim.modjac(model, inputs, flatten=True)
+print(J, J.shape)

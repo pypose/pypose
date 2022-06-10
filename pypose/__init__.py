@@ -8,4 +8,4 @@ from .lietensor import Exp, Log, Inv, Mul, Retr, Act, Adj, AdjT, Jinvp, Jr
 from .lietensor import SO3_type, so3_type, SE3_type, se3_type
 from .lietensor import Sim3_type, sim3_type, RxSO3_type, rxso3_type
 from .lietensor import mat2SO3, euler2SO3, vec2skew
-from . import module
+from . import module, optim
