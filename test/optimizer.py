@@ -87,16 +87,16 @@ class PoseInv(nn.Module):
         self.pose = pp.Parameter(pp.randn_se3(*dim))
 
     def forward(self, inputs):
-        return (self.pose.Exp() @ inputs).Log().abs()
+        return (self.pose.Exp() @ inputs).Log()#.abs()
 
 posnet = PoseInv(2, 2)
 inputs = pp.randn_SE3(2, 2)
+target = pp.identity_se3(2, 2)
 optimizer = pp.optim.LM(posnet, dampening=args.damping)
 timer = Timer()
 
 for idx in range(10):
-    loss = optimizer.step(inputs)
-    loss = sum([l.sum() for l in loss])
+    loss = optimizer.step(inputs, target)
     print('Pose loss %.7f @ %dit, Timing: %.3fs'%(loss, idx, timer.end()))
     if loss < 1e-5:
         print('Early Stoping!')

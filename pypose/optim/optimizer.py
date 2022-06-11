@@ -7,17 +7,25 @@ from torch.optim import Optimizer
 class LM(Optimizer):
     r'''
     The `Levenberg-Marquardt (LM) algorithm
-    <https://en.wikipedia.org/wiki/Levenberg-Marquardt_algorithm>`_, which isalso known as the
+    <https://en.wikipedia.org/wiki/Levenberg-Marquardt_algorithm>`_, which is also known as the
     damped least-squares (DLS) method for solving non-linear least squares problems. This
-    implementation is for solving the model parameters to minimize (or maximize) the model output,
-    which can be a Tensor/LieTensor or a tuple of Tensors/LieTensors.
+    implementation is for optimizing the model parameters to approximate the targets, which can
+    be a Tensor/LieTensor or a tuple of Tensors/LieTensors.
+
+
+
+    .. math::
+        \bm{\theta}^* = \arg\min_{\bm{\theta}}\sum_i \|\bm{y}_i - \bm{f}(\bm{\theta}, \bm{x}_i)\|^2,
+
+    where :math:`\bm{f}(\bm{\theta}, \bm{x})` is the model, :math:`\bm{\theta}` is the parameters
+    to be optimized, and :math:`\bm{x}` is the model inputs.
 
     .. math::
        \begin{aligned}
-            &\rule{110mm}{0.4pt}                                                                 \\
-            &\textbf{input}: \lambda \geq 0~\text{(dampening)}, \bm{\theta}_0 \text{ (params)},
-                \bm{f}(\bm{\theta}) \text{ (model)}, \text{maximize}                             \\
-            &\rule{110mm}{0.4pt}                                                                 \\
+            &\rule{113mm}{0.4pt}                                                                 \\
+            &\textbf{input}: \lambda \geq 0~\text{(dampening)}, \bm{\theta}_0~\text{(params)},
+            \bm{f}~\text{(model)}, \bm{x}~(\text{inputs}), \bm{y}~(\text{targets})               \\
+            &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
             &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}{\partial \bm{\theta}}} \\
             &\hspace{5mm} \mathbf{A} \leftarrow \mathbf{J}^T \mathbf{J}  + \lambda \mathbf{I}    \\
@@ -26,19 +34,17 @@ class LM(Optimizer):
             &\hspace{10mm} \bm{\delta} = \mathrm{cholesky\_solve}(\mathbf{J}^T, \bm{L})          \\
             &\hspace{5mm} \textbf{except}                                                        \\
             &\hspace{10mm} \bm{\delta} = \mathrm{pseudo\_inverse}(\mathbf{A}) \mathbf{J}^T       \\
-            &\hspace{5mm} M = 1 \: \textbf{if}~\text{maximize} \: \textbf{else} -1               \\
-            &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + M \bm{\delta} \mathbf{E}_t\\
-            &\rule{110mm}{0.4pt}                                                          \\[-1.ex]
+            &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} +
+                \bm{\delta}(\bm{y} - \bm{f(\bm{\theta}_{t-1}, \bm{x})})                          \\
+            &\rule{113mm}{0.4pt}                                                          \\[-1.ex]
             &\bf{return} \:  \theta_t                                                     \\[-1.ex]
-            &\rule{110mm}{0.4pt}                                                          \\[-1.ex]
+            &\rule{113mm}{0.4pt}                                                          \\[-1.ex]
        \end{aligned}
 
     Args:
         params (iterable): iterable of parameters to optimize or dicts defining parameter groups
         dampening (float): Levenberg's dampening factor (non-negative number) to prevent
             singularity.
-        maximize (bool, optional): maximize the params based on the objective, instead of
-            minimizing (default: False)
 
     Note:
         The (non-negative) damping factor :math:`\lambda` can be adjusted at each iteration. If
@@ -62,17 +68,17 @@ class LM(Optimizer):
         ...         self.pose = pp.Parameter(pp.randn_se3(*dim))
         ...
         ...     def forward(self, inputs):
-        ...         return (self.pose.Exp() @ inputs).Log().abs()
+        ...         return (self.pose.Exp() @ inputs).Log()
         ...
-        >>> posnet, pose = PoseInv(2, 2), pp.randn_SE3(2, 2)
+        >>> posnet = PoseInv(2, 2)
+        >>> inputs, targets = pp.randn_SE3(2, 2), pp.identity_se3(2, 2)
         >>> optimizer = pp.optim.LM(posnet, dampening=1e-6)
         ...
         >>> for idx in range(10):
-        ...     loss = optimizer.step(pose)
-        ...     error = loss.mean()
-        ...     print('Pose Inversion error %.7f @ %d it'%(error, idx))
-        ...     if error < 1e-5:
-        ...         print('Early Stoping with error:', error.item())
+        ...     loss = optimizer.step(inputs, targets)
+        ...     print('Pose Inversion loss %.7f @ %d it'%(loss, idx))
+        ...     if loss < 1e-5:
+        ...         print('Early Stoping with loss:', loss.item())
         ...         break
         ...
         Pose Inversion error 1.1270601 @ 0 it
@@ -82,31 +88,29 @@ class LM(Optimizer):
         Pose Inversion error 0.0000001 @ 4 it
         Early Stoping with error: 7.761021691976566e-08
     '''
-    def __init__(self, model, dampening, maximize=False):
+    def __init__(self, model, dampening):
         self.model = model
         assert dampening >= 0, ValueError("Invalid dampening value: {}".format(dampening))
-        defaults = dict(dampening=dampening, maximize=maximize)
+        defaults = dict(dampening=dampening)
         super().__init__(model.parameters(), defaults)
 
     @torch.no_grad()
-    def step(self, inputs=None):
+    def step(self, inputs, targets):
         r'''
         Performs a single optimization step.
 
         Args:
-            inputs (Tensor/LieTensor or tuple of Tensors/LieTensors): inputs to the model. Defaults
-                to ``None``. Cannot be ``None`` if the model requires inputs.
+            inputs (Tensor/LieTensor or tuple of Tensors/LieTensors): inputs to the model.
 
         Return:
-            Tensor/LieTensor or tuple of Tensors/LieTensors: the minimized (maximized) model output
-            that is taken as a loss or an objective.
+            Tensor/LieTensor or tuple of Tensors/LieTensors: the minimized model error with respect
+            to the targets.
         '''
-        loss = self.model(inputs)
-        if isinstance(loss, tuple):
-            L = torch.cat([l.tensor().view(-1, 1) if isinstance(l, LieTensor) \
-                            else l.view(-1, 1) for l in loss])
+        outputs = self.model(inputs)
+        if isinstance(outputs, tuple):
+            L = torch.cat([(t - o).view(-1, 1) for t, o in zip(targets, inputs)])
         else:
-            L = loss.tensor().view(-1, 1) if isinstance(loss, LieTensor) else loss.view(-1, 1)
+            L = (targets - outputs).view(-1, 1)
         for group in self.param_groups:
             numels = [p.numel() for p in group['params'] if p.requires_grad]
             J = modjac(self.model, inputs, flatten=True)
@@ -117,7 +121,5 @@ class LM(Optimizer):
                 D = (A.pinverse() @ J.T)
                 warnings.warn("Using pseudo inverse due to singular matrix.", UserWarning)
             D = torch.split(D, numels)
-            maximize = 1 if group['maximize'] else -1
-            [p.add_(maximize * (d @ L).view(p.shape)) \
-                for p, d in zip(group['params'], D) if p.requires_grad]
-        return loss
+            [p.add_((d @ L).view(p.shape)) for p, d in zip(group['params'], D) if p.requires_grad]
+        return L.norm()
