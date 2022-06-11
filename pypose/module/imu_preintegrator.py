@@ -347,7 +347,7 @@ class IMUPreintegrator(nn.Module):
 
 
     @classmethod
-    def batch_imu_integrate(self, init_state, dt, ang, acc, rot:pp.SO3=None, cov=None, gravity=9.81007):
+    def batch_imu_integrate(self, init_state, dt, ang, acc, rot:pp.SO3=None, cov=None, gravity=9.81007, cov_propogation = True):
         """
         Args:
             acc: (B, Frames, 3)
@@ -372,11 +372,12 @@ class IMUPreintegrator(nn.Module):
         inte_state = self.batch_imu_forward(init_state, incre_state)
         cov_state = []
 
-        for i in range(F):
-            cov = self.cov_propogate(dt = dt[:,i], acc = acc[:,i], dr = incre_state["dr"][:,i], 
-                                        incre_r = incre_state["incre_r"][:,i], init_cov = cov)
-            cov_state.append(cov)
-        
-        cov_state = torch.stack(cov_state, dim = 1)
+        if cov_propogation:
+            for i in range(F):
+                cov = self.cov_propogate(dt = dt[:,i], acc = acc[:,i], dr = incre_state["dr"][:,i],
+                                            incre_r = incre_state["incre_r"][:,i], init_cov = cov)
+                cov_state.append(cov)
+
+            cov_state = torch.stack(cov_state, dim = 1)
 
         return inte_state, cov_state
