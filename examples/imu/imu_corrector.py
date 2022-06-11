@@ -32,7 +32,8 @@ class IMUCorrector(torch.nn.Module):
         corrected_acc = output[...,:3] + data["acc"]
         corrected_gyro= output[...,3:] + data["gyro"]
 
-        inte_state, _ = self.imu.batch_imu_integrate(init_state, data['dt'], corrected_acc, corrected_gyro, data['gt_rot'][:,:-1].contiguous())
+        inte_state, _ = self.imu.batch_imu_integrate(init_state = init_state, dt = data['dt'], ang = corrected_gyro, 
+                                                        acc = corrected_acc, rot = data['gt_rot'][:,:-1].contiguous(), cov_propogation = False)
         return inte_state, _
 
 
