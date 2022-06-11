@@ -100,11 +100,11 @@ class LM(Optimizer):
         Performs a single optimization step.
 
         Args:
-            inputs (Tensor/LieTensor or tuple of Tensors/LieTensors): inputs to the model.
+            inputs (Tensor/LieTensor or tuple of Tensors/LieTensors): the inputs to the model.
+            targets (Tensor/LieTensor or tuple of Tensors/LieTensors): the model targets to approximate.
 
         Return:
-            Tensor/LieTensor or tuple of Tensors/LieTensors: the minimized model error with respect
-            to the targets.
+            Tensor: the minimized model normalized error with respect to the targets.
         '''
         outputs = self.model(inputs)
         if isinstance(outputs, tuple):
