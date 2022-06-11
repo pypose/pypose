@@ -299,8 +299,8 @@ class IMUPreintegrator(nn.Module):
         incre_t = torch.cumsum(dt, dim = 1)
         incre_t = torch.cat([torch.zeros(B,1,1,dtype=dt.dtype, device=dt.device), incre_t], dim =1)
 
-        return {"incre_v":incre_v[:,1:,:], "incre_p":incre_p[:,1:,:], "incre_r":incre_r[:,1:,:], 
-                "incre_t":incre_t[:,1:,:], "dr": dr[:,1:,:]}
+        return {"incre_v":incre_v[...,1:,:], "incre_p":incre_p[:,1:,:], "incre_r":incre_r[:,1:,:], 
+                "incre_t":incre_t[...,1:,:], "dr": dr[:,1:,:]}
 
     @classmethod
     def cov_propogate(self, dt, acc, dr, incre_r, init_cov=None, ang_cov=(1.6968*10**-4)**2, acc_cov=(2.0*10**-3)**2):
@@ -320,7 +320,7 @@ class IMUPreintegrator(nn.Module):
         Ha = pp.vec2skew(acc) # (B, 3, 3)
 
         A = torch.eye(9, device=dt.device, dtype=dt.dtype).expand(B, 9, 9).clone()
-        A[:, 0:3, 0:3] = dr.matrix().mT
+        A[..., 0:3, 0:3] = dr.matrix().mT
         A[:, 3:6, 0:3] = torch.einsum('bxy,bt -> bxy', - incre_r.matrix() @ Ha, dt)
         A[:, 6:9, 0:3] = torch.einsum('bxy,bt -> bxy', - 0.5 * incre_r.matrix() @ Ha, dt**2)
         A[:, 6:9, 3:6] = torch.einsum('bxy,bt -> bxy', torch.eye(3, device=dt.device, dtype=dt.dtype).expand(B, 3, 3).clone(), dt)
