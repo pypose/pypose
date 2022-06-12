@@ -92,7 +92,7 @@ class PoseInv(nn.Module):
 posnet = PoseInv(2, 2)
 inputs = pp.randn_SE3(2, 2)
 target = pp.identity_se3(2, 2)
-optimizer = pp.optim.LM(posnet, dampening=args.damping)
+optimizer = pp.optim.LM(posnet, damping=args.damping)
 timer = Timer()
 
 for idx in range(10):

@@ -12,8 +12,6 @@ class LM(Optimizer):
     implementation is for optimizing the model parameters to approximate the targets, which can
     be a Tensor/LieTensor or a tuple of Tensors/LieTensors.
 
-
-
     .. math::
         \bm{\theta}^* = \arg\min_{\bm{\theta}}\sum_i \|\bm{y}_i - \bm{f}(\bm{\theta}, \bm{x}_i)\|^2,
 
@@ -23,12 +21,13 @@ class LM(Optimizer):
     .. math::
        \begin{aligned}
             &\rule{113mm}{0.4pt}                                                                 \\
-            &\textbf{input}: \lambda \geq 0~\text{(dampening)}, \bm{\theta}_0~\text{(params)},
-            \bm{f}~\text{(model)}, \bm{x}~(\text{inputs}), \bm{y}~(\text{targets})               \\
+            &\textbf{input}: \lambda \geq 0~\text{(damping)}, \bm{\theta}_0~\text{(params)},
+                \bm{f}~\text{(model)}, \bm{x}~(\text{inputs}), \bm{y}~(\text{targets})           \\
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
             &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}{\partial \bm{\theta}}} \\
-            &\hspace{5mm} \mathbf{A} \leftarrow \mathbf{J}^T \mathbf{J}  + \lambda \mathbf{I}    \\
+            &\hspace{5mm} \mathbf{A} \leftarrow \mathbf{J}^T \mathbf{J} +
+                \lambda \mathrm{diag} (\mathbf{\mathbf{J}^T \mathbf{J}})                         \\
             &\hspace{5mm} \textbf{try}                                                           \\
             &\hspace{10mm} \mathbf{L} = \mathrm{cholesky\_decomposition}(\mathbf{A})             \\
             &\hspace{10mm} \bm{\delta} = \mathrm{cholesky\_solve}(\mathbf{J}^T, \bm{L})          \\
@@ -43,8 +42,7 @@ class LM(Optimizer):
 
     Args:
         params (iterable): iterable of parameters to optimize or dicts defining parameter groups
-        dampening (float): Levenberg's dampening factor (non-negative number) to prevent
-            singularity.
+        damping (float): Levenberg's damping factor (non-negative number) to prevent singularity.
 
     Note:
         The (non-negative) damping factor :math:`\lambda` can be adjusted at each iteration. If
@@ -72,7 +70,7 @@ class LM(Optimizer):
         ...
         >>> posnet = PoseInv(2, 2)
         >>> inputs, targets = pp.randn_SE3(2, 2), pp.identity_se3(2, 2)
-        >>> optimizer = pp.optim.LM(posnet, dampening=1e-6)
+        >>> optimizer = pp.optim.LM(posnet, damping=1e-6)
         ...
         >>> for idx in range(10):
         ...     loss = optimizer.step(inputs, targets)
@@ -88,10 +86,10 @@ class LM(Optimizer):
         Pose Inversion error 0.0000001 @ 4 it
         Early Stoping with error: 7.761021691976566e-08
     '''
-    def __init__(self, model, dampening):
+    def __init__(self, model, damping):
         self.model = model
-        assert dampening >= 0, ValueError("Invalid dampening value: {}".format(dampening))
-        defaults = dict(dampening=dampening)
+        assert damping >= 0, ValueError("Invalid damping factor: {}".format(damping))
+        defaults = dict(damping=damping)
         super().__init__(model.parameters(), defaults)
 
     @torch.no_grad()
@@ -104,7 +102,7 @@ class LM(Optimizer):
             targets (Tensor/LieTensor or tuple of Tensors/LieTensors): the model targets to approximate.
 
         Return:
-            Tensor: the minimized model normalized error with respect to the targets.
+            Tensor: the minimized model loss, i.e., :math:`\|\bm{y} - \bm{f}(\bm{\theta}, \bm{x})\|^2`.
         '''
         outputs = self.model(inputs)
         if isinstance(outputs, tuple):
@@ -114,7 +112,7 @@ class LM(Optimizer):
         for group in self.param_groups:
             numels = [p.numel() for p in group['params'] if p.requires_grad]
             J = modjac(self.model, inputs, flatten=True)
-            A = (J.T @ J) + group['dampening'] * torch.eye(J.size(-1)).to(J)
+            A = (J.T @ J).diagonal_scatter((1 + group['damping']) * (J**2).sum(0))
             try: # Faster but sometimes singular error
                 D = J.T.cholesky_solve(torch.linalg.cholesky(A))
             except: # Slower but singular is fine
