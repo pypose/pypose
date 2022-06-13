@@ -36,6 +36,7 @@ def torch_sparse_coo_to_sbm(s):
         device=s.device)
     sbm.block_storage = s.values().detach().clone()
     sbm.dtype = s.dtype
+    sbm.coalesced = True
 
     return sbm
 
@@ -68,6 +69,25 @@ class SparseBlockMatrix(object):
                                   # Similar to g2o's _blockCols. 
         self.block_storage = None # Should be 3D Tensor.
         self.dtype = dtype if dtype is not None else FLOAT_TYPE
+
+        self.coalesced = False
+
+    def is_coalesced(self):
+        '''
+        Naive implementation.
+        '''
+        return self.coalesced
+
+    def dimension_str(self):
+        return \
+            f'block_shape = {self.block_shape}\n' + \
+            f'row_block_structure.numel() = {self.row_block_structure.numel()}\n' + \
+            f'col_block_structure.numel() = {self.col_block_structure.numel()}\n' + \
+            f'block_indices.shape = {self.block_indices.shape}\n' + \
+            f'block_storage.shape = {self.block_storage.shape}'
+
+    def show_dimensions(self):
+        print(self.dimension_str())
 
     def create(self, 
         shape_blocks: Iterable[int],
@@ -294,6 +314,8 @@ class SparseBlockMatrix(object):
         # Transpose the blocks.
         self.block_storage = self.block_storage.permute((0, 2, 1))
 
+        self.coalesced = False
+
     def transpose(self):
         '''
         Return a copy of the current sparse block matrix and transpose.
@@ -352,9 +374,23 @@ class SparseBlockMatrix(object):
 
     def __matmul__(self, other):
         '''
-        other: must be a SparseBlockMatrix object or a scalar.
+        other: must be a SparseBlockMatrix object.
         '''
-        raise NotImplementedError()
+        
+        # ========== Checks. ==========
+
+        assert ( self.col_block_structure.numel() == other.row_block_structure.numel() ), \
+            f'Wrong dimension: \n>>> self: \n{self.dimension_str()}\n>>> other: \n{other.dimension_str()}'
+
+        assert ( torch.equal( self.col_block_structure, other.row_block_structure ) ), \
+            f'self and other has inconsistent col_block_structure and row_block_structure. '
+
+        assert ( self.is_coalesced() and other.is_coalesced() ), \
+            f'self.is_coalesced() = {self.is_coalesced()}, other.is_coalesced() = {other.is_coalesced()}'
+        
+        # ========== Checks done. ==========
+
+        
 
     def multiply_symmetric_upper_triangle(self, other):
         '''

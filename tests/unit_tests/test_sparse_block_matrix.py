@@ -69,10 +69,19 @@ class Test_SparseBlockMatrix(unittest.TestCase):
         #     30, 32, 34 = 0,  1,  2 + 30, 31, 32
         #     36, 38, 40   3,  4,  5   33, 34, 35
 
+        #      0,  1,  2,  3,  4,  5,  6,  7,  8
+        # ======================================
+        # 0 |  0,  1,  2,  x,  x,  x, 18, 19, 20
+        # 1 |  3,  4,  5,  x,  x,  x, 21, 22, 23
+        # 2 |  x,  x,  x, 12, 13, 14,  x,  x,  x
+        # 3 |  x,  x,  x, 15, 16, 17,  x,  x,  x
+        # 4 |  6,  7,  8,  x,  x,  x, 24, 25, 26
+        # 5 |  9, 10, 11,  x,  x,  x, 27, 28, 29
+
         cls.block_shape = (2, 3)
         cls.layout = [
-            [ 2, 2, 4, 6, 6 ],
-            [ 3, 9, 6, 3, 9 ]
+            [ 2, 6, 4, 2, 6 ],
+            [ 3, 3, 6, 9, 9 ]
         ]
         cls.block_indices = [
             [ 0, 2, 1, 0, 2 ],
@@ -383,6 +392,10 @@ class Test_SparseBlockMatrix(unittest.TestCase):
 
         # The result.
         raw_true_result_block_storage = raw_main_sbm.block_storage + raw_other_sbm.block_storage
+        raw_result_sbm = SparseBlockMatrix(Test_SparseBlockMatrix.block_shape, dtype=torch.float32)
+        raw_result_sbm.create(shape_blocks=Test_SparseBlockMatrix.shape_blocks, block_indices=Test_SparseBlockMatrix.block_indices)
+        raw_result_sbm.set_block_storage(raw_true_result_block_storage, clone=False)
+        raw_result_sbm = raw_result_sbm.coalesce()
 
         test_entries = [
             { 'device': 'cpu'  },
@@ -395,13 +408,13 @@ class Test_SparseBlockMatrix(unittest.TestCase):
 
             main_sbm = raw_main_sbm.to(device=device)
             other_sbm = raw_other_sbm.to(device=device)
-            true_result_block_storage = raw_true_result_block_storage.to(device=device)
+            true_result_sbm = raw_result_sbm.to(device=device)
 
             result = main_sbm + other_sbm
             result = result.coalesce()
 
             try:
-                torch_equal( result.block_storage, true_result_block_storage )
+                torch_equal( result.block_storage, true_result_sbm.block_storage )
             except Exception as exc:
                 print(exc)
                 self.assertTrue(False, f'test_add_sbm failed with entry {entry}')

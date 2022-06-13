@@ -87,3 +87,48 @@ class Test_functorch(unittest.TestCase):
 
         # f = lambda a, b: a.my_func() * b
         # j = jacrev(f)(x, y)
+
+    def test_non_tensor_type(self):
+        print()
+        show_delimeter('Test non tensor type')
+
+        # Two sparse block matrices.
+        block_indices_0 = [
+            [0, 0, 0],
+            [0, 1, 1],
+            [0, 2, 2],
+            [1, 1, 3],
+            [2, 0, 4],
+            [2, 2, 5],
+        ]
+
+        block_indices_1 = [
+            [0, 0, 0],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 1, 3],
+            [2, 0, 4],
+            [2, 2, 5],
+        ]
+
+        # Compose the block_cols representations.
+        block_cols_0 = [ dict() for _ in range(3) ]
+        for block in block_indices_0:
+            block_cols_0[ block[1] ][ block[0] ] = block[2]
+
+        block_cols_1 = [ dict() for _ in range(3) ]
+        for block in block_indices_1:
+            block_cols_1[ block[1] ][ block[0] ] = block[2]
+
+        print(f'block_cols_0 = \n{block_cols_0}')
+        print(f'block_cols_1 = \n{block_cols_1}')
+
+        def print_list(v):
+            print(v)
+
+        vmap(print_list)(block_cols_0)
+
+if __name__ == '__main__':
+    import os
+    print('Run %s. ' % (os.path.basename(__file__)))
+    unittest.main()
