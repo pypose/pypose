@@ -106,7 +106,7 @@ class LM(Optimizer):
         '''
         outputs = self.model(inputs)
         if isinstance(outputs, tuple):
-            L = torch.cat([(t - o).view(-1, 1) for t, o in zip(targets, inputs)])
+            L = torch.cat([(t - o).view(-1, 1) for t, o in zip(targets, outputs)])
         else:
             L = (targets - outputs).view(-1, 1)
         for group in self.param_groups:
@@ -114,10 +114,10 @@ class LM(Optimizer):
             J = modjac(self.model, inputs, flatten=True)
             A = (J.T @ J).diagonal_scatter((1 + group['damping']) * (J**2).sum(0))
             try: # Faster but sometimes singular error
-                D = J.T.cholesky_solve(torch.linalg.cholesky(A))
+                D = (J.T @ L).cholesky_solve(torch.linalg.cholesky(A))
             except: # Slower but singular is fine
-                D = (A.pinverse() @ J.T)
+                D = A.pinverse() @ (J.T @ L)
                 warnings.warn("Using pseudo inverse due to singular matrix.", UserWarning)
             D = torch.split(D, numels)
-            [p.add_((d @ L).view(p.shape)) for p, d in zip(group['params'], D) if p.requires_grad]
+            [p.add_(d.view(p.shape)) for p, d in zip(group['params'], D) if p.requires_grad]
         return L.norm()
