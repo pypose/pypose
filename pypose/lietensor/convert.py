@@ -69,13 +69,14 @@ def mat2SO3(mat, check=False):
             warnings.warn("Input rotation matrices are not all orthogonal matrix, \
                 the result is likely to be wrong", RuntimeWarning)
 
-        if not torch.allclose(torch.det(mat), torch.ones(shape[:-2], dtype=mat.dtype)):
+        if not torch.allclose(torch.det(mat), torch.ones(shape[:-2], dtype=mat.dtype), \
+                atol=torch.finfo(e0.dtype).resolution):
             warnings.warn("Input rotation matrices' determinant are not all equal to 1, \
                 the result is likely to be wrong", RuntimeWarning)
 
     rmat_t = mat.mT
 
-    mask_d2 = rmat_t[..., 2, 2] < 1e-6
+    mask_d2 = rmat_t[..., 2, 2] < torch.finfo(mat.dtype).resolution
 
     mask_d0_d1 = rmat_t[..., 0, 0] > rmat_t[..., 1, 1]
     mask_d0_nd1 = rmat_t[..., 0, 0] < -rmat_t[..., 1, 1]
@@ -124,8 +125,8 @@ def mat2SO3(mat, check=False):
     return SO3(q)
 
 
-def mat2SE3(mat):
-    r"""Convert batched 3x3 or 3x4 or 4x4 matrices to SO3Type LieTensor.
+def mat2SE3(mat, check=False):
+    r"""Convert batched rotation or transformation matrices to SO3Type LieTensor.
 
     Args:
         mat (Tensor): the matrix to convert. If input is of shape :obj:`(*, 3, 3)`, then translation
@@ -159,9 +160,9 @@ def mat2SE3(mat):
     Examples:
 
         >>> input = torch.tensor([[0., -1., 0., 0.1],
-        ...                       [1., 0., 0., 0.2],
-        ...                       [0., 0., 1., 0.3],
-        ...                       [0., 0., 0., 1.]])
+        ...                       [1.,  0., 0., 0.2],
+        ...                       [0.,  0., 1., 0.3],
+        ...                       [0.,  0., 0.,  1.]])
         >>> pp.mat2SE3(input)
         SE3Type LieTensor:
         tensor([0.1000, 0.2000, 0.3000, 0.0000, 0.0000, 0.7071, 0.7071])
@@ -176,11 +177,11 @@ def mat2SE3(mat):
 
     if not (mat.shape[-2:] == (3, 3) or mat.shape[-2:] == (3, 4) or mat.shape[-2:] == (4, 4)):
         raise ValueError("Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. \
-                            Got {}".format(mat.shape))
+                Got {}".format(mat.shape))
 
-    q = mat2SO3(mat[..., :3, :3]).tensor()
+    q = mat2SO3(mat[..., :3, :3], check).tensor()
     if mat.shape[-1] == 3:
-        t = torch.zeros(mat.shape[:-2]+(3,))
+        t = torch.zeros(mat.shape[:-2]+(3,), dtype = mat.dtype, requires_grad=mat.requires_grad)
     else:
         t = mat[..., :3, 3]
     vec = torch.cat([t, q], dim=-1)
@@ -188,11 +189,12 @@ def mat2SE3(mat):
     return SE3(vec)
 
 
-def mat2Sim3(mat):
-    r"""Convert batched 3x3 or 3x4 or 4x4 matrices to Sim3Type LieTensor.
+def mat2Sim3(mat, check=False):
+    r"""Convert batched rotation or transformation matrices to Sim3Type LieTensor.
 
     Args:
-        mat (Tensor): the matrix to convert. If input is of shape :obj:`(*, 3, 3)`, then translation will be filled with zero.
+        mat (Tensor): the matrix to convert. If input is of shape :obj:`(*, 3, 3)`, 
+            then translation will be filled with zero.
 
     Return:
         LieTensor: the converted Sim3Type LieTensor.
@@ -218,14 +220,15 @@ def mat2Sim3(mat):
     .. math::
         \mathrm{vec}[*, :] = [t_x, t_y, t_z, q_x, q_y, q_z, q_w, s]
 
-    where :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` is computed by :meth:`pypose.mat2SO3`.
+    where :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` is computed 
+        by :meth:`pypose.mat2SO3`.
 
     Examples:
 
-        >>> input = torch.tensor([[0., -0.5,  0., 0.1],
+        >>> input = torch.tensor([[ 0.,-0.5,  0., 0.1],
         ...                       [0.5,  0.,  0., 0.2],
         ...                       [ 0.,  0., 0.5, 0.3],
-        ...                       [ 0.,  0.,  0.,  1.]])
+        ...                       [ 0.,  0.,  0., 1.]])
         >>> pp.mat2Sim3(input)
         Sim3Type LieTensor:
         tensor([0.1000, 0.2000, 0.3000, 0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
@@ -236,20 +239,18 @@ def mat2Sim3(mat):
         mat = torch.tensor(mat)
 
     if len(mat.shape) < 2:
-        raise ValueError(
-            "Input size must be at least 2 dimensions. Got {}".format(
-                mat.shape))
+        raise ValueError("Input size must be at least 2 dimensions. Got {}".format(mat.shape))
+
     if not (mat.shape[-2:] == (3, 3) or mat.shape[-2:] == (3, 4) or mat.shape[-2:] == (4, 4)):
-        raise ValueError(
-            "Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
-                mat.shape))
+        raise ValueError("Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. \
+                Got {}".format(mat.shape))
 
     rot = mat[..., :3, :3]
 
     s = torch.linalg.norm(rot[..., 0], dim=-1).unsqueeze(-1)
-    q = mat2SO3(rot/s.unsqueeze(-1)).tensor()
+    q = mat2SO3(rot/s.unsqueeze(-1), check).tensor()
     if mat.shape[-1] == 3:
-        t = torch.zeros(mat.shape[:-2]+(3,))
+        t = torch.zeros(mat.shape[:-2]+(3,), dtype=mat.dtype, requires_grad=mat.requires_grad)
     else:
         t = mat[..., :3, 3]
 
@@ -258,8 +259,8 @@ def mat2Sim3(mat):
     return Sim3(vec)
 
 
-def mat2RxSO3(mat):
-    r"""Convert batched 3x3 or 3x4 or 4x4 matrices to RxSO3Type LieTensor.
+def mat2RxSO3(mat, check=False):
+    r"""Convert batched rotation or transformation matrices to RxSO3Type LieTensor.
 
     Args:
         mat (Tensor): the matrix to convert.
@@ -287,13 +288,14 @@ def mat2RxSO3(mat):
     .. math::
         \mathrm{vec}[*, :] = [q_x, q_y, q_z, q_w, s]
 
-    where :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` is computed by :meth:`pypose.mat2SO3`.
+    where :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` is computed 
+        by :meth:`pypose.mat2SO3`.
 
     Examples:
 
-        >>> input = torch.tensor([[0., -0.5, 0.],
-        ...                       [0.5, 0., 0.],
-        ...                       [0., 0., 0.5]])
+        >>> input = torch.tensor([[ 0., -0.5,  0.],
+        ...                       [0.5,   0.,  0.],
+        ...                       [ 0.,   0., 0.5]])
         >>> pp.mat2RxSO3(input)
         RxSO3Type LieTensor:
         tensor([0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
@@ -304,29 +306,28 @@ def mat2RxSO3(mat):
         mat = torch.tensor(mat)
 
     if len(mat.shape) < 2:
-        raise ValueError(
-            "Input size must be at least 2 dimensions. Got {}".format(
-                mat.shape))
+        raise ValueError("Input size must be at least 2 dimensions. Got {}".format(mat.shape))
+
     if not (mat.shape[-2:] == (3, 3) or mat.shape[-2:] == (3, 4) or mat.shape[-2:] == (4, 4)):
-        raise ValueError(
-            "Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
-                mat.shape))
+        raise ValueError("Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. \
+                Got {}".format(mat.shape))
 
     rot = mat[..., :3, :3]
 
     s = torch.linalg.norm(rot[..., 0], dim=-1).unsqueeze(-1)
-    q = mat2SO3(rot/s.unsqueeze(-1)).tensor()
+    q = mat2SO3(rot/s.unsqueeze(-1), check).tensor()
     vec = torch.cat([q, s], dim=-1)
 
     return RxSO3(vec)
 
 
-def from_matrix(mat, ltype):
-    r"""Convert batched 3x3 or 3x4 or 4x4 matrices to LieTensor.
+def from_matrix(mat, ltype, check=False):
+    r"""Convert batched rotation or transformation matrices to LieTensor.
 
     Args:
         mat (Tensor): the matrix to convert.
-        ltype (class): one of :meth:`pypose.SO3`, :meth:`pypose.SE3`, :meth:`pypose.Sim3` or :meth:`pypose.RxSO3`.
+        ltype (class): one of :meth:`pypose.SO3`, :meth:`pypose.SE3`, :meth:`pypose.Sim3`
+                        or :meth:`pypose.RxSO3`.
 
     Return:
         LieTensor: the converted LieTensor.
@@ -335,27 +336,23 @@ def from_matrix(mat, ltype):
         mat = torch.tensor(mat)
 
     if len(mat.shape) < 2:
-        raise ValueError(
-            "Input size must be at least 2 dimensions. Got {}".format(
-                mat.shape))
+        raise ValueError("Input size must be at least 2 dimensions. Got {}".format(mat.shape))
+
     if not (mat.shape[-2:] == (3, 3) or mat.shape[-2:] == (3, 4) or mat.shape[-2:] == (4, 4)):
-        raise ValueError(
-            "Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. Got {}".format(
-                mat.shape))
+        raise ValueError("Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. \
+                Got {}".format(mat.shape))
 
     if ltype == SO3_type:
-        return mat2SO3(mat)
+        return mat2SO3(mat, check)
     elif ltype == SE3_type:
-        return mat2SE3(mat)
+        return mat2SE3(mat, check)
     elif ltype == Sim3_type:
-        return mat2Sim3(mat)
+        return mat2Sim3(mat, check)
     elif ltype == RxSO3_type:
-        return mat2RxSO3(mat)
+        return mat2RxSO3(mat, check)
     else:
-        raise ValueError(
-            "Input ltype must be one of SO3_type, SE3_type, Sim3_type or RxSO3_type. Got {}".format(
-                ltype)
-        )
+        raise ValueError("Input ltype must be one of SO3_type, SE3_type, Sim3_type or RxSO3_type.\
+                Got {}".format(ltype))
 
 
 def matrix(lietensor):

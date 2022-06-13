@@ -8,11 +8,11 @@ import pypose as pp
 # rotation 90 degree around the z axis
 input = torch.tensor([[0., -1., 0.],
                       [1., 0., 0.],
-                      [0., 0., 1.]],  requires_grad=True)
+                      [0., 0., 1.]], dtype = torch.float64,  requires_grad=True)
 
 x = pp.mat2SO3(input)
 output = pp.gradcheck(mat2SO3, input)
-# print(torch.allclose(output[0][0], output[1][0]))
+print(torch.allclose(output[0][0], output[1][0]))
 print(x)
 
 
@@ -20,38 +20,38 @@ input = torch.tensor([[0., -1., 0., 0.1],
                       [1., 0., 0., 0.2],
                       [0., 0., 1., 0.3],
                       [0., 0., 0., 1.]], dtype = torch.float64,  requires_grad=True)
-# output = pp.gradcheck(mat2SE3, input)
-# print(torch.allclose(output[0][0], output[1][0]))
-# x = pp.mat2SE3(input)
-# print(x)
+output = pp.gradcheck(mat2SE3, input)
+print(torch.allclose(output[0][0], output[1][0]))
+x = pp.mat2SE3(input)
+print(x)
 
 input = torch.tensor([[0., -0.5, 0., 0.1],
                       [0.5, 0., 0., 0.2],
                       [0., 0., 0.5, 0.3],
                       [0., 0., 0., 1.]], dtype = torch.float64,  requires_grad=True)
-# output = pp.gradcheck(mat2Sim3, input)
-# print(torch.allclose(output[0][0], output[1][0]))
-# x = pp.mat2Sim3(input)
-# print(x)
+output = pp.gradcheck(mat2Sim3, input)
+print(torch.allclose(output[0][0], output[1][0]))
+x = pp.mat2Sim3(input)
+print(x)
 
 input = torch.tensor([[0., -0.5, 0.],
                       [0.5, 0., 0.],
                       [0., 0., 0.5]], dtype = torch.float64,  requires_grad=True)
-# output = pp.gradcheck(mat2RxSO3, input)
-# print(torch.allclose(output[0][0], output[1][0]))
-# x = pp.mat2RxSO3(input)
-# print(x)
+output = pp.gradcheck(mat2RxSO3, input)
+print(torch.allclose(output[0][0], output[1][0]))
+x = pp.mat2RxSO3(input)
+print(x)
 
 
 print("Test illegal input:")
 z = torch.zeros([3, 3], dtype=torch.float64)
 z[0, 2] = 10
 print(z)
-print(pp.mat2SO3(z))
+print(pp.mat2SO3(z, check=True))
 
 x = torch.randn([3, 3], dtype=torch.float64)
 print(x)
-print(pp.mat2SO3(x))
+print(pp.mat2SO3(x, check=True))
 
 print("Test input with more or less information")
 a = pp.randn_SO3(dtype=torch.float64)
@@ -69,8 +69,8 @@ b = pp.mat2RxSO3(t)
 # print(a,b)
 
 
-N = 10
-shape = torch.Size([10])
+N = 100
+shape = torch.Size([10, 10])
 # test logic:
 # generate N random sample x0 with ltype
 # perform T = x0.matrix()
@@ -141,7 +141,7 @@ for randn, mat2x, q_start in zip(rand_generate_funcs, mat2x_funcs, quat_start):
 
     # gradcheck
     output = pp.gradcheck(mat2x, T0)
-    if torch.allclose(output[0][0], output[1][0]):
+    if torch.allclose(output[0][0], output[1][0], torch.finfo(T0.dtype).resolution):
         print("Grad check passed")
     else:
         print("Grad check failed")
