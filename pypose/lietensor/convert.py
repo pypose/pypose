@@ -25,17 +25,17 @@ def mat2SO3(mat, check=False):
     .. math::
         \mathbf{q}_i = 
         \left\{\begin{aligned}
-        &\frac{1}{2} \sqrt{1 + R^{11}_i + R^{22}_i + R^{33}_i} \\
         &\mathrm{sign}(R^{23}_i - R^{32}_i) \frac{1}{2} \sqrt{1 + R^{11}_i - R^{22}_i - R^{33}_i}\\
         &\mathrm{sign}(R^{31}_i - R^{13}_i) \frac{1}{2} \sqrt{1 - R^{11}_i + R^{22}_i - R^{33}_i}\\
-        &\mathrm{sign}(R^{12}_i - R^{21}_i) \frac{1}{2} \sqrt{1 - R^{11}_i - R^{22}_i + R^{33}_i}
+        &\mathrm{sign}(R^{12}_i - R^{21}_i) \frac{1}{2} \sqrt{1 - R^{11}_i - R^{22}_i + R^{33}_i}\\
+        &\frac{1}{2} \sqrt{1 + R^{11}_i + R^{22}_i + R^{33}_i}
         \end{aligned}\right.,
     
-    where :math:`R` and :math:`\mathbf{q}=[]` are the input matrices and output LieTensor, respectively.
+    where :math:`R` and :math:`\mathbf{q_i} = [q^x_i, q^y_i, q^z_i, q^w_i]` are the input matrices and output LieTensor, respectively.
 
     Warning:
-        Illegal input (not full rank or not orthogonal) triggers a warning, but will output a
-        quaternion regardless.
+        A rotation matrix is consided illegal if, :math:`\vert R\vert\neq1` or :math:`RR^{T}\neq \mathrm{I}`.
+        If **check** was set to ``True``, illegal input will trigger a warning, but output a result regardless.
 
     Examples:
 
@@ -45,6 +45,16 @@ def mat2SO3(mat, check=False):
         >>> pp.mat2SO3(input)
         SO3Type LieTensor:
         tensor([0.0000, 0.0000, 0.7071, 0.7071])
+
+        If **check** was set to ``True``, and the input is illegal:
+
+        >>> pp.mat2SO3(torch.zeros(3,3), check=True)
+        .../pypose/pypose/lietensor/convert.py:81: RuntimeWarning: Input rotation matrices are not all orthogonal matrix,
+                         the result is likely to be wrong
+        .../pypose/pypose/lietensor/convert.py:86: RuntimeWarning: Input rotation matrices' determinant are not all equal to 1,
+                         the result is likely to be wrong
+        SO3Type LieTensor:
+        tensor([0.0000, 0.5000, 0.0000, 0.0000])
 
     See :meth:`pypose.SO3` for more details of the output LieTensor format.
     """
@@ -131,31 +141,44 @@ def mat2SE3(mat, check=False):
     Args:
         mat (Tensor): the matrix to convert. If input is of shape :obj:`(*, 3, 3)`, then translation
             will be filled with zero.
+        check (bool, optional): flag to check if the input is valid rotation matrices (orthogonal
+            and and with a determinant of one). More computation is needed if ``True``.
+            Default: ``False``.
 
     Return:
         LieTensor: the converted SE3Type LieTensor.
 
     Shape:
         Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
-
         Output: :obj:`(*, 7)`
 
-    Suppose the input transformation matrix :math:`\mathbf{T}_i` is
+    Suppose the input transformation matrix :math:`\mathbf{T}_i\in\mathbb{R}^{4x4}`, 
+    let :math:`R_i\in\mathbb{R}^{3x3}` be the upper left 3 by 3 sub matrix of :math:`T`,
+
+    Let :math:`T^{mn}_i` be the element of row :math:`m` and coloum :math:`n` in :math:`T_i`, 
+    :math:`R^{mn}_i` be the element of row :math:`m` and coloum :math:`n` in :math:`R_i`,
+
+    Then the translation and quaternion can be computed by:
+    
+    .. math::
+        \left\{\begin{aligned}
+        t^x_i &= T^{14}_i\\
+        t^y_i &= T^{24}_i\\
+        t^z_i &= T^{34}_i\\
+        q^x_i &= \mathrm{sign}(R^{23}_i - R^{32}_i) \frac{1}{2} \sqrt{1 + R^{11}_i - R^{22}_i - R^{33}_i}\\
+        q^y_i &= \mathrm{sign}(R^{31}_i - R^{13}_i) \frac{1}{2} \sqrt{1 - R^{11}_i + R^{22}_i - R^{33}_i}\\
+        q^z_i &= \mathrm{sign}(R^{12}_i - R^{21}_i) \frac{1}{2} \sqrt{1 - R^{11}_i - R^{22}_i + R^{33}_i}\\
+        q^w_i &= \frac{1}{2} \sqrt{1 + R^{11}_i + R^{22}_i + R^{33}_i}
+        \end{aligned}\right.,
+
+    In summary, the output LieTensor should be of format:
 
     .. math::
-        \mathbf{T}_i = \begin{bmatrix}
-            R_{11} & R_{12} & R_{13} & t_x\\
-            R_{21} & R_{22} & R_{23} & t_y\\
-            R_{31} & R_{32} & R_{33} & t_z\\
-            0 & 0 & 0 & 1
-        \end{bmatrix},
+        \textbf{y}_i = [t^x_i, t^y_i, t^z_i, q^x_i, q^y_i, q^z_i, q^w_i]
 
-    Output LieTensor should be of format:
-
-    .. math::
-        \mathrm{vec}[*, :] = [t_x, t_y, t_z, q_x, q_y, q_z, q_w]
-
-    where :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` is computed by :meth:`pypose.mat2SO3`.
+    Warning:
+        A rotation matrix is consided illegal if, :math:`\vert R\vert\neq1` or :math:`RR^{T}\neq \mathrm{I}`.
+        If **check** was set to ``True``, illegal input will trigger a warning, but output a result regardless.
 
     Examples:
 
@@ -166,6 +189,27 @@ def mat2SE3(mat, check=False):
         >>> pp.mat2SE3(input)
         SE3Type LieTensor:
         tensor([0.1000, 0.2000, 0.3000, 0.0000, 0.0000, 0.7071, 0.7071])
+
+        >>> pp.mat2SE3(torch.zeros(4,4), check=True)
+        .../pypose/pypose/lietensor/convert.py:79: RuntimeWarning: Input rotation matrices are not all orthogonal matrix,
+                        the result is likely to be wrong
+        .../pypose/pypose/lietensor/convert.py:84: RuntimeWarning: Input rotation matrices' determinant are not all equal to 1,
+                         the result is likely to be wrong
+        SE3Type LieTensor:
+        tensor([0.0000, 0.0000, 0.0000, 0.0000, 0.5000, 0.0000, 0.0000])
+
+
+    Notes:
+        Input matrices can be written as:
+
+    .. math::
+        \begin{bmatrix}
+                R_{3\times3} & t_{3\times1}\\
+                \textbf{0} & 1
+        \end{bmatrix}
+
+    where :math:`R` is the rotation matrix, :math:`t` is the translation vector.
+
 
     See :meth:`pypose.SE3` for more details of the output LieTensor format.
     """
@@ -195,43 +239,90 @@ def mat2Sim3(mat, check=False):
     Args:
         mat (Tensor): the matrix to convert. If input is of shape :obj:`(*, 3, 3)`, 
             then translation will be filled with zero.
+        check (bool, optional): flag to check if the input is valid rotation matrices (orthogonal
+            and and with a determinant of one). More computation is needed if ``True``.
+            Default: ``False``.
 
     Return:
         LieTensor: the converted Sim3Type LieTensor.
 
     Shape:
         Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
-
         Output: :obj:`(*, 8)`
 
-    Suppose the input transformation matrix :math:`\mathbf{T}_i` is
+    Suppose the input transformation matrix :math:`\mathbf{T}_i\in\mathbb{R}^{4x4}`, 
+    let :math:`T^3_i\in\mathbb{R}^{3x3}` be the upper left 3 by 3 sub matrix of :math:`T`,
 
     .. math::
-        \mathbf{T}_i = \begin{bmatrix}
-            sR_{11} & sR_{12} & sR_{13} & t_x\\
-            sR_{21} & sR_{22} & sR_{23} & t_y\\
-            sR_{31} & sR_{32} & sR_{33} & t_z\\
-            0 & 0 & 0 & 1
-        \end{bmatrix},
+        \begin{aligned}
+            s_i &= \sqrt[3]{\vert T^3_i \vert}\\
+            R_i &= T^3_i/s_i
+        \end{aligned}
+    
+    If :math:`s_i` contains zero value, then the function will raise a ``ValueError``, since further 
+    computation leads to *nan* in the computed quaternions.
 
+    Let :math:`T^{mn}_i` be the element of row :math:`m` and coloum :math:`n` in :math:`T_i`, 
+    :math:`R^{mn}_i` be the element of row :math:`m` and coloum :math:`n` in :math:`R_i`,
 
-    Output LieTensor should be of format:
+    Then the translation and quaternion can be computed by:
 
     .. math::
-        \mathrm{vec}[*, :] = [t_x, t_y, t_z, q_x, q_y, q_z, q_w, s]
+        \left\{\begin{aligned}
+        t^x_i &= T^{14}_i\\
+        t^y_i &= T^{24}_i\\
+        t^z_i &= T^{34}_i\\
+        q^x_i &= \mathrm{sign}(R^{23}_i - R^{32}_i) \frac{1}{2} \sqrt{1 + R^{11}_i - R^{22}_i - R^{33}_i}\\
+        q^y_i &= \mathrm{sign}(R^{31}_i - R^{13}_i) \frac{1}{2} \sqrt{1 - R^{11}_i + R^{22}_i - R^{33}_i}\\
+        q^z_i &= \mathrm{sign}(R^{12}_i - R^{21}_i) \frac{1}{2} \sqrt{1 - R^{11}_i - R^{22}_i + R^{33}_i}\\
+        q^w_i &= \frac{1}{2} \sqrt{1 + R^{11}_i + R^{22}_i + R^{33}_i}
+        \end{aligned}\right.,
+    
+    In summary, the output LieTensor should be of format:
 
-    where :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` is computed 
-        by :meth:`pypose.mat2SO3`.
+    .. math::
+        \textbf{y}_i = [t^x_i, t^y_i, t^z_i, q^x_i, q^y_i, q^z_i, q^w_i, s_i]
+
+
+    Warning:
+        A rotation matrix is consided illegal if, :math:`\vert R\vert\neq1` or :math:`RR^{T}\neq \mathrm{I}`.
+        If **check** was set to ``True``, illegal input will trigger a warning, but output a result regardless.
 
     Examples:
 
         >>> input = torch.tensor([[ 0.,-0.5,  0., 0.1],
         ...                       [0.5,  0.,  0., 0.2],
         ...                       [ 0.,  0., 0.5, 0.3],
-        ...                       [ 0.,  0.,  0., 1.]])
+        ...                       [ 0.,  0.,  0.,  1.]])
         >>> pp.mat2Sim3(input)
         Sim3Type LieTensor:
         tensor([0.1000, 0.2000, 0.3000, 0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
+
+        >>> pp.mat2Sim3(torch.zeros(4,4))
+        Traceback (most recent call last):
+        File "<stdin>", line 1, in <module>
+        File ".../pypose/pypose/lietensor/convert.py", line 342, in mat2Sim3
+            raise ValueError("Rotation matrix not full rank.")
+        ValueError: Rotation matrix not full rank.
+
+        >>> pp.mat2Sim3(torch.randn(4,4),check=True)
+        .../pypose/pypose/lietensor/convert.py:79: RuntimeWarning: Input rotation matrices are not all orthogonal matrix,
+                         the result is likely to be wrong
+        .../pypose/pypose/lietensor/convert.py:84: RuntimeWarning: Input rotation matrices' determinant are not all equal to 1,
+                         the result is likely to be wrong
+        Sim3Type LieTensor:
+        tensor([ 1.1607,  0.9052,  0.3270, -0.0684,  0.1764,  0.9095, -0.0921,  1.4414])
+
+    Notes:
+        Input matrices can be written as:
+        
+    .. math::
+        \begin{bmatrix}
+                sR_{3\times3} & t_{3\times1}\\
+                \textbf{0} & 1
+        \end{bmatrix}
+
+    where :math:`R` is the rotation matrix, :math:`s` is the scaling factor, :math:`t` is the translation vector.
 
     See :meth:`pypose.Sim3` for more details of the output LieTensor format.
     """
@@ -245,10 +336,16 @@ def mat2Sim3(mat, check=False):
         raise ValueError("Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. \
                 Got {}".format(mat.shape))
 
+    shape = mat.shape
     rot = mat[..., :3, :3]
 
-    s = torch.linalg.norm(rot[..., 0], dim=-1).unsqueeze(-1)
+    s = torch.pow(torch.det(mat), 1/3).unsqueeze(-1)
+    if torch.any(torch.isclose(s,  torch.zeros(shape[:-2], dtype=mat.dtype), \
+                atol=torch.finfo(mat.dtype).resolution)):
+        raise ValueError("Rotation matrix not full rank.")
+
     q = mat2SO3(rot/s.unsqueeze(-1), check).tensor()
+
     if mat.shape[-1] == 3:
         t = torch.zeros(mat.shape[:-2]+(3,), dtype=mat.dtype, requires_grad=mat.requires_grad)
     else:
@@ -264,32 +361,49 @@ def mat2RxSO3(mat, check=False):
 
     Args:
         mat (Tensor): the matrix to convert.
+        check (bool, optional): flag to check if the input is valid rotation matrices (orthogonal
+            and and with a determinant of one). More computation is needed if ``True``.
+            Default: ``False``.
 
     Return:
         LieTensor: the converted RxSO3Type LieTensor.
 
     Shape:
         Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
-
         Output: :obj:`(*, 5)`
-
-    Suppose the input transformation matrix :math:`\mathbf{R}_i` is
-
-    .. math::
-        \mathbf{R}_i = \begin{bmatrix}
-            sR_{11} & sR_{12} & sR_{13}\\
-            sR_{21} & sR_{22} & sR_{23}\\
-            sR_{31} & sR_{32} & sR_{33}
-        \end{bmatrix},
-
-
-    Output LieTensor should be of format:
+    
+    Suppose the input transformation matrix :math:`\mathbf{T}_i\in\mathbb{R}^{3\times 3}`,
 
     .. math::
-        \mathrm{vec}[*, :] = [q_x, q_y, q_z, q_w, s]
+        \begin{aligned}
+            s_i &= \sqrt[3]{\vert T_i \vert}\\
+            R_i &= T_i/s_i
+        \end{aligned}
+    
+    If :math:`s_i` contains zero value, then the function will raise a ``ValueError``, since further 
+    computation leads to *nan* in the computed quaternions.
 
-    where :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T` is computed 
-        by :meth:`pypose.mat2SO3`.
+    Let :math:`R^{mn}_i` be the element of row :math:`m` and coloum :math:`n` in :math:`R_i`,
+
+    Then the quaternion can be computed by:
+    
+    .. math::
+        \left\{\begin{aligned}
+        q^x_i &= \mathrm{sign}(R^{23}_i - R^{32}_i) \frac{1}{2} \sqrt{1 + R^{11}_i - R^{22}_i - R^{33}_i}\\
+        q^y_i &= \mathrm{sign}(R^{31}_i - R^{13}_i) \frac{1}{2} \sqrt{1 - R^{11}_i + R^{22}_i - R^{33}_i}\\
+        q^z_i &= \mathrm{sign}(R^{12}_i - R^{21}_i) \frac{1}{2} \sqrt{1 - R^{11}_i - R^{22}_i + R^{33}_i}\\
+        q^w_i &= \frac{1}{2} \sqrt{1 + R^{11}_i + R^{22}_i + R^{33}_i}
+        \end{aligned}\right.,
+    
+    In summary, the output LieTensor should be of format:
+
+    .. math::
+        \textbf{y}_i = [q^x_i, q^y_i, q^z_i, q^w_i, s_i]
+
+
+    Warning:
+        A rotation matrix is consided illegal if, :math:`\vert R\vert\neq1` or :math:`RR^{T}\neq \mathrm{I}`.
+        If **check** was set to ``True``, illegal input will trigger a warning, but output a result regardless.
 
     Examples:
 
@@ -299,6 +413,25 @@ def mat2RxSO3(mat, check=False):
         >>> pp.mat2RxSO3(input)
         RxSO3Type LieTensor:
         tensor([0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
+
+        >>> pp.mat2RxSO3(torch.zeros(3,3))
+        Traceback (most recent call last):
+        File "<stdin>", line 1, in <module>
+        File ".../pypose/pypose/lietensor/convert.py", line 436, in mat2RxSO3
+            raise ValueError("Rotation matrix not full rank.")
+        ValueError: Rotation matrix not full rank.
+
+        >>> pp.mat2RxSO3(torch.randn(3,3), check=True)
+        .../pypose/pypose/lietensor/convert.py:79: RuntimeWarning: Input rotation matrices are not all orthogonal matrix,
+                     the result is likely to be wrong
+        RxSO3Type LieTensor:
+        tensor([0.2427, 0.7269, 1.0757, 0.2057, 1.4335])
+
+
+    
+    Notes:
+        Input matrices can be written as :math:`sR_{3\times3}`, where :math:`R` is the rotation matrix,
+        :math:`s` is the scaling factor.
 
     See :meth:`pypose.RxSO3` for more details of the output LieTensor format.
     """
@@ -312,9 +445,14 @@ def mat2RxSO3(mat, check=False):
         raise ValueError("Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. \
                 Got {}".format(mat.shape))
 
+    shape = mat.shape
     rot = mat[..., :3, :3]
 
-    s = torch.linalg.norm(rot[..., 0], dim=-1).unsqueeze(-1)
+    s = torch.pow(torch.det(mat), 1/3).unsqueeze(-1)
+    if torch.any(torch.isclose(s,  torch.zeros(shape[:-2], dtype=mat.dtype), \
+                atol=torch.finfo(mat.dtype).resolution)):
+        raise ValueError("Rotation matrix not full rank.")
+
     q = mat2SO3(rot/s.unsqueeze(-1), check).tensor()
     vec = torch.cat([q, s], dim=-1)
 
@@ -326,11 +464,55 @@ def from_matrix(mat, ltype, check=False):
 
     Args:
         mat (Tensor): the matrix to convert.
-        ltype (class): one of :meth:`pypose.SO3`, :meth:`pypose.SE3`, :meth:`pypose.Sim3`
-                        or :meth:`pypose.RxSO3`.
-
+        ltype: one of :class:`pypose.SO3_type`, :class:`pypose.SE3_type`, :class:`pypose.Sim3_type`
+                        or :class:`pypose.RxSO3_type`.
+        check (bool, optional): flag to check if the input is valid rotation matrices (orthogonal
+            and and with a determinant of one). More computation is needed if ``True``.
+            Default: ``False``.
+    Warning:
+        If **check** was set to ``True``, illegal input (the upper left 3x3 matrices' determinant not
+        equal to one or not orthogonal matrices) will trigger a warning, but output a result regardless.
+    
     Return:
         LieTensor: the converted LieTensor.
+    Examples:
+
+        - :class:`pypose.SO3_type`
+
+        >>> pp.from_matrix(torch.tensor([[0., -1., 0.],
+        ...                              [1.,  0., 0.],
+        ...                              [0.,  0., 1.]]), ltype=pp.SO3_type)
+        SO3Type LieTensor:
+        tensor([0.0000, 0.0000, 0.7071, 0.7071])
+
+        - :class:`pypose.SE3_type`
+
+        >>> pp.from_matrix(torch.tensor([[0., -1., 0., 0.1],
+        ...                              [1.,  0., 0., 0.2],
+        ...                              [0.,  0., 1., 0.3],
+        ...                              [0.,  0., 0.,  1.]]), ltype=pp.SE3_type)
+        SE3Type LieTensor:
+        tensor([0.1000, 0.2000, 0.3000, 0.0000, 0.0000, 0.7071, 0.7071])
+
+        - :class:`pypose.Sim3_type`
+
+        >>> pp.from_matrix(torch.tensor([[ 0.,-0.5,  0., 0.1],
+        ...                              [0.5,  0.,  0., 0.2],
+        ...                              [ 0.,  0., 0.5, 0.3],
+        ...                              [ 0.,  0.,  0.,  1.]]), ltype=pp.Sim3_type)
+        Sim3Type LieTensor:
+        tensor([0.1000, 0.2000, 0.3000, 0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
+
+        - :class:`pypose.RxSO3_type`
+
+        >>> pp.from_matrix(torch.tensor([[0., -0.5, 0.],
+        ...                              [0.5, 0.,  0.],
+        ...                              [0.,  0., 0.5]]), ltype=pp.RxSO3_type)
+        RxSO3Type LieTensor:
+        tensor([0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
+        
+
+
     """
     if not torch.is_tensor(mat):
         mat = torch.tensor(mat)
