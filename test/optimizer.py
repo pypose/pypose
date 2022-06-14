@@ -1,7 +1,8 @@
+import warnings
 import torch, time
-from torch import nn
 import pypose as pp
-from torch.autograd.functional import jacobian
+from torch import nn
+warnings.filterwarnings("ignore")
 
 
 class Timer:
@@ -50,44 +51,37 @@ parser.add_argument('--gamma', default=2, type=float, help='Gamma')
 args = parser.parse_args()
 
 
-class Pose(nn.Module):
-    def __init__(self, *dim):
-        super().__init__()
-        self.pose = pp.Parameter(pp.randn_se3(*dim))
-        self.identity = pp.identity_se3(2, 2)
-
-    def forward(self, inputs):
-        e = (self.pose.Exp() @ inputs).Log()
-        return (e - self.identity).abs().sum()
-
-posnet = Pose(2, 2)
-inputs = pp.randn_SE3(2, 2)
-optimizer = torch.optim.SGD(posnet.parameters(), lr=1e-1)
-scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [50, 70], gamma=0.1)
-timer = Timer()
-
-for idx in range(100):
-    optimizer.zero_grad()
-    scheduler.step()
-    loss = posnet(inputs)
-    loss.backward()
-    optimizer.step()
-    print('Pose loss %.7f @ %dit, Timing: %.3fs'%(loss.sum(), idx, timer.end()))
-    if loss.sum() < 1e-7:
-        print('Early Stoping!')
-        print('Optimization Early Done with loss:', loss.sum().item())
-        break
-print('Done', timer.toc())
-
-
-
 class PoseInv(nn.Module):
     def __init__(self, *dim):
         super().__init__()
         self.pose = pp.Parameter(pp.randn_se3(*dim))
 
     def forward(self, inputs):
-        return (self.pose.Exp() @ inputs).Log()#.abs()
+        return (self.pose.Exp() @ inputs).Log()
+
+
+posnet = PoseInv(2, 2)
+inputs = pp.randn_SE3(2, 2)
+target = pp.identity_se3(2, 2)
+criterion = nn.MSELoss()
+optimizer = torch.optim.SGD(posnet.parameters(), lr=1e-1)
+scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [50, 70], gamma=0.1)
+timer = Timer()
+
+for idx in range(100):
+    optimizer.zero_grad()
+    output = posnet(inputs)
+    loss = criterion(output, target)
+    loss.backward()
+    optimizer.step()
+    scheduler.step()
+    print('Pose loss %.7f @ %dit, Timing: %.3fs'%(loss.item(), idx, timer.end()))
+    if loss.sum() < 1e-5:
+        print('Early Stoping!')
+        print('Optimization Early Done with loss:', loss.item())
+        break
+print('Done', timer.toc())
+
 
 posnet = PoseInv(2, 2)
 inputs = pp.randn_SE3(2, 2)
