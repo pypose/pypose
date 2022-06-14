@@ -3,6 +3,7 @@ from typing import List, Set, Dict, Tuple, Optional, Iterable, Union
 
 import re
 from numpy import block
+from scipy.sparse import bsr_matrix
 
 import torch
 
@@ -39,6 +40,41 @@ def torch_sparse_coo_to_sbm(s):
     sbm.coalesced = True
 
     return sbm
+
+def sbm_to_bsr_cpu(sbm):
+    '''
+    Convert a SparseBlockMatrix to a Block Row Matrix defined by SciPy. 
+    Note that this function is for test purpose. If sbm is on GPU, then
+    all the data will be off loaded to CPU.
+    '''
+
+    if not sbm.is_coalesced():
+        sbm = sbm.coalesce()
+
+    # We only need these two.
+    block_indices = sbm.block_indices
+    block_storage = sbm.block_storage
+
+    # Compose the indptr and indices variables. 
+    middle = torch.nonzero( torch.diff( block_indices[:, 0] ) ).view((-1,)) + 1
+    indptr = torch.zeros( (middle.numel() + 2,), dtype=INDEX_TYPE, device=block_indices.device )
+    indptr[1:-1] = middle
+    indptr[-1] = block_indices.shape[0] # block_indices is a table with many rows.
+    indices = block_indices[:, 1]
+
+    assert indptr.numel() - 1 == sbm.shape_blocks[0], \
+        f'indptr.numel() = {indptr.numel()}, sbm.rows = {sbm.rows}'
+
+    if sbm.is_cuda:
+        # sbm = sbm.to(device='cpu')
+        block_indices = block_indices.cpu()
+        block_storage = block_storage.cpu()
+        indptr = indptr.cpu()
+        indices = indices.cpu()
+    
+    return bsr_matrix( 
+        ( block_storage.numpy(), indices.numpy(), indptr.numpy() ),
+        shape=sbm.shape )
 
 class SparseBlockMatrix(object):
     def __init__(self, 
@@ -163,6 +199,10 @@ class SparseBlockMatrix(object):
     @property
     def device(self):
         return self.row_block_structure.device
+
+    @property
+    def is_cuda(self):
+        return self.row_block_structure.is_cuda
 
     @device.setter
     def device(self, d):
@@ -389,6 +429,9 @@ class SparseBlockMatrix(object):
             f'self.is_coalesced() = {self.is_coalesced()}, other.is_coalesced() = {other.is_coalesced()}'
         
         # ========== Checks done. ==========
+
+        # ========== Off load the data from GPU to CPU. ==========
+
 
         
 

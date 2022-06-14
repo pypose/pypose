@@ -6,11 +6,14 @@ import unittest
 
 # System tools.
 import numpy as np
+from scipy.sparse import bsr_matrix
 
 # pypose.
 import pypose as pp
 from pypose.optim.sparse_block_matrix import (
-    SparseBlockMatrix, sbm_to_torch_sparse_coo, torch_sparse_coo_to_sbm)
+    SparseBlockMatrix, 
+    sbm_to_torch_sparse_coo, torch_sparse_coo_to_sbm, 
+    sbm_to_bsr_cpu)
 
 # Test utils.
 from tests.unit_tests.common import ( torch_equal, show_delimeter )
@@ -88,6 +91,9 @@ class Test_SparseBlockMatrix(unittest.TestCase):
             [ 0, 0, 1, 2, 2 ]
         ]
 
+        cls.bsr_indptr = np.array([ 0, 2, 3, 5 ])
+        cls.bsr_indices = np.array([ 0, 2, 1, 0, 2 ])
+
         cls.rows = max(cls.layout[0])
         cls.cols = max(cls.layout[1])
         cls.shape = ( cls.rows, cls.cols )
@@ -111,6 +117,7 @@ class Test_SparseBlockMatrix(unittest.TestCase):
 
         shape_values = ( len(cls.layout[0]), *cls.block_shape )
         cls.values_raw = torch.arange(30, dtype=torch.float32).view( shape_values )
+        cls.bsr_data = torch.index_select( cls.values_raw, 0, torch.Tensor([0, 3, 2, 1, 4]).to(dtype=torch.int32) ).numpy()
 
     def test_overwrite(self):
         print()
@@ -419,6 +426,35 @@ class Test_SparseBlockMatrix(unittest.TestCase):
                 print(exc)
                 self.assertTrue(False, f'test_add_sbm failed with entry {entry}')
 
+    def test_sbm_2_bsr_cpu(self):
+        print()
+        show_delimeter('Test sbm to bsr conversion. ')
+
+        raw_true_bsr = bsr_matrix(
+            ( Test_SparseBlockMatrix.bsr_data, 
+              Test_SparseBlockMatrix.bsr_indices,
+              Test_SparseBlockMatrix.bsr_indptr ),
+            shape=Test_SparseBlockMatrix.shape ).toarray()
+
+        test_entries = [
+            { 'device': 'cpu'  },
+            { 'device': 'cuda' }
+        ]
+
+        for entry in test_entries:
+            print(entry)
+
+            device = entry['device']
+            values = Test_SparseBlockMatrix.values_raw.to(device)
+
+            sbm = SparseBlockMatrix(Test_SparseBlockMatrix.block_shape, dtype=torch.float32, device=device)
+            sbm.create(shape_blocks=Test_SparseBlockMatrix.shape_blocks, block_indices=Test_SparseBlockMatrix.block_indices)
+            sbm.set_block_storage(values, clone=False)
+
+            bsr = sbm_to_bsr_cpu(sbm)
+            bsr = bsr.toarray()
+
+            self.assertTrue( np.allclose( bsr, raw_true_bsr ), f'test_sbm_2_bsr_cpu failed with entry {entry}' )
 
 if __name__ == '__main__':
     import os
