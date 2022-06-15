@@ -25,23 +25,24 @@ class LM(Optimizer):
                 \bm{f}~\text{(model)}, \bm{x}~(\text{inputs}), \bm{y}~(\text{targets})           \\
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
-            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}{\partial \bm{\theta}}} \\
+            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}
+                {\partial \bm{\theta}_{t-1}}}                                                    \\
             &\hspace{5mm} \mathbf{A} \leftarrow \mathbf{J}^T \mathbf{J} +
                 \lambda \mathrm{diag} (\mathbf{\mathbf{J}^T \mathbf{J}})                         \\
+            &\hspace{5mm} \mathbf{E} = \bm{y} - \bm{f(\bm{\theta}_{t-1}, \bm{x})}                \\
             &\hspace{5mm} \textbf{try}                                                           \\
             &\hspace{10mm} \mathbf{L} = \mathrm{cholesky\_decomposition}(\mathbf{A})             \\
-            &\hspace{10mm} \bm{\delta} = \mathrm{cholesky\_solve}(\mathbf{J}^T, \bm{L})          \\
+            &\hspace{10mm} \bm{\delta}=\mathrm{cholesky\_solve}(\mathbf{J}^T \mathbf{E}, \bm{L}) \\
             &\hspace{5mm} \textbf{except}                                                        \\
-            &\hspace{10mm} \bm{\delta} = \mathrm{pseudo\_inverse}(\mathbf{A}) \mathbf{J}^T       \\
-            &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} +
-                \bm{\delta}(\bm{y} - \bm{f(\bm{\theta}_{t-1}, \bm{x})})                          \\
+            &\hspace{10mm} \bm{\delta}=\mathrm{pseudo\_inverse}(\mathbf{A})\mathbf{J}^T\mathbf{E}\\
+            &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}               \\
             &\rule{113mm}{0.4pt}                                                          \\[-1.ex]
             &\bf{return} \:  \theta_t                                                     \\[-1.ex]
             &\rule{113mm}{0.4pt}                                                          \\[-1.ex]
        \end{aligned}
 
     Args:
-        params (iterable): iterable of parameters to optimize or dicts defining parameter groups
+        model (nn.Module): a module containing learnable parameters.
         damping (float): Levenberg's damping factor (non-negative number) to prevent singularity.
 
     Note:
@@ -106,18 +107,18 @@ class LM(Optimizer):
         '''
         outputs = self.model(inputs)
         if isinstance(outputs, tuple):
-            L = torch.cat([(t - o).view(-1, 1) for t, o in zip(targets, outputs)])
+            E = torch.cat([(t - o).view(-1, 1) for t, o in zip(targets, outputs)])
         else:
-            L = (targets - outputs).view(-1, 1)
+            E = (targets - outputs).view(-1, 1)
         for group in self.param_groups:
             numels = [p.numel() for p in group['params'] if p.requires_grad]
             J = modjac(self.model, inputs, flatten=True)
             A = (J.T @ J).diagonal_scatter((1 + group['damping']) * (J**2).sum(0))
             try: # Faster but sometimes singular error
-                D = (J.T @ L).cholesky_solve(torch.linalg.cholesky(A))
+                D = (J.T @ E).cholesky_solve(torch.linalg.cholesky(A))
             except: # Slower but singular is fine
-                D = A.pinverse() @ (J.T @ L)
+                D = A.pinverse() @ (J.T @ E)
                 warnings.warn("Using pseudo inverse due to singular matrix.", UserWarning)
             D = torch.split(D, numels)
             [p.add_(d.view(p.shape)) for p, d in zip(group['params'], D) if p.requires_grad]
-        return L.norm()
+        return E.norm()
