@@ -39,6 +39,65 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
                         torch.stack([-v[...,1],  v[...,0],         O], dim=-1)], dim=-2)
 
 
+def add_(input, other, alpha=1):
+    r'''
+    Inplace version of :meth:`pypose.add`.
+    '''
+    return input.add_(other, alpha)
+
+
+def add(input, other, alpha=1):
+    r'''
+    Adds other, scaled by alpha, to input LieTensor.
+
+    .. math::
+        \bm{y}_i =
+        \begin{cases}
+        \alpha * \bm{a}_i + \bm{x}_i & \text{if}~\bm{x}_i~\text{is a Lie Algebra} \\
+        \mathrm{Exp}(\alpha * \bm{a}_i) \times \bm{x}_i & \text{if}~\bm{x}_i~\text{is a Lie Group}
+        \end{cases}
+
+    where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` Tensor to add.
+
+    Args:
+        input (:obj:`LieTensor`): the input LieTensor.
+
+        other (:obj:`Tensor` or :obj:`Number`): the tensor or number to add to input.
+
+        alpha (:obj:`Number`): the multiplier for other.
+
+    Return:
+        :obj:`LieTensor`: the output LieTensor.
+
+    Warning:
+        The ``other`` Tensor is taken as a Lie Algebra during computation. For shape compatibility,
+        its elements exceeding the expected shape of a Lie Algebra in the last dimension are
+        ignored. This is to work with PyTorch optimizers like :obj:`torch.optim.SGD` for calling
+        functions :meth:`.add_` to alter parameters.
+
+    See :meth:`LieTensor` for types of Lie Algebra and Lie Group.
+
+    See :meth:`Exp` for Exponential mapping of Lie Albebra.
+
+    Examples:
+        >>> x = pp.randn_SE3()
+        >>> a = torch.randn(6)
+        >>> x + a
+        SE3Type LieTensor:
+        tensor([-1.6089,  0.4184,  0.6621, -0.2098,  0.5383,  0.4794,  0.6606])
+        >>> pp.add(x, a)
+        SE3Type LieTensor:
+        tensor([-1.6089,  0.4184,  0.6621, -0.2098,  0.5383,  0.4794,  0.6606])
+        >>> pp.se3(a).Exp() @ x
+        SE3Type LieTensor:
+        tensor([-1.6089,  0.4184,  0.6621, -0.2098,  0.5383,  0.4794,  0.6606])
+        >>> x + torch.cat([a, torch.randn(1)])
+        SE3Type LieTensor:
+        tensor([-1.6089,  0.4184,  0.6621, -0.2098,  0.5383,  0.4794,  0.6606])
+    '''
+    return input.add(other, alpha)
+
+
 def cumops_(input, dim, ops):
     r'''
         Inplace version of :meth:`pypose.cumops`

@@ -18,7 +18,7 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
                      'swapaxes', 'swapdims', 'take', 'take_along_dim', 'tile', 'copy',
                      'transpose', 'unbind', 'gather', 'repeat', 'expand', 'expand_as',
                      'index_select', 'masked_select', 'index_copy', 'index_copy_',
-                     'select', 'select_scatter', 'index_put','index_put_']
+                     'select', 'select_scatter', 'index_put','index_put_', 'copy_']
 
 
 class LieType:
@@ -48,6 +48,13 @@ class LieType:
     @property
     def on_manifold(self):
         return self.dimension == self.manifold
+
+    def add_(self, input, other):
+        if self.on_manifold:
+            other1 = torch.Tensor.as_subclass(input, torch.Tensor)
+            other2 = torch.Tensor.as_subclass(other, torch.Tensor)
+            return input.copy_(other1 + other2)
+        raise NotImplementedError("Instance has no add_ attribute.")
 
     def Log(self, X):
         if self.on_manifold:
@@ -207,6 +214,10 @@ class SO3Type(LieType):
         data = so3_type.Exp(so3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=SO3_type).requires_grad_(requires_grad)
 
+    @classmethod
+    def add_(cls, input, other):
+        return input.copy_(LieTensor(other[..., :3], ltype=so3_type).Exp() * inputs)
+
     def matrix(self, X):
         """ To 3x3 matrix """
         I = torch.eye(3, dtype=X.dtype, device=X.device)
@@ -278,6 +289,10 @@ class SE3Type(LieType):
         data = se3_type.Exp(se3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=SE3_type).requires_grad_(requires_grad)
 
+    @classmethod
+    def add_(cls, input, other):
+        return input.copy_(LieTensor(other[..., :6], ltype=se3_type).Exp() * input)
+
 
 class se3Type(LieType):
     def __init__(self):
@@ -313,6 +328,10 @@ class Sim3Type(LieType):
         data = sim3_type.Exp(sim3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=Sim3_type).requires_grad_(requires_grad)
 
+    @classmethod
+    def add_(cls, input, other):
+        return input.copy_(LieTensor(other[..., :7], ltype=sim3_type).Exp() * input)
+
 
 class sim3Type(LieType):
     def __init__(self):
@@ -347,6 +366,10 @@ class RxSO3Type(LieType):
     def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
         data = rxso3_type.Exp(rxso3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=RxSO3_type).requires_grad_(requires_grad)
+
+    @classmethod
+    def add_(cls, input, other):
+        return input.copy_(LieTensor(other[..., :4], ltype=rxso3_type).Exp() * input)
 
 
 class rxso3Type(LieType):
@@ -619,6 +642,21 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.Act(self, p)
 
+    def add(self, other, alpha=1):
+        r'''
+        See :meth:`pypose.add`
+        '''
+        return self.clone().add_(other = alpha * other)
+
+    def add_(self, other, alpha=1):
+        r'''
+        See :meth:`pypose.add_`
+        '''
+        return self.ltype.add_(self, other = alpha * other)
+
+    def __add__(self, other):
+        return self.add(other=other)
+
     def __mul__(self, other):
         return self.ltype.Mul(self, other)
 
@@ -785,11 +823,6 @@ class Parameter(LieTensor, nn.Parameter):
         data (LieTensor): parameter LieTensor.
         requires_grad (bool, optional): if the parameter requires
             gradient. Default: True
-
-    Note:
-        :meth:`Parameter` is **highly recommended** to use with LieTensor for
-        **Lie Algebra types**, e.g., :meth:`so3`, :meth:`se3`, :meth:`sim3`,
-        and :meth:`rxso3`, although Lie Group types are also applicable.
 
     Examples:
         >>> x = pp.Parameter(pp.randn_so3(2))
