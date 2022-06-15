@@ -72,8 +72,10 @@ def add(input, other, alpha=1):
     Warning:
         The ``other`` Tensor is taken as a Lie Algebra during computation. For shape compatibility,
         its elements exceeding the expected shape of a Lie Algebra in the last dimension are
-        ignored. This is to work with PyTorch optimizers like :obj:`torch.optim.SGD` for calling
-        functions :meth:`.add_` to alter parameters.
+        ignored to work with PyTorch optimizers like :obj:`torch.optim.SGD` for calling functions
+        :meth:`.add_` to alter parameters by gradients. This is because the gradient of a Lie Group
+        has a smaller shape, while it is stored in :obj:`LieTensor.grad`, which has the same storage
+        with its Lie Group.
 
     See :meth:`LieTensor` for types of Lie Algebra and Lie Group.
 
