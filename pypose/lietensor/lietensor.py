@@ -254,7 +254,7 @@ class so3Type(LieType):
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
 
     def rotation(self, lietensor):
-        return lietensor.Exp()
+        return lietensor.Exp().rotation()
 
     def Jr(self, x):
         """
@@ -302,12 +302,10 @@ class se3Type(LieType):
         return LieTensor(X, ltype=SE3_type)
 
     def rotation(self, lietensor):
-        X = lietensor.Exp()
-        return LieTensor(X.tensor()[..., 0:4], ltype=SO3_type)
+        return lietensor.Exp().rotation()
 
     def translation(self, lietensor):
-        X = lietensor.Exp()
-        return X.tensor()[..., 4:6]
+        return lietensor.Exp().translation()
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -354,16 +352,13 @@ class sim3Type(LieType):
         return LieTensor(X, ltype=Sim3_type)
 
     def rotation(self, lietensor):
-        X = lietensor.Exp()
-        return LieTensor(X.tensor()[..., 0:4], ltype=SO3_type)
+        return lietensor.Exp().rotation()
 
     def translation(self, lietensor):
-        X = lietensor.Exp()
-        return X.tensor()[..., 4:6]
+        return lietensor.Exp().translation()
 
     def scale(self, lietensor):
-        X = lietensor.Exp()
-        return X.tensor()[..., 6:7]
+        return lietensor.Exp().scale()
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -407,12 +402,10 @@ class rxso3Type(LieType):
         return LieTensor(X, ltype=RxSO3_type)
 
     def rotation(self, lietensor):
-        X = lietensor.Exp()
-        return LieTensor(X.tensor()[..., 0:4], ltype=SO3_type)
+        return lietensor.Exp().rotation()
 
     def scale(self, lietensor):
-        X = lietensor.Exp()
-        return X.tensor()[..., 4:5]
+        return lietensor.Exp().scale()
 
     @classmethod
     def identity(cls, *size, **kwargs):
