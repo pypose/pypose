@@ -122,27 +122,16 @@ class LieType:
         I = I.view([1] * (X.dim() - 1) + [4, 4])
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
 
-    def translation(self, lietensor):
-        """ To translation """
-        X = lietensor.Exp() if self.on_manifold else lietensor
-        p = torch.tensor([0., 0., 0.], dtype=X.dtype, device=X.device)
-        return X.Act(p.view([1] * (X.dim() - 1) + [3,]))
+    def rotation(self, lietensor):
+        raise NotImplementedError("Rotation is not implemented for the instance.")
 
-    def quaternion(self, lietensor):
-        """ To quaternion """
-        X = lietensor.Exp() if self.on_manifold else lietensor
-        if self.lid == 1 or self.lid == 2:      # X is SO3 or RxSO3 type
-            return LieTensor(X.tensor()[..., 0:4], ltype=SO3_type)
-        elif self.lid == 3 or self.lid == 4:    # X is SE3 or Sim3 type
-            return LieTensor(X.tensor()[..., 3:7], ltype=SO3_type)
+    def translation(self, lietensor):
+        warnings.warn("Instance has no translation. Zero vector(s) is returned.")
+        return torch.zeros(lietensor.size()[:-1] + (3,))
 
     def scale(self, lietensor):
-        """ Get scale """
-        if self.lid == 1 or self.lid == 3:      # SO3, so3, SE3, se3 type, scale = 1
-            return torch.ones(lietensor.size()[:-1] + (1,))
-        elif self.lid == 2 or self.lid == 4:    # Sim3, sim3, RxSO3, rxso3 type
-            X = lietensor.Exp() if self.on_manifold else lietensor
-            return X.tensor()[..., -1].view(X.size()[:-1] + (1,))
+        warnings.warn("Instance has no scale. Scalar one(s) is returned.")
+        return torch.ones(lietensor.size()[:-1] + (1,))
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -226,6 +215,9 @@ class SO3Type(LieType):
         I = I.view([1] * (X.dim() - 1) + [3, 3])
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
 
+    def rotation(self, X):
+        return X
+
     def identity_(self, X):
         X.fill_(0)
         X.index_fill_(dim=-1, index=torch.tensor([-1], device=X.device), value=1)
@@ -261,6 +253,9 @@ class so3Type(LieType):
         I = I.view([1] * (X.dim() - 1) + [3, 3])
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
 
+    def rotation(self, lietensor):
+        return lietensor.Exp().rotation()
+
     def Jr(self, x):
         """
         Right jacobian of so(3)
@@ -282,6 +277,12 @@ class SE3Type(LieType):
         x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=se3_type)
 
+    def rotation(self, X):
+        return LieTensor(X.tensor()[..., 0:4], ltype=SO3_type)
+
+    def translation(self, X):
+        return X.tensor()[..., 4:6]
+
     @classmethod
     def identity(cls, *size, **kwargs):
         data = torch.tensor([0., 0., 0., 0., 0., 0., 1.], **kwargs)
@@ -300,6 +301,12 @@ class se3Type(LieType):
         X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=SE3_type)
 
+    def rotation(self, lietensor):
+        return lietensor.Exp().rotation()
+
+    def translation(self, lietensor):
+        return lietensor.Exp().translation()
+
     @classmethod
     def identity(cls, *size, **kwargs):
         return SE3_type.Log(SE3_type.identity(*size, **kwargs))
@@ -316,6 +323,15 @@ class Sim3Type(LieType):
     def Log(self, X):
         x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=sim3_type)
+
+    def rotation(self, X):
+        return LieTensor(X.tensor()[..., 0:4], ltype=SO3_type)
+
+    def translation(self, X):
+        return X.tensor()[..., 4:6]
+
+    def scale(self, X):
+        return X.tensor()[..., 6:7]
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -335,6 +351,15 @@ class sim3Type(LieType):
         X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=Sim3_type)
 
+    def rotation(self, lietensor):
+        return lietensor.Exp().rotation()
+
+    def translation(self, lietensor):
+        return lietensor.Exp().translation()
+
+    def scale(self, lietensor):
+        return lietensor.Exp().scale()
+
     @classmethod
     def identity(cls, *size, **kwargs):
         return Sim3_type.Log(Sim3_type.identity(*size, **kwargs))
@@ -351,6 +376,12 @@ class RxSO3Type(LieType):
     def Log(self, X):
         x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=rxso3_type)
+
+    def rotation(self, X):
+        return LieTensor(X.tensor()[..., 0:4], ltype=SO3_type)
+
+    def scale(self, X):
+        return X.tensor()[..., 4:5]
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -369,6 +400,12 @@ class rxso3Type(LieType):
     def Exp(self, x):
         X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=RxSO3_type)
+
+    def rotation(self, lietensor):
+        return lietensor.Exp().rotation()
+
+    def scale(self, lietensor):
+        return lietensor.Exp().scale()
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -755,10 +792,10 @@ class LieTensor(torch.Tensor):
 
     def translation(self) -> torch.Tensor:
         r'''
-        Extract the translation vector from a LieTensor.
+        Extract the translation from a LieTensor.
 
         Return:
-            Tensor: the batched translation.
+            Tensor: the batched translation vectors.
 
         Warning:
             The :obj:`SO3`, :obj:`so3`, :obj:`RxSO3`, and :obj:`rxso3` types do not contain translation. 
@@ -776,28 +813,28 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.translation(self)
 
-    def quaternion(self):
+    def rotation(self):
         r'''
-        Extract the quaternion from a LieTensor.
+        Extract the rotation from a LieTensor.
 
         Return:
-            SO3: the batched quaternion.
+            SO3: the batched quaternions.
 
         Example:
             >>> x = pp.randn_SE3(2)
-            >>> x.quaternion()
+            >>> x.rotation()
             SO3Type LieTensor:
             tensor([[-0.8302,  0.5200, -0.0056,  0.2006],
                     [-0.2541, -0.3184,  0.6305,  0.6607]])
         '''
-        return self.ltype.quaternion(self)
+        return self.ltype.rotation(self)
 
     def scale(self) -> torch.Tensor:
         r'''
         Extract the scale from a LieTensor.
 
         Return:
-            Tensor: the batched scale.
+            Tensor: the batched scale scalars.
 
         Warning:
             The :obj:`SO3`, :obj:`so3`, :obj:`SE3`, and :obj:`se3` types do not contain scale. 
