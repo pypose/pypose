@@ -1,0 +1,74 @@
+import torch
+import pykitti
+
+import numpy as np
+import pypose as pp
+from datetime import datetime
+import torch.utils.data as Data
+
+
+def get_loss(inte_state, cov_state, data):
+    pos_loss = torch.nn.functional.mse_loss(inte_state['pos'], data['gt_pos'][:,1:,:])
+    rot_loss = torch.nn.functional.mse_loss(inte_state['rot'].Log(), data['gt_rot'][:,1:,:].Log())
+
+    loss = pos_loss + rot_loss
+    return loss, {'pos_loss': pos_loss, 'rot_loss': rot_loss}
+
+
+class KITTI_IMU(Data.Dataset):
+    def __init__(self, root, dataname, drive, duration = 10, step_size = 1, mode = 'train',):
+        super().__init__()
+        self.duration = duration
+        self.data = pykitti.raw(root, dataname, drive)
+        self.seq_len = len(self.data.timestamps) - 1
+
+        self.dt = torch.tensor([datetime.timestamp(self.data.timestamps[i+1]) - datetime.timestamp(self.data.timestamps[i]) for i in range(self.seq_len)])
+        self.gyro = torch.tensor([[self.data.oxts[i].packet.wx, self.data.oxts[i].packet.wy, self.data.oxts[i].packet.wz] for i in range(self.seq_len)])
+        self.acc = torch.tensor([[self.data.oxts[i].packet.ax, self.data.oxts[i].packet.ay, self.data.oxts[i].packet.az] for i in range(self.seq_len)])
+        self.gt_rot = pp.euler2SO3(torch.tensor([[self.data.oxts[i].packet.roll, self.data.oxts[i].packet.pitch, self.data.oxts[i].packet.yaw] for i in range(self.seq_len)]))
+        self.gt_vel = self.gt_rot @ torch.tensor([[self.data.oxts[i].packet.vf, self.data.oxts[i].packet.vl, self.data.oxts[i].packet.vu] for i in range(self.seq_len)])
+        self.gt_pos = torch.tensor([self.data.oxts[i].T_w_imu[0:3, 3] for i in range(self.seq_len)] )
+
+        start_frame = 0
+        end_frame = self.seq_len
+        if mode == 'train':
+            end_frame = np.floor(self.seq_len * 0.5).astype(int)
+        elif mode == 'test':
+            start_frame = np.floor(self.seq_len * 0.5).astype(int)
+
+        self.index_map = [i for i in range(0, end_frame - start_frame - self.duration, step_size)]
+
+    def __len__(self):
+        return len(self.index_map)
+
+    def __getitem__(self, i):
+        frame_id = self.index_map[i]
+        end_frame_id = frame_id + self.duration
+        return {
+            'dt': self.dt[frame_id: end_frame_id],
+            'acc': self.acc[frame_id: end_frame_id],
+            'ang': self.gyro[frame_id: end_frame_id],
+            'gt_pos': self.gt_pos[frame_id: end_frame_id+1],
+            'gt_rot': self.gt_rot[frame_id: end_frame_id+1],
+            'gt_vel': self.gt_vel[frame_id: end_frame_id+1],
+        }
+
+
+def imu_collate(data):
+    feat_acc = torch.stack([torch.tensor(d['acc']) for d in data])
+    feat_gyro = torch.stack([torch.tensor(d['ang']) for d in data])
+
+    gt_pos = torch.stack([d['gt_pos'] for d in data])
+    gt_rot = torch.stack([d['gt_rot'] for d in data])
+    gt_vel = torch.stack([d['gt_vel'] for d in data])
+
+    dt = torch.stack([d['dt'] for d in data]).unsqueeze(-1)
+
+    return {
+        'dt': dt,
+        'acc': feat_acc,
+        'ang': feat_gyro,
+        'gt_pos': gt_pos,
+        'gt_vel': gt_vel,
+        'gt_rot': gt_rot,
+    }
