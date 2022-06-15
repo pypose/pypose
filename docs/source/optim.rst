@@ -7,4 +7,5 @@ Optimization
    :nosignatures:
 
    :template: autosummary/class-no-inherit.rst
+   optim.LM
    optim.modjac
