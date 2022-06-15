@@ -144,7 +144,7 @@ def mat2SE3(mat, check=False):
         Output: :obj:`(*, 7)`
 
     Suppose the input transformation matrix :math:`T_i\in\mathbb{R}^{4\times 4}`,
-    let :math:`R_i\in\mathbb{R}^{3\times 3}` be the upper left 3 by 3 sub matrix of :math:`T_i`.  
+    let :math:`R_i\in\mathbb{R}^{3\times 3}` be the upper left 3 by 3 submatrix of :math:`T_i`.  
     Let :math:`T^{m,n}_i` be the element of row :math:`m` and coloum :math:`n` in :math:`T_i`, 
     then the translation and quaternion can be computed by:
     
@@ -233,7 +233,7 @@ def mat2Sim3(mat, check=False):
         Output: :obj:`(*, 8)`
 
     Suppose the input transformation matrix :math:`T_i\in\mathbb{R}^{4\times 4}`,
-    let :math:`U_i\in\mathbb{R}^{3\times 3}` be the upper left 3 by 3 sub matrix of :math:`T_i`,
+    let :math:`U_i\in\mathbb{R}^{3\times 3}` be the upper left 3 by 3 submatrix of :math:`T_i`,
     then the scaling factor :math:`s_i\in\mathbb{R}` and the rotation matrix
     :math:`R_i\in\mathbb{R}^{3\times 3}` can be computed as:
 
