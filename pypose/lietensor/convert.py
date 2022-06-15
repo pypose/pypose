@@ -25,19 +25,19 @@ def mat2SO3(mat, check=False):
     .. math::
         \mathbf{q}_i = 
         \left\{\begin{aligned}
-        &\mathrm{sign}(R^{23}_i - R^{32}_i) \frac{1}{2} \sqrt{1 + R^{11}_i - R^{22}_i - R^{33}_i}\\
-        &\mathrm{sign}(R^{31}_i - R^{13}_i) \frac{1}{2} \sqrt{1 - R^{11}_i + R^{22}_i - R^{33}_i}\\
-        &\mathrm{sign}(R^{12}_i - R^{21}_i) \frac{1}{2} \sqrt{1 - R^{11}_i - R^{22}_i + R^{33}_i}\\
-        &\frac{1}{2} \sqrt{1 + R^{11}_i + R^{22}_i + R^{33}_i}
+        &\mathrm{sign}(R^{2,3}_i - R^{3,2}_i) \frac{1}{2} \sqrt{1 + R^{1,1}_i - R^{2,2}_i - R^{3,3}_i}\\
+        &\mathrm{sign}(R^{3,1}_i - R^{1,3}_i) \frac{1}{2} \sqrt{1 - R^{1,1}_i + R^{2,2}_i - R^{3,3}_i}\\
+        &\mathrm{sign}(R^{1,2}_i - R^{2,1}_i) \frac{1}{2} \sqrt{1 - R^{1,1}_i - R^{2,2}_i + R^{3,3}_i}\\
+        &\frac{1}{2} \sqrt{1 + R^{1,1}_i + R^{2,2}_i + R^{3,3}_i}
         \end{aligned}\right.,
     
-    where :math:`R` and :math:`\mathbf{q_i} = [q^x_i, q^y_i, q^z_i, q^w_i]` are the input matrices
+    where :math:`R_i` and :math:`\mathbf{q_i} = [q^x_i, q^y_i, q^z_i, q^w_i]` are the input matrices
     and output LieTensor, respectively.
 
     Warning:
-        A rotation matrix is consided illegal if :math:`\vert R\vert\neq1` or
-        :math:`RR^{T}\neq \mathrm{I}`. If ``check`` was set to ``True``, illegal input will trigger
-        a warning, but output a result regardless.
+        A rotation matrix is consided illegal if, :math:`\vert R\vert\neq1` or 
+        :math:`RR^{T}\neq \mathrm{I}`. If ``check`` was set to ``True``, illegal input will raise 
+        a ``ValueError``, since the function will ouput irrelevant result, likely contains ``nan``.
 
     Examples:
 
@@ -68,13 +68,11 @@ def mat2SO3(mat, check=False):
         e0 = mat @ mat.mT
         e1 = torch.eye(3, dtype=mat.dtype).repeat(shape[:-2] + (1, 1))
         if not torch.allclose(e0, e1, atol=torch.finfo(e0.dtype).resolution):
-            warnings.warn("Input rotation matrices are not all orthogonal matrix, \
-                the result is likely to be wrong", RuntimeWarning)
+            raise ValueError("Input rotation matrices are not all orthogonal matrix")
 
         if not torch.allclose(torch.det(mat), torch.ones(shape[:-2], dtype=mat.dtype), \
                 atol=torch.finfo(e0.dtype).resolution):
-            warnings.warn("Input rotation matrices' determinant are not all equal to 1, \
-                the result is likely to be wrong", RuntimeWarning)
+            raise ValueError("Input rotation matrices' determinant are not all equal to 1")
 
     rmat_t = mat.mT
 
@@ -142,23 +140,23 @@ def mat2SE3(mat, check=False):
 
     Shape:
         Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
+
         Output: :obj:`(*, 7)`
 
-    Suppose the input transformation matrix :math:`\mathbf{T}_i\in\mathbb{R}^{4\times 4}`,
-    let :math:`R_i\in\mathbb{R}^{3\times 3}` be the upper left 3 by 3 sub matrix of :math:`T`.
-    Let :math:`T^{mn}_i` be the element of row :math:`m` and coloum :math:`n` in :math:`T_i`, 
-    :math:`R^{mn}_i` be the element of row :math:`m` and coloum :math:`n` in :math:`R_i`, then
-    the translation and quaternion can be computed by:
+    Suppose the input transformation matrix :math:`T_i\in\mathbb{R}^{4\times 4}`,
+    let :math:`R_i\in\mathbb{R}^{3\times 3}` be the upper left 3 by 3 sub matrix of :math:`T_i`.  
+    Let :math:`T^{m,n}_i` be the element of row :math:`m` and coloum :math:`n` in :math:`T_i`, 
+    then the translation and quaternion can be computed by:
     
     .. math::
         \left\{\begin{aligned}
-        t^x_i &= T^{14}_i\\
-        t^y_i &= T^{24}_i\\
-        t^z_i &= T^{34}_i\\
-        q^x_i &= \mathrm{sign}(R^{23}_i - R^{32}_i) \frac{1}{2} \sqrt{1 + R^{11}_i - R^{22}_i - R^{33}_i}\\
-        q^y_i &= \mathrm{sign}(R^{31}_i - R^{13}_i) \frac{1}{2} \sqrt{1 - R^{11}_i + R^{22}_i - R^{33}_i}\\
-        q^z_i &= \mathrm{sign}(R^{12}_i - R^{21}_i) \frac{1}{2} \sqrt{1 - R^{11}_i - R^{22}_i + R^{33}_i}\\
-        q^w_i &= \frac{1}{2} \sqrt{1 + R^{11}_i + R^{22}_i + R^{33}_i}
+        t^x_i &= T^{1,4}_i\\
+        t^y_i &= T^{2,4}_i\\
+        t^z_i &= T^{3,4}_i\\
+        q^x_i &= \mathrm{sign}(R^{2,3}_i - R^{3,2}_i) \frac{1}{2} \sqrt{1 + R^{1,1}_i - R^{2,2}_i - R^{3,3}_i}\\
+        q^y_i &= \mathrm{sign}(R^{3,1}_i - R^{1,3}_i) \frac{1}{2} \sqrt{1 - R^{1,1}_i + R^{2,2}_i - R^{3,3}_i}\\
+        q^z_i &= \mathrm{sign}(R^{1,2}_i - R^{2,1}_i) \frac{1}{2} \sqrt{1 - R^{1,1}_i - R^{2,2}_i + R^{3,3}_i}\\
+        q^w_i &= \frac{1}{2} \sqrt{1 + R^{1,1}_i + R^{2,2}_i + R^{3,3}_i}
         \end{aligned}\right.,
 
     In summary, the output LieTensor should be of format:
@@ -167,8 +165,9 @@ def mat2SE3(mat, check=False):
         \textbf{y}_i = [t^x_i, t^y_i, t^z_i, q^x_i, q^y_i, q^z_i, q^w_i]
 
     Warning:
-        A rotation matrix is consided illegal if, :math:`\vert R\vert\neq1` or :math:`RR^{T}\neq \mathrm{I}`.
-        If **check** was set to ``True``, illegal input will trigger a warning, but output a result regardless.
+        A rotation matrix is consided illegal if, :math:`\vert R\vert\neq1` or 
+        :math:`RR^{T}\neq \mathrm{I}`. If ``check`` was set to ``True``, illegal input will
+        raise a ``ValueError``, since the function will ouput irrelevant result, likely contains ``nan``.
 
     Examples:
 
@@ -180,16 +179,17 @@ def mat2SE3(mat, check=False):
         SE3Type LieTensor:
         tensor([0.1000, 0.2000, 0.3000, 0.0000, 0.0000, 0.7071, 0.7071])
 
-    Notes:
+    Note:
         Input matrices can be written as:
 
-    .. math::
-        \begin{bmatrix}
-                R_{3\times3} & t_{3\times1}\\
-                \textbf{0} & 1
-        \end{bmatrix}
+        .. math::
+            \begin{bmatrix}
+                    R_{3\times3} & \mathbf{t}_{3\times1}\\
+                    \textbf{0} & 1
+            \end{bmatrix},
 
-    where :math:`R` is the rotation matrix, :math:`t` is the translation vector.
+        where :math:`R` is the rotation matrix. The translation vector :math:`\mathbf{t}` defines the
+        displacement between the original position and the transformed position.
 
 
     See :meth:`pypose.SE3` for more details of the output LieTensor format.
@@ -229,34 +229,32 @@ def mat2Sim3(mat, check=False):
 
     Shape:
         Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
+
         Output: :obj:`(*, 8)`
 
-    Suppose the input transformation matrix :math:`\mathbf{T}_i\in\mathbb{R}^{4\times 4}`,
-    let :math:`T^3_i\in\mathbb{R}^{3\times 3}` be the upper left 3 by 3 sub matrix of :math:`T`,
+    Suppose the input transformation matrix :math:`T_i\in\mathbb{R}^{4\times 4}`,
+    let :math:`U_i\in\mathbb{R}^{3\times 3}` be the upper left 3 by 3 sub matrix of :math:`T_i`,
+    then the scaling factor :math:`s_i\in\mathbb{R}` and the rotation matrix
+    :math:`R_i\in\mathbb{R}^{3\times 3}` can be computed as:
 
     .. math::
         \begin{aligned}
-            s_i &= \sqrt[3]{\vert T^{1:3, 1:3}_i \vert}\\
-            R_i &= T^3_i/s_i
+            s_i &= \sqrt[3]{\vert U_i \vert}\\
+            R_i &= U_i/s_i
         \end{aligned}
     
-    If :math:`s_i` contains zero value, then the function will raise a ``ValueError``, since further 
-    computation leads to *nan* in the computed quaternions.
-
-    Let :math:`T^{mn}_i` be the element of row :math:`m` and coloum :math:`n` in :math:`T_i`, 
-    :math:`R^{mn}_i` be the element of row :math:`m` and coloum :math:`n` in :math:`R_i`,
-
-    Then the translation and quaternion can be computed by:
+    Let :math:`T^{m,n}_i` be the element of row :math:`m` and coloum :math:`n` in :math:`T_i`, 
+    then the translation and quaternion can be computed by:
 
     .. math::
         \left\{\begin{aligned}
-        t^x_i &= T^{14}_i\\
-        t^y_i &= T^{24}_i\\
-        t^z_i &= T^{34}_i\\
-        q^x_i &= \mathrm{sign}(R^{23}_i - R^{32}_i) \frac{1}{2} \sqrt{1 + R^{11}_i - R^{22}_i - R^{33}_i}\\
-        q^y_i &= \mathrm{sign}(R^{31}_i - R^{13}_i) \frac{1}{2} \sqrt{1 - R^{11}_i + R^{22}_i - R^{33}_i}\\
-        q^z_i &= \mathrm{sign}(R^{12}_i - R^{21}_i) \frac{1}{2} \sqrt{1 - R^{11}_i - R^{22}_i + R^{33}_i}\\
-        q^w_i &= \frac{1}{2} \sqrt{1 + R^{11}_i + R^{22}_i + R^{33}_i}
+        t^x_i &= T^{1,4}_i\\
+        t^y_i &= T^{2,4}_i\\
+        t^z_i &= T^{3,4}_i\\
+        q^x_i &= \mathrm{sign}(R^{2,3}_i - R^{3,2}_i) \frac{1}{2} \sqrt{1 + R^{1,1}_i - R^{2,2}_i - R^{3,3}_i}\\
+        q^y_i &= \mathrm{sign}(R^{3,1}_i - R^{1,3}_i) \frac{1}{2} \sqrt{1 - R^{1,1}_i + R^{2,2}_i - R^{3,3}_i}\\
+        q^z_i &= \mathrm{sign}(R^{1,2}_i - R^{2,1}_i) \frac{1}{2} \sqrt{1 - R^{1,1}_i - R^{2,2}_i + R^{3,3}_i}\\
+        q^w_i &= \frac{1}{2} \sqrt{1 + R^{1,1}_i + R^{2,2}_i + R^{3,3}_i}
         \end{aligned}\right.,
     
     In summary, the output LieTensor should be of format:
@@ -264,13 +262,15 @@ def mat2Sim3(mat, check=False):
     .. math::
         \textbf{y}_i = [t^x_i, t^y_i, t^z_i, q^x_i, q^y_i, q^z_i, q^w_i, s_i]
 
-
     Warning:
-        A rotation matrix is consided illegal if, :math:`\vert R\vert\neq1` or :math:`RR^{T}\neq \mathrm{I}`.
-        If **check** was set to ``True``, illegal input will trigger a warning, but output a result regardless.
+        If :math:`s_i` contains zero value, then the function will raise a ``ValueError``, since
+        further computation leads to *nan* in the computed quaternions.
 
+        A rotation matrix is consided illegal if, :math:`\vert R\vert\neq1` or 
+        :math:`RR^{T}\neq \mathrm{I}`. If ``check`` was set to ``True``, illegal input will raise 
+        a ``ValueError``, since the function will ouput irrelevant result, likely contains ``nan``.
+        
     Examples:
-
         >>> input = torch.tensor([[ 0.,-0.5,  0., 0.1],
         ...                       [0.5,  0.,  0., 0.2],
         ...                       [ 0.,  0., 0.5, 0.3],
@@ -280,16 +280,18 @@ def mat2Sim3(mat, check=False):
         tensor([0.1000, 0.2000, 0.3000, 0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
 
     Note:
-
         Input matrices can be written as:
         
         .. math::
             \begin{bmatrix}
-                    sR_{3\times3} & t_{3\times1}\\
+                    sR_{3\times3} & \mathbf{t}_{3\times1}\\
                     \textbf{0} & 1
             \end{bmatrix},
 
-        where :math:`R` is the rotation matrix, :math:`s` is the scaling factor, :math:`t` is the translation vector.
+        where :math:`R` is the rotation matrix. The scaling factor :math:`s` defines a linear
+        transformation that enlarges or diminishes the object in the same ratio across 3 dimensions,
+        the translation vector :math:`\mathbf{t}` defines the displacement between the original position and
+        the transformed position.
 
     See :meth:`pypose.Sim3` for more details of the output LieTensor format.
     """
@@ -340,24 +342,25 @@ def mat2RxSO3(mat, check=False):
 
         Output: :obj:`(*, 5)`
     
-    Suppose the input transformation matrix :math:`\mathbf{T}_i\in\mathbb{R}^{3\times 3}`,
+    Suppose the input transformation matrix :math:`T_i\in\mathbb{R}^{3\times 3}`, 
+    then the scaling factor :math:`s_i\in\mathbb{R}` and the rotation matrix
+    :math:`R_i\in\mathbb{R}^{3\times 3}` can be computed as:
 
     .. math::
         \begin{aligned}
             s_i &= \sqrt[3]{\vert T_i \vert}\\
-            R_i &= T_i/s_i
+            R_i &= R_i/s_i
         \end{aligned}
     
-    If :math:`s_i` contains zero value, then the function will raise a ``ValueError``, since further 
-    computation leads to *nan* in the computed quaternions. Let :math:`R^{mn}_i` be the element of
-    row :math:`m` and coloum :math:`n` in :math:`R_i`, then the quaternion can be computed by:
+    Let :math:`R^{m,n}_i` be the element of row :math:`m` and coloum :math:`n` in :math:`R_i`, then
+    the quaternion can be computed by:
     
     .. math::
         \left\{\begin{aligned}
-        q^x_i &= \mathrm{sign}(R^{23}_i - R^{32}_i) \frac{1}{2} \sqrt{1 + R^{11}_i - R^{22}_i - R^{33}_i}\\
-        q^y_i &= \mathrm{sign}(R^{31}_i - R^{13}_i) \frac{1}{2} \sqrt{1 - R^{11}_i + R^{22}_i - R^{33}_i}\\
-        q^z_i &= \mathrm{sign}(R^{12}_i - R^{21}_i) \frac{1}{2} \sqrt{1 - R^{11}_i - R^{22}_i + R^{33}_i}\\
-        q^w_i &= \frac{1}{2} \sqrt{1 + R^{11}_i + R^{22}_i + R^{33}_i}
+        q^x_i &= \mathrm{sign}(R^{2,3}_i - R^{3,2}_i) \frac{1}{2} \sqrt{1 + R^{1,1}_i - R^{2,2}_i - R^{3,3}_i}\\
+        q^y_i &= \mathrm{sign}(R^{3,1}_i - R^{1,3}_i) \frac{1}{2} \sqrt{1 - R^{1,1}_i + R^{2,2}_i - R^{3,3}_i}\\
+        q^z_i &= \mathrm{sign}(R^{1,2}_i - R^{2,1}_i) \frac{1}{2} \sqrt{1 - R^{1,1}_i - R^{2,2}_i + R^{3,3}_i}\\
+        q^w_i &= \frac{1}{2} \sqrt{1 + R^{1,1}_i + R^{2,2}_i + R^{3,3}_i}
         \end{aligned}\right.,
     
     In summary, the output LieTensor should be of format:
@@ -365,13 +368,15 @@ def mat2RxSO3(mat, check=False):
     .. math::
         \textbf{y}_i = [q^x_i, q^y_i, q^z_i, q^w_i, s_i]
 
-
     Warning:
-        A rotation matrix is consided illegal if, :math:`\vert R\vert\neq1` or :math:`RR^{T}\neq \mathrm{I}`.
-        If **check** was set to ``True``, illegal input will trigger a warning, but output a result regardless.
+        If :math:`s_i` contains zero value, then the function will raise a ``ValueError``, since
+        further computation leads to *nan* in the computed quaternions.
+
+        A rotation matrix is consided illegal if, :math:`\vert R\vert\neq1` or 
+        :math:`RR^{T}\neq \mathrm{I}`. If ``check`` was set to ``True``, illegal input will raise 
+        a ``ValueError``, since the function will ouput irrelevant result, likely contains ``nan``.
 
     Examples:
-
         >>> input = torch.tensor([[ 0., -0.5,  0.],
         ...                       [0.5,   0.,  0.],
         ...                       [ 0.,   0., 0.5]])
@@ -379,9 +384,10 @@ def mat2RxSO3(mat, check=False):
         RxSO3Type LieTensor:
         tensor([0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
 
-    Notes:
-        Input matrices can be written as :math:`sR_{3\times3}`, where :math:`R` is the rotation matrix,
-        :math:`s` is the scaling factor.
+    Note:
+        Input matrices can be written as :math:`sR_{3\times3}`, where :math:`R` is the rotation
+        matrix. where  the scaling factor :math:`s` defines a linear transformation that enlarges
+        or diminishes the object in the same ratio across 3 dimensions.
 
     See :meth:`pypose.RxSO3` for more details of the output LieTensor format.
     """
@@ -421,8 +427,9 @@ def from_matrix(mat, ltype, check=False):
             and with a determinant of one). More computation is needed if ``True``. Default: ``False``.
 
     Warning:
-        If ``check`` was set to ``True``, illegal input (the upper left 3x3 matrices' determinant not
-        equal to one or not orthogonal matrices) will trigger a warning, but output a result regardless.
+        A rotation matrix is consided illegal if, :math:`\vert R\vert\neq1` or 
+        :math:`RR^{T}\neq \mathrm{I}`. If ``check`` was set to ``True``, illegal input
+        will raise a ``ValueError``, since the function will ouput irrelevant result, likely contains ``nan``.
     
     Return:
         LieTensor: the converted LieTensor.
