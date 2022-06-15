@@ -127,11 +127,11 @@ class LieType:
 
     def translation(self, lietensor):
         warnings.warn("Instance has no translation. Zero vector(s) is returned.")
-        return torch.zeros(lietensor.size()[:-1] + (3,))
+        return torch.zeros(lietensor.lshape + (3,))
 
     def scale(self, lietensor):
         warnings.warn("Instance has no scale. Scalar one(s) is returned.")
-        return torch.ones(lietensor.size()[:-1] + (1,))
+        return torch.ones(lietensor.lshape + (1,))
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -710,99 +710,31 @@ class LieTensor(torch.Tensor):
 
     def tensor(self) -> torch.Tensor:
         r'''
-        Return the torch.Tensor without changing data.
-
-        Return:
-            Tensor: the torch.Tensor form of LieTensor.
-
-        Example:
-            >>> x = pp.randn_SO3(2)
-            >>> x.tensor()
-            tensor([[ 0.1196,  0.2339, -0.6824,  0.6822],
-                    [ 0.9198, -0.2704, -0.2395,  0.1532]])
+        See :meth:`pypose.tensor`
         '''
         return torch.Tensor.as_subclass(self, torch.Tensor)
 
     def matrix(self) -> torch.Tensor:
         r'''
-        Return LieTensor into matrix form.
-
-        Return:
-            Tensor: the batched matrix form (torch.Tensor) of LieTensor.
-
-        Example:
-            >>> x = pp.randn_SO3(2)
-            >>> x.matrix()
-            tensor([[[ 0.9285, -0.0040, -0.3713],
-                    [ 0.2503,  0.7454,  0.6178],
-                    [ 0.2743, -0.6666,  0.6931]],
-                    [[ 0.4805,  0.8602, -0.1706],
-                    [-0.7465,  0.2991, -0.5944],
-                    [-0.4603,  0.4130,  0.7858]]])
+        See :meth:`pypose.matrix`
         '''
         return self.ltype.matrix(self)
 
     def translation(self) -> torch.Tensor:
         r'''
-        Extract the translation from a LieTensor.
-
-        Return:
-            Tensor: the batched translation vectors.
-
-        Warning:
-            The :obj:`SO3`, :obj:`so3`, :obj:`RxSO3`, and :obj:`rxso3` types do not contain translation. 
-            Calling :obj:`translation()` on these types will return zero vector(s).
-
-        Example:
-            >>> x = pp.randn_SE3(2)
-            >>> x.translation()
-            tensor([[-0.5358, -1.5421, -0.7224],
-                    [ 0.8331, -1.4412,  0.0863]])
-            >>> y = pp.randn_SO3(2)
-            >>> y.translation()
-            tensor([[0., 0., 0.],
-                    [0., 0., 0.]])
+        See :meth:`pypose.translation`
         '''
         return self.ltype.translation(self)
 
     def rotation(self):
         r'''
-        Extract the rotation from a LieTensor.
-
-        Return:
-            SO3: the batched quaternions.
-
-        Example:
-            >>> x = pp.randn_SE3(2)
-            >>> x.rotation()
-            SO3Type LieTensor:
-            tensor([[-0.8302,  0.5200, -0.0056,  0.2006],
-                    [-0.2541, -0.3184,  0.6305,  0.6607]])
+        See :meth:`pypose.rotation`
         '''
         return self.ltype.rotation(self)
 
     def scale(self) -> torch.Tensor:
         r'''
-        Extract the scale from a LieTensor.
-
-        Return:
-            Tensor: the batched scale scalars.
-
-        Warning:
-            The :obj:`SO3`, :obj:`so3`, :obj:`SE3`, and :obj:`se3` types do not contain scale. 
-            Calling :obj:`scale()` on these types will return one(s).
-
-        Example:
-            >>> x = pp.randn_Sim3(4)
-            >>> x.scale()
-            tensor([[10.9577],
-                    [ 1.0248],
-                    [ 0.0947],
-                    [ 1.1989]])
-            >>> y = pp.randn_SE3(2)
-            >>> y.scale()
-            tensor([[1.],
-                    [1.]])
+        See :meth:`pypose.scale`
         '''
         return self.ltype.scale(self)
 
