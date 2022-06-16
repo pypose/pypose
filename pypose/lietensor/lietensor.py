@@ -53,7 +53,7 @@ class LieType:
         if self.on_manifold:
             other1 = torch.Tensor.as_subclass(input, torch.Tensor)
             other2 = torch.Tensor.as_subclass(other, torch.Tensor)
-            return input.copy_(other1 + other2)
+            return input.copy_(other1 + other2[..., :self.manifold[0]])
         raise NotImplementedError("Instance has no add_ attribute.")
 
     def Log(self, X):
