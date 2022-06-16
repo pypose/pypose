@@ -62,7 +62,8 @@ def add(input, other, alpha=1):
     Args:
         input (:obj:`LieTensor`): the input LieTensor.
 
-        other (:obj:`Tensor` or :obj:`Number`): the tensor or number to add to input.
+        other (:obj:`Tensor`): the tensor to add to input. The last dimension has to be no less
+            than the expected shape of the corresponding Lie Algebra of the input.
 
         alpha (:obj:`Number`): the multiplier for other.
 
@@ -72,7 +73,7 @@ def add(input, other, alpha=1):
     Warning:
         The ``other`` Tensor is taken as a Lie Algebra during computation. For shape compatibility,
         its elements exceeding the expected shape of a Lie Algebra in the last dimension are
-        ignored to work with PyTorch optimizers like :obj:`torch.optim.SGD` for calling functions
+        ignored to work with PyTorch optimizers like :obj:`torch.optim.SGD`, which calls function
         :meth:`.add_` to alter parameters by gradients. This is because the gradient of a Lie Group
         has a smaller shape, while it is stored in :obj:`LieTensor.grad`, which has the same storage
         with its Lie Group.
