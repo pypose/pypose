@@ -4,7 +4,7 @@ import pypose as pp
 from torch import nn
 import torch.utils.data as Data
 import os, glob, tqdm, argparse
-from imu_dataset import KITTI_IMU, imu_collate
+from imu_dataset import KITTI_IMU, imu_collate, move_to
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
@@ -21,7 +21,7 @@ class IMUCorrector(torch.nn.Module):
         self.imu = pp.module.IMUPreintegrator()
 
     def forward(self, data):
-        feature = torch.cat([data["acc"], data["gyro"]], dim = -1)
+        feature = torch.cat([data["acc"], data["ang"]], dim = -1)
         B, F = feature.shape[:2]
 
         init_state = {
@@ -30,27 +30,12 @@ class IMUCorrector(torch.nn.Module):
             "v": data['gt_vel'][:,:1,:],}
         output = self.net(feature.reshape(B*F,6)).reshape(B, F, 6)
         corrected_acc = output[...,:3] + data["acc"]
-        corrected_gyro= output[...,3:] + data["gyro"]
+        corrected_ang = output[...,3:] + data["ang"]
 
-        inte_state, _ = self.imu.batch_imu_integrate(init_state = init_state, dt = data['dt'], ang = corrected_gyro, 
-                                                        acc = corrected_acc, rot = data['gt_rot'][:,:-1].contiguous(), cov_propogation = False)
+        inte_state, _ = self.imu.batch_imu_integrate(init_state = init_state, dt = data['dt'], ang = corrected_ang, 
+                                                    acc = corrected_acc, rot = data['gt_rot'][:,:-1].contiguous(), cov_propogation = False)
         return inte_state, _
 
-
-def move_to(obj, device):
-    if torch.is_tensor(obj):return obj.to(device)
-    elif isinstance(obj, dict):
-        res = {}
-        for k, v in obj.items():
-            res[k] = move_to(v, device)
-        return res
-    elif isinstance(obj, list):
-        res = []
-        for v in obj:
-            res.append(move_to(v, device))
-        return res
-    else:
-        raise TypeError("Invalid type for move_to", obj)
 
 
 def get_loss(inte_state, cov_state, data):
@@ -112,8 +97,8 @@ if __name__ == '__main__':
     parser.add_argument('--load_ckpt', default=False, action="store_true")
     args = parser.parse_args(); print(args)
     
-    train_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0], duration=10, train=True)
-    test_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0],  duration=10, train=False)
+    train_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0], duration=10, mode = 'train')
+    test_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0],  duration=10, mode = 'train')
     train_loader = Data.DataLoader(dataset=train_dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=True)
     test_loader = Data.DataLoader(dataset=test_dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=False)
 

@@ -7,6 +7,22 @@ from datetime import datetime
 import torch.utils.data as Data
 
 
+def move_to(obj, device):
+    if torch.is_tensor(obj):return obj.to(device)
+    elif isinstance(obj, dict):
+        res = {}
+        for k, v in obj.items():
+            res[k] = move_to(v, device)
+        return res
+    elif isinstance(obj, list):
+        res = []
+        for v in obj:
+            res.append(move_to(v, device))
+        return res
+    else:
+        raise TypeError("Invalid type for move_to", obj)
+
+
 def get_loss(inte_state, cov_state, data):
     pos_loss = torch.nn.functional.mse_loss(inte_state['pos'], data['gt_pos'][:,1:,:])
     rot_loss = torch.nn.functional.mse_loss(inte_state['rot'].Log(), data['gt_rot'][:,1:,:].Log())
@@ -35,6 +51,8 @@ class KITTI_IMU(Data.Dataset):
             end_frame = np.floor(self.seq_len * 0.5).astype(int)
         elif mode == 'test':
             start_frame = np.floor(self.seq_len * 0.5).astype(int)
+        elif mode == 'evaluate':
+            step_size = self.duration # ensure that step size is the same as the duration length
 
         self.index_map = [i for i in range(0, end_frame - start_frame - self.duration, step_size)]
 
@@ -53,10 +71,15 @@ class KITTI_IMU(Data.Dataset):
             'gt_vel': self.gt_vel[frame_id: end_frame_id+1],
         }
 
+    def get_init_value(self):
+        return {'p': self.gt_pos[None, :1], 
+                'r': self.gt_rot[None, :1],
+                'v': self.gt_vel[None, :1]}
+
 
 def imu_collate(data):
-    feat_acc = torch.stack([torch.tensor(d['acc']) for d in data])
-    feat_gyro = torch.stack([torch.tensor(d['ang']) for d in data])
+    acc = torch.stack([d['acc'] for d in data])
+    ang = torch.stack([d['ang'] for d in data])
 
     gt_pos = torch.stack([d['gt_pos'] for d in data])
     gt_rot = torch.stack([d['gt_rot'] for d in data])
@@ -66,8 +89,8 @@ def imu_collate(data):
 
     return {
         'dt': dt,
-        'acc': feat_acc,
-        'ang': feat_gyro,
+        'acc': acc,
+        'ang': ang,
         'gt_pos': gt_pos,
         'gt_vel': gt_vel,
         'gt_rot': gt_rot,
