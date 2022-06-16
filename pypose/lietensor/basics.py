@@ -50,6 +50,17 @@ def add(input, other, alpha=1):
     r'''
     Adds other, scaled by alpha, to input LieTensor.
 
+    Args:
+        input (:obj:`LieTensor`): the input LieTensor (Lie Algebra or Lie Group).
+
+        other (:obj:`Tensor`): the tensor to add to input. The last dimension has to be no less
+            than the shape of the corresponding Lie Algebra of the input.
+
+        alpha (:obj:`Number`): the multiplier for other.
+
+    Return:
+        :obj:`LieTensor`: the output LieTensor.
+
     .. math::
         \bm{y}_i =
         \begin{cases}
@@ -59,28 +70,23 @@ def add(input, other, alpha=1):
 
     where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` Tensor to add.
 
-    Args:
-        input (:obj:`LieTensor`): the input LieTensor.
+    Note:
+        The ``other`` Tensor is treated as a Lie Algebra during computation. The elements beyond
+        the corresponding shape of a Lie Algebra in the last dimension are ignored. This is
+        because the gradient of a Lie Group is computed as the perturbation in its tangent space.
 
-        other (:obj:`Tensor`): the tensor to add to input. The last dimension has to be no less
-            than the expected shape of the corresponding Lie Algebra of the input.
+        See Eq.(44) in `Micro Lie theory <https://arxiv.org/abs/1812.01537>`_ or Eq.(10) in
+        `Tangent space backpropagation <https://arxiv.org/abs/2103.12032>`_ for the definition of
+        gradient for a Lie Group.
 
-        alpha (:obj:`Number`): the multiplier for other.
-
-    Return:
-        :obj:`LieTensor`: the output LieTensor.
-
-    Warning:
-        The ``other`` Tensor is taken as a Lie Algebra during computation. For shape compatibility,
-        its elements exceeding the expected shape of a Lie Algebra in the last dimension are
-        ignored to work with PyTorch optimizers like :obj:`torch.optim.SGD`, which calls function
-        :meth:`.add_` to alter parameters by gradients. This is because the gradient of a Lie Group
-        has a smaller shape, while it is stored in :obj:`LieTensor.grad`, which has the same storage
-        with its Lie Group.
+        This provides convenience to work with PyTorch optimizers like :obj:`torch.optim.SGD`,
+        which calls function :meth:`.add_` of a Lie Group to adjust parameters by gradients, which
+        are stored in :obj:`LieTensor.grad` (the last element is often zero since tangent vector
+        requires smaller storage).
 
     See :meth:`LieTensor` for types of Lie Algebra and Lie Group.
 
-    See :meth:`Exp` for Exponential mapping of Lie Albebra.
+    See :meth:`Exp` for Exponential mapping of Lie Algebra.
 
     Examples:
         >>> x = pp.randn_SE3()
