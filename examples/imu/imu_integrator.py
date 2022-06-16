@@ -1,6 +1,5 @@
 import os
 import torch
-import pykitti
 import argparse
 import numpy as np
 import pypose as pp
@@ -9,30 +8,7 @@ import torch.utils.data as Data
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 from matplotlib.collections import PatchCollection
-
-
-class KITTI_IMU(Data.Dataset):
-    def __init__(self, root, dataname, drive):
-        super().__init__()
-        self.data = pykitti.raw(root, dataname, drive)
-
-    def __len__(self):
-        return len(self.data.timestamps) - 1
-
-    def __getitem__(self, i):
-        dt = torch.tensor([datetime.timestamp(self.data.timestamps[i+1]) - datetime.timestamp(self.data.timestamps[i])])
-        ang = torch.tensor([self.data.oxts[i].packet.wx, self.data.oxts[i].packet.wy, self.data.oxts[i].packet.wz])
-        acc = torch.tensor([self.data.oxts[i].packet.ax, self.data.oxts[i].packet.ay, self.data.oxts[i].packet.az])
-        vel = torch.tensor([self.data.oxts[i].packet.vf, self.data.oxts[i].packet.vl, self.data.oxts[i].packet.vu])
-        rot = pp.euler2SO3([self.data.oxts[i].packet.roll, self.data.oxts[i].packet.pitch, self.data.oxts[i].packet.yaw])
-        pos_gt = self.data.oxts[i].T_w_imu[0:3, 3]
-        return dt, ang, acc, vel, rot, pos_gt
-
-    def init_value(self):
-        P = torch.tensor(self.data.oxts[0].T_w_imu[:3,3])
-        R = pp.mat2SO3(torch.tensor(self.data.oxts[0].T_w_imu[:3,:3]))
-        V = R @ torch.tensor([self.data.oxts[0].packet.vf, self.data.oxts[0].packet.vl, self.data.oxts[0].packet.vu])
-        return P.unsqueeze(0), R.unsqueeze(0), V.unsqueeze(0)
+from imu_dataset import KITTI_IMU, imu_collate, move_to
 
 
 def plot_gaussian(ax, means, covs, color=None, sigma=3):
@@ -53,6 +29,7 @@ if __name__ == '__main__':
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
     parser.add_argument("--integrating-step", type=int, default=1, help="number of integrated steps")
     parser.add_argument("--batch-size", type=int, default=1, help="batch size, only support 1 now")
+    parser.add_argument("--step-size", type=int, default=2, help="the size of the integration for one interval")
     parser.add_argument("--save", type=str, default='./examples/imu/save/', help="location of png files to save")
     parser.add_argument("--dataroot", type=str, default='./examples/imu/', help="dataset location downloaded")
     parser.add_argument("--dataname", type=str, default='2011_09_26', help="dataset name")
@@ -65,24 +42,24 @@ if __name__ == '__main__':
     torch.set_default_tensor_type(torch.DoubleTensor)
 
     for drive in args.datadrive:
-        dataset = KITTI_IMU(args.dataroot, args.dataname, drive)
-        p, r, v = dataset.init_value()
-        integrator = pp.module.IMUPreintegrator(p, r, v).to(args.device)
-        loader = Data.DataLoader(dataset=dataset, batch_size=args.batch_size)
-        poses, poses_gt = [p.to(args.device)], [p.to(args.device)]
+        dataset = KITTI_IMU(args.dataroot, args.dataname, drive, duration=args.step_size, step_size=args.step_size, mode = 'evaluate')
+        loader = Data.DataLoader(dataset=dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=False)
+        init_value = dataset.get_init_value()
+        integrator = pp.module.IMUPreintegrator(init_value['p'], init_value['r'], init_value['v'], update=True).to(args.device)
+        
+        poses, poses_gt = [init_value['p']], [init_value['p']]
         covs = [torch.zeros(9, 9, device=args.device)]
-        for idx, (dt, ang, acc, vel, rot, pos_gt) in enumerate(loader):
-            dt,  ang = dt.to(args.device),  ang.to(args.device)
-            acc, rot = acc.to(args.device), rot.to(args.device)
-            poses_gt.append(pos_gt.to(args.device))
-            integrator.update(dt, ang, acc, rot)
-            if idx % args.integrating_step == 0:
-                states = integrator()
-                poses.append(states['pos'])
-                covs.append(states['cov'])
-        poses = torch.cat(poses).cpu().numpy()
-        poses_gt = torch.cat(poses_gt).cpu().numpy()
-        covs = torch.stack(covs).cpu().numpy()
+        for idx, data in enumerate(loader):
+            data = move_to(data, args.device)
+
+            inte_state, cov_state = integrator(dt = data['dt'], ang = data['ang'], acc = data['acc'], rot = data['gt_rot'][:,:-1].contiguous())
+            poses_gt.append(data['gt_pos'][..., -1:, :].cpu())
+            poses.append(inte_state['pos'][..., -1:, :].cpu())
+            covs.append(cov_state['cov'][...,0,:,:].cpu())
+
+        poses = torch.cat(poses, dim = 1)[0].numpy()
+        poses_gt = torch.cat(poses_gt, dim = 1)[0].numpy()
+        covs = torch.stack(covs, dim = 0).numpy()
 
         plt.figure(figsize=(5, 5))
         if args.plot3d:
