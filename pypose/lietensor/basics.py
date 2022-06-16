@@ -73,16 +73,26 @@ def add(input, other, alpha=1):
     Note:
         The ``other`` Tensor is treated as a Lie Algebra during computation. The elements beyond
         the corresponding shape of a Lie Algebra in the last dimension are ignored. This is
-        because the gradient of a Lie Group is computed as the perturbation in its tangent space.
+        because the gradient of a Lie Group is computed as the perturbation in its tangent space:
 
-        See Eq.(44) in `Micro Lie theory <https://arxiv.org/abs/1812.01537>`_ or Eq.(10) in
-        `Tangent space backpropagation <https://arxiv.org/abs/2103.12032>`_ for the definition of
-        gradient for a Lie Group.
+        .. math::
+            \begin{align*}
+                \frac{D f(\mathcal{X})}{D \mathcal{X}} & \overset{\underset{\mathrm{def}}{}}{=}
+                \displaystyle \lim_{\bm{\tau} \to \bm{0}} \frac{f(\bm{\tau} \oplus X)
+                    \ominus f(\mathcal{X})}{\bm{\tau}} \\
+                & = \left. \frac{\partial \mathrm{Log} (\mathrm{Exp}(\bm{\tau}) \times \mathcal{X})
+                    \times f(\mathcal{X})^{-1}}{\partial \bm{\tau}}\right|_{\bm{\tau=\bm{0}}}
+            \end{align*},
+
+        where :math:`\mathcal{X}` is a Lie Group and :math:`\bm{\tau}` is its left perturbation.
 
         This provides convenience to work with PyTorch optimizers like :obj:`torch.optim.SGD`,
         which calls function :meth:`.add_` of a Lie Group to adjust parameters by gradients, which
         are stored in :obj:`LieTensor.grad` (the last element is often zero since tangent vector
         requires smaller storage).
+
+        See Eq.(44) in `Micro Lie theory <https://arxiv.org/abs/1812.01537>`_ for more details of
+        the gradient for a Lie Group.
 
     See :meth:`LieTensor` for types of Lie Algebra and Lie Group.
 
