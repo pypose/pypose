@@ -72,9 +72,9 @@ class KITTI_IMU(Data.Dataset):
         }
 
     def get_init_value(self):
-        return {'p': self.gt_pos[None, :1], 
-                'r': self.gt_rot[None, :1],
-                'v': self.gt_vel[None, :1]}
+        return {'pos': self.gt_pos[None, :1],
+                'rot': self.gt_rot[None, :1],
+                'vel': self.gt_vel[None, :1]}
 
 
 def imu_collate(data):

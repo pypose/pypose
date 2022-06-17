@@ -25,22 +25,20 @@ class IMUCorrector(torch.nn.Module):
         B, F = feature.shape[:2]
 
         init_state = {
-            "p": data['gt_pos'][:,:1,:], 
-            "r": data['gt_rot'][:,:1,:],
-            "v": data['gt_vel'][:,:1,:],}
+            "pos": data['gt_pos'][:,:1,:], 
+            "rot": data['gt_rot'][:,:1,:],
+            "vel": data['gt_vel'][:,:1,:],}
         output = self.net(feature.reshape(B*F,6)).reshape(B, F, 6)
         corrected_acc = output[...,:3] + data["acc"]
         corrected_ang = output[...,3:] + data["ang"]
 
-        inte_state, _ = self.imu.batch_imu_integrate(init_state = init_state, dt = data['dt'], ang = corrected_ang, 
-                                                    acc = corrected_acc, rot = data['gt_rot'][:,:-1].contiguous(), cov_propogation = False)
-        return inte_state, _
+        return self.imu(init_state = init_state, dt = data['dt'], ang = corrected_ang,
+            acc = corrected_acc, rot = data['gt_rot'][:,:-1].contiguous(), cov_propogation = False)
 
 
-
-def get_loss(inte_state, cov_state, data):
-    pos_loss = torch.nn.functional.mse_loss(inte_state['pos'], data['gt_pos'][:,1:,:])
-    rot_loss = torch.nn.functional.mse_loss(inte_state['rot'].Log(), data['gt_rot'][:,1:,:].Log())
+def get_loss(state, data):
+    pos_loss = torch.nn.functional.mse_loss(state['pos'], data['gt_pos'][:,1:,:])
+    rot_loss = torch.nn.functional.mse_loss(state['rot'].Log(), data['gt_rot'][:,1:,:].Log())
     loss = pos_loss + rot_loss
     return loss, {'pos_loss': pos_loss, 'rot_loss': rot_loss}
 
@@ -55,9 +53,9 @@ def train(network, train_loader, epoch, optimizer, device="cuda:0"):
     t_range = tqdm.tqdm(train_loader)
     for i, data in enumerate(t_range):
         data = move_to(data, device)
-        inte_state, cov_state = network(data)
+        state = network(data)
 
-        losses, _ = get_loss(inte_state, cov_state, data)
+        losses, _ = get_loss(state, data)
         running_loss += losses.item()
 
         t_range.set_description(f'iteration: {i:04d}, losses: {losses:.06f}')
@@ -74,9 +72,9 @@ def test(network, loader, device = "cuda:0"):
         running_loss = 0
         for i, data in enumerate(tqdm.tqdm(loader)):
             data = move_to(data, device)
-            inte_state, cov_state = network(data)
+            state = network(data)
 
-            losses, _ = get_loss(inte_state, cov_state, data)
+            losses, _ = get_loss(state, data)
             running_loss += losses.item()
 
         print("the running loss of the test set %0.6f"%(running_loss/i))
