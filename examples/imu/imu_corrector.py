@@ -18,7 +18,7 @@ class IMUCorrector(torch.nn.Module):
             layers.append(nn.GELU())
         layers.append(nn.Linear(size_list[-2], size_list[-1]))
         self.net = nn.Sequential(*layers)
-        self.imu = pp.module.IMUPreintegrator()
+        self.imu = pp.module.IMUPreintegrator(reset=True, prop_cov=False)
 
     def forward(self, data):
         feature = torch.cat([data["acc"], data["ang"]], dim = -1)
@@ -33,7 +33,7 @@ class IMUCorrector(torch.nn.Module):
         corrected_ang = output[...,3:] + data["ang"]
 
         return self.imu(init_state = init_state, dt = data['dt'], ang = corrected_ang,
-            acc = corrected_acc, rot = data['gt_rot'][:,:-1].contiguous(), cov_propogation = False)
+            acc = corrected_acc, rot = data['gt_rot'][:,:-1].contiguous())
 
 
 def get_loss(state, data):
@@ -94,7 +94,7 @@ if __name__ == '__main__':
     parser.add_argument("--datadrive", nargs='+', type=str, default=[ "0001"], help="data sequences")
     parser.add_argument('--load_ckpt', default=False, action="store_true")
     args = parser.parse_args(); print(args)
-    
+
     train_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0], duration=10, mode = 'train')
     test_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0],  duration=10, mode = 'train')
     train_loader = Data.DataLoader(dataset=train_dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=True)

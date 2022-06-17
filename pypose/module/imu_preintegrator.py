@@ -25,18 +25,18 @@ class IMUPreintegrator(nn.Module):
                        gravity = 9.81007,
                        ang_cov = (1.6968*10**-4)**2,
                        acc_cov = (2.0*10**-3)**2,
-                       update = False):
+                       prop_cov = True,
+                       reset = False):
         super().__init__()
-        self.update = update
+        self.reset, self.prop_cov = reset, prop_cov
         # Initial status of IMU: (pos)ition, (rot)ation, (vel)ocity, (cov)ariance
         self.gravity, self.ang_cov, self.acc_cov = gravity, ang_cov, acc_cov
+        self.register_buffer('cov', torch.zeros(1, 9, 9))
         self.register_buffer('pos', pos.clone())
         self.register_buffer('rot', rot.clone())
         self.register_buffer('vel', vel.clone())
-        self.register_buffer('cov', torch.zeros(1, 9, 9))
 
-
-    def forward(self, dt, ang, acc, rot:pp.SO3=None, cov=None, cov_propogation = True, init_state = None):
+    def forward(self, dt, ang, acc, rot:pp.SO3=None, cov=None, init_state=None, ang_cov=None, acc_cov=None):
         '''
         Args:
             acc: (B, Frames, 3)
@@ -50,23 +50,29 @@ class IMUPreintegrator(nn.Module):
         '''
         assert(len(acc.shape) == len(dt.shape) == len(ang.shape) == 3)
 
-        if self.update is True and init_state is None:
+        if self.reset is False and init_state is None:
             init_state = {'pos': self.pos, 'rot': self.rot, 'vel': self.vel}
 
         integrate = self.integrate(init_state, dt, ang, acc, rot)
         predict   = self.predict(init_state, integrate)
 
-        if cov_propogation:
-            cov_state = self.propagate_cov(dt=dt, acc=acc, integrate=integrate, init_cov=cov)
-            self.cov = cov_state['cov']
+        if self.prop_cov:
+            if ang_cov is None:
+                ang_cov = self.ang_cov
+            if acc_cov is None:
+                acc_cov = self.acc_cov
+            if cov is None:
+                cov = self.cov
+            cov = self.propagate_cov(dt=dt, acc=acc, integrate=integrate, init_cov=cov, ang_cov=ang_cov, acc_cov=acc_cov)
         else:
-            cov_state = {}
+            cov = {'cov': None}
 
         self.pos = predict['pos'][..., -1:, :]
         self.rot = predict['rot'][..., -1:, :]
         self.vel = predict['vel'][..., -1:, :]
+        self.cov = cov['cov']
 
-        return {**predict, **cov_state}
+        return {**predict, **cov}
 
     def integrate(self, init_state, dt, ang, acc, rot:pp.SO3=None):
         B, F = dt.shape[:2]
@@ -104,7 +110,7 @@ class IMUPreintegrator(nn.Module):
         }
 
     @classmethod
-    def propagate_cov(cls, dt, acc, integrate, init_cov=None, ang_cov=(1.6968*10**-4)**2, acc_cov=(2.0*10**-3)**2):
+    def propagate_cov(cls, dt, acc, integrate, init_cov, ang_cov, acc_cov):
         '''
             Covariance propogation
         '''
@@ -121,9 +127,12 @@ class IMUPreintegrator(nn.Module):
 
         A = torch.eye(9, device=dt.device, dtype=dt.dtype).repeat([B, F+1, 1, 1])
         A[:, :-1, 0:3, 0:3] = integrate['dr'].matrix().mT
-        A[:, :-1, 3:6, 0:3] = torch.einsum('...xy,...t -> ...xy', - integrate['rot'].matrix() @ Ha, dt)
-        A[:, :-1, 6:9, 0:3] = torch.einsum('...xy,...t -> ...xy', - 0.5 * integrate['rot'].matrix() @ Ha, dt**2)
-        A[:, :-1, 6:9, 3:6] = torch.einsum('...xy,...t -> ...xy', torch.eye(3, device=dt.device, dtype=dt.dtype).repeat([B, F, 1, 1]), dt)
+        A[:, :-1, 3:6, 0:3] = torch.einsum('...xy,...t -> ...xy', \
+            - integrate['rot'].matrix() @ Ha, dt)
+        A[:, :-1, 6:9, 0:3] = torch.einsum('...xy,...t -> ...xy', \
+            - 0.5 * integrate['rot'].matrix() @ Ha, dt**2)
+        A[:, :-1, 6:9, 3:6] = torch.einsum('...xy,...t -> ...xy', \
+            torch.eye(3, device=dt.device, dtype=dt.dtype).repeat([B, F, 1, 1]), dt)
 
         Bg = torch.zeros(B, F, 9, 3, device=dt.device, dtype=dt.dtype)
         Bg[..., 0:3, 0:3] = torch.einsum('...xy,...t -> ...xy', integrate['dr'].Log().Jr(), dt)

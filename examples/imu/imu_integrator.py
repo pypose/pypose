@@ -45,20 +45,20 @@ if __name__ == '__main__':
         dataset = KITTI_IMU(args.dataroot, args.dataname, drive, duration=args.step_size, step_size=args.step_size, mode = 'evaluate')
         loader = Data.DataLoader(dataset=dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=False)
         init_value = dataset.get_init_value()
-        integrator = pp.module.IMUPreintegrator(init_value['pos'], init_value['rot'], init_value['vel'], update=True).to(args.device)
-        
+        integrator = pp.module.IMUPreintegrator(init_value['pos'], init_value['rot'], init_value['vel']).to(args.device)
+
         poses, poses_gt = [init_value['pos']], [init_value['pos']]
         covs = [torch.zeros(9, 9, device=args.device)]
         for idx, data in enumerate(loader):
             data = move_to(data, args.device)
 
-            state = integrator(dt=data['dt'], ang=data['ang'], acc=data['acc'], rot=data['gt_rot'][:,:-1].contiguous())
-            poses_gt.append(data['gt_pos'][..., -1:, :].cpu())
-            poses.append(state['pos'][..., -1:, :].cpu())
-            covs.append(state['cov'][...,0,:,:].cpu())
+            state = integrator(dt=data['dt'], ang=data['ang'], acc=data['acc'], rot=data['gt_rot'][:,:-1])
+            poses_gt.append(data['gt_pos'][..., -1, :].cpu())
+            poses.append(state['pos'][..., -1, :].cpu())
+            covs.append(state['cov'][..., -1, :, :].cpu())
 
-        poses = torch.cat(poses, dim = 1)[0].numpy()
-        poses_gt = torch.cat(poses_gt, dim = 1)[0].numpy()
+        poses = torch.cat(poses).numpy()
+        poses_gt = torch.cat(poses_gt).numpy()
         covs = torch.stack(covs, dim = 0).numpy()
 
         plt.figure(figsize=(5, 5))
