@@ -36,7 +36,7 @@ class IMUPreintegrator(nn.Module):
         self.rot = rot.clone()
         self.vel = vel.clone()
 
-    def forward(self, dt, gyro, acc, rot:pp.SO3=None, cov=None, init_state=None, gyro_cov=None, acc_cov=None):
+    def forward(self, dt, gyro, acc, rot:pp.SO3=None, gyro_cov=None, acc_cov=None, init_state=None):
         '''
         Args:
             acc: (B, Frames, 3)
@@ -61,8 +61,10 @@ class IMUPreintegrator(nn.Module):
                 gyro_cov = self.gyro_cov
             if acc_cov is None:
                 acc_cov = self.acc_cov
-            if cov is None:
+            if 'cov' not in init_state or init_state['cov'] is None:
                 init_cov = self.cov
+            else:
+                init_cov = init_state['cov']
             cov = self.propagate_cov(dt, acc, integrate, init_cov, gyro_cov, acc_cov)
         else:
             cov = {'cov': None}
@@ -109,8 +111,7 @@ class IMUPreintegrator(nn.Module):
             'pos': init_state['pos'] + init_state['rot'] * integrate['pos'] + init_state['vel'] * integrate['dt'],
         }
 
-    @classmethod
-    def propagate_cov(cls, dt, acc, integrate, init_cov, gyro_cov, acc_cov):
+    def propagate_cov(self, dt, acc, integrate, init_cov, gyro_cov, acc_cov):
         '''
             Covariance propogation
         '''
@@ -120,11 +121,7 @@ class IMUPreintegrator(nn.Module):
         Ca = torch.eye(3, device=dt.device, dtype=dt.dtype) * acc_cov
         Ca = Ca.repeat([B, F, 1, 1])
 
-        if init_cov is None:
-            init_cov = torch.zeros((B, 9, 9), device=dt.device, dtype=dt.dtype)
-
         Ha = pp.vec2skew(acc)
-
         A = torch.eye(9, device=dt.device, dtype=dt.dtype).repeat([B, F+1, 1, 1])
         A[:, :-1, 0:3, 0:3] = integrate['dr'].matrix().mT
         A[:, :-1, 3:6, 0:3] = torch.einsum('...xy,...t -> ...xy', \
@@ -142,12 +139,13 @@ class IMUPreintegrator(nn.Module):
         Ba[..., 6:9, 0:3] = 0.5 * torch.einsum('...xy,...t -> ...xy', integrate['dr'].matrix(), dt**2)
 
         # the term of B
+        init_cov = init_cov.expand(B, 9, 9)
         B_cov = torch.einsum('...xy,...t -> ...xy', Bg @ Cg @ Bg.mT + Ba @ Ca @ Ba.mT, 1/dt)
         B_cov = torch.cat([init_cov[:,None,...], B_cov], dim=1)
 
         A_left_cum = pp.cumprod(A.flip([1]), dim=1).flip([1]) # cumfrom An to I, then flip
         A_right_cum = A_left_cum.mT
-        
+
         cov = (A_left_cum @ B_cov @ A_right_cum).sum(dim=1)
 
         return {'cov': cov}
