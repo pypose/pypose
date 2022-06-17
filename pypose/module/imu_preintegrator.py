@@ -62,8 +62,8 @@ class IMUPreintegrator(nn.Module):
             if acc_cov is None:
                 acc_cov = self.acc_cov
             if cov is None:
-                cov = self.cov
-            cov = self.propagate_cov(dt=dt, acc=acc, integrate=integrate, init_cov=cov, ang_cov=ang_cov, acc_cov=acc_cov)
+                init_cov = self.cov
+            cov = self.propagate_cov(dt, acc, integrate, init_cov, ang_cov, acc_cov)
         else:
             cov = {'cov': None}
 
