@@ -23,24 +23,24 @@ class IMUPreintegrator(nn.Module):
                        rot = pp.identity_SO3(),
                        vel = torch.zeros(3),
                        gravity = 9.81007,
-                       ang_cov = (1.6968*10**-4)**2,
-                       acc_cov = (2.0*10**-3)**2,
+                       gyro_cov = (1.6968e-4)**2,
+                       acc_cov = (2e-3)**2,
                        prop_cov = True,
                        reset = False):
         super().__init__()
         self.reset, self.prop_cov = reset, prop_cov
         # Initial status of IMU: (pos)ition, (rot)ation, (vel)ocity, (cov)ariance
-        self.gravity, self.ang_cov, self.acc_cov = gravity, ang_cov, acc_cov
+        self.gravity, self.gyro_cov, self.acc_cov = gravity, gyro_cov, acc_cov
         self.register_buffer('cov', torch.zeros(1, 9, 9))
         self.register_buffer('pos', pos.clone())
         self.register_buffer('rot', rot.clone())
         self.register_buffer('vel', vel.clone())
 
-    def forward(self, dt, ang, acc, rot:pp.SO3=None, cov=None, init_state=None, ang_cov=None, acc_cov=None):
+    def forward(self, dt, gyro, acc, rot:pp.SO3=None, cov=None, init_state=None, gyro_cov=None, acc_cov=None):
         '''
         Args:
             acc: (B, Frames, 3)
-            ang: (B, Frames, 3)
+            gyro: (B, Frames, 3)
             dt: (B, Frames, 1)
             rot: (B, Frames, 4)
             init_state: dict
@@ -48,22 +48,22 @@ class IMUPreintegrator(nn.Module):
         dr, dp, dv: represents the incremental of one small interval 
         incre_r, incre_p, incre_v: represents the incremental starting from the first frame
         '''
-        assert(len(acc.shape) == len(dt.shape) == len(ang.shape) == 3)
+        assert(len(acc.shape) == len(dt.shape) == len(gyro.shape) == 3)
 
         if self.reset is False and init_state is None:
             init_state = {'pos': self.pos, 'rot': self.rot, 'vel': self.vel}
 
-        integrate = self.integrate(init_state, dt, ang, acc, rot)
+        integrate = self.integrate(init_state, dt, gyro, acc, rot)
         predict   = self.predict(init_state, integrate)
 
         if self.prop_cov:
-            if ang_cov is None:
-                ang_cov = self.ang_cov
+            if gyro_cov is None:
+                gyro_cov = self.gyro_cov
             if acc_cov is None:
                 acc_cov = self.acc_cov
             if cov is None:
                 init_cov = self.cov
-            cov = self.propagate_cov(dt, acc, integrate, init_cov, ang_cov, acc_cov)
+            cov = self.propagate_cov(dt, acc, integrate, init_cov, gyro_cov, acc_cov)
         else:
             cov = {'cov': None}
 
@@ -74,10 +74,10 @@ class IMUPreintegrator(nn.Module):
 
         return {**predict, **cov}
 
-    def integrate(self, init_state, dt, ang, acc, rot:pp.SO3=None):
+    def integrate(self, init_state, dt, gyro, acc, rot:pp.SO3=None):
         B, F = dt.shape[:2]
         gravity = torch.tensor([0, 0, self.gravity], dtype = dt.dtype, device = dt.device)
-        dr = torch.cat([pp.identity_SO3(B, 1, dtype=dt.dtype, device=dt.device), pp.so3(ang*dt).Exp()], dim=1)
+        dr = torch.cat([pp.identity_SO3(B, 1, dtype=dt.dtype, device=dt.device), pp.so3(gyro*dt).Exp()], dim=1)
         incre_r = pp.cumprod(dr, dim = 1, left=False)
         inte_rot = init_state['rot'] * incre_r
 
@@ -110,12 +110,12 @@ class IMUPreintegrator(nn.Module):
         }
 
     @classmethod
-    def propagate_cov(cls, dt, acc, integrate, init_cov, ang_cov, acc_cov):
+    def propagate_cov(cls, dt, acc, integrate, init_cov, gyro_cov, acc_cov):
         '''
             Covariance propogation
         '''
         B, F = dt.shape[:2]
-        Cg = torch.eye(3, device=dt.device, dtype=dt.dtype) * ang_cov
+        Cg = torch.eye(3, device=dt.device, dtype=dt.dtype) * gyro_cov
         Cg = Cg.repeat([B, F, 1, 1])
         Ca = torch.eye(3, device=dt.device, dtype=dt.dtype) * acc_cov
         Ca = Ca.repeat([B, F, 1, 1])

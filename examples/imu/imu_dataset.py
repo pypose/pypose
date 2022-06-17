@@ -65,7 +65,7 @@ class KITTI_IMU(Data.Dataset):
         return {
             'dt': self.dt[frame_id: end_frame_id],
             'acc': self.acc[frame_id: end_frame_id],
-            'ang': self.gyro[frame_id: end_frame_id],
+            'gyro': self.gyro[frame_id: end_frame_id],
             'gt_pos': self.gt_pos[frame_id: end_frame_id+1],
             'gt_rot': self.gt_rot[frame_id: end_frame_id+1],
             'gt_vel': self.gt_vel[frame_id: end_frame_id+1],
@@ -79,7 +79,7 @@ class KITTI_IMU(Data.Dataset):
 
 def imu_collate(data):
     acc = torch.stack([d['acc'] for d in data])
-    ang = torch.stack([d['ang'] for d in data])
+    gyro = torch.stack([d['gyro'] for d in data])
 
     gt_pos = torch.stack([d['gt_pos'] for d in data])
     gt_rot = torch.stack([d['gt_rot'] for d in data])
@@ -90,7 +90,7 @@ def imu_collate(data):
     return {
         'dt': dt,
         'acc': acc,
-        'ang': ang,
+        'gyro': gyro,
         'gt_pos': gt_pos,
         'gt_vel': gt_vel,
         'gt_rot': gt_rot,

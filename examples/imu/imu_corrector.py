@@ -21,7 +21,7 @@ class IMUCorrector(torch.nn.Module):
         self.imu = pp.module.IMUPreintegrator(reset=True, prop_cov=False)
 
     def forward(self, data):
-        feature = torch.cat([data["acc"], data["ang"]], dim = -1)
+        feature = torch.cat([data["acc"], data["gyro"]], dim = -1)
         B, F = feature.shape[:2]
 
         init_state = {
@@ -30,9 +30,9 @@ class IMUCorrector(torch.nn.Module):
             "vel": data['gt_vel'][:,:1,:],}
         output = self.net(feature.reshape(B*F,6)).reshape(B, F, 6)
         corrected_acc = output[...,:3] + data["acc"]
-        corrected_ang = output[...,3:] + data["ang"]
+        corrected_ang = output[...,3:] + data["gyro"]
 
-        return self.imu(init_state = init_state, dt = data['dt'], ang = corrected_ang,
+        return self.imu(init_state = init_state, dt = data['dt'], gyro = corrected_ang,
             acc = corrected_acc, rot = data['gt_rot'][:,:-1].contiguous())
 
 
