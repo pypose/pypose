@@ -77,7 +77,7 @@ class IMUPreintegrator(nn.Module):
     def integrate(self, init_state, dt, ang, acc, rot:pp.SO3=None):
         B, F = dt.shape[:2]
         gravity = torch.tensor([0, 0, self.gravity], dtype = dt.dtype, device = dt.device)
-        dr = torch.cat([pp.identity_SO3(B,1,dtype=dt.dtype, device=dt.device), pp.so3(ang*dt).Exp()], dim=1)
+        dr = torch.cat([pp.identity_SO3(B, 1, dtype=dt.dtype, device=dt.device), pp.so3(ang*dt).Exp()], dim=1)
         incre_r = pp.cumprod(dr, dim = 1, left=False)
         inte_rot = init_state['rot'] * incre_r
 
@@ -87,16 +87,16 @@ class IMUPreintegrator(nn.Module):
         else:
             a = acc - inte_rot[:,1:,:].Inv() @ gravity
 
-        dv = torch.zeros(B,1,3,dtype=dt.dtype, device=dt.device)
+        dv = torch.zeros(B, 1, 3, dtype=dt.dtype, device=dt.device)
         dv = torch.cat([dv, incre_r[:,:F,:] @ a * dt], dim=1)
         incre_v = torch.cumsum(dv, dim =1)
 
-        dp = torch.zeros(B,1,3,dtype=dt.dtype, device=dt.device)
+        dp = torch.zeros(B, 1, 3, dtype=dt.dtype, device=dt.device)
         dp = torch.cat([dp, incre_v[:,:F,:] * dt + incre_r[:,:F,:] @ a * 0.5 * dt**2], dim =1)
         incre_p = torch.cumsum(dp, dim =1)
 
         incre_t = torch.cumsum(dt, dim = 1)
-        incre_t = torch.cat([torch.zeros(B,1,1,dtype=dt.dtype, device=dt.device), incre_t], dim =1)
+        incre_t = torch.cat([torch.zeros(B, 1, 1, dtype=dt.dtype, device=dt.device), incre_t], dim =1)
 
         return {'vel':incre_v[...,1:,:], 'pos':incre_p[:,1:,:], 'rot':incre_r[:,1:,:],
                 'dt':incre_t[...,1:,:], 'dr': dr[:,1:,:]}
