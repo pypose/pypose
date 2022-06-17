@@ -4,7 +4,7 @@ import pypose as pp
 from torch import nn
 import torch.utils.data as Data
 import os, glob, tqdm, argparse
-from imu_dataset import KITTI_IMU, imu_collate, move_to
+from imu_dataset import KITTI_IMU, imu_collate, move_to, get_loss
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
@@ -25,22 +25,15 @@ class IMUCorrector(torch.nn.Module):
         B, F = feature.shape[:2]
 
         init_state = {
-            "pos": data['gt_pos'][:,:1,:], 
-            "rot": data['gt_rot'][:,:1,:],
-            "vel": data['gt_vel'][:,:1,:],}
+            "pos": data['init_pos'], 
+            "rot": data['init_rot'],
+            "vel": data['init_vel'],}
         output = self.net(feature.reshape(B*F,6)).reshape(B, F, 6)
         corrected_acc = output[...,:3] + data["acc"]
-        corrected_ang = output[...,3:] + data["gyro"]
+        corrected_gyro = output[...,3:] + data["gyro"]
 
-        return self.imu(init_state = init_state, dt = data['dt'], gyro = corrected_ang,
+        return self.imu(init_state = init_state, dt = data['dt'], gyro = corrected_gyro,
             acc = corrected_acc, rot = data['gt_rot'][:,:-1].contiguous())
-
-
-def get_loss(state, data):
-    pos_loss = torch.nn.functional.mse_loss(state['pos'], data['gt_pos'][:,1:,:])
-    rot_loss = torch.nn.functional.mse_loss(state['rot'].Log(), data['gt_rot'][:,1:,:].Log())
-    loss = pos_loss + rot_loss
-    return loss, {'pos_loss': pos_loss, 'rot_loss': rot_loss}
 
 
 def train(network, train_loader, epoch, optimizer, device="cuda:0"):

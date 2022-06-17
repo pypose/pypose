@@ -26,15 +26,15 @@ class IMUPreintegrator(nn.Module):
                        gyro_cov = (1.6968e-4)**2,
                        acc_cov = (2e-3)**2,
                        prop_cov = True,
-                       reset = False):
+                       reset = True):
         super().__init__()
         self.reset, self.prop_cov = reset, prop_cov
         # Initial status of IMU: (pos)ition, (rot)ation, (vel)ocity, (cov)ariance
         self.gravity, self.gyro_cov, self.acc_cov = gravity, gyro_cov, acc_cov
-        self.register_buffer('cov', torch.zeros(1, 9, 9))
-        self.register_buffer('pos', pos.clone())
-        self.register_buffer('rot', rot.clone())
-        self.register_buffer('vel', vel.clone())
+        self.cov = torch.zeros(1, 9, 9)
+        self.pos = pos.clone()
+        self.rot = rot.clone()
+        self.vel = vel.clone()
 
     def forward(self, dt, gyro, acc, rot:pp.SO3=None, cov=None, init_state=None, gyro_cov=None, acc_cov=None):
         '''
