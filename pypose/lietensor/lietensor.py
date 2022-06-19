@@ -346,7 +346,7 @@ class Sim3Type(LieType):
         return input.tensor()[..., 4:7]
 
     def scale(self, input):
-        return input.tensor()[..., 6:7]
+        return input.tensor()[..., 7:8]
 
     @classmethod
     def identity(cls, *size, **kwargs):
