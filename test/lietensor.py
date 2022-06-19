@@ -263,8 +263,9 @@ print(J, J.shape)
 
 LT = [pp.randn_SO3, pp.randn_so3, pp.randn_SE3, pp.randn_se3, \
       pp.randn_Sim3, pp.randn_sim3, pp.randn_RxSO3, pp.randn_rxso3]
+import random
 for lt in LT:
-    x = lt(2, dtype=torch.float64, device='cuda', requires_grad=True)
+    x = lt(random.randint(1, 10), dtype=torch.float64, device='cuda', requires_grad=True)
     t = x.translation()
     r = x.rotation()
     s = x.scale()
@@ -274,3 +275,5 @@ for lt in LT:
     assert(r.lshape == t.shape[:-1] == s.shape[:-1] == x.lshape == m.shape[:-2])
     assert(r.requires_grad == t.requires_grad == s.requires_grad == x.requires_grad == m.requires_grad)
     assert(t.shape[-1]==3 and r.shape[-1]==4 and s.shape[-1]==1 and m.shape[-1] == m.shape[-2])
+
+print('Done')
