@@ -54,15 +54,15 @@ args = parser.parse_args()
 class PoseInv(nn.Module):
     def __init__(self, *dim):
         super().__init__()
-        self.pose = pp.Parameter(pp.randn_se3(*dim))
+        self.pose = pp.Parameter(pp.randn_rxso3(*dim))
 
     def forward(self, inputs):
         return (self.pose.Exp() @ inputs).Log()
 
 
 posnet = PoseInv(2, 2)
-inputs = pp.randn_SE3(2, 2)
-target = pp.identity_se3(2, 2)
+inputs = pp.randn_RxSO3(2, 2)
+target = pp.identity_rxso3(2, 2)
 criterion = nn.MSELoss()
 optimizer = torch.optim.SGD(posnet.parameters(), lr=1e-1)
 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [50, 70], gamma=0.1)
@@ -86,6 +86,26 @@ print('Done', timer.toc())
 posnet = PoseInv(2, 2)
 optimizer = pp.optim.LM(posnet, damping=args.damping)
 timer = Timer()
+
+for idx in range(10):
+    loss = optimizer.step(inputs, target)
+    print('Pose loss %.7f @ %dit, Timing: %.3fs'%(loss, idx, timer.end()))
+    if loss < 1e-5:
+        print('Early Stoping!')
+        print('Optimization Early Done with loss:', loss.sum().item())
+        break
+
+
+class PoseInv(nn.Module):
+    def __init__(self, *dim):
+        super().__init__()
+        self.pose = pp.Parameter(pp.randn_RxSO3(*dim))
+
+    def forward(self, inputs):
+        return (self.pose @ inputs).Log()
+
+posnet = PoseInv(2, 2)
+optimizer = pp.optim.LM(posnet, damping=1e-6)
 
 for idx in range(10):
     loss = optimizer.step(inputs, target)

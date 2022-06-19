@@ -16,6 +16,8 @@ Basics
     AdjT
     Jinvp
     Jr
+    add
+    add_
     randn_so3
     randn_SO3
     randn_se3
