@@ -93,7 +93,7 @@ def add(input, other, alpha=1):
         This provides convenience to work with PyTorch optimizers like :obj:`torch.optim.SGD`,
         which calls function :meth:`.add_` of a Lie Group to adjust parameters by gradients
         (:obj:`LieTensor.grad`, where the last element is often zero since tangent vector requires
-        smaller storage).
+        smaller storage space).
 
     See :meth:`LieTensor` for types of Lie Algebra and Lie Group.
 
@@ -203,7 +203,8 @@ def cummul(input, dim, left = True):
         input (LieTensor): the input LieTensor
         dim (int): the dimension to do the multiplication over
         left (bool, optional): whether perform left multiplication in :obj:`cummul`.
-            If set it to :obj:`False`, this function performs right multiplication. Defaul: True
+            If set it to :obj:`False`, this function performs right multiplication.
+            Defaul: ``True``
 
     Returns:
         LieTensor: The LieTensor
@@ -237,26 +238,27 @@ def cummul(input, dim, left = True):
 
 
 def cumprod(input, dim, left = True):
-    r"""Returns the cumulative product (@) of LieTensor along a dimension.
+    r"""Returns the cumulative product (``@``) of LieTensor along a dimension.
 
     * Left product:
 
     .. math::
-        y_i = x_i ~@~ x_{i-1} ~@~ \cdots ~@~ x_1,
+        y_i = x_i ~\times~ x_{i-1} ~\times~ \cdots ~\times~ x_1,
     
     * Right product:
 
     .. math::
-        y_i = x_1 ~@~ x_2 ~@~ \cdots ~@~ x_i,
+        y_i = x_1 ~\times~ x_2 ~\times~ \cdots ~\times~ x_i,
 
-    where :math:`x_i,~y_i` are the :math:`i`-th LieType item along the :obj:`dim`
-    dimension of input and output, respectively.
+    where :math:`\times` denotes the group product (``@``), :math:`x_i,~y_i` are the
+    :math:`i`-th item along the :obj:`dim` dimension of the input and output LieTensor,
+    respectively.
 
     Args:
         input (LieTensor): the input LieTensor
         dim (int): the dimension to do the operation over
-        left (bool, optional): whether perform left product in :obj:`cumprod`.
-            If set it to :obj:`False`, this function performs right product. Defaul: True
+        left (bool, optional): whether perform left product in :obj:`cumprod`. If set
+            it to :obj:`False`, this function performs right product. Defaul: ``True``
 
     Returns:
         LieTensor: The LieTensor
