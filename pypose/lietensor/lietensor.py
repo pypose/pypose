@@ -7,6 +7,7 @@ from .backends import exp, log, inv, mul, adj
 from .backends import adjT, jinvp, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
 from .basics import cumops_, cummul_, cumprod_
+from .operation import rxso3_Exp, se3_Exp, so3_Exp
 
 
 HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'double',
@@ -230,7 +231,9 @@ class so3Type(LieType):
         super().__init__(1, 3, 4, 3)
 
     def Exp(self, x):
-        X = self.__op__(self.lid, exp, x)
+        # X = self.__op__(self.lid, exp, x)
+        x = x.tensor() if hasattr(x, 'ltype') else x
+        X = so3_Exp.apply(x)
         return LieTensor(X, ltype=SO3_type)
 
     @classmethod
@@ -284,7 +287,9 @@ class se3Type(LieType):
         super().__init__(3, 6, 7, 6)
 
     def Exp(self, x):
-        X = self.__op__(self.lid, exp, x)
+        # X = self.__op__(self.lid, exp, x)
+        x = x.tensor() if hasattr(x, 'ltype') else x
+        X = se3_Exp.apply(x)
         return LieTensor(X, ltype=SE3_type)
 
     @classmethod
@@ -354,7 +359,9 @@ class rxso3Type(LieType):
         super().__init__(2, 4, 5, 4)
 
     def Exp(self, x):
-        X = self.__op__(self.lid, exp, x)
+        # X = self.__op__(self.lid, exp, x)
+        x = x.tensor() if hasattr(x, 'ltype') else x
+        X = rxso3_Exp.apply(x)
         return LieTensor(X, ltype=RxSO3_type)
 
     @classmethod

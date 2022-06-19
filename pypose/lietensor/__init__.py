@@ -11,3 +11,4 @@ from .utils import Exp, Log, Inv, Mul, Retr, Act, Adj, AdjT, Jinvp, Jr
 from .basics import vec2skew, cumops, cummul, cumprod
 from .basics import cumops_, cummul_, cumprod_
 from .convert import mat2SO3, euler2SO3
+from .operation import so3_Jl, so3_Exp, se3_Exp, rxso3_Exp, sim3_Exp
