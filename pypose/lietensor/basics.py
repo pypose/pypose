@@ -68,7 +68,8 @@ def add(input, other, alpha=1):
         \mathrm{Exp}(\alpha * \bm{a}_i) \times \bm{x}_i & \text{if}~\bm{x}_i~\text{is a Lie Group}
         \end{cases}
 
-    where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` Tensor to add.
+    where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` Tensor to add,
+    and :math:`\bm{y}` is the output LieTensor.
 
     Note:
         The ``other`` Tensor is treated as a Lie Algebra during computation. The elements beyond
@@ -86,13 +87,13 @@ def add(input, other, alpha=1):
 
         where :math:`\mathcal{X}` is a Lie Group and :math:`\bm{\tau}` is its left perturbation.
 
-        This provides convenience to work with PyTorch optimizers like :obj:`torch.optim.SGD`,
-        which calls function :meth:`.add_` of a Lie Group to adjust parameters by gradients, which
-        are stored in :obj:`LieTensor.grad` (the last element is often zero since tangent vector
-        requires smaller storage).
-
         See Eq.(44) in `Micro Lie theory <https://arxiv.org/abs/1812.01537>`_ for more details of
         the gradient for a Lie Group.
+
+        This provides convenience to work with PyTorch optimizers like :obj:`torch.optim.SGD`,
+        which calls function :meth:`.add_` of a Lie Group to adjust parameters by gradients
+        (:obj:`LieTensor.grad`, where the last element is often zero since tangent vector requires
+        smaller storage).
 
     See :meth:`LieTensor` for types of Lie Algebra and Lie Group.
 
