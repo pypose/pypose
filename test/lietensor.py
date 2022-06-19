@@ -260,3 +260,17 @@ class PoseTransform(torch.nn.Module):
 model, inputs = PoseTransform(), pp.randn_SO3()
 J = pp.optim.modjac(model, inputs, flatten=True)
 print(J, J.shape)
+
+LT = [pp.randn_SO3, pp.randn_so3, pp.randn_SE3, pp.randn_se3, \
+      pp.randn_Sim3, pp.randn_sim3, pp.randn_RxSO3, pp.randn_rxso3]
+for lt in LT:
+    x = lt(2, dtype=torch.float64, device='cuda', requires_grad=True)
+    t = x.translation()
+    r = x.rotation()
+    s = x.scale()
+    m = x.matrix()
+    assert(r.device == t.device == s.device == x.device == m.device)
+    assert(r.dtype == t.dtype == s.dtype == x.dtype == m.dtype)
+    assert(r.lshape == t.shape[:-1] == s.shape[:-1] == x.lshape == m.shape[:-2])
+    assert(r.requires_grad == t.requires_grad == s.requires_grad == x.requires_grad == m.requires_grad)
+    assert(t.shape[-1]==3 and r.shape[-1]==4 and s.shape[-1]==1 and m.shape[-1] == m.shape[-2])

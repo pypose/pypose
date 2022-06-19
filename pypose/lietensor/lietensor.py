@@ -115,23 +115,23 @@ class LieType:
         out = self.__op__(self.lid, jinvp, X, p)
         return LieTensor(out, ltype=p.ltype)
 
-    def matrix(self, lietensor):
+    def matrix(self, input):
         """ To 4x4 matrix """
-        X = lietensor.Exp() if self.on_manifold else lietensor
+        X = input.Exp() if self.on_manifold else input
         I = torch.eye(4, dtype=X.dtype, device=X.device)
         I = I.view([1] * (X.dim() - 1) + [4, 4])
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
 
-    def rotation(self, lietensor):
+    def rotation(self, input):
         raise NotImplementedError("Rotation is not implemented for the instance.")
 
-    def translation(self, lietensor):
+    def translation(self, input):
         warnings.warn("Instance has no translation. Zero vector(s) is returned.")
-        return torch.zeros(lietensor.lshape + (3,))
+        return torch.zeros(input.lshape + (3,), dtype=input.dtype, device=input.device, requires_grad=input.requires_grad)
 
-    def scale(self, lietensor):
+    def scale(self, input):
         warnings.warn("Instance has no scale. Scalar one(s) is returned.")
-        return torch.ones(lietensor.lshape + (1,))
+        return torch.ones(input.lshape + (1,), dtype=input.dtype, device=input.device, requires_grad=input.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -209,14 +209,14 @@ class SO3Type(LieType):
         data = so3_type.Exp(so3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=SO3_type).requires_grad_(requires_grad)
 
-    def matrix(self, X):
+    def matrix(self, input):
         """ To 3x3 matrix """
-        I = torch.eye(3, dtype=X.dtype, device=X.device)
-        I = I.view([1] * (X.dim() - 1) + [3, 3])
-        return X.unsqueeze(-2).Act(I).transpose(-1,-2)
+        I = torch.eye(3, dtype=input.dtype, device=input.device)
+        I = I.view([1] * (input.dim() - 1) + [3, 3])
+        return input.unsqueeze(-2).Act(I).transpose(-1,-2)
 
-    def rotation(self, X):
-        return X
+    def rotation(self, input):
+        return input
 
     def identity_(self, X):
         X.fill_(0)
@@ -246,15 +246,15 @@ class so3Type(LieType):
         data = super().randn(*size, sigma=sigma, **kwargs).detach()
         return LieTensor(data, ltype=so3_type).requires_grad_(requires_grad)
 
-    def matrix(self, lietensor):
+    def matrix(self, input):
         """ To 3x3 matrix """
-        X = lietensor.Exp()
+        X = input.Exp()
         I = torch.eye(3, dtype=X.dtype, device=X.device)
         I = I.view([1] * (X.dim() - 1) + [3, 3])
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
 
-    def rotation(self, lietensor):
-        return lietensor.Exp().rotation()
+    def rotation(self, input):
+        return input.Exp().rotation()
 
     def Jr(self, x):
         """
@@ -277,11 +277,11 @@ class SE3Type(LieType):
         x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=se3_type)
 
-    def rotation(self, X):
-        return LieTensor(X.tensor()[..., 0:4], ltype=SO3_type)
+    def rotation(self, input):
+        return LieTensor(input.tensor()[..., 0:4], ltype=SO3_type)
 
-    def translation(self, X):
-        return X.tensor()[..., 4:6]
+    def translation(self, input):
+        return input.tensor()[..., 4:7]
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -301,11 +301,11 @@ class se3Type(LieType):
         X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=SE3_type)
 
-    def rotation(self, lietensor):
-        return lietensor.Exp().rotation()
+    def rotation(self, input):
+        return input.Exp().rotation()
 
-    def translation(self, lietensor):
-        return lietensor.Exp().translation()
+    def translation(self, input):
+        return input.Exp().translation()
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -324,14 +324,14 @@ class Sim3Type(LieType):
         x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=sim3_type)
 
-    def rotation(self, X):
-        return LieTensor(X.tensor()[..., 0:4], ltype=SO3_type)
+    def rotation(self, input):
+        return LieTensor(input.tensor()[..., 0:4], ltype=SO3_type)
 
-    def translation(self, X):
-        return X.tensor()[..., 4:6]
+    def translation(self, input):
+        return input.tensor()[..., 4:7]
 
-    def scale(self, X):
-        return X.tensor()[..., 6:7]
+    def scale(self, input):
+        return input.tensor()[..., 6:7]
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -351,14 +351,14 @@ class sim3Type(LieType):
         X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=Sim3_type)
 
-    def rotation(self, lietensor):
-        return lietensor.Exp().rotation()
+    def rotation(self, input):
+        return input.Exp().rotation()
 
-    def translation(self, lietensor):
-        return lietensor.Exp().translation()
+    def translation(self, input):
+        return input.Exp().translation()
 
-    def scale(self, lietensor):
-        return lietensor.Exp().scale()
+    def scale(self, input):
+        return input.Exp().scale()
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -377,11 +377,11 @@ class RxSO3Type(LieType):
         x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=rxso3_type)
 
-    def rotation(self, X):
-        return LieTensor(X.tensor()[..., 0:4], ltype=SO3_type)
+    def rotation(self, input):
+        return LieTensor(input.tensor()[..., 0:4], ltype=SO3_type)
 
-    def scale(self, X):
-        return X.tensor()[..., 4:5]
+    def scale(self, input):
+        return input.tensor()[..., 4:5]
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -401,11 +401,11 @@ class rxso3Type(LieType):
         X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=RxSO3_type)
 
-    def rotation(self, lietensor):
-        return lietensor.Exp().rotation()
+    def rotation(self, input):
+        return input.Exp().rotation()
 
-    def scale(self, lietensor):
-        return lietensor.Exp().scale()
+    def scale(self, input):
+        return input.Exp().scale()
 
     @classmethod
     def identity(cls, *size, **kwargs):
