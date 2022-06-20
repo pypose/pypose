@@ -289,10 +289,10 @@ class SE3Type(LieType):
         return LieTensor(x, ltype=se3_type)
 
     def rotation(self, input):
-        return LieTensor(input.tensor()[..., 0:4], ltype=SO3_type)
+        return LieTensor(input.tensor()[..., 3:7], ltype=SO3_type)
 
     def translation(self, input):
-        return input.tensor()[..., 4:7]
+        return input.tensor()[..., 0:3]
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -340,10 +340,10 @@ class Sim3Type(LieType):
         return LieTensor(x, ltype=sim3_type)
 
     def rotation(self, input):
-        return LieTensor(input.tensor()[..., 0:4], ltype=SO3_type)
+        return LieTensor(input.tensor()[..., 3:7], ltype=SO3_type)
 
     def translation(self, input):
-        return input.tensor()[..., 4:7]
+        return input.tensor()[..., 0:3]
 
     def scale(self, input):
         return input.tensor()[..., 7:8]
