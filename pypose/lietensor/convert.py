@@ -43,7 +43,7 @@ def mat2SO3(mat, check=True):
 
     Warning:
         A rotation matrix is consided illegal if, :math:`\vert \mathbf{R}\vert\neq1` or 
-        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` was set to ``True``, illegal input will raise 
+        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` is set to ``True``, illegal input will raise 
         a ``ValueError``, since the function will ouput irrelevant result, likely contains ``nan``.
 
     Examples:
@@ -175,10 +175,10 @@ def mat2SE3(mat, check=True):
 
     Warning:
         A rotation matrix is consided illegal if, :math:`\vert \mathbf{R}\vert\neq1` or 
-        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` was set to ``True``, illegal input will
+        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` is set to ``True``, illegal input will
         raise a ``ValueError``, since the function will ouput irrelevant result, likely contains ``nan``.
 
-        For input with shape :obj:`(*, 4, 4)`, when ``check`` was set to ``True`` and the last row
+        For input with shape :obj:`(*, 4, 4)`, when ``check`` is set to ``True`` and the last row
         of the each individual matrix is not ``[0, 0, 0, 1]``, a warning will be triggered. 
         Even though the last row is not used in the computation, it is worth noting that a matrix not
         satisfying this condition is not a valid transformation matrix.
@@ -289,10 +289,10 @@ def mat2Sim3(mat, check=True):
         further computation leads to *nan* in the computed quaternions.
 
         A rotation matrix is consided illegal if, :math:`\vert \mathbf{R}\vert\neq1` or 
-        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` was set to ``True``, illegal input will raise 
+        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` is set to ``True``, illegal input will raise 
         a ``ValueError``, since the function will ouput irrelevant result, likely contains ``nan``.
 
-        For input with shape :obj:`(*, 4, 4)`, when ``check`` was set to ``True`` and the last row
+        For input with shape :obj:`(*, 4, 4)`, when ``check`` is set to ``True`` and the last row
         of the each individual matrix is not ``[0, 0, 0, 1]``, a warning will be triggered. 
         Even though the last row is not used in the computation, it is worth noting that a matrix not
         satisfying this condition is not a valid transformation matrix.
@@ -428,7 +428,7 @@ def mat2RxSO3(mat, check=True):
         further computation leads to *nan* in the computed quaternions.
 
         A rotation matrix is consided illegal if, :math:`\vert \mathbf{R}\vert\neq1` or 
-        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` was set to ``True``, illegal input will raise 
+        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` is set to ``True``, illegal input will raise 
         a ``ValueError``, since the function will ouput irrelevant result, likely contains ``nan``.
 
     Examples:
@@ -485,7 +485,7 @@ def from_matrix(mat, ltype, check=True):
 
     Warning:
         A rotation matrix is consided illegal if, :math:`\vert \mathbf{R}\vert\neq1` or 
-        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` was set to ``True``, illegal input
+        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` is set to ``True``, illegal input
         will raise a ``ValueError``, since the function will ouput irrelevant result, likely 
         contains ``nan``.
     
