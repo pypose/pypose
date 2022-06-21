@@ -3,6 +3,7 @@ from typing import List, Set, Dict, Tuple, Optional, Iterable, Union
 
 import re
 from numpy import block
+import numpy as np
 from scipy.sparse import bsr_matrix
 
 import torch
@@ -46,6 +47,8 @@ def sbm_to_bsr_cpu(sbm):
     Convert a SparseBlockMatrix to a Block Row Matrix defined by SciPy. 
     Note that this function is for test purpose. If sbm is on GPU, then
     all the data will be off loaded to CPU.
+
+    NOTE: This function assumes that there are no empty rows of blocks.
     '''
 
     if not sbm.is_coalesced():
@@ -75,6 +78,86 @@ def sbm_to_bsr_cpu(sbm):
     return bsr_matrix( 
         ( block_storage.numpy(), indices.numpy(), indptr.numpy() ),
         shape=sbm.shape )
+
+
+
+# DTYPE_NUMPY_TO_TORCH = {
+#     np.int: torch.int,
+#     np.int64: torch.int64,
+#     np.float: torch.float64,
+#     np.float32: torch.float32,
+#     np.float64: torch.float64
+# }
+
+def get_equivalent_torch_dtype(dtype):
+    '''
+    Return the equivalent torch dtype based on numpy dtype.
+    '''
+
+    # Cannot use DTYPE_NUMPY_TO_TORCH for things like np.dtype('int64')
+    if dtype == int:
+        return torch.int # This might be wrong.
+    elif dtype == np.dtype('int32'):
+        return torch.int32
+    elif dtype == np.dtype('int64'):
+        return torch.int64
+    elif dtype == float:
+        return torch.float64
+    elif dtype == np.dtype('float32'):
+        return torch.float32
+    else:
+        raise Exception(f'dtype {dtype} not supported. ')
+
+def bsr_cpu_to_sbm(bsr, device=None):
+    '''
+    Warning: bsr.sum_duplicates() is called such that bsr is changed.
+    bsr.data may referring to an outer object. That object is also changed.
+
+    Convert a Block Ros Matrix defined by SciPy to SparseBlockMatrix.
+
+    dtype association:
+    np.int     -> torch.int
+    np.int64   -> torch.int64
+    np.float   -> torch.float64
+    np.float64 -> torch.float64
+    np.float32 -> torch.float32
+    '''
+
+    # Call the sum_duplicates() of bsr.
+    bsr.sum_duplicates()
+
+    # Get the dtype.
+    dtype = get_equivalent_torch_dtype(bsr.dtype)
+
+    # Create the SparseBlockMatrix.
+    sbm = SparseBlockMatrix( bsr.blocksize, dtype=dtype, device=device )
+
+    # Shape of blocks.
+    shape_blocks = [
+        bsr.shape[0] // bsr.blocksize[0], 
+        bsr.shape[1] // bsr.blocksize[1] ]
+
+    # Block indices.
+    d = np.diff( bsr.indptr )
+    block_row_indices = np.repeat( np.arange(d.size, dtype=int), d )
+    block_indices = np.stack( ( block_row_indices, bsr.indices ), axis=0 )
+    block_indices = torch.from_numpy( block_indices )
+
+    # Create memory for sbm.
+    sbm.create(
+        shape_blocks=shape_blocks,
+        block_indices=block_indices,
+        device=device )
+
+    # Block storage.
+    sbm.block_storage = torch.from_numpy( bsr.data ).to(device=device)
+
+    # Coalesce.
+    # The Block Row Matrix created by SciPy is always coalesced since we call
+    # sum_duplicates() explicitly. 
+    sbm.coalesced = True
+
+    return sbm
 
 class SparseBlockMatrix(object):
     def __init__(self, 
