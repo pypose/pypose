@@ -122,21 +122,23 @@ class LieType:
         out = self.__op__(self.lid, jinvp, X, p)
         return LieTensor(out, ltype=p.ltype)
 
-    def matrix(self, lietensor):
+    def matrix(self, input):
         """ To 4x4 matrix """
-        X = lietensor.Exp() if self.on_manifold else lietensor
+        X = input.Exp() if self.on_manifold else input
         I = torch.eye(4, dtype=X.dtype, device=X.device)
         I = I.view([1] * (X.dim() - 1) + [4, 4])
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
 
-    def translation(self, lietensor):
-        """ To translation """
-        X = lietensor.Exp() if self.on_manifold else lietensor
-        p = torch.tensor([0., 0., 0.], dtype=X.dtype, device=X.device)
-        return X.Act(p.view([1] * (X.dim() - 1) + [3,]))
+    def rotation(self, input):
+        raise NotImplementedError("Rotation is not implemented for the instance.")
 
-    def quaternion(self, lietensor):
-        raise NotImplementedError('quaternion not implemented yet')
+    def translation(self, input):
+        warnings.warn("Instance has no translation. Zero vector(s) is returned.")
+        return torch.zeros(input.lshape + (3,), dtype=input.dtype, device=input.device, requires_grad=input.requires_grad)
+
+    def scale(self, input):
+        warnings.warn("Instance has no scale. Scalar one(s) is returned.")
+        return torch.ones(input.lshape + (1,), dtype=input.dtype, device=input.device, requires_grad=input.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -218,11 +220,14 @@ class SO3Type(LieType):
     def add_(cls, input, other):
         return input.copy_(LieTensor(other[..., :3], ltype=so3_type).Exp() * inputs)
 
-    def matrix(self, X):
+    def matrix(self, input):
         """ To 3x3 matrix """
-        I = torch.eye(3, dtype=X.dtype, device=X.device)
-        I = I.view([1] * (X.dim() - 1) + [3, 3])
-        return X.unsqueeze(-2).Act(I).transpose(-1,-2)
+        I = torch.eye(3, dtype=input.dtype, device=input.device)
+        I = I.view([1] * (input.dim() - 1) + [3, 3])
+        return input.unsqueeze(-2).Act(I).transpose(-1,-2)
+
+    def rotation(self, input):
+        return input
 
     def identity_(self, X):
         X.fill_(0)
@@ -252,12 +257,15 @@ class so3Type(LieType):
         data = super().randn(*size, sigma=sigma, **kwargs).detach()
         return LieTensor(data, ltype=so3_type).requires_grad_(requires_grad)
 
-    def matrix(self, lietensor):
+    def matrix(self, input):
         """ To 3x3 matrix """
-        X = lietensor.Exp()
+        X = input.Exp()
         I = torch.eye(3, dtype=X.dtype, device=X.device)
         I = I.view([1] * (X.dim() - 1) + [3, 3])
         return X.unsqueeze(-2).Act(I).transpose(-1,-2)
+
+    def rotation(self, input):
+        return input.Exp().rotation()
 
     def Jr(self, x):
         """
@@ -279,6 +287,12 @@ class SE3Type(LieType):
     def Log(self, X):
         x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=se3_type)
+
+    def rotation(self, input):
+        return LieTensor(input.tensor()[..., 3:7], ltype=SO3_type)
+
+    def translation(self, input):
+        return input.tensor()[..., 0:3]
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -302,6 +316,12 @@ class se3Type(LieType):
         X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=SE3_type)
 
+    def rotation(self, input):
+        return input.Exp().rotation()
+
+    def translation(self, input):
+        return input.Exp().translation()
+
     @classmethod
     def identity(cls, *size, **kwargs):
         return SE3_type.Log(SE3_type.identity(*size, **kwargs))
@@ -318,6 +338,15 @@ class Sim3Type(LieType):
     def Log(self, X):
         x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=sim3_type)
+
+    def rotation(self, input):
+        return LieTensor(input.tensor()[..., 3:7], ltype=SO3_type)
+
+    def translation(self, input):
+        return input.tensor()[..., 0:3]
+
+    def scale(self, input):
+        return input.tensor()[..., 7:8]
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -341,6 +370,15 @@ class sim3Type(LieType):
         X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=Sim3_type)
 
+    def rotation(self, input):
+        return input.Exp().rotation()
+
+    def translation(self, input):
+        return input.Exp().translation()
+
+    def scale(self, input):
+        return input.Exp().scale()
+
     @classmethod
     def identity(cls, *size, **kwargs):
         return Sim3_type.Log(Sim3_type.identity(*size, **kwargs))
@@ -357,6 +395,12 @@ class RxSO3Type(LieType):
     def Log(self, X):
         x = self.__op__(self.lid, log, X)
         return LieTensor(x, ltype=rxso3_type)
+
+    def rotation(self, input):
+        return LieTensor(input.tensor()[..., 0:4], ltype=SO3_type)
+
+    def scale(self, input):
+        return input.tensor()[..., 4:5]
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -379,6 +423,12 @@ class rxso3Type(LieType):
     def Exp(self, x):
         X = self.__op__(self.lid, exp, x)
         return LieTensor(X, ltype=RxSO3_type)
+
+    def rotation(self, input):
+        return input.Exp().rotation()
+
+    def scale(self, input):
+        return input.Exp().scale()
 
     @classmethod
     def identity(cls, *size, **kwargs):
@@ -698,55 +748,33 @@ class LieTensor(torch.Tensor):
 
     def tensor(self) -> torch.Tensor:
         r'''
-        Return the torch.Tensor without changing data.
-
-        Return:
-            Tensor: the torch.Tensor form of LieTensor.
-
-        Example:
-            >>> x = pp.randn_SO3(2)
-            >>> x.tensor()
-            tensor([[ 0.1196,  0.2339, -0.6824,  0.6822],
-                    [ 0.9198, -0.2704, -0.2395,  0.1532]])
+        See :meth:`pypose.tensor`
         '''
         return torch.Tensor.as_subclass(self, torch.Tensor)
 
     def matrix(self) -> torch.Tensor:
         r'''
-        Return LieTensor into matrix form.
-
-        Return:
-            Tensor: the batched matrix form (torch.Tensor) of LieTensor.
-
-        Example:
-            >>> x = pp.randn_SO3(2)
-            >>> x.matrix()
-            tensor([[[ 0.9285, -0.0040, -0.3713],
-                    [ 0.2503,  0.7454,  0.6178],
-                    [ 0.2743, -0.6666,  0.6931]],
-                    [[ 0.4805,  0.8602, -0.1706],
-                    [-0.7465,  0.2991, -0.5944],
-                    [-0.4603,  0.4130,  0.7858]]])
+        See :meth:`pypose.matrix`
         '''
         return self.ltype.matrix(self)
 
     def translation(self) -> torch.Tensor:
         r'''
-        Extract the translation vector from a LieTensor.
-
-        Return:
-            Tensor: the batched translation.
-
-        Example:
-            >>> x = pp.randn_SE3(2)
-            >>> x.translation()
-            tensor([[-0.5358, -1.5421, -0.7224],
-                    [ 0.8331, -1.4412,  0.0863]])
+        See :meth:`pypose.translation`
         '''
         return self.ltype.translation(self)
 
-    def quaternion(self) -> torch.Tensor:
-        return self.ltype.quaternion(self)
+    def rotation(self):
+        r'''
+        See :meth:`pypose.rotation`
+        '''
+        return self.ltype.rotation(self)
+
+    def scale(self) -> torch.Tensor:
+        r'''
+        See :meth:`pypose.scale`
+        '''
+        return self.ltype.scale(self)
 
     def identity_(self):
         r'''

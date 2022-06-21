@@ -14,3 +14,8 @@ Convert
     from_matrix
     euler2SO3
     vec2skew
+    tensor
+    translation
+    rotation
+    scale
+    matrix
