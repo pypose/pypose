@@ -559,7 +559,7 @@ def euler2SO3(euler: torch.Tensor):
     r"""Convert batched Euler angles (roll, pitch, and yaw) to SO3Type LieTensor.
 
     Args:
-        euler (Tensor): the euler angles (in radians) to convert.
+        euler (Tensor): the euler angles to convert.
 
     Return:
         LieTensor: the converted SO3Type LieTensor.
@@ -583,14 +583,6 @@ def euler2SO3(euler: torch.Tensor):
 
     Note:
         The last dimension of the input tensor has to be 3.
-
-        In PyPose, we use the ZYZ Euler angle convention. More details about the
-        different kinds of Euler Angle combinations used can be found in the 
-        following tutorial:
-
-        * Ben-Ari, Moti. `A tutorial on euler angles and quaternions
-          <https://www.weizmann.ac.il/sci-tea/benari/sites/sci-tea.benari/files/uploads/softwareAndLearningMaterials/quaternion-tutorial-2-0-1.pdf>`_,
-          Weizmann Institute of Science: Rehovot, Israel (2014).
 
     Examples:
         >>> input = torch.randn(2, 3, requires_grad=True, dtype=torch.float64)
