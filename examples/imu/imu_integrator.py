@@ -52,7 +52,7 @@ if __name__ == '__main__':
         for idx, data in enumerate(loader):
             data = move_to(data, args.device)
 
-            state = integrator(dt=data['dt'], gyro=data['gyro'], acc=data['acc'], rot=data['gt_rot'][:,:-1])
+            state = integrator(dt=data['dt'], gyro=data['gyro'], acc=data['acc'], rot=data['init_rot'])
             poses_gt.append(data['gt_pos'][..., -1, :].cpu())
             poses.append(state['pos'][..., -1, :].cpu())
             covs.append(state['cov'][..., -1, :, :].cpu())

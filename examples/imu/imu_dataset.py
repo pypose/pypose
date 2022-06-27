@@ -51,8 +51,6 @@ class KITTI_IMU(Data.Dataset):
             end_frame = np.floor(self.seq_len * 0.5).astype(int)
         elif mode == 'test':
             start_frame = np.floor(self.seq_len * 0.5).astype(int)
-        elif mode == 'evaluate':
-            step_size = self.duration # ensure that step size is the same as the duration length
 
         self.index_map = [i for i in range(0, end_frame - start_frame - self.duration, step_size)]
 
@@ -71,7 +69,7 @@ class KITTI_IMU(Data.Dataset):
             'gt_rot': self.gt_rot[frame_id+1 : end_frame_id+1],
             'gt_vel': self.gt_vel[frame_id+1 : end_frame_id+1],
             'init_pos': self.gt_pos[frame_id][None, ...],
-            'init_rot': self.gt_rot[frame_id][None, ...],
+            'init_rot': self.gt_rot[frame_id : end_frame_id], # TODO: the init rotation might be used in gravity compensation 
             'init_vel': self.gt_vel[frame_id][None, ...],
         }
 

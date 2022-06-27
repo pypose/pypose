@@ -26,14 +26,14 @@ class IMUCorrector(torch.nn.Module):
 
         init_state = {
             "pos": data['init_pos'], 
-            "rot": data['init_rot'],
+            "rot": data['init_rot'][:,:1,:],
             "vel": data['init_vel'],}
         output = self.net(feature.reshape(B*F,6)).reshape(B, F, 6)
         corrected_acc = output[...,:3] + data["acc"]
         corrected_gyro = output[...,3:] + data["gyro"]
 
         return self.imu(init_state = init_state, dt = data['dt'], gyro = corrected_gyro,
-            acc = corrected_acc, rot = data['gt_rot'][:,:-1].contiguous())
+            acc = corrected_acc, rot = data['gt_rot'].contiguous())
 
 
 def train(network, train_loader, epoch, optimizer, device="cuda:0"):
