@@ -218,7 +218,7 @@ class SO3Type(LieType):
 
     @classmethod
     def add_(cls, input, other):
-        return input.copy_(LieTensor(other[..., :3], ltype=so3_type).Exp() * inputs)
+        return input.copy_(LieTensor(other[..., :3], ltype=so3_type).Exp() * input)
 
     def matrix(self, input):
         """ To 3x3 matrix """
