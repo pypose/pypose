@@ -2,7 +2,6 @@ import warnings
 import torch, time
 import pypose as pp
 from torch import nn
-warnings.filterwarnings("ignore")
 
 
 class Timer:

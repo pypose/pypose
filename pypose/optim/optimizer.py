@@ -27,8 +27,7 @@ class LM(Optimizer):
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
             &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}
                 {\partial \bm{\theta}_{t-1}}}                                                    \\
-            &\hspace{5mm} \mathbf{A} \leftarrow \mathbf{J}^T \mathbf{J} +
-                \lambda \mathrm{diag} (\mathbf{\mathbf{J}^T \mathbf{J}})                         \\
+            &\hspace{5mm} \mathbf{A} \leftarrow \mathbf{J}^T \mathbf{J} + \lambda \mathbf{I}     \\
             &\hspace{5mm} \mathbf{E} = \bm{y} - \bm{f(\bm{\theta}_{t-1}, \bm{x})}                \\
             &\hspace{5mm} \textbf{try}                                                           \\
             &\hspace{10mm} \mathbf{L} = \mathrm{cholesky\_decomposition}(\mathbf{A})             \\
@@ -113,12 +112,12 @@ class LM(Optimizer):
         for group in self.param_groups:
             numels = [p.numel() for p in group['params'] if p.requires_grad]
             J = modjac(self.model, inputs, flatten=True)
-            A = (J.T @ J).diagonal_scatter((1 + group['damping']) * (J**2).sum(0))
+            A = (J.T @ J).diagonal_scatter(group['damping'] + (J**2).sum(0))
             try: # Faster but sometimes singular error
                 D = (J.T @ E).cholesky_solve(torch.linalg.cholesky(A))
             except: # Slower but singular is fine
-                D = A.pinverse() @ (J.T @ E)
                 warnings.warn("Using pseudo inverse due to singular matrix.", UserWarning)
+                D = A.pinverse() @ (J.T @ E)
             D = torch.split(D, numels)
             [p.add_(d.view(p.shape)) for p, d in zip(group['params'], D) if p.requires_grad]
         return E.norm()

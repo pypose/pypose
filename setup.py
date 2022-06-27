@@ -7,7 +7,7 @@ ROOT = osp.dirname(osp.abspath(__file__))
 setup(
     name='pypose',
     version='0.1.1',
-    description='PyPose = (GTSAM | G2O) x PyTorch',
+    description='To connect classic robotics with modern learning methods.',
     author='Chen Wang',
     packages=find_packages(),
     license = 'BSD 3-Clause License',
