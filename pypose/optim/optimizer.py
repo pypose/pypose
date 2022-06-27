@@ -43,48 +43,6 @@ class LM(Optimizer):
     Args:
         model (nn.Module): a module containing learnable parameters.
         damping (float): Levenberg's damping factor (non-negative number) to prevent singularity.
-
-    Note:
-        The (non-negative) damping factor :math:`\lambda` can be adjusted at each iteration. If
-        reduction of the residual is rapid, a smaller value can be used, bringing the algorithm
-        closer to the Gauss-Newton algorithm, whereas if an iteration gives insufficient reduction
-        in the residual, :math:`\lambda` can be increased, giving a step closer to the gradient
-        descent direction.
-
-    Note:
-        Different from PyTorch optimizers like
-        `SGD <https://pytorch.org/docs/stable/generated/torch.optim.SGD.html>`_, where the model
-        loss has to be a scalar, the model output of :obj:`LM` can be a Tensor/LieTensor or a
-        tuple of Tensors/LieTensors.
-
-    Example:
-        Optimizing a simple module to **approximate pose inversion**.
-
-        >>> class PoseInv(nn.Module):
-        ...     def __init__(self, *dim):
-        ...         super().__init__()
-        ...         self.pose = pp.Parameter(pp.randn_se3(*dim))
-        ...
-        ...     def forward(self, inputs):
-        ...         return (self.pose.Exp() @ inputs).Log()
-        ...
-        >>> posnet = PoseInv(2, 2)
-        >>> inputs, targets = pp.randn_SE3(2, 2), pp.identity_se3(2, 2)
-        >>> optimizer = pp.optim.LM(posnet, damping=1e-6)
-        ...
-        >>> for idx in range(10):
-        ...     loss = optimizer.step(inputs, targets)
-        ...     print('Pose Inversion loss %.7f @ %d it'%(loss, idx))
-        ...     if loss < 1e-5:
-        ...         print('Early Stoping with loss:', loss.item())
-        ...         break
-        ...
-        Pose Inversion error 1.1270601 @ 0 it
-        Pose Inversion error 0.2298058 @ 1 it
-        Pose Inversion error 0.0203174 @ 2 it
-        Pose Inversion error 0.0001056 @ 3 it
-        Pose Inversion error 0.0000001 @ 4 it
-        Early Stoping with error: 7.761021691976566e-08
     '''
     def __init__(self, model, damping):
         self.model = model
@@ -93,22 +51,71 @@ class LM(Optimizer):
         super().__init__(model.parameters(), defaults)
 
     @torch.no_grad()
-    def step(self, inputs, targets):
+    def step(self, inputs, targets=None):
         r'''
         Performs a single optimization step.
 
         Args:
             inputs (Tensor/LieTensor or tuple of Tensors/LieTensors): the inputs to the model.
             targets (Tensor/LieTensor or tuple of Tensors/LieTensors): the model targets to approximate.
+                If not given, the model outputs are minimized. Defaults: ``None``.
 
         Return:
             Tensor: the minimized model loss, i.e., :math:`\|\bm{y} - \bm{f}(\bm{\theta}, \bm{x})\|^2`.
+
+        Note:
+            The (non-negative) damping factor :math:`\lambda` can be adjusted at each iteration. If
+            reduction of the residual is rapid, a smaller value can be used, bringing the algorithm
+            closer to the Gauss-Newton algorithm, whereas if an iteration gives insufficient reduction
+            in the residual, :math:`\lambda` can be increased, giving a step closer to the gradient
+            descent direction.
+
+        Note:
+            Different from PyTorch optimizers like
+            `SGD <https://pytorch.org/docs/stable/generated/torch.optim.SGD.html>`_, where the model
+            loss has to be a scalar, the model output of :obj:`LM` can be a Tensor/LieTensor or a
+            tuple of Tensors/LieTensors.
+
+        Example:
+            Optimizing a simple module to **approximate pose inversion**.
+
+            >>> class PoseInv(nn.Module):
+            ...     def __init__(self, *dim):
+            ...         super().__init__()
+            ...         self.pose = pp.Parameter(pp.randn_se3(*dim))
+            ...
+            ...     def forward(self, inputs):
+            ...         return (self.pose.Exp() @ inputs).Log()
+            ...
+            >>> posnet = PoseInv(2, 2)
+            >>> inputs, targets = pp.randn_SE3(2, 2), pp.identity_se3(2, 2)
+            >>> optimizer = pp.optim.LM(posnet, damping=1e-6)
+            ...
+            >>> for idx in range(10):
+            ...     loss = optimizer.step(inputs, targets)
+            ...     print('Pose Inversion loss %.7f @ %d it'%(loss, idx))
+            ...     if loss < 1e-5:
+            ...         print('Early Stoping with loss:', loss.item())
+            ...         break
+            ...
+            Pose Inversion error 1.1270601 @ 0 it
+            Pose Inversion error 0.2298058 @ 1 it
+            Pose Inversion error 0.0203174 @ 2 it
+            Pose Inversion error 0.0001056 @ 3 it
+            Pose Inversion error 0.0000001 @ 4 it
+            Early Stoping with error: 7.761021691976566e-08
         '''
         outputs = self.model(inputs)
-        if isinstance(outputs, tuple):
-            E = torch.cat([(t - o).view(-1, 1) for t, o in zip(targets, outputs)])
+        if targets is not None:
+            if isinstance(outputs, tuple):
+                E = torch.cat([(t - o).view(-1, 1) for t, o in zip(targets, outputs)])
+            else:
+                E = (targets - outputs).view(-1, 1)
         else:
-            E = (targets - outputs).view(-1, 1)
+            if isinstance(outputs, tuple):
+                E = torch.cat([-o.view(-1, 1) for o in outputs])
+            else:
+                E = -outputs.view(-1, 1)
         for group in self.param_groups:
             numels = [p.numel() for p in group['params'] if p.requires_grad]
             J = modjac(self.model, inputs, flatten=True)
