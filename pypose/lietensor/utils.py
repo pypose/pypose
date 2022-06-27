@@ -6,6 +6,7 @@ from .lietensor import SE3_type, se3_type
 from .lietensor import SO3_type, so3_type
 from .lietensor import Sim3_type, sim3_type
 from .lietensor import RxSO3_type, rxso3_type
+from .common_types import _size_any_t, _size_2_t, _size_35_t, _size_24_t
 
 
 def _LieTensor_wrapper_add_docstr(wrapper: functools.partial, embedding_doc):
@@ -225,7 +226,7 @@ sim3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=sim3_typ
         tensor([0., 0., 0., 0., 0., 0., 1.])
     ''')
 
-def randn_like(input, sigma=[1.0], **kwargs):
+def randn_like(input, sigma:_size_any_t=1.0, **kwargs):
     r'''
     Returns a LieTensor with the same size as input that is filled with random
     LieTensor that satisfies the corresponding :obj:`input.ltype`.
@@ -266,14 +267,7 @@ def randn_like(input, sigma=[1.0], **kwargs):
 
         input (LieTensor): the size of input will determine size of the output tensor.
 
-        sigma (List, optional): sigma parameter for generating random LieTensors.
-            For :obj:`SO3_type` and :obj:`so3_type` input: 1-dimensional list ([:obj:`sigma_d`]).
-            For :obj:`SE3_type` and :obj:`se3_type` input: 2-dimensional list ([:obj:`sigma_t`, :obj:`sigma_d`])
-            or 4-dimensional list ([:obj:`sigma_t_x`, :obj:`sigma_t_y`, :obj:`sigma_t_z`, :obj:`sigma_d`]).
-            For :obj:`Sim3_type` and :obj:`sim3_type` input: 3-dimensional list ([:obj:`sigma_t`, :obj:`sigma_d`, :obj:`sigma_s`])
-            or 5-dimensional list ([:obj:`sigma_t_x`, :obj:`sigma_t_y`, :obj:`sigma_t_z`, :obj:`sigma_d`, :obj:`sigma_s`]). 
-            For :obj:`RxSO3_type` and :obj:`rxso3_type` input: 2-dimensional list ([:obj:`sigma_d`, :obj:`sigma_s`]).
-            Default: 1.0 for all sigma.
+        sigma (float or tuple, optional): sigma parameter for generating random LieTensors. Default: 1.0.
 
         dtype (torch.dtype, optional): the desired data type of returned Tensor.
             Default: if None, defaults to the dtype of input.
@@ -289,6 +283,13 @@ def randn_like(input, sigma=[1.0], **kwargs):
 
         memory_format (torch.memory_format, optional): the desired memory format of returned Tensor.
             Default: torch.preserve_format.
+    
+    Note:
+        The parameter :obj:`sigma` can either be:
+
+            - a single ``float`` -- in which all the elements in the LieType share the same sigma
+
+            - a ``tuple`` of a number of floats -- in which case, the specific sigma for each element can be assigned independently.
 
     Note:
         If we have:
@@ -311,31 +312,13 @@ def randn_like(input, sigma=[1.0], **kwargs):
             so3Type LieTensor:
             tensor([0.8970, 0.0943, 0.1399])
     '''
-    if input.ltype == so3_type or input.ltype == SO3_type:
-        assert len(sigma)==1, 'input sigma should be 1-dimensional list ([rotation_sigma]).'
-        sigma = sigma[0]
-    elif input.ltype == se3_type or input.ltype == SE3_type:
-        if len(sigma)==1:
-            sigma = [sigma[0], sigma[0]]
-        else:
-            assert len(sigma)==2 or len(sigma)==4, 'input sigma should be either 2-dimensional list ([transation_sigma, rotation_sigma]) or 4-dimensional list ([transation_sigma_x, transation_sigma_y, transation_sigma_z, rotation_sigma]).'
-    elif input.ltype == rxso3_type or input.ltype == RxSO3_type:
-        if len(sigma)==1:
-            sigma = [sigma[0], sigma[0]]
-        else:
-            assert len(sigma)==2, 'input sigma should be 2-dimensional list ([transation_sigma, rotation_sigma]).'
-    elif input.ltype == sim3_type or input.ltype == Sim3_type:
-        if len(sigma)==1:
-            sigma = [sigma[0], sigma[0], sigma[0]]
-        else:
-            assert len(sigma)==3 or len(sigma)==5, 'input sigma should be either 3-dimensional list ([transation_sigma, rotation_sigma, scale_sigma]) or 5-dimensional list ([transation_sigma_x, transation_sigma_y, transation_sigma_z, rotation_sigma, scale_sigma]).'
     return input.ltype.randn_like(*input.lshape, sigma=sigma, **kwargs)
 
 
-def randn_so3(*size, sigma=1.0, **kwargs):
+def randn_so3(*size, sigma_d=1.0, **kwargs):
     r'''
-    Returns :obj:`so3_type` LieTensor filled with random numbers satisfying the expected distance (quaternions distance)
-    between the generated state and :math:`\mathbf{0}` is :obj:`sigma`.
+    Returns :obj:`so3_type` LieTensor filled with random numbers satisfying the expected distance (quaternion distance)
+    between the generated state and :math:`\mathbf{0}` is :obj:`sigma_d`.
 
     The shape of the tensor is defined by the variable argument size.
 
@@ -343,7 +326,7 @@ def randn_so3(*size, sigma=1.0, **kwargs):
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float, optional): expected distance between the generated state and zero. Default: 1.
+        sigma_d (float, optional): expected distance between the generated state and zero. Default: 1.0.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
@@ -364,14 +347,13 @@ def randn_so3(*size, sigma=1.0, **kwargs):
     Returns:
         LieTensor: a :obj:`so3_type` LieTensor
 
-    Given the expected distance :obj:`sigma`, we first calculte the standard deviation of the 
+    Given the expected distance :obj:`sigma_d`, we first calculte the standard deviation of the 
     individual components of the tangent perturbation :math:`\sigma_{\mathrm{r}}` as:
 
     .. math::
-        \sigma_{\mathrm{r}} = \frac{2*\sigma}{\sqrt{3}}.
+        \sigma_{\mathrm{r}} = \frac{2*\sigma_{\mathrm{d}}}{\sqrt{3}}.
 
-    The factor 2 is due to the way we define distance (see also `Matt Mason's lecture on 
-    quaternions <http://www.cs.cmu.edu/afs/cs/academic/class/16741-s07/www/lectures/Lecture8.pdf>`_)
+    The factor 2 is due to the way we define quaternion distance.
     The :math:`1/\sqrt{3}` factor is necessary because the distribution in the tangent space is 
     a 3-dimensional Gaussian, so that the *length* of a tangent vector needs to be scaled by
     :math:`1/\sqrt{3}`.
@@ -385,26 +367,29 @@ def randn_so3(*size, sigma=1.0, **kwargs):
 
     Note:
         The detailed explanation of the above implementation can be found in the 
-        `OMPL code <https://ompl.kavrakilab.org/SO3StateSpace_8cpp_source.html>`_, line 119.
+        `OMPL code <https://ompl.kavrakilab.org/SO3StateSpace_8cpp_source.html>`_, line 119, 
+        and `Matt Mason's lecture on quaternions <http://www.cs.cmu.edu/afs/cs/academic/class/16741-s07/www/lectures/Lecture8.pdf>`_.
 
     Example:
-        >>> pp.randn_so3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
+        >>> pp.randn_so3(2, sigma_d=0.1, requires_grad=True, dtype=torch.float64)
         so3Type LieTensor:
         tensor([[ 0.1918, -0.0804, -0.1110],
         [ 0.0452, -0.1506,  0.2428]], dtype=torch.float64, requires_grad=True)
     '''
-    return so3_type.randn(*size, sigma=sigma, **kwargs)
+    return so3_type.randn(*size, sigma=sigma_d, **kwargs)[0]
 
 
-def randn_SO3(*size, sigma=1.0, **kwargs):
+def randn_SO3(*size, sigma_d=1.0, **kwargs):
     r'''
     Returns :obj:`SO3_type` LieTensor filled with the Exponential map of the random
-    :obj:`so3_type` LieTensor, whose expected quaternions distance from :math:`\mathbf{0}` is :obj:`sigma`.
+    :obj:`so3_type` LieTensor, whose expected quaternions distance from :math:`\mathbf{0}` is :obj:`sigma_d`.
 
     .. math::
         \mathrm{out}_i = \mathrm{Exp}(\mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma_{\mathrm{r}}}_{3\times 1}))
 
-    For the definition and explanation of :math:`\mathbf{\sigma_{\mathrm{r}}}`, please see the documentation of :meth:`randn_so3()`.
+    where :math:`\sigma_{\mathrm{r}} = \frac{2*\sigma_{\mathrm{d}}}{\sqrt{3}}`, which is expained in the documentation of 
+    :meth:`randn_so3()`.
+
     The shape of the tensor is defined by the variable argument size.
 
     Args:
@@ -433,22 +418,23 @@ def randn_SO3(*size, sigma=1.0, **kwargs):
         LieTensor: a :obj:`SO3_type` LieTensor
 
     Example:
-        >>> pp.randn_SO3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
+        >>> pp.randn_SO3(2, sigma_d=0.1, requires_grad=True, dtype=torch.float64)
         SO3Type LieTensor:
         tensor([[-0.0494,  0.0226,  0.0243,  0.9982],
                 [-0.0701, -0.0723, -0.0199,  0.9947]], dtype=torch.float64,
             requires_grad=True)
 
     '''
-    return SO3_type.randn(*size, sigma=sigma, **kwargs)
+    return SO3_type.randn(*size, sigma=sigma_d, **kwargs)
 
 
-def randn_se3(*size, sigma=[1.0,1.0], **kwargs):
+def randn_se3(*size, sigma:_size_24_t=1.0, **kwargs):
     r'''
     Returns :obj:`se3_type` LieTensor, where the transation part :math:`\bm{\tau}_i` is filled with 
     random numbers from a normal distribution with mean 0 and variance :obj:`sigma_t`, the rotation 
-    part :math:`\bm{\phi}_i` is filled with random numbers satisfying the expected distance (quaternions distance) 
-    between the generated state and :math:`\mathbf{0}` is :obj:`sigma_d`.
+    part :math:`\bm{\phi}_i` is filled with random numbers satisfying the expected distance (quaternion distance) 
+    between the generated state and :math:`\mathbf{0}` is :obj:`sigma_d`. Note that the input argument
+    :obj:`sigma` = (:obj:`sigma_t`, :obj:`sigma_d`)
 
     .. math::
         \mathrm{out}_i = [\bm{\tau}_i, \bm{\phi}_i],
@@ -466,9 +452,7 @@ def randn_se3(*size, sigma=[1.0,1.0], **kwargs):
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (List, optional): could be 2-dimensional list ([:obj:`sigma_t`, :obj:`sigma_d`])
-        or 4-dimensional list ([:obj:`sigma_t_x`, :obj:`sigma_t_y`, :obj:`sigma_t_z`, :obj:`sigma_d`]). 
-        Default: [1.0, 1.0].
+        sigma (float or tuple, optional): variance (sigma_t and sigma_d) for the two normal distribution. Default: 1.0.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
@@ -489,13 +473,25 @@ def randn_se3(*size, sigma=[1.0,1.0], **kwargs):
     Returns:
         LieTensor: a :obj:`se3_type` LieTensor
 
+    Note:
+        The parameter :obj:`sigma` can either be:
+
+            - a single ``float`` -- in which all the elements in the :obj:`se3_type` share the same sigma, i.e., 
+                :obj:`sigma_d` = :obj:`sigma_t` = :obj:`sigma`.
+
+            - a ``tuple`` of two floats -- in which case, the specific sigmas are assigned independently, i.e.,
+                :obj:`sigma` = (:obj:`sigma_t`, :obj:`sigma_d`).
+
+            - a ``tuple`` of four floats -- in which case, the specific sigmas for each transation data are assigned independently, i.e., 
+                :obj:`sigma` = (:obj:`sigma_t_x`, :obj:`sigma_t_y`, :obj:`sigma_t_z`, :obj:`sigma_d`).
+
     Example:
-        >>> pp.randn_se3(2, sigma=[1.0,0.5], requires_grad=True, dtype=torch.float64) # sigma = [sigma_t, sigma_d]
+        >>> pp.randn_se3(2, sigma=(1.0, 0.5), requires_grad=True, dtype=torch.float64) # sigma = (sigma_t, sigma_d)
             se3Type LieTensor:
             tensor([[-1.2322, -1.4267,  0.6751,  0.8957, -0.0815, -0.8978],
                     [ 0.2730,  0.1029,  0.0180, -0.3064, -1.0914,  1.0258]],
                 dtype=torch.float64, requires_grad=True)
-        >>> pp.randn_se3(2, sigma=[0.1,0.2,0.3,0.5]) # sigma = [sigma_t_x, sigma_t_y, sigma_t_z, sigma_d]
+        >>> pp.randn_se3(2, sigma=(0.1, 0.2, 0.3, 0.5)) # sigma = (sigma_t_x, sigma_t_y, sigma_t_z, sigma_d)
             se3Type LieTensor:
             tensor([[ 0.0570,  0.1811, -0.0433, -0.3530,  0.8739,  0.3371],
                     [-0.1572,  0.0661, -0.0921, -0.5485,  0.4343, -0.1366]])
@@ -503,23 +499,23 @@ def randn_se3(*size, sigma=[1.0,1.0], **kwargs):
     return se3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_SE3(*size, sigma=[1.0,1.0], **kwargs):
+def randn_SE3(*size, sigma:_size_24_t=1.0, **kwargs):
     r'''
     Returns :obj:`SE3_type` LieTensor filled with the Exponential map of the random
     :obj:`se3_type` LieTensor generated using :meth:`randn_se3()`.
 
     .. math::
-        \mathrm{out}_i = \mathrm{Exp}([\mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma_{\rm{t}}}_{3\times 1}), \mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma_{\mathrm{r}}}_{3\times 1})])
+        \mathrm{out}_i = \mathrm{Exp}([\mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma_{\rm{t}}}_{3\times 1}), 
+        \mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma_{\mathrm{r}}}_{3\times 1})])
 
+    where :obj:`\sigma_t` and :obj:`\sigma_r` are the variance for the two normal distribution, coming from input argument :obj:`\sigma`.
     The shape of the tensor is defined by the variable argument size.
 
     Args:
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (List, optional): could be 2-dimensional list ([:obj:`sigma_t`, :obj:`sigma_d`])
-        or 4-dimensional list ([:obj:`sigma_t_x`, :obj:`sigma_t_y`, :obj:`sigma_t_z`, :obj:`sigma_d`]). 
-        Default: [1.0, 1.0].
+        sigma (float or tuple, optional): variance (sigma_t and sigma_d) for the two normal distribution. Default: 1.0.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
@@ -540,12 +536,24 @@ def randn_SE3(*size, sigma=[1.0,1.0], **kwargs):
     Returns:
         LieTensor: a :obj:`SE3_type` LieTensor
 
+    Note:
+        The parameter :obj:`sigma` can either be:
+
+            - a single ``float`` -- in which all the elements in the :obj:`SE3_type` share the same sigma, i.e., 
+                :obj:`sigma_d` = :obj:`sigma_t` = :obj:`sigma`.
+
+            - a ``tuple`` of two floats -- in which case, the specific sigmas are assigned independently, i.e.,
+                :obj:`sigma` = (:obj:`sigma_t`, :obj:`sigma_d`).
+
+            - a ``tuple`` of four floats -- in which case, the specific sigmas for each transation data are assigned independently, i.e.,
+                :obj:`sigma` = (:obj:`sigma_t_x`, :obj:`sigma_t_y`, :obj:`sigma_t_z`, :obj:`sigma_d`).
+
     Example:
-        >>> pp.randn_SE3(2, sigma=[1.0,2.0]) # sigma = [sigma_t, sigma_d]
+        >>> pp.randn_SE3(2, sigma=(1.0, 2.0)) # sigma = (sigma_t, sigma_d)
             SE3Type LieTensor:
             tensor([[-0.8355,  0.7782,  0.0338, -0.1641,  0.5466,  0.0998,  0.8151],
                     [ 0.2710, -2.0285, -0.6473, -0.5649, -0.6031,  0.5611,  0.0478]])
-        >>> pp.randn_SE3(2, sigma=[1.0,1.5,2.0,2.0]) # sigma = [sigma_t_x, sigma_t_y, sigma_t_z, sigma_d]
+        >>> pp.randn_SE3(2, sigma=(1.0, 1.5, 2.0, 2.0)) # sigma = (sigma_t_x, sigma_t_y, sigma_t_z, sigma_d)
             SE3Type LieTensor:
             tensor([[ 0.8922, -0.5284,  0.8733,  0.8678, -0.3748,  0.3049,  0.1164],
                     [-1.3952, -2.8119,  2.5019,  0.2641,  0.2629,  0.0624,  0.9259]])
@@ -553,14 +561,20 @@ def randn_SE3(*size, sigma=[1.0,1.0], **kwargs):
     return SE3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_sim3(*size, sigma=[1.0,1.0,1.0], **kwargs):
+def randn_sim3(*size, sigma:_size_35_t=1.0, **kwargs):
     r'''
-    Returns :obj:`sim3_type` LieTensor, where the transation part :math:`\bm{\tau}_i` is filled with random numbers from a normal distribution with mean 0 and variance :obj:`sigma_t`, the rotation part :math:`\bm{\phi}_i` is filled with random numbers satisfying the expected distance (quaternions distance) between the generated state and :math:`\mathbf{0}` is :obj:`sigma_d`, and the scale part :math:`s_i` is a random number from a normal distribution with mean 0 and variance :obj:`sigma_s`.
+    Returns :obj:`sim3_type` LieTensor, where the transation part :math:`\bm{\tau}_i` is filled with 
+    random numbers from a normal distribution with mean 0 and variance :obj:`sigma_t`, the rotation 
+    part :math:`\bm{\phi}_i` is filled with random numbers satisfying the expected distance 
+    (quaternion distance) between the generated state and :math:`\mathbf{0}` is :obj:`sigma_d`, 
+    and the scale part :math:`s_i` is a random number from a normal distribution with mean 0 and variance :obj:`sigma_s`.
+    Note that :obj:`sigma_t`, :obj:`sigma_d`, and :obj:`sigma_s` are all from input argument :obj:`sigma`, i.e.,
+    :obj:`sigma` = (:obj:`sigma_t`, :obj:`sigma_d`, :obj:`sigma_s`).
 
     .. math::
         \mathrm{out}_i = [\bm{\tau}_i, \bm{\phi}_i, s_i],
 
-    where :math:`[\bm{\tau}_i, \bm{\phi}_i]` is generated using :meth:`randn_se3()` and :math:`s_i = \mathcal{N}(0, \sigma_{\rm{s}}})`.
+    where :math:`[\bm{\tau}_i, \bm{\phi}_i]` is generated using :meth:`randn_se3()` and :math:`s_i = \mathcal{N}(0, \sigma_{\mathrm{s}})`.
 
     The shape of the tensor is defined by the variable argument size.
 
@@ -568,9 +582,7 @@ def randn_sim3(*size, sigma=[1.0,1.0,1.0], **kwargs):
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (List, optional): could be 3-dimensional list ([:obj:`sigma_t`, :obj:`sigma_d`, :obj:`sigma_s`])
-        or 5-dimensional list ([:obj:`sigma_t_x`, :obj:`sigma_t_y`, :obj:`sigma_t_z`, :obj:`sigma_d`, :obj:`sigma_s`]). 
-        Default: [1.0, 1.0, 1.0].
+        sigma (float, tuple, optional): variance (sigma_t, sigma_d, and sigma_s) for the three normal distribution. Default: 1.0.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
@@ -590,13 +602,25 @@ def randn_sim3(*size, sigma=[1.0,1.0,1.0], **kwargs):
 
     Returns:
         LieTensor: a :obj:`sim3_type` LieTensor
+    
+    Note:
+        The parameter :obj:`sigma` can either be:
+
+            - a single ``float`` -- in which all the elements in the :obj:`sim3_type` share the same sigma, i.e., 
+                :obj:`sigma_d` = :obj:`sigma_t` = :obj:`sigma_s` = :obj:`sigma`.
+
+            - a ``tuple`` of three floats -- in which case, the specific sigmas for the three parts are assigned independently, i.e.,
+                :obj:`sigma` = (:obj:`sigma_t`, :obj:`sigma_d`, :obj:`sigma_s`).
+
+            - a ``tuple`` of five floats -- in which case, the specific sigmas for each transation data are also assigned independently, i.e.,
+                :obj:`sigma` = (:obj:`sigma_t_x`, :obj:`sigma_t_y`, :obj:`sigma_t_z`, :obj:`sigma_d`, :obj:`sigma_s`).
 
     Example:
-        >>> pp.randn_sim3(2, sigma=[1.0,1.0,2.0]) # sigma = [sigma_t, sigma_d, sigma_s]
+        >>> pp.randn_sim3(2, sigma=(1.0, 1.0, 2.0)) # sigma = (sigma_t, sigma_d, sigma_s)
             sim3Type LieTensor:
             tensor([[-1.0898, -0.3859, -0.6781, -1.0066,  0.4151,  0.9659, -1.5967],
                     [-1.8039,  0.7329, -0.0616, -1.0538, -0.3579, -1.3305, -0.0532]])
-        >>> pp.randn_sim3(2, sigma=[1.0,1.0,2.0,1.0,2.0]) # sigma = [sigma_t_x, sigma_t_y, sigma_t_z, sigma_d, sigma_s]
+        >>> pp.randn_sim3(2, sigma=(1.0, 1.0, 2.0, 1.0, 2.0)) # sigma = (sigma_t_x, sigma_t_y, sigma_t_z, sigma_d, sigma_s)
             sim3Type LieTensor:
             tensor([[-0.4073,  1.0928, -0.4961,  1.2099,  0.6376, -0.8252,  2.4228],
                     [ 0.2881,  1.5011,  0.3938,  1.6231, -0.6546, -0.0889, -0.1773]])
@@ -604,13 +628,18 @@ def randn_sim3(*size, sigma=[1.0,1.0,1.0], **kwargs):
     return sim3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_Sim3(*size, sigma=[1.0,1.0,1.0], **kwargs):
+def randn_Sim3(*size, sigma:_size_35_t=1.0, **kwargs):
     r'''
     Returns :obj:`Sim3_type` LieTensor filled with the Exponential map of the random
     :obj:`sim3_type` LieTensor generated using :meth:`randn_sim3()`.
 
     .. math::
-        \mathrm{out}_i = \mathrm{Exp}([\mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma_{\rm{t}}}_{3\times 1}), \mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma_{\mathrm{r}}}_{3\times 1}), \mathcal{N}(0, \sigma_{\rm{s}}})])
+        \mathrm{out}_i = \mathrm{Exp}([\mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma_{\rm{t}}}_{3\times 1}), 
+        \mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma_{\mathrm{r}}}_{3\times 1}), 
+        \mathcal{N}(0, \sigma_{\mathrm{s}})])
+
+    where :math:`\sigma_{\mathrm{r}} = \frac{2*\sigma_{\mathrm{d}}}{\sqrt{3}}`, :obj:`sigma_t`, :obj:`sigma_d`, and :obj:`sigma_s` 
+    are all from input argument :obj:`sigma`, i.e., :obj:`sigma` = (:obj:`sigma_t`, :obj:`sigma_d`, :obj:`sigma_s`).
 
     The shape of the tensor is defined by the variable argument size.
 
@@ -618,9 +647,7 @@ def randn_Sim3(*size, sigma=[1.0,1.0,1.0], **kwargs):
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (List, optional): could be 3-dimensional list ([:obj:`sigma_t`, :obj:`sigma_d`, :obj:`sigma_s`])
-        or 5-dimensional list ([:obj:`sigma_t_x`, :obj:`sigma_t_y`, :obj:`sigma_t_z`, :obj:`sigma_d`, :obj:`sigma_s`]). 
-        Default: [1.0, 1.0, 1.0].
+        sigma (float, tuple, optional): variance (sigma_t, sigma_d, and sigma_s) for the three normal distribution. Default: 1.0.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
@@ -641,12 +668,24 @@ def randn_Sim3(*size, sigma=[1.0,1.0,1.0], **kwargs):
     Returns:
         LieTensor: a :obj:`Sim_type` LieTensor
 
+    Note:
+        The parameter :obj:`sigma` can either be:
+
+            - a single ``float`` -- in which all the elements in the :obj:`sim3_type` share the same sigma, i.e., 
+                :obj:`sigma_d` = :obj:`sigma_t` = :obj:`sigma_s` = :obj:`sigma`.
+
+            - a ``tuple`` of three floats -- in which case, the specific sigmas for the three parts are assigned independently, i.e.,
+                :obj:`sigma` = (:obj:`sigma_t`, :obj:`sigma_d`, :obj:`sigma_s`).
+
+            - a ``tuple`` of five floats -- in which case, the specific sigmas for each transation data are also assigned independently, i.e.,
+                :obj:`sigma` = (:obj:`sigma_t_x`, :obj:`sigma_t_y`, :obj:`sigma_t_z`, :obj:`sigma_d`, :obj:`sigma_s`).
+
     Example:
-        >>> pp.randn_Sim3(2, sigma=[1.0,1.0,2.0]) # sigma = [sigma_t, sigma_d, sigma_s]
+        >>> pp.randn_Sim3(2, sigma=(1.0, 1.0, 2.0)) # sigma = (sigma_t, sigma_d, sigma_s)
             Sim3Type LieTensor:
             tensor([[-0.4676, -0.9314, -0.4881,  0.6543, -0.4844, -0.5182,  0.2620,  1.1351],
                     [ 0.7047, -0.8917,  0.4568, -0.1251, -0.4366, -0.3225,  0.8305,  0.2759]])
-        >>> pp.randn_Sim3(2, sigma=[1.0,1.0,2.0,1.0,2.0]) # sigma = [sigma_t_x, sigma_t_y, sigma_t_z, sigma_d, sigma_s]
+        >>> pp.randn_Sim3(2, sigma=(1.0, 1.0, 2.0, 1.0, 2.0)) # sigma = (sigma_t_x, sigma_t_y, sigma_t_z, sigma_d, sigma_s)
             Sim3Type LieTensor:
             tensor([[ 0.3882,  0.5598,  2.3918, -0.1527,  0.4519,  0.4843,  0.7334,  0.3091],
                     [-1.0396, -2.8683, -0.4880, -0.7121,  0.2236,  0.3979,  0.5334,  3.8714]])
@@ -654,14 +693,18 @@ def randn_Sim3(*size, sigma=[1.0,1.0,1.0], **kwargs):
     return Sim3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_rxso3(*size, sigma=[1.0,1.0], **kwargs):
+def randn_rxso3(*size, sigma:_size_2_t=1.0, **kwargs):
     r'''
-    Returns :obj:`rxso3_type` LieTensor, where the rotation part :math:`\bm{\phi}_i` is filled with random numbers satisfying the expected distance (quaternions distance) between the generated state and :math:`\mathbf{0}` is :obj:`sigma_d`, the scale part :math:`s_i` is a random number from a normal distribution with mean 0 and variance :obj:`sigma_s`.
+    Returns :obj:`rxso3_type` LieTensor, where the rotation part :math:`\bm{\phi}_i` is filled with random numbers satisfying 
+    the expected distance (quaternions distance) between the generated state and :math:`\mathbf{0}` is :obj:`sigma_d`, 
+    the scale part :math:`s_i` is a random number from a normal distribution with mean 0 and variance :obj:`sigma_s`.
+    Note that :obj:`sigma_d`, and :obj:`sigma_s` are both from input argument :obj:`sigma`, i.e.,
+    :obj:`sigma` = (:obj:`sigma_d`, :obj:`sigma_s`).
 
     .. math::
         \mathrm{out}_i = [\bm{\phi}_i, s_i],
 
-    where :math:`\bm{\phi}_i` is generated using :meth:`randn_so3()` and :math:`s_i = \mathcal{N}(0, \sigma_{\rm{s}}})`.
+    where :math:`\bm{\phi}_i` is generated using :meth:`randn_so3()` and :math:`s_i = \mathcal{N}(0, \sigma_{\mathrm{s}})`.
 
     The shape of the tensor is defined by the variable argument size.
 
@@ -669,8 +712,7 @@ def randn_rxso3(*size, sigma=[1.0,1.0], **kwargs):
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (List, optional): 2-dimensional list ([:obj:`sigma_d`, :obj:`sigma_s`]). 
-        Default: [1.0, 1.0].
+        sigma (float, tuple, optional): variance (sigma_d, and sigma_s) for the two normal distribution. Default: 1.0.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
@@ -691,8 +733,17 @@ def randn_rxso3(*size, sigma=[1.0,1.0], **kwargs):
     Returns:
         LieTensor: a :obj:`rxso3_type` LieTensor
 
+    Note:
+        The parameter :obj:`sigma` can either be:
+
+            - a single ``float`` -- in which all the elements in the :obj:`rxso3_type` share the same sigma, i.e., 
+                :obj:`sigma_d` = :obj:`sigma_s` = :obj:`sigma`.
+
+            - a ``tuple`` of two floats -- in which case, the specific sigmas for the two parts are assigned independently, i.e., 
+                :obj:`sigma` = (:obj:`sigma_d`, :obj:`sigma_s`).
+
     Example:
-        >>> pp.randn_rxso3(2, sigma=[1.0,2.0]) # [sigma_d, sigma_s]
+        >>> pp.randn_rxso3(2, sigma=(1.0, 2.0)) # (sigma_d, sigma_s)
             rxso3Type LieTensor:
             tensor([[-0.6014,  0.9899, -2.5600, -1.7157],
                     [-0.5560,  0.3107,  0.8966, -1.5175]])
@@ -700,13 +751,17 @@ def randn_rxso3(*size, sigma=[1.0,1.0], **kwargs):
     return rxso3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_RxSO3(*size, sigma=[1.0,1.0], **kwargs):
+def randn_RxSO3(*size, sigma:_size_2_t=1.0, **kwargs):
     r'''
     Returns :obj:`RxSO3_type` LieTensor filled with the Exponential map of the random
     :obj:`sim3_type` LieTensor generated using :meth:`randn_rxso3()`.
 
     .. math::
-        \mathrm{out}_i = \mathrm{Exp}([\mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma_{\mathrm{r}}}_{3\times 1}), \mathcal{N}(0, \sigma_{\rm{s}}})])
+        \mathrm{out}_i = \mathrm{Exp}([\mathcal{N}(\mathbf{0}_{3\times 1}, \mathbf{\sigma_{\mathrm{r}}}_{3\times 1}), 
+        \mathcal{N}(0, \sigma_{\mathrm{s}})])
+
+    where :math:`\sigma_{\mathrm{r}} = \frac{2*\sigma_{\mathrm{d}}}{\sqrt{3}}`, :obj:`sigma_d` and :obj:`sigma_s` 
+    are all from input argument :obj:`sigma`, i.e., :obj:`sigma` = (:obj:`sigma_d`, :obj:`sigma_s`).
 
     The shape of the tensor is defined by the variable argument size.
 
@@ -714,8 +769,7 @@ def randn_RxSO3(*size, sigma=[1.0,1.0], **kwargs):
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (List, optional): 2-dimensional list ([:obj:`sigma_d`, :obj:`sigma_s`]). 
-        Default: [1.0, 1.0].
+        sigma (float, tuple, optional): variance (sigma_d, and sigma_s) for the two normal distribution. Default: 1.0.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: False.
@@ -736,8 +790,17 @@ def randn_RxSO3(*size, sigma=[1.0,1.0], **kwargs):
     Returns:
         LieTensor: a :obj:`RxSO3_type` LieTensor
 
+    Note:
+        The parameter :obj:`sigma` can either be:
+
+            - a single ``float`` -- in which all the elements in the :obj:`rxso3_type` share the same sigma, i.e., 
+                :obj:`sigma_d` = :obj:`sigma_s` = :obj:`sigma`.
+
+            - a ``tuple`` of two floats -- in which case, the specific sigmas for the two parts are assigned independently, i.e., 
+                :obj:`sigma` = (:obj:`sigma_d`, :obj:`sigma_s`).
+
     Example:
-        >>> pp.randn_RxSO3(2, sigma=[1.0,2.0]) # [sigma_d, sigma_s]
+        >>> pp.randn_RxSO3(2, sigma=(1.0, 2.0)) # (sigma_d, sigma_s)
             RxSO3Type LieTensor:
             tensor([[ 0.5917,  0.2337, -0.3464,  0.6894,  0.0237],
                     [-0.3895,  0.2188, -0.4915,  0.7476,  0.2706]])
