@@ -115,14 +115,14 @@ se3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=se3_type)
     with the axis-angle representation of the rotation:
 
     .. math::
-        \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z],
+        \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z, \tau_x, \tau_y, \tau_z]
 
-    where :math:`\begin{pmatrix} \tau_x & \tau_y & \tau_z \end{pmatrix}^T =
-    \mathbf{J}^{-1} \begin{pmatrix} t_x & t_y & t_z \end{pmatrix}^T` is the product
-    between the left Jacobian inverse (of SO3's logarithm map) and the translation
-    vector, and :math:`\begin{pmatrix} \delta_x & \delta_y & \delta_z \end{pmatrix}^T`
-    is the axis-angle vector as in :obj:`pypose.so3`.
-    See :meth:`pypose.Log` with :obj:`SE3_type` input.
+    where :math:`\begin{pmatrix} \delta_x & \delta_y & \delta_z \end{pmatrix}^T`
+    is the axis-angle vector as in :obj:`pypose.so3`, and
+    :math:`\begin{pmatrix} \tau_x & \tau_y & \tau_z \end{pmatrix}^T = \mathbf{J}^{-1}
+    \begin{pmatrix} t_x & t_y & t_z \end{pmatrix}^T` is the product between the
+    inverse left jacobian (of SO3's logarithm map) and the translation vector.
+    See :obj:`pypose.Log` with :obj:`SE3_type` input.
 
     Examples:
         >>> pp.se3(torch.randn(2, 6))
@@ -204,14 +204,14 @@ sim3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=sim3_typ
     vector with the corresponding rxso3:
 
     .. math::
-        \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z, \log s],
+        \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z, \log s]
 
-    where :math:`\begin{pmatrix} \tau_x & \tau_y & \tau_z \end{pmatrix}^T = \mathbf{W}^{-1}
-    \begin{pmatrix} t_x & t_y & t_z \end{pmatrix}^T` is the product between the
-    inverse of the ":math:`W`-matrix" and the translation vector, and
+    where :math:`\begin{pmatrix} \tau_x & \tau_y & \tau_z \end{pmatrix}^T` is
+    similar to that of :obj:`pypose.se3` but the left Jacobian being that of
+    RxSO3's logarithm map, and
     :math:`\begin{pmatrix} \delta_x & \delta_y & \delta_z & \log s \end{pmatrix}^T`
     represents the rotation and scaling, as in :obj:`pypose.rxso3`.
-    See :meth:`pypose.Log` with :obj:`Sim3_type` input.
+    See :obj:`pypose.Log` with :obj:`Sim3_type` input.
 
     Examples:
         >>> pp.Sim3(torch.randn(2, 7))
