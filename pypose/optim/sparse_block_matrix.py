@@ -113,7 +113,7 @@ def bsr_cpu_to_sbm(bsr, device=None):
     Warning: bsr.sum_duplicates() is called such that bsr is changed.
     bsr.data may referring to an outer object. That object is also changed.
 
-    Convert a Block Ros Matrix defined by SciPy to SparseBlockMatrix.
+    Convert a Block Row Matrix defined by SciPy to SparseBlockMatrix.
 
     dtype association:
     np.int     -> torch.int
@@ -407,6 +407,8 @@ class SparseBlockMatrix(object):
         if self.block_storage is not None:
             new_matrix.block_storage = self.block_storage.clone()
 
+        new_matrix.coalesced = self.coalesced
+
         return new_matrix
 
     def clone(self):
@@ -432,12 +434,17 @@ class SparseBlockMatrix(object):
 
         # We just need to swap row and column structures and the order of self.block_indices.
         self.row_block_structure, self.col_block_structure = self.col_block_structure, self.row_block_structure
-        self.block_indices = torch.index_select( self.block_indices, 1, torch.LongTensor([1, 0, 2]) )
+        self.block_indices = torch.index_select( 
+            self.block_indices, 
+            1, 
+            torch.LongTensor([1, 0, 2]).to(device=self.block_indices.device) )
 
         # Transpose the blocks.
         self.block_storage = self.block_storage.permute((0, 2, 1))
 
         self.coalesced = False
+
+        return self
 
     def transpose(self):
         '''
@@ -473,30 +480,123 @@ class SparseBlockMatrix(object):
         sbm = self.clone()
         sbm.block_storage.add_(other)
         return sbm
-    
-    def add_tensor(self, other):
+
+    def add_(self, other):
         '''
-        Currently only supports adding a Tensor that can be broadcasted to self.block_storage.
+        WARNING: Calling this function changes the block_storage, it has side effects if
+        the block_storage referencing to an external tensor. This is the case when the 
+        set_block_storage() function is called with clone=False. 
+        
+        other: must be a scalar or a Tensor or.
         '''
-        return self.add_broadcast(other)
+        if isinstance(other, ( int, float, torch.Tensor)):
+            self.block_storage.add_( other )
+        else:
+            raise Exception(
+                f'Currently only supports scalar or Tensor. type(other) = {type(other)}' )
+
+        return self
 
     def __add__(self, other):
         '''
-        othet: must be a SparseBlockMatrix object, or a tensor, or a scalar value.
+        other: must be a SparseBlockMatrix object, or a tensor, or a scalar value.
         '''
 
         if isinstance(other, SparseBlockMatrix):
             return self.add_sparse_block_matrix(other)
-        elif isinstance(other, torch.Tensor):
-            return self.add_tensor(other)
-        elif isinstance(other, ( int, long, float, )):
+        elif isinstance(other, ( int, float, torch.Tensor)):
+            # Not calling add_() to save a call to the isinstance() function.
             return self.add_broadcast(other)
         else:
             raise Exception(
                 f'Currently only supports SparseBlockMatrix, torch.Tensor, or scalar type. type(other) = {type(other)}' )
 
+    def __radd__(self, other):
+        '''
+        other: must be a SparseBlockMatrix object, or a tensor, or a scalar value.
+        '''
+        return self.__add__(other)
+
+    def sub_broadcast(self, other):
+        sbm = self.clone()
+        sbm.block_storage.sub_(other)
+        return sbm
+
+    def sub_(self, other):
+        '''
+        WARNING: Calling this function changes the block_storage, it has side effects if
+        the block_storage referencing to an external tensor. This is the case when the 
+        set_block_storage() function is called with clone=False. 
+
+        other: must be a scalar or a Tensor.
+        '''
+        if isinstance(other, ( int, float, torch.Tensor)):
+            self.block_storage.sub_( other )
+        else:
+            raise Exception(
+                f'Currently only supports scalar or Tensor. type(other) = {type(other)}' )
+
+        return self
+
+    def __sub__(self, other):
+        '''
+        other: must be a SparseBlockMatrix object, or a tensor, or a scalar value.
+        '''
+        
+        # This is not implemented as self.__add__( -1 * other) considering that
+        # torch.Tensor.sub_() might be more efficient.
+
+        if isinstance(other, SparseBlockMatrix):
+            return self.add_sparse_block_matrix( -1 * other )
+        elif isinstance(other, ( int, float, torch.Tensor)):
+            # Not calling sub_() to save a call to the isinstance() function.
+            return self.sub_broadcast(other)
+        else:
+            raise Exception(
+                f'Currently only supports SparseBlockMatrix, torch.Tensor, or scalar type. type(other) = {type(other)}' )
+
+    def __rsub__(self, other):
+        '''
+        other: must be a SparseBlockMatrix object, or a tensor, or a scalar value.
+        '''
+        # This saves one multiplication compared with -1 * ( self - other )
+        # When other is a SparseBlockMatrix.
+        return (-1 * self) + other
+
+    def mul_(self, other):
+        '''
+        WARNING: Calling this function changes the block_storage, it has side effects if
+        the block_storage referencing to an external tensor. This is the case when the 
+        set_block_storage() function is called with clone=False. 
+
+        other: must be a scalar or a Tensor.
+        '''
+        if isinstance(other, ( int, float, torch.Tensor )):
+            self.block_storage.mul_(other)
+        else:
+            raise Exception(
+                f'Currently only supports scalar type or Tensor. type(other) = {type(other)}' )
+
+        return self
+
+    def __mul__(self, other):
+        '''
+        Currently only supports multiplying by a scalar.
+        '''
+        res = self.clone()
+        res.mul_(other)
+        return res
+
+    def __rmul__(self, other):
+        '''
+        Currently only supports multiplying by a scalar.
+        '''
+        return self.__mul__(other)
+
     def __matmul__(self, other):
         '''
+        WARNING: This function causes the data to be offloaded to the CPU and back to the GPU if necessary.
+
         other: must be a SparseBlockMatrix object.
         '''
         
@@ -513,11 +613,17 @@ class SparseBlockMatrix(object):
         
         # ========== Checks done. ==========
 
-        # ========== Off load the data from GPU to CPU. ==========
+        # ========== Off load the data from GPU to CPU and multiply. ==========
 
+        bsr_self  = sbm_to_bsr_cpu(self)
+        bsr_other = sbm_to_bsr_cpu(other)
+        res_cpu   = bsr_self @ bsr_other
 
+        # ========== Convert the result back to GPU. ==========
+        res_gpu = bsr_cpu_to_sbm(res_cpu)
+
+        return res_gpu
         
-
     def multiply_symmetric_upper_triangle(self, other):
         '''
         Not clear what this function does in g2o.

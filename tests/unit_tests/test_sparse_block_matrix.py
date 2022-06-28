@@ -13,7 +13,7 @@ import pypose as pp
 from pypose.optim.sparse_block_matrix import (
     SparseBlockMatrix, 
     sbm_to_torch_sparse_coo, torch_sparse_coo_to_sbm, 
-    sbm_to_bsr_cpu)
+    sbm_to_bsr_cpu, bsr_cpu_to_sbm)
 
 # Test utils.
 from tests.unit_tests.common import ( torch_equal, show_delimeter )
@@ -426,6 +426,133 @@ class Test_SparseBlockMatrix(unittest.TestCase):
                 print(exc)
                 self.assertTrue(False, f'test_add_sbm failed with entry {entry}')
 
+    def test_add_sub_scalar(self):
+        print()
+        show_delimeter('test adding/subtracting a scalar. ')
+
+        # The main sbm.
+        raw_sbm = SparseBlockMatrix(Test_SparseBlockMatrix.block_shape, dtype=torch.float32)
+        raw_sbm.create(shape_blocks=Test_SparseBlockMatrix.shape_blocks, block_indices=Test_SparseBlockMatrix.block_indices)
+        raw_sbm.set_block_storage(Test_SparseBlockMatrix.values_raw, clone=False)
+
+        test_entries = [
+            { 'device': 'cpu',  'scalar': 1 },
+            { 'device': 'cpu',  'scalar': 1.0 },
+            { 'device': 'cpu',  'scalar': torch.Tensor([1]).to(dtype=torch.float32) },
+            { 'device': 'cpu',  'scalar': torch.Tensor([1, 2, 3]).to(dtype=torch.float32).view((1, 3)) },
+            { 'device': 'cpu',  'scalar': torch.Tensor([1, 2]).to(dtype=torch.float32).view((2, 1)) },
+            { 'device': 'cuda', 'scalar': 1 },
+            { 'device': 'cuda', 'scalar': 1.0 },
+            { 'device': 'cuda', 'scalar': torch.Tensor([1]).to(dtype=torch.float32) },
+            { 'device': 'cuda', 'scalar': torch.Tensor([1, 2, 3]).to(dtype=torch.float32).view((1, 3)) },
+            { 'device': 'cuda', 'scalar': torch.Tensor([1, 2]).to(dtype=torch.float32).view((2, 1)) }
+        ]
+
+        for entry in test_entries:
+            print(f'entry = {entry}')
+            device = entry['device']
+
+            # Transfer to the device.
+            sbm = raw_sbm.to(device=device)
+            scalar = entry['scalar']
+            if isinstance(scalar, (int, float)):
+                other = scalar
+            else:
+                other = scalar.to(device=device)
+            block_storage = Test_SparseBlockMatrix.values_raw.to(device=device)
+
+            # ========== Addition. ==========
+
+            # The result values.
+            true_result_values = block_storage + other
+
+            # Perform the addition from left.
+            result = sbm + other
+
+            try:
+                torch_equal( result.block_storage, true_result_values )
+            except Exception as exc:
+                print(exc)
+                self.assertTrue(False, f'test_add_sub_scalar (add left) failed with entry {entry}')
+
+            # Perform the addition from right.
+            result = other + sbm
+
+            try:
+                torch_equal( result.block_storage, true_result_values )
+            except Exception as exc:
+                print(exc)
+                self.assertTrue(False, f'test_add_sub_scalar (add right) failed with entry {entry}')
+
+            # ========== Substraction. ==========
+
+            # Perform the subtraction from left.
+            true_result_values = block_storage - other
+            result = sbm - other
+
+            try:
+                torch_equal( result.block_storage, true_result_values )
+            except Exception as exc:
+                print(exc)
+                self.assertTrue(False, f'test_add_sub_scalar (sub left) failed with entry {entry}')
+
+            # Perform the subtraction from right.
+            true_result_values = other - block_storage
+            result = other - sbm
+
+            try:
+                torch_equal( result.block_storage, true_result_values )
+            except Exception as exc:
+                print(exc)
+                self.assertTrue(False, f'test_add_sub_scalar (sub right) failed with entry {entry}')
+
+    def test_add_scalar_inplace(self):
+        print()
+        show_delimeter('test inplace-adding a scalar. ')
+
+        # The main sbm.
+        raw_sbm = SparseBlockMatrix(Test_SparseBlockMatrix.block_shape, dtype=torch.float32)
+        raw_sbm.create(shape_blocks=Test_SparseBlockMatrix.shape_blocks, block_indices=Test_SparseBlockMatrix.block_indices)
+        raw_sbm.set_block_storage(Test_SparseBlockMatrix.values_raw, clone=False)
+
+        test_entries = [
+            { 'device': 'cpu',  'scalar': 1 },
+            { 'device': 'cpu',  'scalar': 1.0 },
+            { 'device': 'cpu',  'scalar': torch.Tensor([1]).to(dtype=torch.float32) },
+            { 'device': 'cpu',  'scalar': torch.Tensor([1, 2, 3]).to(dtype=torch.float32).view((1, 3)) },
+            { 'device': 'cpu',  'scalar': torch.Tensor([1, 2]).to(dtype=torch.float32).view((2, 1)) },
+            { 'device': 'cuda', 'scalar': 1 },
+            { 'device': 'cuda', 'scalar': 1.0 },
+            { 'device': 'cuda', 'scalar': torch.Tensor([1]).to(dtype=torch.float32) },
+            { 'device': 'cuda', 'scalar': torch.Tensor([1, 2, 3]).to(dtype=torch.float32).view((1, 3)) },
+            { 'device': 'cuda', 'scalar': torch.Tensor([1, 2]).to(dtype=torch.float32).view((2, 1)) }
+        ]
+
+        for entry in test_entries:
+            print(f'entry = {entry}')
+            device = entry['device']
+
+            # Transfer to the device.
+            sbm = raw_sbm.clone().to(device=device)
+            scalar = entry['scalar']
+            if isinstance(scalar, (int, float)):
+                other = scalar
+            else:
+                other = scalar.to(device=device)
+            block_storage = Test_SparseBlockMatrix.values_raw.to(device=device)
+
+            # The result values.
+            true_result_values = block_storage + other
+
+            # Perform the addition.
+            sbm.add_(other)
+
+            try:
+                torch_equal( sbm.block_storage, true_result_values )
+            except Exception as exc:
+                print(exc)
+                self.assertTrue(False, f'test_add_scalar_inplace failed with entry {entry}')
+
     def test_sbm_2_bsr_cpu(self):
         print()
         show_delimeter('Test sbm to bsr conversion. ')
@@ -455,6 +582,179 @@ class Test_SparseBlockMatrix(unittest.TestCase):
             bsr = bsr.toarray()
 
             self.assertTrue( np.allclose( bsr, raw_true_bsr ), f'test_sbm_2_bsr_cpu failed with entry {entry}' )
+
+    def test_bsr_cpu_2_sbm(self):
+        print()
+        show_delimeter('Test bsr to sbm conversion. ')
+
+        # Create the BSR matrix.
+        bsr = bsr_matrix( 
+            ( Test_SparseBlockMatrix.bsr_data, 
+              Test_SparseBlockMatrix.bsr_indices, 
+              Test_SparseBlockMatrix.bsr_indptr ), 
+            shape=Test_SparseBlockMatrix.shape )
+        
+        # Convert BSR to SBM.
+        sbm = bsr_cpu_to_sbm(bsr)
+
+        # Check equality.
+        dense_sbm = sbm_to_torch_sparse_coo(sbm).to_dense().permute((0,2,1,3)).numpy().reshape(
+            ( Test_SparseBlockMatrix.shape_blocks[0]*Test_SparseBlockMatrix.block_shape[0], 
+              Test_SparseBlockMatrix.shape_blocks[1]*Test_SparseBlockMatrix.block_shape[1] ) )
+        dense_bsr = bsr.toarray()
+
+        print(f'dense_sbm = \n{dense_sbm}')
+        print(f'dense_bsr = \n{dense_bsr}')
+
+        self.assertTrue( np.allclose( dense_sbm, dense_bsr ), f'test_bsr_cpu_2_sbm failed' )
+
+    def test_matmul(self):
+        print()
+        show_delimeter('Test matmul. ')
+
+        # The Sparse Block Matrix.
+        raw_sbm = SparseBlockMatrix(Test_SparseBlockMatrix.block_shape, dtype=torch.float32)
+        raw_sbm.create(shape_blocks=Test_SparseBlockMatrix.shape_blocks, block_indices=Test_SparseBlockMatrix.block_indices)
+        raw_sbm.set_block_storage(Test_SparseBlockMatrix.values_raw, clone=False)
+
+        raw_sbm = raw_sbm.coalesce()
+
+        # The equavelent dense NumPy array.
+        dense_array = sbm_to_bsr_cpu(raw_sbm).toarray()
+
+        # The matmul results.
+        true_res_a_at = dense_array @ dense_array.transpose()
+        true_res_at_a = dense_array.transpose() @ dense_array
+
+        # Show the true values.
+        print(f'true_res_at_a = \n{true_res_at_a}')
+        print(f'true_res_a_at = \n{true_res_a_at}')
+
+        test_entries = [
+            { 'device': 'cpu'  },
+            { 'device': 'cuda' }
+        ]
+
+        for entry in test_entries:
+            print(entry)
+
+            device = entry['device']
+
+            # Transfer the Sparse Block Matrix to the device.
+            sbm = raw_sbm.to(device=device)
+
+            # a.T @ a.
+            res_at_a = sbm.transpose().coalesce() @ sbm
+            res_at_a_cpu = sbm_to_bsr_cpu(res_at_a).toarray()
+            self.assertTrue( np.allclose( res_at_a_cpu, true_res_at_a ) )
+
+            # a @ a.T.
+            res_a_at = sbm @ sbm.transpose().coalesce()
+            res_a_at_cpu = sbm_to_bsr_cpu(res_a_at).toarray()
+            self.assertTrue( np.allclose( res_a_at_cpu, true_res_a_at ) )
+
+    def test_multiply_scalar(self):
+        print()
+        show_delimeter('test multiplying a scalar. ')
+
+        # The main sbm.
+        raw_sbm = SparseBlockMatrix(Test_SparseBlockMatrix.block_shape, dtype=torch.float32)
+        raw_sbm.create(shape_blocks=Test_SparseBlockMatrix.shape_blocks, block_indices=Test_SparseBlockMatrix.block_indices)
+        raw_sbm.set_block_storage(Test_SparseBlockMatrix.values_raw, clone=False)
+
+        test_entries = [
+            { 'device': 'cpu',  'scalar': 2 },
+            { 'device': 'cpu',  'scalar': 2.0 },
+            { 'device': 'cpu',  'scalar': torch.Tensor([2]).to(dtype=torch.float32) },
+            { 'device': 'cpu',  'scalar': torch.Tensor([1, 2, 3]).to(dtype=torch.float32).view((1, 3)) },
+            { 'device': 'cpu',  'scalar': torch.Tensor([1, 2]).to(dtype=torch.float32).view((2, 1)) },
+            { 'device': 'cuda', 'scalar': 2 },
+            { 'device': 'cuda', 'scalar': 2.0 },
+            { 'device': 'cuda', 'scalar': torch.Tensor([2]).to(dtype=torch.float32) },
+            { 'device': 'cuda', 'scalar': torch.Tensor([1, 2, 3]).to(dtype=torch.float32).view((1, 3)) },
+            { 'device': 'cuda', 'scalar': torch.Tensor([1, 2]).to(dtype=torch.float32).view((2, 1)) }
+        ]
+
+        for entry in test_entries:
+            print(f'entry = {entry}')
+            device = entry['device']
+
+            # Transfer to the device.
+            sbm = raw_sbm.to(device=device)
+            scalar = entry['scalar']
+            if isinstance(scalar, (int, float)):
+                other = scalar
+            else:
+                other = scalar.to(device=device)
+            block_storage = Test_SparseBlockMatrix.values_raw.to(device=device)
+
+            # The result values.
+            true_result_values = block_storage * other
+
+            # Perform the multiplication from left.
+            result = sbm * other
+
+            try:
+                torch_equal( result.block_storage, true_result_values )
+            except Exception as exc:
+                print(exc)
+                self.assertTrue(False, f'test_multiply_scalar (left) failed with entry {entry}')
+
+            # Perform the multiplication from right.
+            result = other * sbm
+
+            try:
+                torch_equal( result.block_storage, true_result_values )
+            except Exception as exc:
+                print(exc)
+                self.assertTrue(False, f'test_multiply_scalar (right) failed with entry {entry}')
+
+    def test_multiply_scalar_inplace(self):
+        print()
+        show_delimeter('test inplace multiplying a scalar. ')
+
+        # The main sbm.
+        raw_sbm = SparseBlockMatrix(Test_SparseBlockMatrix.block_shape, dtype=torch.float32)
+        raw_sbm.create(shape_blocks=Test_SparseBlockMatrix.shape_blocks, block_indices=Test_SparseBlockMatrix.block_indices)
+        raw_sbm.set_block_storage(Test_SparseBlockMatrix.values_raw, clone=False)
+
+        test_entries = [
+            { 'device': 'cpu',  'scalar': 2 },
+            { 'device': 'cpu',  'scalar': 2.0 },
+            { 'device': 'cpu',  'scalar': torch.Tensor([2]).to(dtype=torch.float32) },
+            { 'device': 'cpu',  'scalar': torch.Tensor([1, 2, 3]).to(dtype=torch.float32).view((1, 3)) },
+            { 'device': 'cpu',  'scalar': torch.Tensor([1, 2]).to(dtype=torch.float32).view((2, 1)) },
+            { 'device': 'cuda', 'scalar': 2 },
+            { 'device': 'cuda', 'scalar': 2.0 },
+            { 'device': 'cuda', 'scalar': torch.Tensor([2]).to(dtype=torch.float32) },
+            { 'device': 'cuda', 'scalar': torch.Tensor([1, 2, 3]).to(dtype=torch.float32).view((1, 3)) },
+            { 'device': 'cuda', 'scalar': torch.Tensor([1, 2]).to(dtype=torch.float32).view((2, 1)) }
+        ]
+
+        for entry in test_entries:
+            print(f'entry = {entry}')
+            device = entry['device']
+
+            # Transfer to the device.
+            sbm = raw_sbm.clone().to(device=device)
+            scalar = entry['scalar']
+            if isinstance(scalar, (int, float)):
+                other = scalar
+            else:
+                other = scalar.to(device=device)
+            block_storage = Test_SparseBlockMatrix.values_raw.to(device=device)
+
+            # The result values.
+            true_result_values = block_storage * other
+
+            # Perform the multiplication from left.
+            sbm.mul_(other)
+
+            try:
+                torch_equal( sbm.block_storage, true_result_values )
+            except Exception as exc:
+                print(exc)
+                self.assertTrue(False, f'test_inplace_multiply_scalar failed with entry {entry}')
 
 if __name__ == '__main__':
     import os
