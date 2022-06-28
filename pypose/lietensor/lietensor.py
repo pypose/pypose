@@ -7,7 +7,7 @@ from .backends import exp, log, inv, mul, adj
 from .backends import adjT, jinvp, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
 from .basics import cumops_, cummul_, cumprod_
-from .operation import rxso3_Exp, se3_Exp, so3_Exp
+from .operation import RxSO3_Log, SE3_Log, SO3_Log, Sim3_Log, rxso3_Exp, se3_Exp, sim3_Exp, so3_Exp
 
 
 HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'double',
@@ -196,7 +196,9 @@ class SO3Type(LieType):
         super().__init__(1, 4, 4, 3)
 
     def Log(self, X):
-        x = self.__op__(self.lid, log, X)
+        # x = self.__op__(self.lid, log, X)
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        x = SO3_Log.apply(X)
         return LieTensor(x, ltype=so3_type)
 
     @classmethod
@@ -269,7 +271,9 @@ class SE3Type(LieType):
         super().__init__(3, 7, 7, 6)
 
     def Log(self, X):
-        x = self.__op__(self.lid, log, X)
+        # x = self.__op__(self.lid, log, X)
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        x = SE3_Log.apply(X)
         return LieTensor(x, ltype=se3_type)
 
     @classmethod
@@ -306,7 +310,9 @@ class Sim3Type(LieType):
         super().__init__(4, 8, 8, 7)
 
     def Log(self, X):
-        x = self.__op__(self.lid, log, X)
+        # x = self.__op__(self.lid, log, X)
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        x = Sim3_Log.apply(X)
         return LieTensor(x, ltype=sim3_type)
 
     @classmethod
@@ -325,6 +331,8 @@ class sim3Type(LieType):
 
     def Exp(self, x):
         X = self.__op__(self.lid, exp, x)
+        x = x.tensor() if hasattr(x, 'ltype') else x
+        X = sim3_Exp.apply(x)
         return LieTensor(X, ltype=Sim3_type)
 
     @classmethod
@@ -341,7 +349,9 @@ class RxSO3Type(LieType):
         super().__init__(2, 5, 5, 4)
 
     def Log(self, X):
-        x = self.__op__(self.lid, log, X)
+        # x = self.__op__(self.lid, log, X)
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        x = RxSO3_Log.apply(X)
         return LieTensor(x, ltype=rxso3_type)
 
     @classmethod
