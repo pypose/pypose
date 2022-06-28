@@ -39,6 +39,85 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
                         torch.stack([-v[...,1],  v[...,0],         O], dim=-1)], dim=-2)
 
 
+def add_(input, other, alpha=1):
+    r'''
+    Inplace version of :meth:`pypose.add`.
+    '''
+    return input.add_(other, alpha)
+
+
+def add(input, other, alpha=1):
+    r'''
+    Adds other, scaled by alpha, to input LieTensor.
+
+    Args:
+        input (:obj:`LieTensor`): the input LieTensor (Lie Algebra or Lie Group).
+
+        other (:obj:`Tensor`): the tensor to add to input. The last dimension has to be no less
+            than the shape of the corresponding Lie Algebra of the input.
+
+        alpha (:obj:`Number`): the multiplier for other.
+
+    Return:
+        :obj:`LieTensor`: the output LieTensor.
+
+    .. math::
+        \bm{y}_i =
+        \begin{cases}
+        \alpha * \bm{a}_i + \bm{x}_i & \text{if}~\bm{x}_i~\text{is a Lie Algebra} \\
+        \mathrm{Exp}(\alpha * \bm{a}_i) \times \bm{x}_i & \text{if}~\bm{x}_i~\text{is a Lie Group}
+        \end{cases}
+
+    where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` Tensor to add,
+    and :math:`\bm{y}` is the output LieTensor.
+
+    Note:
+        The ``other`` Tensor is treated as a Lie Algebra during computation. The elements beyond
+        the corresponding shape of a Lie Algebra in the last dimension are ignored. This is
+        because the gradient of a Lie Group is computed as the perturbation in its tangent space:
+
+        .. math::
+            \begin{align*}
+                \frac{D f(\mathcal{X})}{D \mathcal{X}} & \overset{\underset{\mathrm{def}}{}}{=}
+                \displaystyle \lim_{\bm{\tau} \to \bm{0}} \frac{f(\bm{\tau} \oplus X)
+                    \ominus f(\mathcal{X})}{\bm{\tau}} \\
+                & = \left. \frac{\partial \mathrm{Log} (\mathrm{Exp}(\bm{\tau}) \times \mathcal{X})
+                    \times f(\mathcal{X})^{-1}}{\partial \bm{\tau}}\right|_{\bm{\tau=\bm{0}}}
+            \end{align*},
+
+        where :math:`\mathcal{X}` is a Lie Group and :math:`\bm{\tau}` is its left perturbation.
+
+        See Eq.(44) in `Micro Lie theory <https://arxiv.org/abs/1812.01537>`_ for more details of
+        the gradient for a Lie Group.
+
+        This provides convenience to work with PyTorch optimizers like :obj:`torch.optim.SGD`,
+        which calls function :meth:`.add_` of a Lie Group to adjust parameters by gradients
+        (:obj:`LieTensor.grad`, where the last element is often zero since tangent vector requires
+        smaller storage space).
+
+    See :meth:`LieTensor` for types of Lie Algebra and Lie Group.
+
+    See :meth:`Exp` for Exponential mapping of Lie Algebra.
+
+    Examples:
+        >>> x = pp.randn_SE3()
+        >>> a = torch.randn(6)
+        >>> x + a
+        SE3Type LieTensor:
+        tensor([-1.6089,  0.4184,  0.6621, -0.2098,  0.5383,  0.4794,  0.6606])
+        >>> pp.add(x, a)
+        SE3Type LieTensor:
+        tensor([-1.6089,  0.4184,  0.6621, -0.2098,  0.5383,  0.4794,  0.6606])
+        >>> pp.se3(a).Exp() @ x
+        SE3Type LieTensor:
+        tensor([-1.6089,  0.4184,  0.6621, -0.2098,  0.5383,  0.4794,  0.6606])
+        >>> x + torch.cat([a, torch.randn(1)])
+        SE3Type LieTensor:
+        tensor([-1.6089,  0.4184,  0.6621, -0.2098,  0.5383,  0.4794,  0.6606])
+    '''
+    return input.add(other, alpha)
+
+
 def cumops_(input, dim, ops):
     r'''
         Inplace version of :meth:`pypose.cumops`
@@ -124,7 +203,8 @@ def cummul(input, dim, left = True):
         input (LieTensor): the input LieTensor
         dim (int): the dimension to do the multiplication over
         left (bool, optional): whether perform left multiplication in :obj:`cummul`.
-            If set it to :obj:`False`, this function performs right multiplication. Defaul: True
+            If set it to :obj:`False`, this function performs right multiplication.
+            Defaul: ``True``
 
     Returns:
         LieTensor: The LieTensor
@@ -158,26 +238,27 @@ def cummul(input, dim, left = True):
 
 
 def cumprod(input, dim, left = True):
-    r"""Returns the cumulative product (@) of LieTensor along a dimension.
+    r"""Returns the cumulative product (``@``) of LieTensor along a dimension.
 
     * Left product:
 
     .. math::
-        y_i = x_i ~@~ x_{i-1} ~@~ \cdots ~@~ x_1,
+        y_i = x_i ~\times~ x_{i-1} ~\times~ \cdots ~\times~ x_1,
     
     * Right product:
 
     .. math::
-        y_i = x_1 ~@~ x_2 ~@~ \cdots ~@~ x_i,
+        y_i = x_1 ~\times~ x_2 ~\times~ \cdots ~\times~ x_i,
 
-    where :math:`x_i,~y_i` are the :math:`i`-th LieType item along the :obj:`dim`
-    dimension of input and output, respectively.
+    where :math:`\times` denotes the group product (``@``), :math:`x_i,~y_i` are the
+    :math:`i`-th item along the :obj:`dim` dimension of the input and output LieTensor,
+    respectively.
 
     Args:
         input (LieTensor): the input LieTensor
         dim (int): the dimension to do the operation over
-        left (bool, optional): whether perform left product in :obj:`cumprod`.
-            If set it to :obj:`False`, this function performs right product. Defaul: True
+        left (bool, optional): whether perform left product in :obj:`cumprod`. If set
+            it to :obj:`False`, this function performs right product. Defaul: ``True``
 
     Returns:
         LieTensor: The LieTensor
