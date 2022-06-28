@@ -79,8 +79,6 @@ def sbm_to_bsr_cpu(sbm):
         ( block_storage.numpy(), indices.numpy(), indptr.numpy() ),
         shape=sbm.shape )
 
-
-
 # DTYPE_NUMPY_TO_TORCH = {
 #     np.int: torch.int,
 #     np.int64: torch.int64,
@@ -486,7 +484,7 @@ class SparseBlockMatrix(object):
         WARNING: Calling this function changes the block_storage, it has side effects if
         the block_storage referencing to an external tensor. This is the case when the 
         set_block_storage() function is called with clone=False. 
-        
+
         other: must be a scalar or a Tensor or.
         '''
         if isinstance(other, ( int, float, torch.Tensor)):
@@ -638,4 +636,3 @@ class SparseBlockMatrix(object):
         CCS - Column Compressed Structure.
         '''
         raise NotImplementedError()
-
