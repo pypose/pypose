@@ -62,7 +62,8 @@ class IMUPreintegrator(nn.Module):
                 Default value is used if not given.
             acc_cov (torch.Tensor, optional): covariance matrix of linear acceleration.
                 Default value is used if not given.
-            init_state (Dict, optional): the initial state for the integration.
+            init_state (Dict, optional): the initial state for the integration. The structure of the dictionary is
+            {"pos": initial_position, "rot": initial_rotation, "vel": initial_velocity} 
             the default state will be used if this state not given. Default value is None.
 
         Note:
