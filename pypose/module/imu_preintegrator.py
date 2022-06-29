@@ -12,6 +12,14 @@ class IMUPreintegrator(nn.Module):
         rot (pypose.SO3, optional): initial rotation. Default: :meth:`pypose.identity_SO3`
         vel (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
         gravity (float, optional): the gravity acceleration. Default: 9.81007
+        gyro_cov (float, optional): covariance of the gyroscope. Default: (1.6968e-4)**2
+        acc_cov (float, optional): covariance of the accelerator. Default: (2e-3)**2
+        prop_cov (Bool, optional): If this parameter is :obj:`True`, the imu integrator will propogate the covariance matrix.
+                                If this parameter is :obj:`False`, the imu integrator will not calculate the covariance.
+                                Default: :obj:`True`
+        reset (Bool, optional): If this parameter is :obj:`True`, the imu integrator will integrate on the inputed `init_state`. 
+                                If this parameter is :obj:`False`, the imu integrator will update the state integrated from the last frame.  
+                                Default: :obj:`True`
     '''
     def __init__(self, pos = torch.zeros(3),
                        rot = pp.identity_SO3(),
