@@ -17,9 +17,8 @@ class IMUPreintegrator(nn.Module):
         prop_cov (Bool, optional): If this parameter is :obj:`True`, the imu integrator will propogate the covariance matrix.
                                 If this parameter is :obj:`False`, the imu integrator will not calculate the covariance.
                                 Default: :obj:`True`
-        reset (Bool, optional): If this parameter is :obj:`True`, the imu integrator will integrate on the inputed `init_state`. 
-                                If this parameter is :obj:`False`, the imu integrator will update the state integrated from the last frame.  
-                                Default: :obj:`True`
+        reset (Bool, optional): If this parameter is :obj:`True`, the imu integrator will update the default state with the 
+                                integrated state from the last frame. If not, the integrator will not update. Default: :obj:`True`
     '''
     def __init__(self, pos = torch.zeros(3),
                        rot = pp.identity_SO3(),
@@ -63,7 +62,8 @@ class IMUPreintegrator(nn.Module):
                 Default value is used if not given.
             acc_cov (torch.Tensor, optional): covariance matrix of linear acceleration.
                 Default value is used if not given.
-            init_state (torch.Tensor, optional): 
+            init_state (Dict, optional): the initial state for the integration.
+            the default state will be used if this state not given. Default value is None.
 
         Note:
             This layer supports the input shape with :math:`(B, F, H_{in})`, :math:`(F, H_{in})`
@@ -207,7 +207,7 @@ class IMUPreintegrator(nn.Module):
         acc = self._check(acc); gyro = self._check(gyro)
         dt = self._check(dt); rot = self._check(rot)
 
-        if self.reset is False and init_state is None:
+        if init_state is None:
             init_state = {'pos': self.pos, 'rot': self.rot, 'vel': self.vel}
 
         integrate = self.integrate(init_state, dt, gyro, acc, rot)
@@ -226,10 +226,11 @@ class IMUPreintegrator(nn.Module):
         else:
             cov = {'cov': None}
 
-        self.pos = predict['pos'][..., -1:, :]
-        self.rot = predict['rot'][..., -1:, :]
-        self.vel = predict['vel'][..., -1:, :]
-        self.cov = cov['cov']
+        if self.reset:
+            self.pos = predict['pos'][..., -1:, :]
+            self.rot = predict['rot'][..., -1:, :]
+            self.vel = predict['vel'][..., -1:, :]
+            self.cov = cov['cov']
 
         return {**predict, **cov}
 
