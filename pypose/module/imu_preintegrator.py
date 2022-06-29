@@ -14,11 +14,11 @@ class IMUPreintegrator(nn.Module):
         gravity (float, optional): the gravity acceleration. Default: 9.81007
         gyro_cov (float, optional): covariance of the gyroscope. Default: (1.6968e-4)**2
         acc_cov (float, optional): covariance of the accelerator. Default: (2e-3)**2
-        prop_cov (Bool, optional): If this parameter is :obj:`True`, the imu integrator will propogate the covariance matrix.
-                                If this parameter is :obj:`False`, the imu integrator will not calculate the covariance.
-                                Default: :obj:`True`
-        reset (Bool, optional): If this parameter is :obj:`True`, the imu integrator will update the default state with the 
-                                integrated state from the last frame. If not, the integrator will not update. Default: :obj:`True`
+        prop_cov (Bool, optional): flag to propogate the covariance matrix. Default: :obj:`True`
+        reset (Bool, optional): flag to reset the initial states after each time the forward
+            function is called. If False, the IMU integrator will use the states from last time
+            as the initial states only when the initial state is not given when calling the
+            forward function. Default: :obj:`True`.
     '''
     def __init__(self, pos = torch.zeros(3),
                        rot = pp.identity_SO3(),
@@ -48,9 +48,9 @@ class IMUPreintegrator(nn.Module):
 
     def forward(self, dt, gyro, acc, rot:pp.SO3=None, gyro_cov=None, acc_cov=None, init_state=None):
         r"""
-        IMU updates from duration (:math:`\delta t`), gyroscope (angular rate :math:`\omega`),
+        Propagate IMU states from duration (:math:`\delta t`), gyroscope (angular rate :math:`\omega`),
         linear acceleration (:math:`\mathbf{a}`) in body frame, as well as their measurement
-        covariance for angular rate :math:`C_{g}` and acceleration :math:`C_{\mathbf{a}}`.
+        covariance for gyroscope :math:`C_{g}` and acceleration :math:`C_{\mathbf{a}}`.
         Known IMU rotation :math:`R` estimation can also be provided for better precision.
 
         Args:
@@ -62,21 +62,22 @@ class IMUPreintegrator(nn.Module):
                 Default value is used if not given.
             acc_cov (torch.Tensor, optional): covariance matrix of linear acceleration.
                 Default value is used if not given.
-            init_state (Dict, optional): the initial state for the integration. The structure of the dictionary is
-            {"pos": initial_position, "rot": initial_rotation, "vel": initial_velocity} 
-            the default state will be used if this state not given. Default value is None.
+            init_state (Dict, optional): the initial state for the integration. The structure
+                of the dictionary should be :obj:`{'pos': torch.Tensor, 'rot': pypose.SO3, 'vel':
+                torch.Tensor}`. The initial state given in constructor will be used if not given.
 
         Note:
             This layer supports the input shape with :math:`(B, F, H_{in})`, :math:`(F, H_{in})`
-            and :math:`(H_{in})`, where :math:`B` is the batch size, :math:`F` is the number of
-            frames, and :math:`H_{in}` is the raw inputs of the sensor.
+            and :math:`(H_{in})`, where :math:`B` is the batch size (or the number of IMU),
+            :math:`F` is the number of frames (measurements), and :math:`H_{in}` is the raw
+            sensor inputs.
 
-        IMU Measurements Propagation:
+        IMU Measurements Integration:
 
         .. math::
             \begin{align*}
                 {\Delta}R_{ik+1} &= {\Delta}R_{ik} \mathrm{Exp} ((w_k - b_i^g) {\Delta}t) \\
-                {\Delta}v_{ik+1} &= {\Delta}v_{ik} + {\Delta}R_{ik} (a_k - b_i^a) {\Delta}t  \\
+                {\Delta}v_{ik+1} &= {\Delta}v_{ik} + {\Delta}R_{ik} (a_k - b_i^a) {\Delta}t \\
                 {\Delta}p_{ik+1} &= {\Delta}v_{ik} + {\Delta}v_{ik} {\Delta}t
                     + 1/2 {\Delta}R_{ik} (a_k - b_i^a) {\Delta}t^2
             \end{align*}
@@ -108,9 +109,9 @@ class IMUPreintegrator(nn.Module):
 
         .. math::
             A = \begin{bmatrix}
-                    {\Delta}R_{ik+1}^T & 0_{3*3} \\
-                    -{\Delta}R_{ik} (a_k - b_i^g)^\wedge {\Delta}t & I_{3*3} & 0_{3*3} \\
-                    -1/2{\Delta}R_{ik} (a_k - b_i^g)^\wedge {\Delta}t^2 & I_{3*3} {\Delta}t & I_{3*3}
+                  {\Delta}R_{ik+1}^T & 0_{3*3} \\
+                  -{\Delta}R_{ik} (a_k - b_i^g)^\wedge {\Delta}t & I_{3*3} & 0_{3*3} \\
+                  -1/2{\Delta}R_{ik} (a_k - b_i^g)^\wedge {\Delta}t^2 & I_{3*3} {\Delta}t & I_{3*3}
                 \end{bmatrix},
 
         .. math::
@@ -135,6 +136,26 @@ class IMUPreintegrator(nn.Module):
         :math:`\mathrm{Exp}(w_k{\Delta}t)` at :math:`k`-th time step,
         :math:`C_{g}` and :math:`C_{\mathbf{a}}` are measurement covariance of angular rate
         and acceleration, respectively.
+
+        Note:
+            Output covariance (Shape: (9, 9)) is in the order of rotation, velocity, and position.
+
+        With IMU preintegration, the propagated IMU status:
+
+        .. math::
+            \begin{align*}
+                R_j &= {\Delta}R_{ij} * R_i                                                     \\
+                v_j &= {\Delta}v_{ij} * R_i   + v_i + g \Delta t_{ij}                           \\
+                p_j &= {\Delta}p_{ij} * R_i   + p_i + v_i \Delta t_{ij} + 1/2 g \Delta t_{ij}^2 \\
+            \end{align*}
+
+        where:
+
+            - :math:`{\Delta}R_{ij}`, :math:`{\Delta}v_{ij}`, :math:`{\Delta}p_{ij}`
+              are the preintegrated measurements.
+            - :math:`R_i`, :math:`v_i`, and :math:`p_i` are the initial state. Default initial values
+              are used if :obj:`reset` is True.
+            - :math:`R_j`, :math:`v_j`, and :math:`p_j` are the propagated state variables
 
         Note:
             The implementation is based on Eq. (A7), (A8), (A9), and (A10) of this report:
@@ -163,8 +184,7 @@ class IMUPreintegrator(nn.Module):
             >>> dt = torch.tensor([0.002])        # Time difference between two measurements
 
             3. Preintegrating IMU measurements.
-            Takes as input the imu values and calculates the preintegrated 
-            IMU measurements. 
+            Takes as input the IMU values and calculates the preintegrated IMU measurements.
 
             >>> states = integrator(dt, ang, acc, rot)
             {'rot': SO3Type LieTensor:
@@ -172,23 +192,23 @@ class IMUPreintegrator(nn.Module):
             'vel': tensor([[[ 0.0002,  0.0002, -0.0194]]]),
             'pos': tensor([[[ 2.0000e-07,  2.0000e-07, -1.9420e-05]]]),
             'cov': tensor([[[ 5.7583e-11, -5.6826e-19, -5.6827e-19,  0.0000e+00,  0.0000e+00,
-                        0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00],
-                    [-5.6826e-19,  5.7583e-11, -5.6827e-19,  0.0000e+00,  0.0000e+00,
-                        0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00],
-                    [-5.6827e-19, -5.6827e-19,  5.7583e-11,  0.0000e+00,  0.0000e+00,
-                        0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00],
-                    [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  8.0000e-09, -3.3346e-20,
-                    -1.0588e-19,  8.0000e-12,  1.5424e-23, -1.0340e-22],
-                    [ 0.0000e+00,  0.0000e+00,  0.0000e+00, -1.3922e-19,  8.0000e-09,
-                        0.0000e+00, -8.7974e-23,  8.0000e-12,  0.0000e+00],
-                    [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00, -1.0588e-19,
-                        8.0000e-09,  0.0000e+00, -1.0340e-22,  8.0000e-12],
-                    [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  8.0000e-12,  1.5424e-23,
-                    -1.0340e-22,  8.0000e-15, -1.2868e-26,  0.0000e+00],
-                    [ 0.0000e+00,  0.0000e+00,  0.0000e+00, -8.7974e-23,  8.0000e-12,
-                        0.0000e+00, -1.2868e-26,  8.0000e-15,  0.0000e+00],
-                    [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00, -1.0340e-22,
-                        8.0000e-12,  0.0000e+00,  0.0000e+00,  8.0000e-15]]])}
+                              0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00],
+                            [-5.6826e-19,  5.7583e-11, -5.6827e-19,  0.0000e+00,  0.0000e+00,
+                              0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00],
+                            [-5.6827e-19, -5.6827e-19,  5.7583e-11,  0.0000e+00,  0.0000e+00,
+                              0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00],
+                            [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  8.0000e-09, -3.3346e-20,
+                             -1.0588e-19,  8.0000e-12,  1.5424e-23, -1.0340e-22],
+                            [ 0.0000e+00,  0.0000e+00,  0.0000e+00, -1.3922e-19,  8.0000e-09,
+                              0.0000e+00, -8.7974e-23,  8.0000e-12,  0.0000e+00],
+                            [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00, -1.0588e-19,
+                              8.0000e-09,  0.0000e+00, -1.0340e-22,  8.0000e-12],
+                            [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  8.0000e-12,  1.5424e-23,
+                             -1.0340e-22,  8.0000e-15, -1.2868e-26,  0.0000e+00],
+                            [ 0.0000e+00,  0.0000e+00,  0.0000e+00, -8.7974e-23,  8.0000e-12,
+                              0.0000e+00, -1.2868e-26,  8.0000e-15,  0.0000e+00],
+                            [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00, -1.0340e-22,
+                              8.0000e-12,  0.0000e+00,  0.0000e+00,  8.0000e-15]]])}
 
         Preintegrated IMU odometry from the KITTI dataset with and without known rotation.
 
