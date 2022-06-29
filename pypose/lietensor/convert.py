@@ -240,7 +240,7 @@ def mat2SE3(mat, check=True, rtol=1e-5, atol=1e-5):
 
     q = mat2SO3(mat[..., :3, :3], check=check, rtol=rtol, atol=atol).tensor()
     if shape[-1] == 3:
-        t = torch.zeros(shape[:-2]+(3,), dtype = mat.dtype, device=mat.device, requires_grad=mat.requires_grad)
+        t = torch.zeros(shape[:-2]+(3,), dtype=mat.dtype, device=mat.device, requires_grad=mat.requires_grad)
     else:
         t = mat[..., :3, 3]
     vec = torch.cat([t, q], dim=-1)
