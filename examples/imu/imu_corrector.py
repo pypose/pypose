@@ -20,14 +20,10 @@ class IMUCorrector(torch.nn.Module):
         self.net = nn.Sequential(*layers)
         self.imu = pp.module.IMUPreintegrator(reset=True, prop_cov=False)
 
-    def forward(self, data):
+    def forward(self, data, init_state):
         feature = torch.cat([data["acc"], data["gyro"]], dim = -1)
         B, F = feature.shape[:2]
 
-        init_state = {
-            "pos": data['init_pos'], 
-            "rot": data['init_rot'][:,:1,:],
-            "vel": data['init_vel'],}
         output = self.net(feature.reshape(B*F,6)).reshape(B, F, 6)
         corrected_acc = output[...,:3] + data["acc"]
         corrected_gyro = output[...,3:] + data["gyro"]
@@ -46,7 +42,11 @@ def train(network, train_loader, epoch, optimizer, device="cuda:0"):
     t_range = tqdm.tqdm(train_loader)
     for i, data in enumerate(t_range):
         data = move_to(data, device)
-        state = network(data)
+        init_state = {
+            "pos": data['init_pos'], 
+            "rot": data['init_rot'][:,:1,:],
+            "vel": data['init_vel'],}
+        state = network(data, init_state)
 
         losses, _ = get_loss(state, data)
         running_loss += losses.item()
@@ -65,7 +65,11 @@ def test(network, loader, device = "cuda:0"):
         running_loss = 0
         for i, data in enumerate(tqdm.tqdm(loader)):
             data = move_to(data, device)
-            state = network(data)
+            init_state = {
+            "pos": data['init_pos'], 
+            "rot": data['init_rot'][:,:1,:],
+            "vel": data['init_vel'],}
+            state = network(data, init_state)
 
             losses, _ = get_loss(state, data)
             running_loss += losses.item()
