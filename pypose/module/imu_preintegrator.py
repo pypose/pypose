@@ -7,12 +7,6 @@ class IMUPreintegrator(nn.Module):
     r'''
     Applies preintegration over IMU input signals.
 
-    IMU updates from duration (:math:`\delta t`), angular rate (:math:`\omega`),
-    linear acceleration (:math:`\mathbf{a}`) in body frame, as well as their
-    measurement covariance for angular rate :math:`C_{g}` and acceleration
-    :math:`C_{\mathbf{a}}`. Known IMU rotation :math:`R` estimation can also be provided
-    for better precision.
-
     Args:
         pos (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
         rot (pypose.SO3, optional): initial rotation. Default: :meth:`pypose.identity_SO3`
@@ -47,23 +41,26 @@ class IMUPreintegrator(nn.Module):
 
     def forward(self, dt, gyro, acc, rot:pp.SO3=None, gyro_cov=None, acc_cov=None, init_state=None):
         r"""
-        IMU Preintegration from duration (dt), angular rate (ang), linear acceleration (acc).
-        Uncertainty propagation from measurement covariance (cov): ang_cov, acc_cov
-        Known IMU rotation (rot) estimation can be provided for better precision.
+        IMU updates from duration (:math:`\delta t`), gyroscope (angular rate :math:`\omega`),
+        linear acceleration (:math:`\mathbf{a}`) in body frame, as well as their measurement
+        covariance for angular rate :math:`C_{g}` and acceleration :math:`C_{\mathbf{a}}`.
+        Known IMU rotation :math:`R` estimation can also be provided for better precision.
 
         Args:
             dt (torch.Tensor): time interval from last update.
-            ang (torch.Tensor): angular rate (:math:`\omega`) in IMU body frame.
+            gyro (torch.Tensor): angular rate (:math:`\omega`) in IMU body frame.
             acc (torch.Tensor): linear acceleration (:math:`\mathbf{a}`) in IMU body frame.
             rot (:obj:`pypose.SO3`, optional): known IMU rotation.
-            ang_cov (torch.Tensor, optional): covariance matrix of angular rate.
-                Default: :obj:`torch.eye(3)*(1.6968*10**-4)**2` (Adapted from Euroc dataset)
+            gyro_cov (torch.Tensor, optional): covariance matrix of angular rate.
+                Default value is used if not given.
             acc_cov (torch.Tensor, optional): covariance matrix of linear acceleration.
-                Default: :obj:`torch.eye(3)*(2.0*10**-3)**2` (Adapted from Euroc dataset)
+                Default value is used if not given.
+            init_state (torch.Tensor, optional): 
 
         Note:
-            This layer supports the input shape with :math:`(B, F, H_{in})`, :math:`(F, H_{in})` and :math:`(H_{in})` 
-            where :math:`B` is the batch size, :math:`F` is the number of frames, and :math:`H_{in}` is the raw inputs of the sensor.
+            This layer supports the input shape with :math:`(B, F, H_{in})`, :math:`(F, H_{in})`
+            and :math:`(H_{in})`, where :math:`B` is the batch size, :math:`F` is the number of
+            frames, and :math:`H_{in}` is the raw inputs of the sensor.
 
         IMU Measurements Propagation:
 
@@ -71,16 +68,20 @@ class IMUPreintegrator(nn.Module):
             \begin{align*}
                 {\Delta}R_{ik+1} &= {\Delta}R_{ik} \mathrm{Exp} ((w_k - b_i^g) {\Delta}t) \\
                 {\Delta}v_{ik+1} &= {\Delta}v_{ik} + {\Delta}R_{ik} (a_k - b_i^a) {\Delta}t  \\
-                {\Delta}p_{ik+1} &= {\Delta}v_{ik} + {\Delta}v_{ik} {\Delta}t + 1/2 {\Delta}R_{ik} (a_k - b_i^a) {\Delta}t^2
+                {\Delta}p_{ik+1} &= {\Delta}v_{ik} + {\Delta}v_{ik} {\Delta}t
+                    + 1/2 {\Delta}R_{ik} (a_k - b_i^a) {\Delta}t^2
             \end{align*}
 
         where:
 
-            - :math:`{\Delta}R_{ik}` is the preintegrated rotation between the :math:`i`-th and :math:`k`-th time step.
+            - :math:`{\Delta}R_{ik}` is the preintegrated rotation between the :math:`i`-th
+              and :math:`k`-th time step.
 
-            - :math:`{\Delta}v_{ik}` is the preintegrated velocity between the :math:`i`-th and :math:`k`-th time step.
+            - :math:`{\Delta}v_{ik}` is the preintegrated velocity between the :math:`i`-th
+              and :math:`k`-th time step.
 
-            - :math:`{\Delta}p_{ik}` is the preintegrated position between the :math:`i`-th and :math:`k`-th time step.
+            - :math:`{\Delta}p_{ik}` is the preintegrated position between the :math:`i`-th
+              and :math:`k`-th time step.
 
             - :math:`a_k` is linear acceleration at the :math:`k`-th time step.
 
@@ -130,8 +131,9 @@ class IMUPreintegrator(nn.Module):
             The implementation is based on Eq. (A7), (A8), (A9), and (A10) of this report:
 
             * Christian Forster, et al., `IMU Preintegration on Manifold for Ecient Visual-Inertial
-              Maximum-a-Posteriori Estimation <https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf>`_,
-              Technical Report GT-IRIM-CP&R-2015-001, 2015.
+              Maximum-a-Posteriori Estimation
+              <https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf>`_, Technical Report
+              GT-IRIM-CP&R-2015-001, 2015.
 
         Example:
 
