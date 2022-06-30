@@ -50,10 +50,16 @@ def mat2SO3(mat, check=True, rtol=1e-5, atol=1e-5):
         \textbf{y}_i = [q^x_i, q^y_i, q^z_i, q^w_i]
 
     Warning:
-        A rotation matrix is consided illegal if, :math:`\vert \mathbf{R}\vert\neq1` or 
-        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` is set to ``True``, illegal input will raise 
-        a ``ValueError``, since the function will ouput irrelevant result, likely contains ``nan``.
+        Numerically, a transformation matrix is considered legal if:
 
+        .. math::
+            {\rm det}(\mathbf{R}) - 1 \leq \texttt{atol} + \texttt{rtol}\times 1\\
+            |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
+        
+        where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
+        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed. 
+        Illegal input will output an irrelevant result, which likely contains ``nan``.
+        
     Examples:
 
         >>> input = torch.tensor([[0., -1.,  0.],
@@ -188,9 +194,15 @@ def mat2SE3(mat, check=True, rtol=1e-5, atol=1e-5):
         \textbf{y}_i = [t^x_i, t^y_i, t^z_i, q^x_i, q^y_i, q^z_i, q^w_i]
 
     Warning:
-        A rotation matrix is consided illegal if, :math:`\vert \mathbf{R}\vert\neq1` or 
-        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` is set to ``True``, illegal input will
-        raise a ``ValueError``, since the function will ouput irrelevant result, likely contains ``nan``.
+        Numerically, a transformation matrix is considered legal if:
+
+        .. math::
+            {\rm det}(\mathbf{R}) - 1 \leq \texttt{atol} + \texttt{rtol}\times 1\\
+            |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
+        
+        where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
+        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed. 
+        Illegal input will output an irrelevant result, which likely contains ``nan``.
 
         For input with shape :obj:`(*, 4, 4)`, when ``check`` is set to ``True`` and the last row
         of the each individual matrix is not ``[0, 0, 0, 1]``, a warning will be triggered. 
@@ -304,12 +316,16 @@ def mat2Sim3(mat, check=True, rtol=1e-5, atol=1e-5):
         \textbf{y}_i = [t^x_i, t^y_i, t^z_i, q^x_i, q^y_i, q^z_i, q^w_i, s_i]
 
     Warning:
-        If there exists any :math:`s_i=0`, the function will raise a ``ValueError``, since
-        further computation leads to *nan* in the computed quaternions.
+        Numerically, a transformation matrix is considered legal if:
 
-        A rotation matrix is consided illegal if, :math:`\vert \mathbf{R}\vert\neq1` or 
-        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` is set to ``True``, illegal input will raise 
-        a ``ValueError``, since the function will ouput irrelevant result, likely contains ``nan``.
+        .. math::
+            \vert s \vert > \texttt{atol} \\
+            {\rm det}(\mathbf{R}) - 1 \leq \texttt{atol} + \texttt{rtol}\times 1\\
+            |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
+        
+        where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
+        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed. 
+        Illegal input will output an irrelevant result, which likely contains ``nan``.
 
         For input with shape :obj:`(*, 4, 4)`, when ``check`` is set to ``True`` and the last row
         of the each individual matrix is not ``[0, 0, 0, 1]``, a warning will be triggered. 
@@ -448,13 +464,16 @@ def mat2RxSO3(mat, check=True, rtol=1e-5, atol=1e-5):
         \textbf{y}_i = [q^x_i, q^y_i, q^z_i, q^w_i, s_i]
 
     Warning:
-        If there exists any :math:`s_i=0`, then the function will raise a ``ValueError``, since
-        further computation leads to *nan* in the computed quaternions.
+        Numerically, a transformation matrix is considered legal if:
 
-        A rotation matrix is consided illegal if, :math:`\vert \mathbf{R}\vert\neq1` or 
-        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` is set to ``True``, illegal input
-        will raise a ``ValueError``, since the function will ouput irrelevant result, likely
-        contains ``nan``.
+        .. math::
+            \vert s \vert > \texttt{atol} \\
+            {\rm det}(\mathbf{R}) - 1 \leq \texttt{atol} + \texttt{rtol}\times 1\\
+            |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
+        
+        where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
+        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed. 
+        Illegal input will output an irrelevant result, which likely contains ``nan``.
 
     Examples:
         >>> input = torch.tensor([[ 0., -0.5,  0.],
@@ -510,10 +529,15 @@ def from_matrix(mat, ltype, check=True, rtol=1e-5, atol=1e-5):
         atol (float, optional): absolute tolerance when check is enabled. Default: 1e-05
 
     Warning:
-        A rotation matrix is consided illegal if, :math:`\vert \mathbf{R}\vert\neq1` or 
-        :math:`\mathbf{RR}^{T}\neq \mathbf{I}`. When ``check`` is set to ``True``, illegal input
-        will raise a ``ValueError``, since the function will ouput irrelevant result, likely 
-        contains ``nan``.
+        Numerically, a transformation matrix is considered legal if:
+
+        .. math::
+            {\rm det}(\mathbf{R}) - 1 \leq \texttt{atol} + \texttt{rtol}\times 1\\
+            |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
+        
+        where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
+        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed. 
+        Illegal input will output an irrelevant result, which likely contains ``nan``.
     
     Return:
         LieTensor: the converted LieTensor.
