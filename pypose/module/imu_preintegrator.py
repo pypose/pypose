@@ -15,10 +15,10 @@ class IMUPreintegrator(nn.Module):
         gyro_cov (float, optional): covariance of the gyroscope. Default: (1.6968e-4)**2
         acc_cov (float, optional): covariance of the accelerator. Default: (2e-3)**2
         prop_cov (Bool, optional): flag to propogate the covariance matrix. Default: :obj:`True`
-        reset (Bool, optional): flag to reset the initial states after each time the forward
+        reset (Bool, optional): flag to reset the initial states after each time the :obj:`forward`
             function is called. If False, the IMU integrator will use the states from last time
-            as the initial states only when the initial state is not given when calling the
-            forward function. Default: :obj:`True`.
+            as the initial states. Note that if the :obj:`init_state` is not :obj:`None` while calling 
+            the :obj:`forward` function, the integrator will use the given inital state Default: :obj:`False`.
     '''
     def __init__(self, pos = torch.zeros(3),
                        rot = pp.identity_SO3(),
@@ -27,7 +27,7 @@ class IMUPreintegrator(nn.Module):
                        gyro_cov = (1.6968e-4)**2,
                        acc_cov = (2e-3)**2,
                        prop_cov = True,
-                       reset = True):
+                       reset = False):
         super().__init__()
         self.reset, self.prop_cov, self.gyro_cov, self.acc_cov = reset, prop_cov, gyro_cov, acc_cov
         # Initial status of IMU: (pos)ition, (rot)ation, (vel)ocity, (cov)ariance
@@ -247,7 +247,7 @@ class IMUPreintegrator(nn.Module):
         else:
             cov = {'cov': None}
 
-        if self.reset:
+        if not self.reset:
             self.pos = predict['pos'][..., -1:, :]
             self.rot = predict['rot'][..., -1:, :]
             self.vel = predict['vel'][..., -1:, :]
