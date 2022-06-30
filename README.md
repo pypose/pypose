@@ -7,17 +7,17 @@ PyPose = (GTSAM | G2O) x PyTorch
     
 [PyTorch 1.11+](https://pytorch.org/get-started/locally/) is required.
     
-Additionally, install:
+On Ubuntu, MasOS, or Windows, run:
    
-    sudo apt-get update -y
-    sudo apt-get install -y ninja-build
-
-To rebuild pypose, run`rm -rf build/ *.so` to clean the previous build first.
+    pip install ninja
+    pip install functorch
 
 1.2 Test locally:
 
     git clone --recursive https://github.com/pypose/pypose.git
     cd pypose && python setup.py develop
+    
+To rebuild pypose, run `rm -rf build/ *.so` to clean the previous build first.
 
 ## 2. For Contributors
 
