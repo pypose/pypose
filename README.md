@@ -10,6 +10,7 @@ PyPose = (GTSAM | G2O) x PyTorch
 On Ubuntu, MasOS, or Windows, run:
    
     pip install ninja
+    pip install functorch
 
 1.2 Test locally:
 
