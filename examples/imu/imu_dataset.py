@@ -1,42 +1,18 @@
 import torch
 import pykitti
-
 import numpy as np
 import pypose as pp
 from datetime import datetime
 import torch.utils.data as Data
 
 
-def move_to(obj, device):
-    if torch.is_tensor(obj):return obj.to(device)
-    elif isinstance(obj, dict):
-        res = {}
-        for k, v in obj.items():
-            res[k] = move_to(v, device)
-        return res
-    elif isinstance(obj, list):
-        res = []
-        for v in obj:
-            res.append(move_to(v, device))
-        return res
-    else:
-        raise TypeError("Invalid type for move_to", obj)
-
-
-def get_loss(inte_state, data):
-    pos_loss = torch.nn.functional.mse_loss(inte_state['pos'][:,-1,:], data['gt_pos'][:,-1,:])
-    rot_loss = torch.nn.functional.mse_loss(inte_state['rot'][:,-1,:].Log(), data['gt_rot'][:,-1,:].Log())
-
-    loss = pos_loss + rot_loss
-    return loss, {'pos_loss': pos_loss, 'rot_loss': rot_loss}
-
-
 class KITTI_IMU(Data.Dataset):
-    def __init__(self, root, dataname, drive, duration = 10, step_size = 1, mode = 'train',):
+    def __init__(self, root, dataname, drive, duration=10, step_size=1, mode='train'):
         super().__init__()
         self.duration = duration
         self.data = pykitti.raw(root, dataname, drive)
         self.seq_len = len(self.data.timestamps) - 1
+        assert mode in ['evaluate', 'train', 'test'], "{} mode is not supported.".format(mode)
 
         self.dt = torch.tensor([datetime.timestamp(self.data.timestamps[i+1]) - datetime.timestamp(self.data.timestamps[i]) for i in range(self.seq_len)])
         self.gyro = torch.tensor([[self.data.oxts[i].packet.wx, self.data.oxts[i].packet.wy, self.data.oxts[i].packet.wz] for i in range(self.seq_len)])
@@ -106,3 +82,20 @@ def imu_collate(data):
         'init_vel': init_vel,
         'init_rot': init_rot,
     }
+
+
+def move_to(obj, device):
+    if torch.is_tensor(obj):
+        return obj.to(device)
+    elif isinstance(obj, dict):
+        res = {}
+        for k, v in obj.items():
+            res[k] = move_to(v, device)
+        return res
+    elif isinstance(obj, list):
+        res = []
+        for v in obj:
+            res.append(move_to(v, device))
+        return res
+    else:
+        raise TypeError("Invalid type for move_to", obj)
