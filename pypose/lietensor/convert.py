@@ -53,7 +53,7 @@ def mat2SO3(mat, check=True, rtol=1e-5, atol=1e-5):
         Numerically, a transformation matrix is considered legal if:
 
         .. math::
-            {\rm det}(\mathbf{R}) - 1 \leq \texttt{atol} + \texttt{rtol}\times 1\\
+            |{\rm det}(\mathbf{R}) - 1| \leq \texttt{atol} + \texttt{rtol}\times 1\\
             |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
         
         where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
@@ -197,7 +197,7 @@ def mat2SE3(mat, check=True, rtol=1e-5, atol=1e-5):
         Numerically, a transformation matrix is considered legal if:
 
         .. math::
-            {\rm det}(\mathbf{R}) - 1 \leq \texttt{atol} + \texttt{rtol}\times 1\\
+            |{\rm det}(\mathbf{R}) - 1| \leq \texttt{atol} + \texttt{rtol}\times 1\\
             |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
         
         where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
@@ -320,7 +320,7 @@ def mat2Sim3(mat, check=True, rtol=1e-5, atol=1e-5):
 
         .. math::
             \vert s \vert > \texttt{atol} \\
-            {\rm det}(\mathbf{R}) - 1 \leq \texttt{atol} + \texttt{rtol}\times 1\\
+            |{\rm det}(\mathbf{R}) - 1| \leq \texttt{atol} + \texttt{rtol}\times 1\\
             |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
         
         where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
@@ -468,7 +468,7 @@ def mat2RxSO3(mat, check=True, rtol=1e-5, atol=1e-5):
 
         .. math::
             \vert s \vert > \texttt{atol} \\
-            {\rm det}(\mathbf{R}) - 1 \leq \texttt{atol} + \texttt{rtol}\times 1\\
+            |{\rm det}(\mathbf{R}) - 1| \leq \texttt{atol} + \texttt{rtol}\times 1\\
             |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
         
         where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
@@ -532,7 +532,7 @@ def from_matrix(mat, ltype, check=True, rtol=1e-5, atol=1e-5):
         Numerically, a transformation matrix is considered legal if:
 
         .. math::
-            {\rm det}(\mathbf{R}) - 1 \leq \texttt{atol} + \texttt{rtol}\times 1\\
+            |{\rm det}(\mathbf{R}) - 1| \leq \texttt{atol} + \texttt{rtol}\times 1\\
             |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
         
         where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
