@@ -48,7 +48,7 @@ if __name__ == '__main__':
         integrator = pp.module.IMUPreintegrator(init_value['pos'], init_value['rot'], init_value['vel'], reset=False).to(args.device)
 
         poses, poses_gt = [init_value['pos']], [init_value['pos']]
-        covs = [torch.zeros(9, 9, device=args.device)]
+        covs = [torch.zeros(9, 9)]
         for idx, data in enumerate(loader):
             data = move_to(data, args.device)
 
