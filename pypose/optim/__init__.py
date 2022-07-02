@@ -1,2 +1,2 @@
-from .jacobian import modjac
-from .optimizer import LM
+from . import functional
+from .optimizer import *
