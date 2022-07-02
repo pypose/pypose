@@ -7,5 +7,8 @@ Optimization
    :nosignatures:
 
    :template: autosummary/class-no-inherit.rst
+   optim.GaussNewton
+   optim.GN
+   optim.LevenbergMarquardt
    optim.LM
-   optim.modjac
+   optim.functional.modjac
