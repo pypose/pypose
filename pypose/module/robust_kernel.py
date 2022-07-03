@@ -23,7 +23,7 @@ class Huber(nn.Module):
     Note:
         The output tensor has the same shape with the input tensor. Use `torch.nn.HuberLoss
         <https://pytorch.org/docs/stable/generated/torch.nn.HuberLoss.html>`_ instead, if a scalar
-        output is expected.
+        Huber loss function is needed.
 
     Example:
         >>> kernel = pp.module.Huber()
