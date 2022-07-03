@@ -17,9 +17,9 @@ class Huber(nn.Module):
     and output tensors, respectively.
 
     Args:
-        delta (float, optional): Specify the threshold at which to change scale the input.
-            The value must be positive.  Default: 1.0
-    
+        delta (float, optional): Specify the threshold at which to scale the input. The value must
+            be positive.  Default: 1.0
+
     Note:
         The output tensor has the same shape with the input tensor. Use `torch.nn.HuberLoss
         <https://pytorch.org/docs/stable/generated/torch.nn.HuberLoss.html>`_ instead, if a scalar
