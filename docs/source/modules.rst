@@ -7,4 +7,5 @@ Modules
    :nosignatures:
 
    :template: autosummary/class-no-inherit.rst
+   module.Huber
    module.IMUPreintegrator
