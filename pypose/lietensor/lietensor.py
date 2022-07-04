@@ -205,7 +205,6 @@ class SO3Type(LieType):
         super().__init__(1, 4, 4, 3)
 
     def Log(self, X):
-        # x = self.__op__(self.lid, log, X)
         X = X.tensor() if hasattr(X, 'ltype') else X
         x = SO3_Log.apply(X)
         return LieTensor(x, ltype=so3_type)
@@ -249,7 +248,6 @@ class so3Type(LieType):
         super().__init__(1, 3, 4, 3)
 
     def Exp(self, x):
-        # X = self.__op__(self.lid, exp, x)
         x = x.tensor() if hasattr(x, 'ltype') else x
         X = so3_Exp.apply(x)
         return LieTensor(X, ltype=SO3_type)
@@ -290,7 +288,6 @@ class SE3Type(LieType):
         super().__init__(3, 7, 7, 6)
 
     def Log(self, X):
-        # x = self.__op__(self.lid, log, X)
         X = X.tensor() if hasattr(X, 'ltype') else X
         x = SE3_Log.apply(X)
         return LieTensor(x, ltype=se3_type)
@@ -320,7 +317,6 @@ class se3Type(LieType):
         super().__init__(3, 6, 7, 6)
 
     def Exp(self, x):
-        # X = self.__op__(self.lid, exp, x)
         x = x.tensor() if hasattr(x, 'ltype') else x
         X = se3_Exp.apply(x)
         return LieTensor(X, ltype=SE3_type)
@@ -345,7 +341,6 @@ class Sim3Type(LieType):
         super().__init__(4, 8, 8, 7)
 
     def Log(self, X):
-        # x = self.__op__(self.lid, log, X)
         X = X.tensor() if hasattr(X, 'ltype') else X
         x = Sim3_Log.apply(X)
         return LieTensor(x, ltype=sim3_type)
@@ -378,7 +373,6 @@ class sim3Type(LieType):
         super().__init__(4, 7, 8, 7)
 
     def Exp(self, x):
-        X = self.__op__(self.lid, exp, x)
         x = x.tensor() if hasattr(x, 'ltype') else x
         X = sim3_Exp.apply(x)
         return LieTensor(X, ltype=Sim3_type)
@@ -406,7 +400,6 @@ class RxSO3Type(LieType):
         super().__init__(2, 5, 5, 4)
 
     def Log(self, X):
-        # x = self.__op__(self.lid, log, X)
         X = X.tensor() if hasattr(X, 'ltype') else X
         x = RxSO3_Log.apply(X)
         return LieTensor(x, ltype=rxso3_type)
@@ -436,7 +429,6 @@ class rxso3Type(LieType):
         super().__init__(2, 4, 5, 4)
 
     def Exp(self, x):
-        # X = self.__op__(self.lid, exp, x)
         x = x.tensor() if hasattr(x, 'ltype') else x
         X = rxso3_Exp.apply(x)
         return LieTensor(X, ltype=RxSO3_type)
