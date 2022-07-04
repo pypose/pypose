@@ -373,7 +373,6 @@ class sim3Type(LieType):
         super().__init__(4, 7, 8, 7)
 
     def Exp(self, x):
-        X = self.__op__(self.lid, exp, x)
         x = x.tensor() if hasattr(x, 'ltype') else x
         X = sim3_Exp.apply(x)
         return LieTensor(X, ltype=Sim3_type)

@@ -1,14 +1,13 @@
 import torch
-import numpy as np
 import pypose as pp
 from torch import nn
+import tqdm, argparse
 import torch.utils.data as Data
-import os, glob, tqdm, argparse
-from imu_dataset import KITTI_IMU, imu_collate, move_to, get_loss
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from imu_dataset import KITTI_IMU, imu_collate, move_to
 
 
-class IMUCorrector(torch.nn.Module):
+class IMUCorrector(nn.Module):
     def __init__(self, size_list= [6, 64, 128, 128, 128, 6]):
         super().__init__()
         layers = []
@@ -30,6 +29,14 @@ class IMUCorrector(torch.nn.Module):
 
         return self.imu(init_state = init_state, dt = data['dt'], gyro = corrected_gyro,
             acc = corrected_acc, rot = data['gt_rot'].contiguous())
+
+
+def get_loss(inte_state, data):
+    pos_loss = torch.nn.functional.mse_loss(inte_state['pos'][:,-1,:], data['gt_pos'][:,-1,:])
+    rot_loss = torch.nn.functional.mse_loss(inte_state['rot'][:,-1,:].Log(), data['gt_rot'][:,-1,:].Log())
+
+    loss = pos_loss + rot_loss
+    return loss, {'pos_loss': pos_loss, 'rot_loss': rot_loss}
 
 
 def train(network, train_loader, epoch, optimizer, device="cuda:0"):
@@ -92,8 +99,8 @@ if __name__ == '__main__':
     parser.add_argument('--load_ckpt', default=False, action="store_true")
     args = parser.parse_args(); print(args)
 
-    train_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0], duration=10, mode = 'train')
-    test_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0],  duration=10, mode = 'train')
+    train_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0], duration=10, mode='train')
+    test_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0],  duration=10, mode='test')
     train_loader = Data.DataLoader(dataset=train_dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=True)
     test_loader = Data.DataLoader(dataset=test_dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=False)
 
@@ -102,7 +109,6 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(network.parameters(), lr = 5e-6)  # to use with ViTs
     scheduler = ReduceLROnPlateau(optimizer, 'min', factor = 0.1, patience = 10)# default setup
 
-    best_loss = np.inf
     for epoch_i in range(args.max_epoches):
         train_loss = train(network, train_loader, epoch_i, optimizer, device = args.device)
         test_loss = test(network, test_loader, device = args.device)
