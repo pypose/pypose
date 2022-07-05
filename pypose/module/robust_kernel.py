@@ -3,14 +3,13 @@ from torch import nn, Tensor
 
 
 class Huber(nn.Module):
-    r"""The robust Huber kernel function that is less sensitive to outliers than squared error
-    in a non-linear optimization problem.
-    See `Huber loss <https://en.wikipedia.org/wiki/Huber_loss>`_ for more information.
+    r"""The robust Huber kernel cost function that is often used in a non-linear optimization
+    problem. See `Huber loss <https://en.wikipedia.org/wiki/Huber_loss>`_ for more information.
 
     .. math::
         \bm{y}_i = \begin{cases}
-            0.5 \bm{x}_i^2                       & \text{if } |\bm{x}_i| < \delta \\
-            \delta * (|\bm{x}_i| - 0.5 * \delta) & \text{otherwise }
+            \bm{x}_i                            & \text{if } \sqrt{\bm{x}_i} < \delta \\
+            2 \delta \sqrt{\bm{x}_i} - \delta^2 & \text{otherwise }
         \end{cases},
 
     where :math:`\delta` (delta) is a threshold, :math:`\bm{x}` and :math:`\bm{y}` are the input
@@ -18,19 +17,19 @@ class Huber(nn.Module):
 
     Args:
         delta (float, optional): Specify the threshold at which to scale the input. The value must
-            be positive.  Default: 1.0
+            be positive. Default: 1.0
 
     Note:
-        The output tensor has the same shape with the input tensor. Use `torch.nn.HuberLoss
+        The input has to be a non-nagative tensor and the output tensor has the same shape with the
+        input. Use `torch.nn.HuberLoss
         <https://pytorch.org/docs/stable/generated/torch.nn.HuberLoss.html>`_ instead, if a scalar
         Huber loss function is needed.
 
     Example:
         >>> kernel = pp.module.Huber()
-        >>> input = torch.randn(3).abs()
-        tensor([1.9087, 0.2256, 0.6565])
-        >>> output = kernel(input)
-        tensor([1.4087, 0.0254, 0.2155])
+        >>> input = torch.tensor([0, 0.5, 1, 2, 3])
+        >>> kernel(input)
+        tensor([0.0000, 0.5000, 1.0000, 1.8284, 2.4641])
     """
     def __init__(self, delta: float = 1.0) -> None:
         super().__init__()
@@ -38,39 +37,41 @@ class Huber(nn.Module):
         self.delta = delta
 
     def forward(self, input: Tensor) -> Tensor:
-        ''''''
-        mask = input.abs() < self.delta
+        '''
+        Args:
+            input (torch.Tensor): the input tensor (non-negative).
+        '''
+        assert torch.all(input >= 0), 'input has to be non-negative.'
+        mask = input.sqrt() < self.delta
         output = torch.zeros_like(input)
-        output[mask] = (input[mask]**2)/2
-        output[~mask] = self.delta * (input[~mask].abs() - 0.5 * self.delta)
+        output[mask] = input[mask]
+        output[~mask] = 2 * self.delta * input[~mask].sqrt() - self.delta**2
         return output
 
 
 class PseudoHuber(nn.Module):
-    r"""The robust Pseudo Huber kernel function that is less sensitive to outliers than squared
-    error in a non-linear optimization problem. It approximates :math:`\bm{x}^2/2` for small
-    values of :math:`\bm{x}`, and approximates a straight line with slope :math:`\delta` for large
-    values of :math:`\bm{x}`.
+    r"""The robust pseudo Huber kernel cost function that is often used in a non-linear
+    optimization problem.
 
     .. math::
-        \bm{y}_i = \delta^2 (\sqrt{1 + (\bm{x}/\delta)^2} - 1)
+        \bm{y}_i = 2\delta^2 \left(\sqrt{1 + \bm{x}_i/\delta^2} - 1\right),
 
     where :math:`\delta` (delta) defines the steepness of the slope, :math:`\bm{x}` and
     :math:`\bm{y}` are the input and output tensors, respectively.  It can be used as a smooth
     version of :obj:`Huber`.
 
     Args:
-        delta (float, optional): Specify the slope. The value must be positive.  Default: 1.0
+        delta (float, optional): Specify the slope. The value must be positive. Default: 1.0
 
     Note:
-        The output tensor has the same shape with the input tensor.
+        The input has to be a non-nagative tensor and the output tensor has the same shape with the
+        input.
 
     Example:
         >>> kernel = pp.module.PseudoHuber()
-        >>> input = torch.randn(3).abs()
-        tensor([0.3256, 0.9250, 0.2337])
-        >>> output = kernel(input)
-        tensor([0.0517, 0.3622, 0.0269])
+        >>> input = torch.tensor([0, 0.5, 1, 2, 3])
+        >>> kernel(input)
+        tensor([0.0000, 0.4495, 0.8284, 1.4641, 2.0000])
     """
     def __init__(self, delta: float = 1.0) -> None:
         super().__init__()
@@ -78,5 +79,45 @@ class PseudoHuber(nn.Module):
         self.delta = delta
 
     def forward(self, input: Tensor) -> Tensor:
-        ''''''
-        return self.delta**2 * ((1 + (input/self.delta)**2).sqrt() - 1)
+        '''
+        Args:
+            input (torch.Tensor): the input tensor (non-negative).
+        '''
+        assert torch.all(input >= 0), 'input has to be non-negative'
+        return 2 * self.delta**2 * ((input/self.delta**2 + 1).sqrt() - 1)
+
+
+class Cauchy(nn.Module):
+    r"""The robust Cauchy kernel cost function that is often used in a non-linear optimization
+    problem.
+
+    .. math::
+        \bm{y}_i = \delta^2 \log\left(1 + \frac{\bm{x}_i}{\delta^2}\right),
+
+    where :math:`\bm{x}` and :math:`\bm{y}` are the input and output tensors, respectively.
+
+    Args:
+        delta (float, optional): Specify the Cauchy cost. The value must be positive. Default: 1.0
+
+    Note:
+        The input has to be a non-nagative tensor and the output tensor has the same shape with the
+        input.
+
+    Example:
+        >>> kernel = pp.module.Cauchy()
+        >>> input = torch.tensor([0, 0.5, 1, 2, 3])
+        >>> kernel(input)
+        tensor([0.0000, 0.4055, 0.6931, 1.0986, 1.3863])
+    """
+    def __init__(self, delta: float = 1.0) -> None:
+        super().__init__()
+        assert delta > 0, ValueError("Invalid delta value: {}".format(delta))
+        self.delta = delta
+
+    def forward(self, input: Tensor) -> Tensor:
+        '''
+        Args:
+            input (torch.Tensor): the input tensor (non-negative).
+        '''
+        assert torch.all(input >= 0), 'input has to be non-negative'
+        return self.delta**2 * (input/self.delta**2 + 1).log()
