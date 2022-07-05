@@ -9,4 +9,5 @@ Modules
    :template: autosummary/class-no-inherit.rst
    module.Huber
    module.PseudoHuber
+   module.Cauchy
    module.IMUPreintegrator
