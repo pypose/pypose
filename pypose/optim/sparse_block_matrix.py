@@ -296,6 +296,10 @@ class SparseBlockMatrix(object):
         if self.block_storage is not None:
             self.block_storage = self.block_storage.to(device=d)
 
+    @property
+    def n_nz_blocks(self):
+        return self.block_indices.shape[0]
+
     def type(self, dtype=None):
         if dtype is None:
             return self.dtype
