@@ -101,7 +101,7 @@ class Test_LinearSolverCuSparse(unittest.TestCase):
 
         # Compare.
         try:
-            torch_equal( sx, x )
+            torch_equal_rough( sx, x )
         except Exception as exc:
             print(exc)
             self.assertTrue(False, f'test_solve_sym_postive_definite failed. ')
