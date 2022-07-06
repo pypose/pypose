@@ -39,7 +39,7 @@ class LTI(_System):
         return self.C @ state + self.D @ input
 
     def forward(self,x,u):
-        x = self.state_transition(u,x)
+        z = self.state_transition(u,x)
         y = self.observation(u,x)
         return y
     
@@ -64,7 +64,7 @@ class LTV(_System):
         return self.C @ state + self.D @ input
 
     def forward(self,x,u):
-        x = self.state_transition(u,x)
+        z = self.state_transition(u,x)
         y = self.observation(u,x)
         return y
     
@@ -95,13 +95,13 @@ class _System(nn.Module):
         if not isinstance(x, Variable) and isinstance(self.A, Variable):
             A = self.A.data
             B = self.B.data
-            c = self.C.data
-            d = self.D.data
+            C = self.C.data
+            D = self.D.data
         else:
             A = self.A
             B = self.B
-            c = self.C
-            d = self.D
+            C = self.C
+            D = self.D
 
         x_dim, u_dim = x.ndimension(), u.ndimension()
         if x_dim == 1:
