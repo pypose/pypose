@@ -4,7 +4,7 @@ from torch import nn, Tensor
 
 class Huber(nn.Module):
     r"""The robust Huber kernel cost function that is often used in a non-linear optimization
-    problem. See `Huber loss <https://en.wikipedia.org/wiki/Huber_loss>`_ for more information.
+    problem.
 
     .. math::
         \bm{y}_i = \begin{cases}
