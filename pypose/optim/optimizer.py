@@ -7,41 +7,23 @@ from .corrector import Trivial, Scale, GradScale
 
 
 class RobustModel(nn.Module):
-    def __init__(self, model, kernel):
+    def __init__(self, model, kernel=None, auto=False):
         super().__init__()
         self.model = model
-        self.kernel = kernel
+        self.kernel = lambda x:x if kernel is None else kernel
+        if auto:
+            self.register_forward_hook(self.kernel_forward)
 
-    def forward(self, *args, targets=None, **kwargs):
-        outputs = self.model(*args, **kwargs)
-        eps = finfo(outputs.dtype).eps
+    def forward(self, inputs, targets):
+        outputs = self.model(inputs)
+        return self.residual(outputs, targets)
+
+    def kernel_forward(self, module, inputs, outputs):
         # eps is to prevent grad of sqrt() from being -inf
-        return (self.kernel(outputs**2) + eps).sqrt()
+        eps = finfo(outputs.dtype).eps
+        return self.kernel(outputs**2).clamp(min=eps).sqrt()
 
-
-class _Optimizer(Optimizer):
-    r'''
-    Base class of 2nd order optimizer.
-    '''
-    def __init__(self, model, solver, kernel=None, corrector=None, **kwargs):
-        super().__init__(model.parameters(), defaults=kwargs)
-        self.model, self.solver = model, solver
-        if kernel is not None and corrector is None:
-            # auto diff of robust model will be computed
-            self.rmodel = RobustModel(model, kernel)
-            self.kernel, self.corrector = lambda x:x, Trivial()
-        else:
-            # manually Jacobian correction will be computed
-            self.rmodel, self.kernel = model, lambda x:x if kernel is None else kernel
-            self.corrector = Trivial() if corrector is None else corrector
-
-    @torch.no_grad()
-    def step(self, inputs, targets=None):
-        raise NotImplementedError('step method is not implemented.')
-
-    @classmethod
-    def _residual(cls, model, inputs, targets=None):
-        outputs = model(inputs)
+    def residual(self, outputs, targets):
         if targets is not None:
             if isinstance(outputs, tuple):
                 E = torch.cat([(t - o).view(-1, 1) for t, o in zip(targets, outputs)])
@@ -54,12 +36,13 @@ class _Optimizer(Optimizer):
                 E = -outputs.view(-1, 1)
         return E
 
-    def _loss(self, model, inputs, targets):
-        E = self._residual(model, inputs, targets)
+    def loss(self, inputs, targets):
+        outputs = self.model(inputs)
+        E = self.residual(outputs, targets)
         return self.kernel(E**2).sum()
 
 
-class GaussNewton(_Optimizer):
+class GaussNewton(Optimizer):
     r'''
     The Gauss-Newton (GN) algorithm solving non-linear least squares problems. This implementation
     is for optimizing the model parameters to approximate the targets, which can be a
@@ -96,8 +79,16 @@ class GaussNewton(_Optimizer):
         solver (nn.Module): a linear solver. If None, :meth:`PINV` will be used. Default: None.
     '''
     def __init__(self, model, solver=None, kernel=None, corrector=None):
-        solver = PINV() if solver is None else solver
-        super().__init__(model, solver, kernel, corrector)
+        super().__init__(model.parameters(), defaults={})
+        self.solver = PINV() if solver is None else solver
+        if kernel is not None and corrector is None:
+            # auto diff of robust model will be computed
+            self.model = RobustModel(model, kernel, auto=True)
+            self.corrector = Trivial()
+        else:
+            # manually Jacobian correction will be computed
+            self.model = RobustModel(model, kernel, auto=False)
+            self.corrector = Trivial() if corrector is None else corrector
 
     @torch.no_grad()
     def step(self, inputs, targets=None):
@@ -150,17 +141,17 @@ class GaussNewton(_Optimizer):
             Pose Inversion error: 0.0000005 @ 3 it
             Early Stoping with error: 5.21540641784668e-07
         '''
-        E = self._residual(self.rmodel, inputs, targets)
+        E = self.model(inputs, targets)
         for pg in self.param_groups:
             numels = [p.numel() for p in pg['params'] if p.requires_grad]
-            J = modjac(self.rmodel, inputs, flatten=True)
+            J = modjac(self.model, inputs=(inputs, targets), flatten=True)
             E, J = self.corrector(E = E, J = J)
-            D = self.solver(A = J, b = E).split(numels)
+            D = self.solver(A = J, b = -E).split(numels)
             [p.add_(d.view(p.shape)) for p, d in zip(pg['params'], D) if p.requires_grad]
-        return self._loss(self.model, inputs, targets)
+        return self.model.loss(inputs, targets)
 
 
-class LevenbergMarquardt(_Optimizer):
+class LevenbergMarquardt(Optimizer):
     r'''
     The Levenberg-Marquardt (LM) algorithm, which is also known as the damped least-squares (DLS)
     method for solving non-linear least squares problems. This implementation is for optimizing the
@@ -203,11 +194,20 @@ class LevenbergMarquardt(_Optimizer):
         max (float, optional): the upper-bound of the matrix diagonal to inverse.
     '''
     def __init__(self, model, damping, solver=None, kernel=None, corrector=None, min=1e-6, max=1e32):
-        solver = solver if solver is not None else Cholesky()
         assert damping > 0, ValueError("damping factor has to be positive: {}".format(damping))
         assert min > 0, ValueError("min value has to be positive: {}".format(min))
         assert max > 0, ValueError("max value has to be positive: {}".format(max))
-        super().__init__(model, solver, kernel, corrector, damping=damping, min=min, max=min)
+        defaults = {'damping':damping, 'min':min, 'max':min}
+        super().__init__(model.parameters(), defaults=defaults)
+        self.solver = Cholesky() if solver is None else solver
+        if kernel is not None and corrector is None:
+            # auto diff of robust model will be computed
+            self.model = RobustModel(model, kernel, auto=True)
+            self.corrector = Trivial()
+        else:
+            # manually Jacobian correction will be computed
+            self.model = RobustModel(model, kernel, auto=False)
+            self.corrector = Trivial() if corrector is None else corrector
 
     @torch.no_grad()
     def step(self, inputs, targets=None):
@@ -266,13 +266,13 @@ class LevenbergMarquardt(_Optimizer):
             Pose Inversion error: 0.0000004 @ 3 it
             Early Stoping with error: 4.443569991963159e-07
         '''
-        E = self._residual(self.rmodel, inputs, targets)
+        E = self.model(inputs, targets)
         for pg in self.param_groups:
             numels = [p.numel() for p in pg['params'] if p.requires_grad]
-            J = modjac(self.rmodel, inputs, flatten=True)
+            J = modjac(self.model, inputs=(inputs, targets), flatten=True)
             E, J = self.corrector(E = E, J = J)
             A = J.T @ J
             A.diagonal().add_(pg['damping'] * A.diagonal().clamp(pg['min'], pg['max']))
-            D = self.solver(A = A, b = J.T @ E).split(numels)
+            D = self.solver(A = A, b = -J.T @ E).split(numels)
             [p.add_(d.view(p.shape)) for p, d in zip(pg['params'], D) if p.requires_grad]
-        return self._loss(self.model, inputs, targets)
+        return self.model.loss(inputs, targets)
