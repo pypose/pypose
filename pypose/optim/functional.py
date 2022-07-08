@@ -130,7 +130,8 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
     if inputs is None:
         func_param = lambda *p: func(p)
     else:
-        func_param = lambda *p: func(p, inputs)
+        inputs = inputs if isinstance(inputs, tuple) else (inputs,)
+        func_param = lambda *p: func(p, *inputs)
 
     J = jacobian(func_param, params, create_graph=create_graph, strict=strict, \
                     vectorize=vectorize, strategy=strategy)
