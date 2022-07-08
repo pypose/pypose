@@ -1,11 +1,65 @@
 import torch, warnings
+from torch import nn, finfo
 from .functional import modjac
 from torch.optim import Optimizer
-from torch.linalg import lstsq
-from torch.autograd.functional import jacobian
+from .solver import PINV, LSTSQ, Cholesky
+from .corrector import Trivial, Scale, GradScale
 
 
-class GaussNewton(Optimizer):
+class RobustModel(nn.Module):
+    def __init__(self, model, kernel):
+        super().__init__()
+        self.model = model
+        self.kernel = kernel
+
+    def forward(self, *args, targets=None, **kwargs):
+        outputs = self.model(*args, **kwargs)
+        eps = finfo(outputs.dtype).eps
+        # eps is to prevent grad of sqrt() from being -inf
+        return (self.kernel(outputs**2) + eps).sqrt()
+
+
+class _Optimizer(Optimizer):
+    r'''
+    Base class of 2nd order optimizer.
+    '''
+    def __init__(self, model, solver, kernel=None, corrector=None, **kwargs):
+        super().__init__(model.parameters(), defaults=kwargs)
+        self.model, self.solver = model, solver
+        if kernel is not None and corrector is None:
+            # auto diff of robust model will be computed
+            self.rmodel = RobustModel(model, kernel)
+            self.kernel, self.corrector = lambda x:x, Trivial()
+        else:
+            # manually Jacobian correction will be computed
+            self.rmodel, self.kernel = model, lambda x:x if kernel is None else kernel
+            self.corrector = Trivial() if corrector is None else corrector
+
+    @torch.no_grad()
+    def step(self, inputs, targets=None):
+        raise NotImplementedError('step method is not implemented.')
+
+    @classmethod
+    def _residual(cls, model, inputs, targets=None):
+        outputs = model(inputs)
+        if targets is not None:
+            if isinstance(outputs, tuple):
+                E = torch.cat([(t - o).view(-1, 1) for t, o in zip(targets, outputs)])
+            else:
+                E = (targets - outputs).view(-1, 1)
+        else:
+            if isinstance(outputs, tuple):
+                E = torch.cat([-o.view(-1, 1) for o in outputs])
+            else:
+                E = -outputs.view(-1, 1)
+        return E
+
+    def _loss(self, model, inputs, targets):
+        E = self._residual(model, inputs, targets)
+        return self.kernel(E**2).sum()
+
+
+class GaussNewton(_Optimizer):
     r'''
     The Gauss-Newton (GN) algorithm solving non-linear least squares problems. This implementation
     is for optimizing the model parameters to approximate the targets, which can be a
@@ -39,45 +93,11 @@ class GaussNewton(Optimizer):
 
     Args:
         model (nn.Module): a module containing learnable parameters.
-        fast (bool, optional): choose method for calculating matrix inversion. If ``False``, explicit
-            pseudo matrix inversison will be computed, otherwise multiplying a matrix on the left by
-            the pseudo matrix inversison will be computed directly (:obj:`torch.linalg.lstsq`).
-            Default: ``False``
-        rcond (float, optional): used to determine the effective rank of :math:`\mathbf{A}`. It is
-            used only when the fast model is enabled. If ``None``, rcond is set to the machine
-            precision of the dtype of :math:`\mathbf{A}`. Default: ``None``.
-        driver (string, optional): chooses the LAPACK/MAGMA function that will be used. It is
-            used only when the fast model is enabled. For CPU users, the valid values are ``gels``,
-            ``gelsy``, ``gelsd``, ``gelss``. For CUDA users, the only valid driver is ``gels``,
-            which assumes that :math:`\mathbf{A}` is full-rank. If ``None``, ``gelsy`` is used for
-            CPU inputs and ``gels`` for CUDA inputs. Default: ``None``.
-            To choose the best driver on CPU consider:
-
-            - If :math:`\mathbf{A}` is well-conditioned (its `condition number
-              <https://en.wikipedia.org/wiki/Condition_number>`_ is not too large), or you do not
-              mind some precision loss.
-
-                - For a general matrix: ``gelsy`` (QR with pivoting) (default)
-
-                - If A is full-rank: ``gels`` (QR)
-
-            - If :math:`\mathbf{A}` is not well-conditioned.
-
-                - ``gelsd`` (tridiagonal reduction and SVD)
-
-                - But if you run into memory issues: ``gelss`` (full SVD).
-
-            See full description of `drivers <https://www.netlib.org/lapack/lug/node27.html>`_.
-
-    See more details of `pseudo inversion
-    <https://pytorch.org/docs/stable/generated/torch.linalg.lstsq.html>`_ using
-    :obj:`torch.linalg.lstsq`.
+        solver (nn.Module): a linear solver. If None, :meth:`PINV` will be used. Default: None.
     '''
-    def __init__(self, model, kernel=None, fast=False, rcond=None, driver=None):
-        self.model, self.fast = model, fast
-        self.kernel = kernel if kernel is not None else lambda x:x
-        defaults = dict(rcond=rcond, driver=driver)
-        super().__init__(model.parameters(), defaults=defaults)
+    def __init__(self, model, solver=None, kernel=None, corrector=None):
+        solver = PINV() if solver is None else solver
+        super().__init__(model, solver, kernel, corrector)
 
     @torch.no_grad()
     def step(self, inputs, targets=None):
@@ -130,37 +150,17 @@ class GaussNewton(Optimizer):
             Pose Inversion error: 0.0000005 @ 3 it
             Early Stoping with error: 5.21540641784668e-07
         '''
-        E = self._residual(inputs, targets)
-        func = lambda x: self.kernel(x).sum()
-        K = jacobian(func, E**2, vectorize=True, strategy='forward-mode')
+        E = self._residual(self.rmodel, inputs, targets)
         for pg in self.param_groups:
             numels = [p.numel() for p in pg['params'] if p.requires_grad]
-            J = modjac(self.model, inputs, flatten=True)
-            if self.fast:
-                D = lstsq(J.T @ J, K.T * J.T @ E, rcond=pg['rcond'], driver=pg['driver']).solution
-            else:
-                D = (J.T @ J).pinverse() @ (K.T * J.T @ E)
-            D = torch.split(D, numels)
+            J = modjac(self.rmodel, inputs, flatten=True)
+            E, J = self.corrector(E = E, J = J)
+            D = self.solver(A = J, b = E).split(numels)
             [p.add_(d.view(p.shape)) for p, d in zip(pg['params'], D) if p.requires_grad]
-        return self.kernel(self._residual(inputs, targets)**2).sum()
-
-    def _residual(self, inputs, targets=None):
-        outputs = self.model(inputs)
-        if targets is not None:
-            if isinstance(outputs, tuple):
-                E = torch.cat([(t - o).view(-1, 1) for t, o in zip(targets, outputs)])
-            else:
-                E = (targets - outputs).view(-1, 1)
-        else:
-            if isinstance(outputs, tuple):
-                E = torch.cat([-o.view(-1, 1) for o in outputs])
-            else:
-                E = -outputs.view(-1, 1)
-        return E
+        return self._loss(self.model, inputs, targets)
 
 
-
-class LevenbergMarquardt(GaussNewton):
+class LevenbergMarquardt(_Optimizer):
     r'''
     The Levenberg-Marquardt (LM) algorithm, which is also known as the damped least-squares (DLS)
     method for solving non-linear least squares problems. This implementation is for optimizing the
@@ -202,11 +202,12 @@ class LevenbergMarquardt(GaussNewton):
         min (float, optional): the lower-bound of the matrix diagonal to inverse.
         max (float, optional): the upper-bound of the matrix diagonal to inverse.
     '''
-    def __init__(self, model, damping, kernel=None, min=1e-6, max=1e32):
-        self.model, self.kernel = model, kernel if kernel is not None else lambda x:x
-        assert damping > 0, ValueError("Invalid damping factor: {}".format(damping))
-        defaults = dict(damping=damping, min=min, max=max)
-        Optimizer.__init__(self, params=model.parameters(), defaults=defaults)
+    def __init__(self, model, damping, solver=None, kernel=None, corrector=None, min=1e-6, max=1e32):
+        solver = solver if solver is not None else Cholesky()
+        assert damping > 0, ValueError("damping factor has to be positive: {}".format(damping))
+        assert min > 0, ValueError("min value has to be positive: {}".format(min))
+        assert max > 0, ValueError("max value has to be positive: {}".format(max))
+        super().__init__(model, solver, kernel, corrector, damping=damping, min=min, max=min)
 
     @torch.no_grad()
     def step(self, inputs, targets=None):
@@ -265,15 +266,13 @@ class LevenbergMarquardt(GaussNewton):
             Pose Inversion error: 0.0000004 @ 3 it
             Early Stoping with error: 4.443569991963159e-07
         '''
-        E = self._residual(inputs, targets)
-        func = lambda x: self.kernel(x).sum()
-        K = jacobian(func, E**2, vectorize=True, strategy='forward-mode')
+        E = self._residual(self.rmodel, inputs, targets)
         for pg in self.param_groups:
             numels = [p.numel() for p in pg['params'] if p.requires_grad]
-            J = modjac(self.model, inputs, flatten=True)
+            J = modjac(self.rmodel, inputs, flatten=True)
+            E, J = self.corrector(E = E, J = J)
             A = J.T @ J
             A.diagonal().add_(pg['damping'] * A.diagonal().clamp(pg['min'], pg['max']))
-            D = (K.T * J.T @ E).cholesky_solve(torch.linalg.cholesky(A))
-            D = torch.split(D, numels)
+            D = self.solver(A = A, b = J.T @ E).split(numels)
             [p.add_(d.view(p.shape)) for p, d in zip(pg['params'], D) if p.requires_grad]
-        return self.kernel(self._residual(inputs, targets)**2).sum()
+        return self._loss(self.model, inputs, targets)
