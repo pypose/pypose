@@ -11,4 +11,6 @@ Optimization
    optim.GN
    optim.LevenbergMarquardt
    optim.LM
+   optim.solver.PINV
+   optim.solver.LSTSQ
    optim.functional.modjac
