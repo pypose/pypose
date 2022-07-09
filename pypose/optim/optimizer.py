@@ -2,15 +2,32 @@ import torch, warnings
 from torch import nn, finfo
 from .functional import modjac
 from torch.optim import Optimizer
-from .solver import PINV, LSTSQ, Cholesky
-from .corrector import Trivial, Scale, GradScale
+from .solver import PINV, Cholesky
+
+
+class Trivial(torch.nn.Module):
+    r"""
+    A trivial module. Get anything, return anything.
+    Not supposed to be called by PyPose users.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+
+    def forward(self, *args, **kwargs):
+        out = *args, *kwargs.values()
+        return out[0] if len(out) == 1 else out
 
 
 class RobustModel(nn.Module):
+    '''
+    Standardize a model for least square problems with an option of square-rooting kernel.
+    Then model regression becomes minimizing the outputs of the standardized model.
+    This class is used during optimization but is not designed to expose to PyPose users.
+    '''
     def __init__(self, model, kernel=None, auto=False):
         super().__init__()
         self.model = model
-        self.kernel = lambda x:x if kernel is None else kernel
+        self.kernel = Trivial() if kernel is None else kernel
         if auto:
             self.register_forward_hook(self.kernel_forward)
 
@@ -190,14 +207,14 @@ class LevenbergMarquardt(Optimizer):
         model (nn.Module): a module containing learnable parameters.
         damping (float): Levenberg's damping factor (positive number).
         kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
-        min (float, optional): the lower-bound of the matrix diagonal to inverse.
-        max (float, optional): the upper-bound of the matrix diagonal to inverse.
+        min (float, optional): the lower-bound of the matrix diagonal to inverse. Default: 1e-6.
+        max (float, optional): the upper-bound of the matrix diagonal to inverse. Default: 1e32.
     '''
     def __init__(self, model, damping, solver=None, kernel=None, corrector=None, min=1e-6, max=1e32):
         assert damping > 0, ValueError("damping factor has to be positive: {}".format(damping))
         assert min > 0, ValueError("min value has to be positive: {}".format(min))
         assert max > 0, ValueError("max value has to be positive: {}".format(max))
-        defaults = {'damping':damping, 'min':min, 'max':min}
+        defaults = {'damping':damping, 'min':min, 'max':max}
         super().__init__(model.parameters(), defaults=defaults)
         self.solver = Cholesky() if solver is None else solver
         if kernel is not None and corrector is None:
@@ -272,7 +289,7 @@ class LevenbergMarquardt(Optimizer):
             J = modjac(self.model, inputs=(inputs, targets), flatten=True)
             E, J = self.corrector(E = E, J = J)
             A = J.T @ J
-            A.diagonal().add_(pg['damping'] * A.diagonal().clamp(pg['min'], pg['max']))
+            A.diagonal().add_(pg['damping'] * A.diagonal()).clamp_(pg['min'], pg['max'])
             D = self.solver(A = A, b = -J.T @ E).split(numels)
             [p.add_(d.view(p.shape)) for p, d in zip(pg['params'], D) if p.requires_grad]
         return self.model.loss(inputs, targets)
