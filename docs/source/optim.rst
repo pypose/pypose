@@ -13,4 +13,5 @@ Optimization
    optim.LM
    optim.solver.PINV
    optim.solver.LSTSQ
+   optim.solver.Cholesky
    optim.functional.modjac
