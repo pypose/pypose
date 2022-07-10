@@ -7,6 +7,7 @@ Basics
     :toctree: generated
     :nosignatures:
 
+    :template: autosummary/class.rst
     add
     add_
     Exp
