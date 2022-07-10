@@ -32,31 +32,27 @@ class RobustModel(nn.Module):
             self.register_forward_hook(self.kernel_forward)
 
     def forward(self, inputs, targets):
-        outputs = self.model(inputs)
+        outputs = self.model_forward(inputs)
         return self.residual(outputs, targets)
 
-    def kernel_forward(self, module, inputs, outputs):
-        # eps is to prevent grad of sqrt() from being -inf
-        eps = finfo(outputs.dtype).eps
-        return self.kernel(outputs**2).clamp(min=eps).sqrt()
+    def model_forward(self, inputs):
+        if isinstance(inputs, tuple):
+            return self.model(*inputs)
+        else:
+            return self.model(inputs)
 
     def residual(self, outputs, targets):
-        if targets is not None:
-            if isinstance(outputs, tuple):
-                E = torch.cat([(t - o).view(-1, 1) for t, o in zip(targets, outputs)])
-            else:
-                E = (targets - outputs).view(-1, 1)
-        else:
-            if isinstance(outputs, tuple):
-                E = torch.cat([-o.view(-1, 1) for o in outputs])
-            else:
-                E = -outputs.view(-1, 1)
-        return E
+        return  outputs if targets is None else targets - outputs
+
+    def kernel_forward(self, module, inputs, outputs):
+        # eps is to prevent grad of sqrt() from being inf
+        eps = finfo(outputs.dtype).eps
+        return self.kernel(outputs.square().sum(-1)).clamp(min=eps).sqrt()
 
     def loss(self, inputs, targets):
-        outputs = self.model(inputs)
+        outputs = self.model_forward(inputs)
         E = self.residual(outputs, targets)
-        return self.kernel(E**2).sum()
+        return self.kernel(E.square().sum(-1)).sum()
 
 
 class GaussNewton(Optimizer):
@@ -163,7 +159,7 @@ class GaussNewton(Optimizer):
             numels = [p.numel() for p in pg['params'] if p.requires_grad]
             J = modjac(self.model, inputs=(inputs, targets), flatten=True)
             E, J = self.corrector(E = E, J = J)
-            D = self.solver(A = J, b = -E).split(numels)
+            D = self.solver(A = J, b = -E.view(-1, 1)).split(numels)
             [p.add_(d.view(p.shape)) for p, d in zip(pg['params'], D) if p.requires_grad]
         return self.model.loss(inputs, targets)
 
@@ -290,6 +286,6 @@ class LevenbergMarquardt(Optimizer):
             E, J = self.corrector(E = E, J = J)
             A = J.T @ J
             A.diagonal().add_(pg['damping'] * A.diagonal()).clamp_(pg['min'], pg['max'])
-            D = self.solver(A = A, b = -J.T @ E).split(numels)
+            D = self.solver(A = A, b = -J.T @ E.view(-1, 1)).split(numels)
             [p.add_(d.view(p.shape)) for p, d in zip(pg['params'], D) if p.requires_grad]
         return self.model.loss(inputs, targets)
