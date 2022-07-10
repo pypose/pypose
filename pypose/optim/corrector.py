@@ -18,7 +18,7 @@ class TrivialScale(nn.Module):
         return G * E, J
 
 
-class SimpleTriggs(nn.Module):
+class FastTriggs(nn.Module):
     '''
     Faster yet stable version of Triggs correction
     '''
