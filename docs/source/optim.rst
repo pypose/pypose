@@ -14,4 +14,7 @@ Optimization
    optim.solver.PINV
    optim.solver.LSTSQ
    optim.solver.Cholesky
+   optim.corrector.TrivialScale
+   optim.corrector.FastTriggs
+   optim.corrector.Triggs
    optim.functional.modjac
