@@ -34,6 +34,15 @@ class PINV(nn.Module):
 
     Warning:
         It is always prefered to use :meth:`LSTSQ`, which is faster and more numerically stable.
+
+    Examples:
+        >>> import torch, pypose.optim.solver as ps
+        >>> A, b = torch.randn(3, 3), torch.randn(3, 1)
+        >>> solver = ps.PINV()
+        >>> x = solver(A, b)
+        tensor([[ 1.8572],
+                [-1.4063],
+                [-0.7925]])
     """
     def __init__(self, atol=None, rtol=None, hermitian=False):
         super().__init__()
@@ -102,6 +111,15 @@ class LSTSQ(nn.Module):
 
         It is also preferred to use :meth:`Cholesky` if the matrix :math:`\mathbf{A}` is guaranteed
         to be positive definite.
+
+    Examples:
+        >>> import torch, pypose.optim.solver as ps
+        >>> A, b = torch.randn(3, 3), torch.randn(3, 1)
+        >>> solver = ps.LSTSQ(driver='gels')
+        >>> x = solver(A, b)
+        tensor([[ 1.8572],
+                [-1.4063],
+                [-0.7925]])
     """
     def __init__(self, rcond=None, driver=None):
         super().__init__()
@@ -150,6 +168,20 @@ class Cholesky(nn.Module):
     Args:
         upper (bool, optional): whether use an upper triangular matrix in Cholesky decomposition.
             Default: ``False``.
+
+    Examples:
+        >>> import torch, pypose.optim.solver as ps
+        >>> A = torch.tensor([[1.0000, 0.1000, 0.0000],
+        ...                   [0.1000, 1.0000, 0.2000],
+        ...                   [0.0000, 0.2000, 1.0000]])
+        >>> b = torch.tensor([[1.],
+        ...                   [2.],
+        ...                   [3.]])
+        >>> solver = ps.Cholesky()
+        >>> x = solver(A, b)
+        tensor([[0.8632],
+                [1.3684],
+                [2.7263]])
     """
     def __init__(self, upper=False):
         super().__init__()
