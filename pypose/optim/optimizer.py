@@ -66,21 +66,20 @@ class GaussNewton(Optimizer):
 
     where :math:`\bm{f}(\bm{\theta}, \bm{x})` is the model, :math:`\bm{\theta}` is the parameters
     to be optimized, :math:`\bm{x}` is the model inputs, and :math:`\rho` is a robust kernel
-    function. :math:`\rho(\bm{x})=x` is used in default.
+    function. :math:`\rho(\bm{x})=\bm{x}` is used in default.
 
     .. math::
        \begin{aligned}
             &\rule{113mm}{0.4pt}                                                                 \\
-            &\textbf{input}: \lambda \geq 0~\text{(damping)}, \bm{\theta}_0~\text{(params)},
-                \bm{f}~\text{(model)}, \bm{x}~(\text{inputs}), \bm{y}~(\text{targets})           \\
+            &\textbf{input}: \bm{\theta}_0~\text{(params)}, \bm{f}~\text{(model)},
+                \bm{x}~(\text{inputs}), \bm{y}~(\text{targets}), \rho (\text{kernel})            \\
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
             &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}
                 {\partial \bm{\theta}_{t-1}}}                                                    \\
-            &\hspace{5mm} \mathbf{A} \leftarrow \mathbf{J}^T \mathbf{J}                          \\
             &\hspace{5mm} \mathbf{E} = \bm{y} - \bm{f(\bm{\theta}_{t-1}, \bm{x})}                \\
-            &\hspace{5mm} \bm{\delta}=\mathrm{pseudo\_inverse}(\mathbf{A})
-                      (\frac{\partial \rho}{\partial \mathbf{E}^2} \cdot \mathbf{J}^T\mathbf{E}) \\
+            &\hspace{5mm} \mathbf{E}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{E}, \mathbf{J})\\
+            &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{J}, -\mathbf{E})                 \\
             &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}               \\
             &\rule{113mm}{0.4pt}                                                          \\[-1.ex]
             &\bf{return} \:  \theta_t                                                     \\[-1.ex]
@@ -89,7 +88,30 @@ class GaussNewton(Optimizer):
 
     Args:
         model (nn.Module): a module containing learnable parameters.
-        solver (nn.Module): a linear solver. If None, :meth:`PINV` will be used. Default: None.
+        solver (nn.Module, optional): a linear solver. Available linear solvers include
+            :meth:`solver.PINV` and :meth:`solver.LSTSQ`. If ``None``, :meth:`solver.PINV` is used.
+            Default: None.
+        kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
+        corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit the kernel
+            function. If ``None``, auto correction is used. Auto correction can be unstable when
+            the robust model has indefinite Hessian.  Default: ``None``.
+
+    Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`.
+
+    Available kernels: :meth:`pypose.module.Huber`; :meth:`module.PseudoHuber`; :meth:`module.Cauchy`.
+
+    Available correctors: :meth:`corrector.TrivialScale`, :meth:`corrector.FastTriggs`,
+    :meth:`corrector.Triggs`.
+
+    Note:
+        Instead of solving :math:`\mathbf{J}^T\mathbf{J}\delta = -\mathbf{J}^T\mathbf{E}`, we solve
+        :math:`\mathbf{J}\delta = -\mathbf{E}` via QR-decomposition, which is more numerically
+        advisible. Therefore, only solvers with pseudo inversion such as :meth:`solver.PINV` and
+        :meth:`solver.LSTSQ` are available. More details are in Eq. (5) of the paper:
+
+        * Christopher Zach, `Robust Bundle Adjustment Revisited
+          <https://link.springer.com/chapter/10.1007/978-3-319-10602-1_50>`_, European Conference on
+          Computer Vision (ECCV), 2014.
     '''
     def __init__(self, model, solver=None, kernel=None, corrector=None):
         super().__init__(model.parameters(), defaults={})
@@ -114,12 +136,12 @@ class GaussNewton(Optimizer):
                 If not given, the model outputs are minimized. Defaults: ``None``.
 
         Return:
-            Tensor: the minimized model error, i.e., :math:`\|\bm{y} - \bm{f}(\bm{\theta}, \bm{x})\|^2`.
+            Tensor: the minimized model loss.
 
         Note:
             Different from PyTorch optimizers like
             `SGD <https://pytorch.org/docs/stable/generated/torch.optim.SGD.html>`_, where the model
-            error has to be a scalar, the model output of :obj:`LM` can be a Tensor/LieTensor or a
+            error has to be a scalar, the output of model :math:`\bm{f}` can be a Tensor/LieTensor or a
             tuple of Tensors/LieTensors.
 
             See more details of

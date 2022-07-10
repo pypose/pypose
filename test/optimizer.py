@@ -129,7 +129,7 @@ class PoseInv(nn.Module):
     def forward(self, inputs):
         return (self.pose @ inputs).Log()
 
-device = 'cuda'
+
 timer = Timer()
 target = pp.identity_se3(2, 2).to(device)
 inputs = pp.randn_SE3(2, 2).to(device)

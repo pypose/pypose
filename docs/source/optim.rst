@@ -14,6 +14,9 @@ Optimization
    optim.solver.PINV
    optim.solver.LSTSQ
    optim.solver.Cholesky
+   optim.kernel.Huber
+   optim.kernel.PseudoHuber
+   optim.kernel.Cauchy
    optim.corrector.TrivialScale
    optim.corrector.FastTriggs
    optim.corrector.Triggs
