@@ -62,11 +62,14 @@ class GaussNewton(Optimizer):
     Tensor/LieTensor or a tuple of Tensors/LieTensors.
 
     .. math::
-        \bm{\theta}^*=\arg\min_{\bm{\theta}}\sum_i\rho(\|\bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i)\|^2),
+        \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
+            \rho\left(
+                (\bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i))^T(\bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i))
+            \right),
 
-    where :math:`\bm{f}(\bm{\theta}, \bm{x})` is the model, :math:`\bm{\theta}` is the parameters
-    to be optimized, :math:`\bm{x}` is the model inputs, and :math:`\rho` is a robust kernel
-    function. :math:`\rho(\bm{x})=\bm{x}` is used in default.
+    where :math:`\bm{f}()` is the model, :math:`\bm{\theta}` is the parameters to be optimized,
+    :math:`\bm{x}` is the model inputs, and :math:`\rho` is a robust kernel function.
+    :math:`\rho(x) = x` is used in default.
 
     .. math::
        \begin{aligned}
@@ -92,16 +95,37 @@ class GaussNewton(Optimizer):
             :meth:`solver.PINV` and :meth:`solver.LSTSQ`. If ``None``, :meth:`solver.PINV` is used.
             Default: None.
         kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
-        corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit the kernel
-            function. If a kernel is given but a corrector is not specified, auto correction is
-            used. Auto correction can be unstable when the robust model has indefinite Hessian.
-            Default: ``None``.
+        corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit
+            the kernel function. If a kernel is given but a corrector is not specified, auto
+            correction is used. Auto correction can be unstable when the robust model has
+            indefinite Hessian. Default: ``None``.
 
     Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`.
 
-    Available kernels: :meth:`pypose.module.Huber`; :meth:`module.PseudoHuber`; :meth:`module.Cauchy`.
+    Available kernels: :meth:`pypose.module.Huber`; :meth:`module.PseudoHuber`;
+    :meth:`module.Cauchy`.
 
     Available correctors: :meth:`corrector.FastTriggs`; :meth:`corrector.Triggs`.
+
+    Warning:
+        The output of model :math:`\bm{f}(\bm{\theta},\bm{x}_i)` and targets :math:`\bm{y}_i`
+        can be any shape, while their **last dimension** :math:`d` is always taken as the
+        dimension of model residual, whose inner product will be input to the kernel
+        function. This is useful for residuals like re-projection error, whose last
+        dimension is 2.
+
+        Note that auto correction is equivalent to the method of 'square-rooting the kernel'
+        mentioned in Section 3.3 of the following paper. This replace the
+        :math:`d`-dimensional residual with a one-dimensional one, which loses
+        residual-level structural information.
+
+        * Christopher Zach, `Robust Bundle Adjustment Revisited
+          <https://link.springer.com/chapter/10.1007/978-3-319-10602-1_50>`_, European
+          Conference on Computer Vision (ECCV), 2014.
+        
+        **Therefore, the users need to keep the last dimension of model output and target to
+        1, even if the model residual is a scalar, otherwise the model Jacobian will be a
+        row vector, instead of a matrix, which loses sample-level structural information.**
 
     Note:
         Instead of solving :math:`\mathbf{J}^T\mathbf{J}\delta = -\mathbf{J}^T\mathbf{R}`, we solve
@@ -109,12 +133,7 @@ class GaussNewton(Optimizer):
         advisible. Therefore, only solvers with pseudo inversion such as :meth:`solver.PINV` and
         :meth:`solver.LSTSQ` are available. More details are in Eq. (5) of the paper:
 
-        * Christopher Zach, `Robust Bundle Adjustment Revisited
-          <https://link.springer.com/chapter/10.1007/978-3-319-10602-1_50>`_, European Conference on
-          Computer Vision (ECCV), 2014.
-        
-        The auto correction is equivalent to the method 'Squared-Rooting the Kernel' in Section 3.3
-        of the above paper.
+
     '''
     def __init__(self, model, solver=None, kernel=None, corrector=None):
         super().__init__(model.parameters(), defaults={})
@@ -161,6 +180,8 @@ class GaussNewton(Optimizer):
             ...         self.pose = pp.Parameter(pp.randn_se3(*dim))
             ...
             ...     def forward(self, inputs):
+            ...         # the last dimension of the output is 6,
+            ...         # which will be the residual dimension.
             ...         return (self.pose.Exp() @ inputs).Log()
             ...
             >>> posinv = PoseInv(2, 2)
@@ -198,11 +219,14 @@ class LevenbergMarquardt(Optimizer):
     Tensors/LieTensors.
 
     .. math::
-        \bm{\theta}^*=\arg\min_{\bm{\theta}}\sum_i\rho(\|\bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i)\|^2),
+        \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
+            \rho\left(
+                (\bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i))^T(\bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i))
+            \right),
 
-    where :math:`\bm{f}(\bm{\theta}, \bm{x})` is the model, :math:`\bm{\theta}` is the parameters
-    to be optimized, :math:`\bm{x}` is the model inputs, and :math:`\rho` is a robust kernel
-    function. :math:`\rho(\bm{x})=\bm{x}` is used in default.
+    where :math:`\bm{f}()` is the model, :math:`\bm{\theta}` is the parameters to be optimized,
+    :math:`\bm{x}` is the model inputs, and :math:`\rho` is a robust kernel function.
+    :math:`\rho(x) = x` is used in default.
 
     .. math::
        \begin{aligned}
@@ -243,6 +267,26 @@ class LevenbergMarquardt(Optimizer):
     Available kernels: :meth:`pypose.module.Huber`; :meth:`module.PseudoHuber`; :meth:`module.Cauchy`.
 
     Available correctors: :meth:`corrector.FastTriggs`, :meth:`corrector.Triggs`.
+
+    Warning:
+        The output of model :math:`\bm{f}(\bm{\theta},\bm{x}_i)` and targets :math:`\bm{y}_i`
+        can be any shape, while their **last dimension** :math:`d` is always taken as the
+        dimension of model residual, whose inner product will be input to the kernel
+        function. This is useful for residuals like re-projection error, whose last
+        dimension is 2.
+
+        Note that auto correction is equivalent to the method of 'square-rooting the kernel'
+        mentioned in Section 3.3 of the following paper. This replace the
+        :math:`d`-dimensional residual with a one-dimensional one, which loses
+        residual-level structural information.
+
+        * Christopher Zach, `Robust Bundle Adjustment Revisited
+          <https://link.springer.com/chapter/10.1007/978-3-319-10602-1_50>`_, European
+          Conference on Computer Vision (ECCV), 2014.
+        
+        **Therefore, the users need to keep the last dimension of model output and target to
+        1, even if the model residual is a scalar, otherwise the model Jacobian will be a
+        row vector, instead of a matrix, which loses sample-level structural information.**
     '''
     def __init__(self, model, damping, solver=None, kernel=None, corrector=None, min=1e-6, max=1e32):
         assert damping > 0, ValueError("damping factor has to be positive: {}".format(damping))
@@ -299,6 +343,8 @@ class LevenbergMarquardt(Optimizer):
             ...         self.pose = pp.Parameter(pp.randn_se3(*dim))
             ...
             ...     def forward(self, inputs):
+            ...         # the last dimension of the output is 6,
+            ...         # which will be the residual dimension.
             ...         return (self.pose.Exp() @ inputs).Log()
             ...
             >>> posinv = PoseInv(2, 2)
