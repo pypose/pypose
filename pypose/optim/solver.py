@@ -4,7 +4,7 @@ from torch.linalg import pinv, lstsq, cholesky_ex
 
 
 class PINV(nn.Module):
-    r"""The batched solver with pseudo inversion for the linear equation.
+    r'''The batched linear solver with pseudo inversion.
 
     .. math::
         \mathbf{A}_i \bm{x}_i = \mathbf{b}_i,
@@ -12,7 +12,7 @@ class PINV(nn.Module):
     where :math:`\mathbf{A}_i \in \mathbb{C}^{M \times N}` and :math:`\bm{b}_i \in
     \mathbb{C}^{M \times 1}` are the :math:`i`-th item of batched linear equations.
 
-    The solution is given by calculating the pseudo inversion of the matrix :math:`\mathbf{A}`, i.e.,
+    The solution is given by
 
     .. math::
         \bm{x}_i = \mathrm{pinv}(\mathbf{A}_i) \mathbf{b}_i,
@@ -43,7 +43,7 @@ class PINV(nn.Module):
         tensor([[ 1.8572],
                 [-1.4063],
                 [-0.7925]])
-    """
+    '''
     def __init__(self, atol=None, rtol=None, hermitian=False):
         super().__init__()
         self.atol, self.rtol, self.hermitian = atol, rtol, hermitian
@@ -62,7 +62,7 @@ class PINV(nn.Module):
 
 
 class LSTSQ(nn.Module):
-    r"""The batched solver with pseudo inversion for the linear equation.
+    r'''The batched linear solver with fast pseudo inversion.
 
     .. math::
         \mathbf{A}_i \bm{x}_i = \mathbf{b}_i,
@@ -120,7 +120,7 @@ class LSTSQ(nn.Module):
         tensor([[ 1.8572],
                 [-1.4063],
                 [-0.7925]])
-    """
+    '''
     def __init__(self, rcond=None, driver=None):
         super().__init__()
         self.rcond, self.driver = rcond, driver
@@ -141,7 +141,7 @@ class LSTSQ(nn.Module):
 
 
 class Cholesky(nn.Module):
-    r"""The batched solver with pseudo inversion for the linear equation.
+    r'''The batched linear solver with Cholesky decomposition.
 
     .. math::
         \mathbf{A}_i \bm{x}_i = \mathbf{b}_i,
@@ -149,7 +149,7 @@ class Cholesky(nn.Module):
     where :math:`\mathbf{A}_i \in \mathbb{C}^{M \times N}` and :math:`\bm{b}_i \in
     \mathbb{C}^{M \times 1}` are the :math:`i`-th item of batched linear equations.
 
-    The solution is given by calculating the Cholesky decomposition.
+    The solution is given by
 
     .. math::
         \begin{align*}
@@ -182,7 +182,7 @@ class Cholesky(nn.Module):
         tensor([[0.8632],
                 [1.3684],
                 [2.7263]])
-    """
+    '''
     def __init__(self, upper=False):
         super().__init__()
         self.upper = upper

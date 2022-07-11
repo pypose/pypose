@@ -3,8 +3,7 @@ from torch import nn, Tensor
 
 
 class Huber(nn.Module):
-    r"""The robust Huber kernel cost function that is often used in a non-linear optimization
-    problem.
+    r"""The robust Huber kernel cost function.
 
     .. math::
         \bm{y}_i = \begin{cases}
@@ -50,8 +49,7 @@ class Huber(nn.Module):
 
 
 class PseudoHuber(nn.Module):
-    r"""The robust pseudo Huber kernel cost function that is often used in a non-linear
-    optimization problem.
+    r"""The robust pseudo Huber kernel cost function.
 
     .. math::
         \bm{y}_i = 2\delta^2 \left(\sqrt{1 + \bm{x}_i/\delta^2} - 1\right),
@@ -88,8 +86,7 @@ class PseudoHuber(nn.Module):
 
 
 class Cauchy(nn.Module):
-    r"""The robust Cauchy kernel cost function that is often used in a non-linear optimization
-    problem.
+    r"""The robust Cauchy kernel cost function.
 
     .. math::
         \bm{y}_i = \delta^2 \log\left(1 + \frac{\bm{x}_i}{\delta^2}\right),
