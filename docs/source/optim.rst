@@ -17,7 +17,7 @@ Optimization
    optim.kernel.Huber
    optim.kernel.PseudoHuber
    optim.kernel.Cauchy
-   optim.corrector.TrivialScale
+   optim.corrector.GradScale
    optim.corrector.FastTriggs
    optim.corrector.Triggs
    optim.functional.modjac
