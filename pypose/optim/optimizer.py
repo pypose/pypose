@@ -93,15 +93,15 @@ class GaussNewton(Optimizer):
             Default: None.
         kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
         corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit the kernel
-            function. If ``None``, auto correction is used. Auto correction can be unstable when
-            the robust model has indefinite Hessian.  Default: ``None``.
+            function. If a kernel is given but a corrector is not specified, auto correction is
+            used. Auto correction can be unstable when the robust model has indefinite Hessian.
+            Default: ``None``.
 
     Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`.
 
     Available kernels: :meth:`pypose.module.Huber`; :meth:`module.PseudoHuber`; :meth:`module.Cauchy`.
 
-    Available correctors: :meth:`corrector.TrivialScale`, :meth:`corrector.FastTriggs`,
-    :meth:`corrector.Triggs`.
+    Available correctors: :meth:`corrector.FastTriggs`; :meth:`corrector.Triggs`.
 
     Note:
         Instead of solving :math:`\mathbf{J}^T\mathbf{J}\delta = -\mathbf{J}^T\mathbf{E}`, we solve
@@ -229,8 +229,9 @@ class LevenbergMarquardt(Optimizer):
             Default: None.
         kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
         corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit the kernel
-            function. If ``None``, auto correction is used. Auto correction can be unstable when
-            the robust model has indefinite Hessian. Default: ``None``.
+            function. If a kernel is given but a corrector is not specified, auto correction is
+            used. Auto correction can be unstable when the robust model has indefinite Hessian.
+            Default: ``None``.
         min (float, optional): the lower-bound of the matrix diagonal to inverse. Default: 1e-6.
         max (float, optional): the upper-bound of the matrix diagonal to inverse. Default: 1e32.
 
@@ -238,8 +239,7 @@ class LevenbergMarquardt(Optimizer):
 
     Available kernels: :meth:`pypose.module.Huber`; :meth:`module.PseudoHuber`; :meth:`module.Cauchy`.
 
-    Available correctors: :meth:`corrector.TrivialScale`, :meth:`corrector.FastTriggs`,
-    :meth:`corrector.Triggs`.
+    Available correctors: :meth:`corrector.FastTriggs`, :meth:`corrector.Triggs`.
     '''
     def __init__(self, model, damping, solver=None, kernel=None, corrector=None, min=1e-6, max=1e32):
         assert damping > 0, ValueError("damping factor has to be positive: {}".format(damping))
