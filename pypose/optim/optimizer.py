@@ -112,6 +112,9 @@ class GaussNewton(Optimizer):
         * Christopher Zach, `Robust Bundle Adjustment Revisited
           <https://link.springer.com/chapter/10.1007/978-3-319-10602-1_50>`_, European Conference on
           Computer Vision (ECCV), 2014.
+        
+        The auto correction is equivalent to the method 'Squared-Rooting the Kernel' in Section 3.3
+        of the above paper.
     '''
     def __init__(self, model, solver=None, kernel=None, corrector=None):
         super().__init__(model.parameters(), defaults={})
