@@ -14,8 +14,8 @@ class FastTriggs(nn.Module):
             \mathbf{J}_i^\rho &= \sqrt{\rho'(c_i)} \mathbf{J}_i
         \end{align*},
     
-    where :math:`\mathbf{E}_i` and :math:`\mathbf{J}_i` is the :math:`i`-th item of the model
-    residual and Jacobian, respectively. :math:`\rho()` is the kernel function and
+    where :math:`\mathbf{E}_i` and :math:`\mathbf{J}_i` are the :math:`i`-th item of the
+    model residual and Jacobian, respectively. :math:`\rho()` is the kernel function and
     :math:`c_i = \mathbf{E}_i^T\mathbf{E}_i` is the point to compute the gradient.
 
     Args:
@@ -90,7 +90,38 @@ class FastTriggs(nn.Module):
 
 
 class Triggs(nn.Module):
-    '''The Triggs correction correction of model residual and Jacobian.
+    r'''The Triggs correction of model residual and Jacobian.
+
+    .. math::
+        \begin{align*}
+            \mathbf{E}_i^\rho &= \frac{\sqrt{\rho'(c_i)}}{1 - \alpha} \mathbf{E}_i,\\
+            \mathbf{J}_i^\rho &= \sqrt{\rho'(c_i)} \left(\mathbf{I} - \alpha
+                \frac{\mathbf{E}_i^T\mathbf{E}_i}{\|\mathbf{E}_i\|^2} \right) \mathbf{J}_i,
+        \end{align*}
+    
+    where :math:`\alpha` is a root of
+
+    .. math::
+        \frac{1}{2} \alpha^2 - \alpha - \frac{\rho''}{\rho'} \|\mathbf{E}_i\|^2 = 0.
+
+    :math:`\mathbf{E}_i` and :math:`\mathbf{J}_i` are the :math:`i`-th item of the model
+    residual and Jacobian, respectively. :math:`\rho()` is the kernel function and
+    :math:`c_i = \mathbf{E}_i^T\mathbf{E}_i` is the point to compute the gradients.
+
+    Args:
+        kernel (nn.Module): the robust kernel (cost) function.
+
+    Note:
+        This implementation thanks to Eq. (11) of the following paper.
+
+        * Bill Triggs, etc., `Bundle Adjustment -- A Modern Synthesis
+          <https://link.springer.com/chapter/10.1007/3-540-44480-7_21>`_, International
+          Workshop on Vision Algorithms, 1999.
+    
+    Warning:
+
+        The :meth:`FastTriggs` corrector is preferred when the kernel function has a
+        negative Hessian.
     '''
     def __init__(self, kernel):
         super().__init__()
