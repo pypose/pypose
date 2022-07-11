@@ -125,15 +125,14 @@ class GaussNewton(Optimizer):
         
         **Therefore, the users need to keep the last dimension of model output and target to
         1, even if the model residual is a scalar, otherwise the model Jacobian will be a
-        row vector, instead of a matrix, which loses sample-level structural information.**
+        row vector, instead of a matrix, which loses sample-level structural information,
+        but becomes faster.**
 
     Note:
         Instead of solving :math:`\mathbf{J}^T\mathbf{J}\delta = -\mathbf{J}^T\mathbf{R}`, we solve
         :math:`\mathbf{J}\delta = -\mathbf{R}` via QR-decomposition, which is more numerically
         advisible. Therefore, only solvers with pseudo inversion such as :meth:`solver.PINV` and
         :meth:`solver.LSTSQ` are available. More details are in Eq. (5) of the paper:
-
-
     '''
     def __init__(self, model, solver=None, kernel=None, corrector=None):
         super().__init__(model.parameters(), defaults={})
@@ -286,7 +285,8 @@ class LevenbergMarquardt(Optimizer):
         
         **Therefore, the users need to keep the last dimension of model output and target to
         1, even if the model residual is a scalar, otherwise the model Jacobian will be a
-        row vector, instead of a matrix, which loses sample-level structural information.**
+        row vector, instead of a matrix, which loses sample-level structural information,
+        but becomes faster.**
     '''
     def __init__(self, model, damping, solver=None, kernel=None, corrector=None, min=1e-6, max=1e32):
         assert damping > 0, ValueError("damping factor has to be positive: {}".format(damping))
