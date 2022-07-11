@@ -153,7 +153,7 @@ class GaussNewton(Optimizer):
 
         Args:
             inputs (Tensor/LieTensor or tuple of Tensors/LieTensors): the inputs to the model.
-            targets (Tensor/LieTensor or tuple of Tensors/LieTensors): the model targets to approximate.
+            targets (Tensor/LieTensor): the model targets to approximate.
                 If not given, the model outputs are minimized. Defaults: ``None``.
 
         Return:
@@ -311,7 +311,7 @@ class LevenbergMarquardt(Optimizer):
 
         Args:
             inputs (Tensor/LieTensor or tuple of Tensors/LieTensors): the inputs to the model.
-            targets (Tensor/LieTensor or tuple of Tensors/LieTensors): the model targets to optimize.
+            targets (Tensor/LieTensor): the model targets to optimize.
                 If not given, the squared model outputs are minimized. Defaults: ``None``.
 
         Return:
