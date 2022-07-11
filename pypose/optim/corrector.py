@@ -4,64 +4,65 @@ from torch.autograd import grad
 from torch.autograd.functional import jacobian
 
 
-class GradScale(nn.Module):
+class FastTriggs(nn.Module):
     r'''
-    The gradient scale correction of model residual and Jacobian for the non-linear least
-    squares problems.
+    Faster yet stable version of Triggs correction of model residual and Jacobian.
 
     .. math::
         \begin{align*}
-            \mathbf{E}_i &= \frac{\mathrm{d} \rho(c_i)}{\mathrm{d} c_i} \mathbf{E}_i\\
-            \mathbf{J}_i &= \frac{\mathrm{d} \rho(c_i)}{\mathrm{d} c_i} \mathbf{J}_i
+            \mathbf{E}_i^\rho &= \sqrt{\rho'(c_i)} \mathbf{E}_i\\
+            \mathbf{J}_i^\rho &= \sqrt{\rho'(c_i)} \mathbf{J}_i
         \end{align*},
-
+    
     where :math:`\mathbf{E}_i` and :math:`\mathbf{J}_i` is the :math:`i`-th item of the model
     residual and Jacobian, respectively. :math:`\rho()` is the kernel function and
     :math:`c_i = \mathbf{E}_i^T\mathbf{E}_i` is the point to compute the gradient.
 
     Args:
         kernel (nn.Module): the robust kernel (cost) function.
-    '''
-    def __init__(self, kernel):
-        super().__init__()
-        self.func = lambda x: kernel(x).sum()
 
-    def forward(self, E: Tensor, J: Tensor):
-        r'''
-        Args:
-            E (Tensor): the model residual.
-            J (Tensor): the model Jacobian.
+    Note:
+        This implementation has a faster and numerically stable solution than :meth:`Triggs` due
+        to the removal of 2nd order derivatives, since most kernel functions have negative
+        Hessians, which can lead a 2nd order optimizer unstable. It basically aims to solve
 
-        Returns:
-            tuple of Tensors: the corrected model residual and model Jacobian.
+        .. math::
+            \bm{\theta}^* = \arg\min_{\bm{\theta}} \mathbf{g}(\bm{x})
+                        = \arg\min_{\bm{\theta}} \sum_i \rho(\mathbf{E}_i^T \mathbf{E}_i),
 
-        Note:
-            The :obj:`.forward()` function is not supposed to be directly called by PyPose users.
-            It will be called internally by optimizers such as :meth:`pypose.optim.GaussNewton` and
-            :meth:`pypose.optim.LevenbergMarquardt`.
-        '''
-        x = E.square().sum(-1, keepdim=True)
-        g = jacobian(self.func, x)
-        s = s.expand_as(E).reshape(-1, 1)
-        return g * E, s * J
+        where :math:`\mathbf{E}_i = \bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i)` and
+        :math:`\bm{f}(\bm{\theta}, \bm{x})` is the model, :math:`\bm{\theta}` is the parameters
+        to be optimized, :math:`\bm{x}` is the model inputs. Considering the 1st order Taylor
+        expansion of the model :math:`\bm{f}(\bm{\theta} + \delta) \approx \bm{f}(\bm{\theta})
+        + \mathbf{J}_i \bm{\theta}`. If we take :math:`c_i = \mathbf{E}_i^T \mathbf{E}_i` and set
+        the first derivative of :math:`\mathbf{g}(\bm{\delta})` to zero, we have
 
+        .. math::
+            \frac{\partial \bm{g}}{\partial \bm{\delta}} 
+            = \sum_i \frac{\partial \rho}{\partial c_i} \frac{\partial c_i}{\partial \bm{\delta}}
+            = \bm{0}
 
-class FastTriggs(nn.Module):
-    r'''
-    Faster yet stable version of Triggs correction of model residual and Jacobian for the
-    non-linear least squares problems. It removes the 2nd order derivative in the full Triggs
-    correction, which leads a faster and numerically stable solution. This is because most kernel
-    functions have a negative Hessian, which can lead a 2nd order optimizer unstable.
+        This leads to
 
-    .. math::
-        \begin{align*}
-            \mathbf{E}_i &= \sqrt{\rho'(c_i)} \mathbf{E}_i\\
-            \mathbf{J}_i &= \sqrt{\rho'(c_i)} \mathbf{J}_i
-        \end{align*},
-    
-    where :math:`\mathbf{E}_i` and :math:`\mathbf{J}_i` is the :math:`i`-th item of the model
-    residual and Jacobian, respectively. :math:`\rho()` is the kernel function and
-    :math:`c_i = \mathbf{E}_i^T\mathbf{E}_i` is the point to compute the gradient.
+        .. math::
+            \sum_i \frac{\partial \rho}{\partial c_i} \mathbf{J}_i^T \mathbf{J}_i \bm{\delta}
+            = \sum_i \frac{\partial \rho}{\partial c_i} \mathbf{J}_i^T \mathbf{E}_i
+
+        Rearrange the gradient of :math:`\rho`, we have
+
+        .. math::
+            \sum_i \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right)^T 
+                \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right) \bm{\delta}
+            = \sum_i \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right)^T 
+                \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{E}_i\right)
+
+        This gives us the corrected model residual :math:`\mathbf{E}_i^\rho` and Jacobian
+        :math:`\mathbf{J}_i^\rho`, which is the solution to the standard 2nd order optimizers
+        such as :meth:`pypose.optim.GN` and :meth:`pypose.optim.LM`.
+
+        .. math::
+            \sum_i {\mathbf{J}_i^\rho}^T \mathbf{J}_i^\rho \bm{\delta}
+            = \sum_i {\mathbf{J}_i^\rho}^T \mathbf{E}_i^\rho
     '''
     def __init__(self, kernel):
         super().__init__()
@@ -88,7 +89,7 @@ class FastTriggs(nn.Module):
 
 
 class Triggs(nn.Module):
-    '''The Triggs correction.
+    '''The Triggs correction correction of model residual and Jacobian.
     '''
     def __init__(self, kernel):
         super().__init__()
@@ -113,8 +114,8 @@ class Triggs(nn.Module):
 
         Note:
             The :obj:`.forward()` function is not supposed to be directly called by PyPose users.
-            It will be called internally by optimizers such as :meth:`pypose.optim.GaussNewton` and
-            :meth:`pypose.optim.LevenbergMarquardt`.
+            It will be called internally by optimizers such as :meth:`pypose.optim.GN` and
+            :meth:`pypose.optim.LM`.
         '''
         x, g1, g2 = self.compute_grads(E)
         se = g1.sqrt()
