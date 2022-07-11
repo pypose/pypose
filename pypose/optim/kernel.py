@@ -91,7 +91,8 @@ class Cauchy(nn.Module):
     .. math::
         \bm{y}_i = \delta^2 \log\left(1 + \frac{\bm{x}_i}{\delta^2}\right),
 
-    where :math:`\bm{x}` and :math:`\bm{y}` are the input and output tensors, respectively.
+    where :math:`\delta` (delta) is a hyperparameter, :math:`\bm{x}` and :math:`\bm{y}` are the
+    input and output tensors, respectively.
 
     Args:
         delta (float, optional): Specify the Cauchy cost. The value must be positive. Default: 1.0

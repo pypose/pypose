@@ -22,8 +22,8 @@ class FastTriggs(nn.Module):
         kernel (nn.Module): the robust kernel (cost) function.
 
     Note:
-        This implementation has a faster and numerically stable solution than :meth:`Triggs` due
-        to the removal of 2nd order derivatives, since most kernel functions have negative
+        This implementation has a faster and numerically stable solution than :meth:`Triggs`
+        due to the removal of 2nd order derivatives, since most kernel functions have negative
         Hessians, which can lead a 2nd order optimizer unstable. It basically aims to solve
 
         .. math::
@@ -32,10 +32,11 @@ class FastTriggs(nn.Module):
 
         where :math:`\mathbf{E}_i = \bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i)` and
         :math:`\bm{f}(\bm{\theta}, \bm{x})` is the model, :math:`\bm{\theta}` is the parameters
-        to be optimized, :math:`\bm{x}` is the model inputs. Considering the 1st order Taylor
-        expansion of the model :math:`\bm{f}(\bm{\theta} + \delta) \approx \bm{f}(\bm{\theta})
-        + \mathbf{J}_i \bm{\theta}`. If we take :math:`c_i = \mathbf{E}_i^T \mathbf{E}_i` and set
-        the first derivative of :math:`\mathbf{g}(\bm{\delta})` to zero, we have
+        to be optimized, :math:`\bm{x}` is the model inputs, :math:`\bm{y}` is the model targets.
+        Considering the 1st order Taylor expansion of the model
+        :math:`\bm{f}(\bm{\theta}+\delta) \approx \bm{f}(\bm{\theta}) + \mathbf{J}_i \bm{\theta}`.
+        If we take :math:`c_i = \mathbf{E}_i^T \mathbf{E}_i` and set the first derivative of
+        :math:`\mathbf{g}(\bm{\delta})` to zero, we have
 
         .. math::
             \frac{\partial \bm{g}}{\partial \bm{\delta}} 
@@ -46,14 +47,14 @@ class FastTriggs(nn.Module):
 
         .. math::
             \sum_i \frac{\partial \rho}{\partial c_i} \mathbf{J}_i^T \mathbf{J}_i \bm{\delta}
-            = \sum_i \frac{\partial \rho}{\partial c_i} \mathbf{J}_i^T \mathbf{E}_i
+            = - \sum_i \frac{\partial \rho}{\partial c_i} \mathbf{J}_i^T \mathbf{E}_i
 
         Rearrange the gradient of :math:`\rho`, we have
 
         .. math::
             \sum_i \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right)^T 
                 \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right) \bm{\delta}
-            = \sum_i \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right)^T 
+            = - \sum_i \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right)^T 
                 \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{E}_i\right)
 
         This gives us the corrected model residual :math:`\mathbf{E}_i^\rho` and Jacobian
@@ -62,7 +63,7 @@ class FastTriggs(nn.Module):
 
         .. math::
             \sum_i {\mathbf{J}_i^\rho}^T \mathbf{J}_i^\rho \bm{\delta}
-            = \sum_i {\mathbf{J}_i^\rho}^T \mathbf{E}_i^\rho
+            = - \sum_i {\mathbf{J}_i^\rho}^T \mathbf{E}_i^\rho
     '''
     def __init__(self, kernel):
         super().__init__()
@@ -78,9 +79,9 @@ class FastTriggs(nn.Module):
             tuple of Tensors: the corrected model residual and model Jacobian.
 
         Note:
-            The :obj:`.forward()` function is not supposed to be directly called by PyPose users.
-            It will be called internally by optimizers such as :meth:`pypose.optim.GaussNewton` and
-            :meth:`pypose.optim.LevenbergMarquardt`.
+            The :obj:`.forward()` function is not supposed to be directly called by PyPose
+            users. It will be called internally by optimizers such as
+            :meth:`pypose.optim.GN` and :meth:`pypose.optim.LM`.
         '''
         x = E.square().sum(-1, keepdim=True)
         s = jacobian(self.func, x).sqrt()
@@ -113,9 +114,9 @@ class Triggs(nn.Module):
             tuple of Tensors: the corrected model residual and model Jacobian.
 
         Note:
-            The :obj:`.forward()` function is not supposed to be directly called by PyPose users.
-            It will be called internally by optimizers such as :meth:`pypose.optim.GN` and
-            :meth:`pypose.optim.LM`.
+            The :obj:`.forward()` function is not supposed to be directly called by PyPose
+            users. It will be called internally by optimizers such as :meth:`pypose.optim.GN`
+            and :meth:`pypose.optim.LM`.
         '''
         x, g1, g2 = self.compute_grads(E)
         se = g1.sqrt()
