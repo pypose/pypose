@@ -2,6 +2,9 @@ import warnings
 import torch, time
 import pypose as pp
 from torch import nn
+import pypose.optim.solver as pps
+import pypose.optim.kernel as ppk
+import pypose.optim.corrector as ppc
 
 
 class Timer:
@@ -62,8 +65,8 @@ class PoseInv(nn.Module):
     def forward(self, inputs):
         return (self.pose.Exp() @ inputs).Log()
 
-# kernel = pp.module.Huber(delta=0.25)
-# kernel = pp.module.PseudoHuber()
+# kernel = ppk.Huber(delta=0.25)
+# kernel = ppk.PseudoHuber()
 kernel = None
 posnet = PoseInv(2, 2).to(device)
 inputs = pp.randn_RxSO3(2, 2).to(device)
@@ -134,9 +137,9 @@ timer = Timer()
 target = pp.identity_se3(2, 2).to(device)
 inputs = pp.randn_SE3(2, 2).to(device)
 posnet = PoseInv(2, 2).to(device)
-solver = pp.optim.solver.Cholesky()
-kernel = pp.module.Huber()
-corrector = pp.optim.corrector.FastTriggs(kernel)
+solver = pps.Cholesky()
+kernel = ppk.Cauchy()
+corrector = ppc.FastTriggs(kernel)
 optimizer = pp.optim.LM(posnet, damping=1e-6, solver=solver, kernel=kernel, corrector=corrector)
 
 for idx in range(10):

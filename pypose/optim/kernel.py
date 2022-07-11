@@ -32,8 +32,9 @@ class Huber(nn.Module):
     """
     def __init__(self, delta: float = 1.0) -> None:
         super().__init__()
-        assert delta > 0, ValueError("Invalid delta value: {}".format(delta))
+        assert delta > 0, ValueError("delta has to be positive: {}".format(delta))
         self.delta = delta
+        self.delta2 = delta**2
 
     def forward(self, input: Tensor) -> Tensor:
         '''
@@ -44,7 +45,7 @@ class Huber(nn.Module):
         mask = input.sqrt() < self.delta
         output = torch.zeros_like(input)
         output[mask] = input[mask]
-        output[~mask] = 2 * self.delta * input[~mask].sqrt() - self.delta**2
+        output[~mask] = 2 * self.delta * input[~mask].sqrt() - self.delta2
         return output
 
 
@@ -73,8 +74,8 @@ class PseudoHuber(nn.Module):
     """
     def __init__(self, delta: float = 1.0) -> None:
         super().__init__()
-        assert delta > 0, ValueError("Invalid delta value: {}".format(delta))
-        self.delta = delta
+        assert delta > 0, ValueError("delta has to be positive: {}".format(delta))
+        self.delta2 = delta**2
 
     def forward(self, input: Tensor) -> Tensor:
         '''
@@ -82,7 +83,7 @@ class PseudoHuber(nn.Module):
             input (torch.Tensor): the input tensor (non-negative).
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
-        return 2 * self.delta**2 * ((input/self.delta**2 + 1).sqrt() - 1)
+        return 2 * self.delta2 * ((input/self.delta2 + 1).sqrt() - 1)
 
 
 class Cauchy(nn.Module):
@@ -109,8 +110,8 @@ class Cauchy(nn.Module):
     """
     def __init__(self, delta: float = 1.0) -> None:
         super().__init__()
-        assert delta > 0, ValueError("Invalid delta value: {}".format(delta))
-        self.delta = delta
+        assert delta > 0, ValueError("delta has to be positive: {}".format(delta))
+        self.delta2 = delta**2
 
     def forward(self, input: Tensor) -> Tensor:
         '''
@@ -118,4 +119,4 @@ class Cauchy(nn.Module):
             input (torch.Tensor): the input tensor (non-negative).
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
-        return self.delta**2 * (input/self.delta**2 + 1).log()
+        return self.delta2 * (input/self.delta2 + 1).log()
