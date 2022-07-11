@@ -10,13 +10,13 @@ class FastTriggs(nn.Module):
 
     .. math::
         \begin{align*}
-            \mathbf{E}_i^\rho &= \sqrt{\rho'(c_i)} \mathbf{E}_i\\
+            \mathbf{R}_i^\rho &= \sqrt{\rho'(c_i)} \mathbf{R}_i\\
             \mathbf{J}_i^\rho &= \sqrt{\rho'(c_i)} \mathbf{J}_i
         \end{align*},
     
-    where :math:`\mathbf{E}_i` and :math:`\mathbf{J}_i` are the :math:`i`-th item of the
+    where :math:`\mathbf{R}_i` and :math:`\mathbf{J}_i` are the :math:`i`-th item of the
     model residual and Jacobian, respectively. :math:`\rho()` is the kernel function and
-    :math:`c_i = \mathbf{E}_i^T\mathbf{E}_i` is the point to compute the gradient.
+    :math:`c_i = \mathbf{R}_i^T\mathbf{R}_i` is the point to compute the gradient.
 
     Args:
         kernel (nn.Module): the robust kernel (cost) function.
@@ -28,14 +28,14 @@ class FastTriggs(nn.Module):
 
         .. math::
             \bm{\theta}^* = \arg\min_{\bm{\theta}} \mathbf{g}(\bm{x})
-                        = \arg\min_{\bm{\theta}} \sum_i \rho(\mathbf{E}_i^T \mathbf{E}_i),
+                        = \arg\min_{\bm{\theta}} \sum_i \rho(\mathbf{R}_i^T \mathbf{R}_i),
 
-        where :math:`\mathbf{E}_i = \bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i)` and
+        where :math:`\mathbf{R}_i = \bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i)` and
         :math:`\bm{f}(\bm{\theta}, \bm{x})` is the model, :math:`\bm{\theta}` is the parameters
         to be optimized, :math:`\bm{x}` is the model inputs, :math:`\bm{y}` is the model targets.
         Considering the 1st order Taylor expansion of the model
         :math:`\bm{f}(\bm{\theta}+\delta) \approx \bm{f}(\bm{\theta}) + \mathbf{J}_i \bm{\theta}`.
-        If we take :math:`c_i = \mathbf{E}_i^T \mathbf{E}_i` and set the first derivative of
+        If we take :math:`c_i = \mathbf{R}_i^T \mathbf{R}_i` and set the first derivative of
         :math:`\mathbf{g}(\bm{\delta})` to zero, we have
 
         .. math::
@@ -47,7 +47,7 @@ class FastTriggs(nn.Module):
 
         .. math::
             \sum_i \frac{\partial \rho}{\partial c_i} \mathbf{J}_i^T \mathbf{J}_i \bm{\delta}
-            = - \sum_i \frac{\partial \rho}{\partial c_i} \mathbf{J}_i^T \mathbf{E}_i
+            = - \sum_i \frac{\partial \rho}{\partial c_i} \mathbf{J}_i^T \mathbf{R}_i
 
         Rearrange the gradient of :math:`\rho`, we have
 
@@ -55,24 +55,24 @@ class FastTriggs(nn.Module):
             \sum_i \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right)^T 
                 \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right) \bm{\delta}
             = - \sum_i \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right)^T 
-                \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{E}_i\right)
+                \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{R}_i\right)
 
-        This gives us the corrected model residual :math:`\mathbf{E}_i^\rho` and Jacobian
+        This gives us the corrected model residual :math:`\mathbf{R}_i^\rho` and Jacobian
         :math:`\mathbf{J}_i^\rho`, which is the solution to the standard 2nd order optimizers
         such as :meth:`pypose.optim.GN` and :meth:`pypose.optim.LM`.
 
         .. math::
             \sum_i {\mathbf{J}_i^\rho}^T \mathbf{J}_i^\rho \bm{\delta}
-            = - \sum_i {\mathbf{J}_i^\rho}^T \mathbf{E}_i^\rho
+            = - \sum_i {\mathbf{J}_i^\rho}^T \mathbf{R}_i^\rho
     '''
     def __init__(self, kernel):
         super().__init__()
         self.func = lambda x: kernel(x).sum()
 
-    def forward(self, E: Tensor, J: Tensor):
+    def forward(self, R: Tensor, J: Tensor):
         r'''
         Args:
-            E (Tensor): the model residual.
+            R (Tensor): the model residual.
             J (Tensor): the model Jacobian.
 
         Returns:
@@ -83,10 +83,10 @@ class FastTriggs(nn.Module):
             users. It will be called internally by optimizers such as
             :meth:`pypose.optim.GN` and :meth:`pypose.optim.LM`.
         '''
-        x = E.square().sum(-1, keepdim=True)
+        x = R.square().sum(-1, keepdim=True)
         s = jacobian(self.func, x).sqrt()
-        sj = s.expand_as(E).reshape(-1, 1)
-        return s * E, sj * J
+        sj = s.expand_as(R).reshape(-1, 1)
+        return s * R, sj * J
 
 
 class Triggs(nn.Module):
@@ -94,19 +94,19 @@ class Triggs(nn.Module):
 
     .. math::
         \begin{align*}
-            \mathbf{E}_i^\rho &= \frac{\sqrt{\rho'(c_i)}}{1 - \alpha} \mathbf{E}_i,\\
+            \mathbf{R}_i^\rho &= \frac{\sqrt{\rho'(c_i)}}{1 - \alpha} \mathbf{R}_i,\\
             \mathbf{J}_i^\rho &= \sqrt{\rho'(c_i)} \left(\mathbf{I} - \alpha
-                \frac{\mathbf{E}_i^T\mathbf{E}_i}{\|\mathbf{E}_i\|^2} \right) \mathbf{J}_i,
+                \frac{\mathbf{R}_i^T\mathbf{R}_i}{\|\mathbf{R}_i\|^2} \right) \mathbf{J}_i,
         \end{align*}
     
     where :math:`\alpha` is a root of
 
     .. math::
-        \frac{1}{2} \alpha^2 - \alpha - \frac{\rho''}{\rho'} \|\mathbf{E}_i\|^2 = 0.
+        \frac{1}{2} \alpha^2 - \alpha - \frac{\rho''}{\rho'} \|\mathbf{R}_i\|^2 = 0.
 
-    :math:`\mathbf{E}_i` and :math:`\mathbf{J}_i` are the :math:`i`-th item of the model
+    :math:`\mathbf{R}_i` and :math:`\mathbf{J}_i` are the :math:`i`-th item of the model
     residual and Jacobian, respectively. :math:`\rho()` is the kernel function and
-    :math:`c_i = \mathbf{E}_i^T\mathbf{E}_i` is the point to compute the gradients.
+    :math:`c_i = \mathbf{R}_i^T\mathbf{R}_i` is the point to compute the gradients.
 
     Args:
         kernel (nn.Module): the robust kernel (cost) function.
@@ -128,17 +128,17 @@ class Triggs(nn.Module):
         self.kernel = kernel
 
     @torch.enable_grad()
-    def compute_grads(self, E):
-        x = E.square().sum(-1, keepdim=True).requires_grad_(True)
+    def compute_grads(self, R):
+        x = R.square().sum(-1, keepdim=True).requires_grad_(True)
         y = self.kernel(x).sum()
         g1 = grad(y, x, create_graph=True)[0]
         g2 = grad(g1.sum(), x)[0]
         return x.detach_(), g1.detach_(), g2.detach_()
 
-    def forward(self, E: Tensor, J: Tensor):
+    def forward(self, R: Tensor, J: Tensor):
         r'''
         Args:
-            E (Tensor): the model residual.
+            R (Tensor): the model residual.
             J (Tensor): the model Jacobian.
 
         Returns:
@@ -149,13 +149,13 @@ class Triggs(nn.Module):
             users. It will be called internally by optimizers such as :meth:`pypose.optim.GN`
             and :meth:`pypose.optim.LM`.
         '''
-        x, g1, g2 = self.compute_grads(E)
+        x, g1, g2 = self.compute_grads(R)
         se = g1.sqrt()
-        sj = se.expand_as(E).unsqueeze(-1)
-        sE, sJ = se * E, sj * J.view(E.shape + (J.shape[-1],))
+        sj = se.expand_as(R).unsqueeze(-1)
+        sR, sJ = se * R, sj * J.view(R.shape + (J.shape[-1],))
         M = ~((x==0)|(g2 <=0)).squeeze(-1)
         alpha = 1 - (1 + 2*x[M]*g2[M]/g1[M]).clamp(min=0).sqrt()
-        sE[M] = se[M] / (1 - alpha)
-        Q = torch.einsum('...d,...k,...kl->...dl', E[M], E[M], sJ[M])
+        sR[M] = se[M] / (1 - alpha)
+        Q = torch.einsum('...d,...k,...kl->...dl', R[M], R[M], sJ[M])
         sJ[M] = sJ[M] - (alpha / x[M]).unsqueeze(-1) * Q
-        return sE, sJ.view_as(J)
+        return sR, sJ.view_as(J)
