@@ -225,13 +225,12 @@ class LevenbergMarquardt(Optimizer):
     Args:
         model (nn.Module): a module containing learnable parameters.
         damping (float): Levenberg's damping factor (positive number).
-        solver (nn.Module, optional): a linear solver. Available linear solvers include
-            :meth:`solver.PINV` and :meth:`solver.LSTSQ`. If ``None``, :meth:`solver.PINV` is used.
+        solver (nn.Module, optional): a linear solver. If ``None``, :meth:`solver.Cholesky` is used.
             Default: None.
         kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
         corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit the kernel
             function. If ``None``, auto correction is used. Auto correction can be unstable when
-            the robust model has indefinite Hessian.  Default: ``None``.
+            the robust model has indefinite Hessian. Default: ``None``.
         min (float, optional): the lower-bound of the matrix diagonal to inverse. Default: 1e-6.
         max (float, optional): the upper-bound of the matrix diagonal to inverse. Default: 1e32.
 
