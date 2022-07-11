@@ -51,8 +51,8 @@ class RobustModel(nn.Module):
 
     def loss(self, inputs, targets):
         outputs = self.model_forward(inputs)
-        E = self.residual(outputs, targets)
-        return self.kernel(E.square().sum(-1)).sum()
+        R = self.residual(outputs, targets)
+        return self.kernel(R.square().sum(-1)).sum()
 
 
 class GaussNewton(Optimizer):
@@ -77,9 +77,9 @@ class GaussNewton(Optimizer):
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
             &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}
                 {\partial \bm{\theta}_{t-1}}}                                                    \\
-            &\hspace{5mm} \mathbf{E} = \bm{y} - \bm{f(\bm{\theta}_{t-1}, \bm{x})}                \\
-            &\hspace{5mm} \mathbf{E}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{E}, \mathbf{J})\\
-            &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{J}, -\mathbf{E})                 \\
+            &\hspace{5mm} \mathbf{R} = \bm{y} - \bm{f(\bm{\theta}_{t-1}, \bm{x})}                \\
+            &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
+            &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{J}, -\mathbf{R})                 \\
             &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}               \\
             &\rule{113mm}{0.4pt}                                                          \\[-1.ex]
             &\bf{return} \:  \theta_t                                                     \\[-1.ex]
@@ -104,8 +104,8 @@ class GaussNewton(Optimizer):
     Available correctors: :meth:`corrector.FastTriggs`; :meth:`corrector.Triggs`.
 
     Note:
-        Instead of solving :math:`\mathbf{J}^T\mathbf{J}\delta = -\mathbf{J}^T\mathbf{E}`, we solve
-        :math:`\mathbf{J}\delta = -\mathbf{E}` via QR-decomposition, which is more numerically
+        Instead of solving :math:`\mathbf{J}^T\mathbf{J}\delta = -\mathbf{J}^T\mathbf{R}`, we solve
+        :math:`\mathbf{J}\delta = -\mathbf{R}` via QR-decomposition, which is more numerically
         advisible. Therefore, only solvers with pseudo inversion such as :meth:`solver.PINV` and
         :meth:`solver.LSTSQ` are available. More details are in Eq. (5) of the paper:
 
@@ -180,12 +180,12 @@ class GaussNewton(Optimizer):
             Pose Inversion error: 0.0000005 @ 3 it
             Early Stoping with error: 5.21540641784668e-07
         '''
-        E = self.model(inputs, targets)
+        R = self.model(inputs, targets)
         for pg in self.param_groups:
             numels = [p.numel() for p in pg['params'] if p.requires_grad]
             J = modjac(self.model, inputs=(inputs, targets), flatten=True)
-            E, J = self.corrector(E = E, J = J)
-            D = self.solver(A = J, b = -E.view(-1, 1)).split(numels)
+            R, J = self.corrector(R = R, J = J)
+            D = self.solver(A = J, b = -R.view(-1, 1)).split(numels)
             [p.add_(d.view(p.shape)) for p, d in zip(pg['params'], D) if p.requires_grad]
         return self.model.loss(inputs, targets)
 
@@ -216,9 +216,9 @@ class LevenbergMarquardt(Optimizer):
                 {\partial \bm{\theta}_{t-1}}}                                                    \\
             &\hspace{5mm} \mathbf{A} \leftarrow (\mathbf{J}^T \mathbf{J} 
                 + \lambda \mathrm{diag}(\mathbf{J}^T \mathbf{J})).\mathrm{clamp(min, max)}       \\
-            &\hspace{5mm} \mathbf{E} = \bm{y} - \bm{f(\bm{\theta}_{t-1}, \bm{x})}                \\
-            &\hspace{5mm} \mathbf{E}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{E}, \mathbf{J})\\
-            &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{A}, -\mathbf{J}^T\mathbf{E})     \\
+            &\hspace{5mm} \mathbf{R} = \bm{y} - \bm{f(\bm{\theta}_{t-1}, \bm{x})}                \\
+            &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
+            &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{A}, -\mathbf{J}^T\mathbf{R})     \\
             &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}               \\
             &\rule{113mm}{0.4pt}                                                          \\[-1.ex]
             &\bf{return} \:  \theta_t                                                     \\[-1.ex]
@@ -318,13 +318,13 @@ class LevenbergMarquardt(Optimizer):
             Pose Inversion error: 0.0000004 @ 3 it
             Early Stoping with error: 4.443569991963159e-07
         '''
-        E = self.model(inputs, targets)
+        R = self.model(inputs, targets)
         for pg in self.param_groups:
             numels = [p.numel() for p in pg['params'] if p.requires_grad]
             J = modjac(self.model, inputs=(inputs, targets), flatten=True)
-            E, J = self.corrector(E = E, J = J)
+            R, J = self.corrector(R = R, J = J)
             A = J.T @ J
             A.diagonal().add_(pg['damping'] * A.diagonal()).clamp_(pg['min'], pg['max'])
-            D = self.solver(A = A, b = -J.T @ E.view(-1, 1)).split(numels)
+            D = self.solver(A = A, b = -J.T @ R.view(-1, 1)).split(numels)
             [p.add_(d.view(p.shape)) for p, d in zip(pg['params'], D) if p.requires_grad]
         return self.model.loss(inputs, targets)
