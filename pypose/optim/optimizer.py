@@ -42,7 +42,7 @@ class RobustModel(nn.Module):
             return self.model(inputs)
 
     def residual(self, outputs, targets):
-        return  outputs if targets is None else targets - outputs
+        return outputs if targets is None else outputs - targets
 
     def kernel_forward(self, module, inputs, outputs):
         # eps is to prevent grad of sqrt() from being inf
@@ -64,7 +64,7 @@ class GaussNewton(Optimizer):
     .. math::
         \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
             \rho\left(
-                (\bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i))^T(\bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i))
+                (\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)^T(\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)
             \right),
 
     where :math:`\bm{f}()` is the model, :math:`\bm{\theta}` is the parameters to be optimized,
@@ -80,7 +80,7 @@ class GaussNewton(Optimizer):
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
             &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}
                 {\partial \bm{\theta}_{t-1}}}                                                    \\
-            &\hspace{5mm} \mathbf{R} = \bm{y} - \bm{f(\bm{\theta}_{t-1}, \bm{x})}                \\
+            &\hspace{5mm} \mathbf{R} = \bm{f(\bm{\theta}_{t-1}, \bm{x})} - \bm{y}                \\
             &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
             &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{J}, -\mathbf{R})                 \\
             &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}               \\
@@ -220,7 +220,7 @@ class LevenbergMarquardt(Optimizer):
     .. math::
         \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
             \rho\left(
-                (\bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i))^T(\bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i))
+                (\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)^T(\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)
             \right),
 
     where :math:`\bm{f}()` is the model, :math:`\bm{\theta}` is the parameters to be optimized,
@@ -239,7 +239,7 @@ class LevenbergMarquardt(Optimizer):
                 {\partial \bm{\theta}_{t-1}}}                                                    \\
             &\hspace{5mm} \mathbf{A} \leftarrow (\mathbf{J}^T \mathbf{J} 
                 + \lambda \mathrm{diag}(\mathbf{J}^T \mathbf{J})).\mathrm{clamp(min, max)}       \\
-            &\hspace{5mm} \mathbf{R} = \bm{y} - \bm{f(\bm{\theta}_{t-1}, \bm{x})}                \\
+            &\hspace{5mm} \mathbf{R} = \bm{f(\bm{\theta}_{t-1}, \bm{x})} - \bm{y}                \\
             &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
             &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{A}, -\mathbf{J}^T\mathbf{R})     \\
             &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}               \\
