@@ -583,7 +583,11 @@ class LieTensor(torch.Tensor):
                 grad_fn=<AliasBackward0>)
     """
     def __init__(self, *data, ltype:LieType):
-        assert self.shape[-1:] == ltype.dimension, 'Dimension Invalid. Go to{}'.format(
+        assert self.shape[-1:] == ltype.dimension, 'The last dimension of a LieTensor has to be ' \
+            'corresponding to their LieType. More details go to {}. If this error happens in an ' \
+            'optimization process, where LieType is not a necessary structure, we suggest to '    \
+            'call .tensor() to convert a LieTensor to Tensor before passing it to an optimizer. ' \
+            'If this still happens, create an issue on GitHub please.'.format(
             'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor')
         self.ltype = ltype
 
