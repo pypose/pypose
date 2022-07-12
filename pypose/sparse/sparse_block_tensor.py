@@ -6,21 +6,27 @@ from numpy import block
 import numpy as np
 from scipy.sparse import bsr_matrix
 
+import cupy as cp
+import cupyx as cpx
+
 import torch
+from torch.utils.dlpack import ( to_dlpack, from_dlpack )
 
 # Globals.
 INDEX_TYPE = torch.int64
 FLOAT_TYPE = torch.float32
 
-def sbm_to_torch_sparse_coo(sbm):
-    s_shape = ( *sbm.shape_blocks, *sbm.block_shape )
+# ========== Mutual conversion betwen torch sparse coo tensor and SparseBlockTensor. ==========
 
-    indices = sbm.block_indices[:, :2].permute((1, 0))
+def sbt_to_torch_sparse_coo(sbt):
+    s_shape = ( *sbt.shape_blocks, *sbt.block_shape )
+
+    indices = sbt.block_indices[:, :2].permute((1, 0))
 
     return torch.sparse_coo_tensor( 
-        indices, sbm.block_storage, s_shape, dtype=sbm.dtype, device=sbm.device)
+        indices, sbt.block_storage, s_shape, dtype=sbt.dtype, device=sbt.device)
 
-def torch_sparse_coo_to_sbm(s):
+def torch_sparse_coo_to_sbt(s):
     assert ( s.is_sparse ), f's must be a sparse tensor. '
     assert ( s.layout == torch.sparse_coo ), f's must have the COO layout. s.layout = {s.layout}'
     assert ( s.ndim == 4 ), f's.shape == {s.shape}'
@@ -31,32 +37,34 @@ def torch_sparse_coo_to_sbm(s):
     shape_blocks = s.shape[:2]
     block_shape  = s.values().shape[1:3]
 
-    sbm = SparseBlockMatrix( block_shape, dtype=s.dtype, device=s.device )
-    sbm.create(
+    sbt = SparseBlockTensor( block_shape, dtype=s.dtype, device=s.device )
+    sbt.create(
         shape_blocks=shape_blocks, 
         block_indices=s.indices().detach().clone(), 
         device=s.device)
-    sbm.block_storage = s.values().detach().clone()
-    sbm.dtype = s.dtype
-    sbm.coalesced = True
+    sbt.block_storage = s.values().detach().clone()
+    sbt.dtype = s.dtype
+    sbt.coalesced = True
 
-    return sbm
+    return sbt
 
-def sbm_to_bsr_cpu(sbm):
+# ========== Mutual conversion betwen SciPy Block Sparse Row Matrix and SparseBlockTensor. ==========
+
+def sbt_to_bsr_cpu(sbt):
     '''
-    Convert a SparseBlockMatrix to a Block Row Matrix defined by SciPy. 
-    Note that this function is for test purpose. If sbm is on GPU, then
+    Convert a SparseBlockTensor to a Block Row Matrix defined by SciPy. 
+    Note that this function is for test purpose. If sbt is on GPU, then
     all the data will be off loaded to CPU.
 
     NOTE: This function assumes that there are no empty rows of blocks.
     '''
 
-    if not sbm.is_coalesced():
-        sbm = sbm.coalesce()
+    if not sbt.is_coalesced():
+        sbt = sbt.coalesce()
 
     # We only need these two.
-    block_indices = sbm.block_indices
-    block_storage = sbm.block_storage
+    block_indices = sbt.block_indices
+    block_storage = sbt.block_storage
 
     # Compose the indptr and indices variables. 
     middle = torch.nonzero( torch.diff( block_indices[:, 0] ) ).view((-1,)) + 1
@@ -65,11 +73,11 @@ def sbm_to_bsr_cpu(sbm):
     indptr[-1] = block_indices.shape[0] # block_indices is a table with many rows.
     indices = block_indices[:, 1]
 
-    assert indptr.numel() - 1 == sbm.shape_blocks[0], \
-        f'indptr.numel() = {indptr.numel()}, sbm.rows = {sbm.rows}'
+    assert indptr.numel() - 1 == sbt.shape_blocks[0], \
+        f'indptr.numel() = {indptr.numel()}, sbt.rows = {sbt.rows}'
 
-    if sbm.is_cuda:
-        # sbm = sbm.to(device='cpu')
+    if sbt.is_cuda:
+        # sbt = sbt.to(device='cpu')
         block_indices = block_indices.cpu()
         block_storage = block_storage.cpu()
         indptr = indptr.cpu()
@@ -77,7 +85,7 @@ def sbm_to_bsr_cpu(sbm):
     
     return bsr_matrix( 
         ( block_storage.numpy(), indices.numpy(), indptr.numpy() ),
-        shape=sbm.shape )
+        shape=sbt.shape )
 
 # DTYPE_NUMPY_TO_TORCH = {
 #     np.int: torch.int,
@@ -106,12 +114,12 @@ def get_equivalent_torch_dtype(dtype):
     else:
         raise Exception(f'dtype {dtype} not supported. ')
 
-def bsr_cpu_to_sbm(bsr, device=None):
+def bsr_cpu_to_sbt(bsr, device=None):
     '''
     Warning: bsr.sum_duplicates() is called such that bsr is changed.
     bsr.data may referring to an outer object. That object is also changed.
 
-    Convert a Block Row Matrix defined by SciPy to SparseBlockMatrix.
+    Convert a Block Row Matrix defined by SciPy to SparseBlockTensor.
 
     dtype association:
     np.int     -> torch.int
@@ -127,8 +135,8 @@ def bsr_cpu_to_sbm(bsr, device=None):
     # Get the dtype.
     dtype = get_equivalent_torch_dtype(bsr.dtype)
 
-    # Create the SparseBlockMatrix.
-    sbm = SparseBlockMatrix( bsr.blocksize, dtype=dtype, device=device )
+    # Create the SparseBlockTensor.
+    sbt = SparseBlockTensor( bsr.blocksize, dtype=dtype, device=device )
 
     # Shape of blocks.
     shape_blocks = [
@@ -141,23 +149,81 @@ def bsr_cpu_to_sbm(bsr, device=None):
     block_indices = np.stack( ( block_row_indices, bsr.indices ), axis=0 )
     block_indices = torch.from_numpy( block_indices )
 
-    # Create memory for sbm.
-    sbm.create(
+    # Create memory for sbt.
+    sbt.create(
         shape_blocks=shape_blocks,
         block_indices=block_indices,
         device=device )
 
     # Block storage.
-    sbm.block_storage = torch.from_numpy( bsr.data ).to(device=device)
+    sbt.block_storage = torch.from_numpy( bsr.data ).to(device=device)
 
     # Coalesce.
     # The Block Row Matrix created by SciPy is always coalesced since we call
     # sum_duplicates() explicitly. 
-    sbm.coalesced = True
+    sbt.coalesced = True
 
-    return sbm
+    return sbt
 
-class SparseBlockMatrix(object):
+# ========== Conversion from SparbBlockMatrix to CuPy array. ==========
+
+def flatten_index_from_sbt(sbt):
+    '''
+    Flatten the index from a SparseBlockTensor.
+    '''
+    
+    # Alias of the shape of the block.
+    bh, bw = sbt.block_shape
+
+    # Meshgrid coordinates for a single block.
+    x = torch.arange( bw, dtype=INDEX_TYPE, device=sbt.device )
+    y = torch.arange( bh, dtype=INDEX_TYPE, device=sbt.device )
+    xx, yy = torch.meshgrid( x, y, indexing='xy')
+
+    # Repeat xx and yy.
+    N = sbt.n_nz_blocks
+    xx = xx.repeat( N, 1, 1 )
+    yy = yy.repeat( N, 1, 1 )
+
+    # Shift xx and yy.
+    xx = xx + sbt.block_indices[:, 1].view( ( N, 1, 1 ) ) * bw
+    yy = yy + sbt.block_indices[:, 0].view( ( N, 1, 1 ) ) * bh
+
+    return xx.view((-1, )), yy.view((-1, ))
+
+def torch_to_cupy(t):
+    return cp.from_dlpack( to_dlpack(t) )
+
+def cupy_to_torch(c):
+    return from_dlpack( c.toDlpack() )
+
+def sbt_to_cupy(sbt):
+    '''
+    Convert a SparseBlockTensor to a CuPy sparse matrix.
+    '''
+
+    assert sbt.is_cuda, f'Only supports Tensors on GPU. '
+
+    # Flatten the index.
+    xx, yy = flatten_index_from_sbt(sbt)
+
+    # Flatten the data.
+    data = sbt.block_storage.view((-1, ))
+
+    # Convert xx, yy, and data to CuPy.
+    xx   = torch_to_cupy(xx)
+    yy   = torch_to_cupy(yy)
+    data = torch_to_cupy(data)
+
+    # Create the CuPy sparse matrix in the CSR format.
+    return cpx.scipy.sparse.csr_matrix( 
+        (data, (yy, xx)), 
+        shape=sbt.shape,
+        copy=False )
+
+# =========== The SparseBlockTensor class. ===========
+
+class SparseBlockTensor(object):
     def __init__(self, 
         block_shape: Iterable[int],
         dtype: Optional[torch.dtype] = None,
@@ -362,13 +428,13 @@ class SparseBlockMatrix(object):
         # May need also to wrap some member variables by accessor functions.
 
         # Convert the sparse block matrix to torch sparse matrix.
-        scoo = sbm_to_torch_sparse_coo(self)
+        scoo = sbt_to_torch_sparse_coo(self)
 
         # coalesce.
         scoo = scoo.coalesce()
 
         # Convert the torch sparse matrix back to the sparse block matrix.
-        return torch_sparse_coo_to_sbm(scoo)
+        return torch_sparse_coo_to_sbt(scoo)
 
     def rows_of_block(self, idx: int):
         assert ( idx >= 0 ), \
@@ -399,7 +465,7 @@ class SparseBlockMatrix(object):
         return 0 if idx == 0 else self.col_block_structure[ idx - 1 ].item()
 
     def __deepcopy__(self):
-        new_matrix = SparseBlockMatrix( self.block_shape )
+        new_matrix = SparseBlockTensor( self.block_shape )
         new_matrix.col_block_structure = self.col_block_structure.clone()
         new_matrix.row_block_structure = self.row_block_structure.clone()
         
@@ -424,7 +490,7 @@ class SparseBlockMatrix(object):
         clone: True if the blocks are cloned.
 
         Returns:
-        A new SparseBlockMatrix object.
+        A new SparseBlockTensor object.
         '''
         raise NotImplementedError()
 
@@ -464,7 +530,7 @@ class SparseBlockMatrix(object):
         assert ( self.rows == other.rows and self.cols == other.cols), \
             f'Incompatible dimensions: self: [{self.rows}, {self.cols}], other: [{other.rows}, {other.cols}]. '
 
-        # Concatenate the raw data of the two SparseBlockMatrix.
+        # Concatenate the raw data of the two SparseBlockTensor.
         c_block_indices = torch.cat( ( self.block_indices, other.block_indices ), dim=0 )
         c_block_storage = torch.cat( ( self.block_storage, other.block_storage ), dim=0 )
 
@@ -476,12 +542,12 @@ class SparseBlockMatrix(object):
             indices, c_block_storage, s_shape, 
             dtype=self.dtype, device=self.device)
 
-        return torch_sparse_coo_to_sbm(s)
+        return torch_sparse_coo_to_sbt(s)
 
     def add_broadcast(self, other):
-        sbm = self.clone()
-        sbm.block_storage.add_(other)
-        return sbm
+        sbt = self.clone()
+        sbt.block_storage.add_(other)
+        return sbt
 
     def add_(self, other):
         '''
@@ -501,28 +567,28 @@ class SparseBlockMatrix(object):
 
     def __add__(self, other):
         '''
-        other: must be a SparseBlockMatrix object, or a tensor, or a scalar value.
+        other: must be a SparseBlockTensor object, or a tensor, or a scalar value.
         '''
 
-        if isinstance(other, SparseBlockMatrix):
+        if isinstance(other, SparseBlockTensor):
             return self.add_sparse_block_matrix(other)
         elif isinstance(other, ( int, float, torch.Tensor)):
             # Not calling add_() to save a call to the isinstance() function.
             return self.add_broadcast(other)
         else:
             raise Exception(
-                f'Currently only supports SparseBlockMatrix, torch.Tensor, or scalar type. type(other) = {type(other)}' )
+                f'Currently only supports SparseBlockTensor, torch.Tensor, or scalar type. type(other) = {type(other)}' )
 
     def __radd__(self, other):
         '''
-        other: must be a SparseBlockMatrix object, or a tensor, or a scalar value.
+        other: must be a SparseBlockTensor object, or a tensor, or a scalar value.
         '''
         return self.__add__(other)
 
     def sub_broadcast(self, other):
-        sbm = self.clone()
-        sbm.block_storage.sub_(other)
-        return sbm
+        sbt = self.clone()
+        sbt.block_storage.sub_(other)
+        return sbt
 
     def sub_(self, other):
         '''
@@ -542,27 +608,27 @@ class SparseBlockMatrix(object):
 
     def __sub__(self, other):
         '''
-        other: must be a SparseBlockMatrix object, or a tensor, or a scalar value.
+        other: must be a SparseBlockTensor object, or a tensor, or a scalar value.
         '''
         
         # This is not implemented as self.__add__( -1 * other) considering that
         # torch.Tensor.sub_() might be more efficient.
 
-        if isinstance(other, SparseBlockMatrix):
+        if isinstance(other, SparseBlockTensor):
             return self.add_sparse_block_matrix( -1 * other )
         elif isinstance(other, ( int, float, torch.Tensor)):
             # Not calling sub_() to save a call to the isinstance() function.
             return self.sub_broadcast(other)
         else:
             raise Exception(
-                f'Currently only supports SparseBlockMatrix, torch.Tensor, or scalar type. type(other) = {type(other)}' )
+                f'Currently only supports SparseBlockTensor, torch.Tensor, or scalar type. type(other) = {type(other)}' )
 
     def __rsub__(self, other):
         '''
-        other: must be a SparseBlockMatrix object, or a tensor, or a scalar value.
+        other: must be a SparseBlockTensor object, or a tensor, or a scalar value.
         '''
         # This saves one multiplication compared with -1 * ( self - other )
-        # When other is a SparseBlockMatrix.
+        # When other is a SparseBlockTensor.
         return (-1 * self) + other
 
     def mul_(self, other):
@@ -599,7 +665,7 @@ class SparseBlockMatrix(object):
         '''
         WARNING: This function causes the data to be offloaded to the CPU and back to the GPU if necessary.
 
-        other: must be a SparseBlockMatrix object.
+        other: must be a SparseBlockTensor object.
         '''
         
         # ========== Checks. ==========
@@ -617,12 +683,12 @@ class SparseBlockMatrix(object):
 
         # ========== Off load the data from GPU to CPU and multiply. ==========
 
-        bsr_self  = sbm_to_bsr_cpu(self)
-        bsr_other = sbm_to_bsr_cpu(other)
+        bsr_self  = sbt_to_bsr_cpu(self)
+        bsr_other = sbt_to_bsr_cpu(other)
         res_cpu   = bsr_self @ bsr_other
 
         # ========== Convert the result back to GPU. ==========
-        res_gpu = bsr_cpu_to_sbm(res_cpu)
+        res_gpu = bsr_cpu_to_sbt(res_cpu)
 
         return res_gpu
         
