@@ -7,6 +7,8 @@ Basics
     :toctree: generated
     :nosignatures:
 
+    add
+    add_
     Exp
     Log
     Inv
