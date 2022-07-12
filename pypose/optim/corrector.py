@@ -30,7 +30,7 @@ class FastTriggs(nn.Module):
             \bm{\theta}^* = \arg\min_{\bm{\theta}} \mathbf{g}(\bm{x})
                         = \arg\min_{\bm{\theta}} \sum_i \rho(\mathbf{R}_i^T \mathbf{R}_i),
 
-        where :math:`\mathbf{R}_i = \bm{y}_i-\bm{f}(\bm{\theta},\bm{x}_i)` and
+        where :math:`\mathbf{R}_i = \bm{f}(\bm{\theta},\bm{x}_i) - \bm{y}_i` and
         :math:`\bm{f}(\bm{\theta}, \bm{x})` is the model, :math:`\bm{\theta}` is the parameters
         to be optimized, :math:`\bm{x}` is the model inputs, :math:`\bm{y}` is the model targets.
         Considering the 1st order Taylor expansion of the model
