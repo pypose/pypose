@@ -80,9 +80,9 @@ class FastTriggs(nn.Module):
             tuple of Tensors: the corrected model residual and model Jacobian.
 
         Note:
-            The :obj:`.forward()` function is not supposed to be directly called by PyPose
-            users. It will be called internally by optimizers such as
-            :meth:`pypose.optim.GN` and :meth:`pypose.optim.LM`.
+            The users basically only need to call the constructor, while the :obj:`.forward()`
+            function is not supposed to be directly called by PyPose users. It will be called
+            internally by optimizers such as :meth:`pypose.optim.GN` and :meth:`pypose.optim.LM`.
         '''
         x = R.square().sum(-1, keepdim=True)
         s = jacobian(self.func, x).sqrt()
@@ -146,9 +146,9 @@ class Triggs(nn.Module):
             tuple of Tensors: the corrected model residual and model Jacobian.
 
         Note:
-            The :obj:`.forward()` function is not supposed to be directly called by PyPose
-            users. It will be called internally by optimizers such as :meth:`pypose.optim.GN`
-            and :meth:`pypose.optim.LM`.
+            The users basically only need to call the constructor, while the :obj:`.forward()`
+            function is not supposed to be directly called by PyPose users. It will be called
+            internally by optimizers such as :meth:`pypose.optim.GN` and :meth:`pypose.optim.LM`.
         '''
         x, g1, g2 = self.compute_grads(R)
         se = g1.sqrt()
