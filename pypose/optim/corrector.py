@@ -58,7 +58,7 @@ class FastTriggs(nn.Module):
                 \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{R}_i\right)
 
         This gives us the corrected model residual :math:`\mathbf{R}_i^\rho` and Jacobian
-        :math:`\mathbf{J}_i^\rho`, which end with the same problem formulation as the
+        :math:`\mathbf{J}_i^\rho`, which ends with the same problem formulation as the
         standard 2nd order optimizers such as :meth:`pypose.optim.GN` and
         :meth:`pypose.optim.LM`.
 
