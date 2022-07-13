@@ -22,9 +22,9 @@ class FastTriggs(nn.Module):
         kernel (nn.Module): the robust kernel (cost) function.
 
     Note:
-        This implementation has a faster and numerically stable solution than :meth:`Triggs`
-        due to the removal of 2nd order derivatives, since most kernel functions have negative
-        Hessians, which can lead a 2nd order optimizer unstable. It basically aims to solve
+        This implementation has a faster and numerically stable solution than :meth:`Triggs`.
+        It removes the kernel's 2nd order derivatives (often negative), which can lead a 2nd
+        order optimizer unstable. It basically aims to solve
 
         .. math::
             \bm{\theta}^* = \arg\min_{\bm{\theta}} \mathbf{g}(\bm{x})
@@ -34,7 +34,7 @@ class FastTriggs(nn.Module):
         :math:`\bm{f}(\bm{\theta}, \bm{x})` is the model, :math:`\bm{\theta}` is the parameters
         to be optimized, :math:`\bm{x}` is the model inputs, :math:`\bm{y}` is the model targets.
         Considering the 1st order Taylor expansion of the model
-        :math:`\bm{f}(\bm{\theta}+\delta) \approx \bm{f}(\bm{\theta}) + \mathbf{J}_i \bm{\theta}`.
+        :math:`\bm{f}(\bm{\theta}+\bm{\delta})\approx\bm{f}(\bm{\theta})+\mathbf{J}_i\bm{\delta}`.
         If we take :math:`c_i = \mathbf{R}_i^T \mathbf{R}_i` and set the first derivative of
         :math:`\mathbf{g}(\bm{\delta})` to zero, we have
 
@@ -58,8 +58,9 @@ class FastTriggs(nn.Module):
                 \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{R}_i\right)
 
         This gives us the corrected model residual :math:`\mathbf{R}_i^\rho` and Jacobian
-        :math:`\mathbf{J}_i^\rho`, which is the solution to the standard 2nd order optimizers
-        such as :meth:`pypose.optim.GN` and :meth:`pypose.optim.LM`.
+        :math:`\mathbf{J}_i^\rho`, which end with the same problem formulation as the
+        standard 2nd order optimizers such as :meth:`pypose.optim.GN` and
+        :meth:`pypose.optim.LM`.
 
         .. math::
             \sum_i {\mathbf{J}_i^\rho}^T \mathbf{J}_i^\rho \bm{\delta}
@@ -106,7 +107,7 @@ class Triggs(nn.Module):
 
     :math:`\mathbf{R}_i` and :math:`\mathbf{J}_i` are the :math:`i`-th item of the model
     residual and Jacobian, respectively. :math:`\rho()` is the kernel function and
-    :math:`c_i = \mathbf{R}_i^T\mathbf{R}_i` is the point to compute the gradients.
+    :math:`c_i = \mathbf{R}_i^T\mathbf{R}_i` is the evaluation point.
 
     Args:
         kernel (nn.Module): the robust kernel (cost) function.
@@ -121,7 +122,7 @@ class Triggs(nn.Module):
     Warning:
 
         The :meth:`FastTriggs` corrector is preferred when the kernel function has a
-        negative Hessian.
+        negative 2nd order derivative.
     '''
     def __init__(self, kernel):
         super().__init__()

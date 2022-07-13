@@ -128,7 +128,7 @@ class GaussNewton(Optimizer):
 
     Note:
         Instead of solving :math:`\mathbf{J}^T\mathbf{J}\delta = -\mathbf{J}^T\mathbf{R}`, we solve
-        :math:`\mathbf{J}\delta = -\mathbf{R}` via QR-decomposition, which is more numerically
+        :math:`\mathbf{J}\delta = -\mathbf{R}` via pseudo inversion, which is more numerically
         advisible. Therefore, only solvers with pseudo inversion (inverting non-square matrices)
         such as :meth:`solver.PINV` and :meth:`solver.LSTSQ` are available.
         More details are in Eq. (5) of the paper "`Robust Bundle Adjustment Revisited`_".
