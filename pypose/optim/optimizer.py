@@ -63,13 +63,11 @@ class GaussNewton(Optimizer):
 
     .. math::
         \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
-            \rho\left(
-                (\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)^T(\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)
-            \right),
+            \rho\left(\|\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\|^2\right),
 
     where :math:`\bm{f}()` is the model, :math:`\bm{\theta}` is the parameters to be optimized,
-    :math:`\bm{x}` is the model inputs, and :math:`\rho` is a robust kernel function.
-    :math:`\rho(x) = x` is used in default.
+    :math:`\bm{x}` is the model inputs, and :math:`\rho` is a robust kernel function to reduce
+    the effect of outliers. :math:`\rho(x) = x` is used by default.
 
     .. math::
        \begin{aligned}
@@ -93,7 +91,7 @@ class GaussNewton(Optimizer):
         model (nn.Module): a module containing learnable parameters.
         solver (nn.Module, optional): a linear solver. Available linear solvers include
             :meth:`solver.PINV` and :meth:`solver.LSTSQ`. If ``None``, :meth:`solver.PINV` is used.
-            Default: None.
+            Default: ``None``.
         kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
         corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit
             the kernel function. If a kernel is given but a corrector is not specified, auto
@@ -114,8 +112,8 @@ class GaussNewton(Optimizer):
         function. This is useful for residuals like re-projection error, whose last
         dimension is 2.
 
-        Note that auto correction is equivalent to the method of 'square-rooting the kernel'
-        mentioned in Section 3.3 of the following paper. This replace the
+        Note that **auto correction** is equivalent to the method of 'square-rooting the kernel'
+        mentioned in Section 3.3 of the following paper. This replaces the
         :math:`d`-dimensional residual with a one-dimensional one, which loses
         residual-level structural information.
 
@@ -124,15 +122,16 @@ class GaussNewton(Optimizer):
           Conference on Computer Vision (ECCV), 2014.
         
         **Therefore, the users need to keep the last dimension of model output and target to
-        1, even if the model residual is a scalar, otherwise the model Jacobian will be a
-        row vector, instead of a matrix, which loses sample-level structural information,
-        but becomes faster.**
+        1, even if the model residual is a scalar. If the model output only has one dimension,
+        the model Jacobian will be a row vector, instead of a matrix, which loses sample-level
+        structural information, although computing Jacobian vector is faster.**
 
     Note:
         Instead of solving :math:`\mathbf{J}^T\mathbf{J}\delta = -\mathbf{J}^T\mathbf{R}`, we solve
         :math:`\mathbf{J}\delta = -\mathbf{R}` via QR-decomposition, which is more numerically
-        advisible. Therefore, only solvers with pseudo inversion such as :meth:`solver.PINV` and
-        :meth:`solver.LSTSQ` are available. More details are in Eq. (5) of the paper:
+        advisible. Therefore, only solvers with pseudo inversion (inverting non-square matrices)
+        such as :meth:`solver.PINV` and :meth:`solver.LSTSQ` are available.
+        More details are in Eq. (5) of the paper "`Robust Bundle Adjustment Revisited`_".
     '''
     def __init__(self, model, solver=None, kernel=None, corrector=None):
         super().__init__(model.parameters(), defaults={})
@@ -158,7 +157,7 @@ class GaussNewton(Optimizer):
 
         Return:
             Tensor: the minimized model loss, i.e.,
-            :math:`\sum_i\rho(\|\bm{y}_i - \bm{f}(\bm{\theta}, \bm{x}_i)\|^2)`.
+            :math:`\sum_i \rho( \|\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\|^2)`.
 
         Note:
             Different from PyTorch optimizers like
@@ -212,20 +211,18 @@ class GaussNewton(Optimizer):
 
 class LevenbergMarquardt(Optimizer):
     r'''
-    The Levenberg-Marquardt (LM) algorithm, which is also known as the damped least-squares (DLS)
+    The Levenberg-Marquardt (LM) algorithm, which is also known as the damped least squares (DLS)
     method for solving non-linear least squares problems. This implementation is for optimizing the
     model parameters to approximate the targets, which can be a Tensor/LieTensor or a tuple of
     Tensors/LieTensors.
 
     .. math::
         \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
-            \rho\left(
-                (\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)^T(\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)
-            \right),
+            \rho\left(\|\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\|^2\right),
 
     where :math:`\bm{f}()` is the model, :math:`\bm{\theta}` is the parameters to be optimized,
-    :math:`\bm{x}` is the model inputs, and :math:`\rho` is a robust kernel function.
-    :math:`\rho(x) = x` is used in default.
+    :math:`\bm{x}` is the model inputs, and :math:`\rho` is a robust kernel function to reduce
+    the effect of outliers. :math:`\rho(x) = x` is used by default.
 
     .. math::
        \begin{aligned}
@@ -237,8 +234,8 @@ class LevenbergMarquardt(Optimizer):
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
             &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}
                 {\partial \bm{\theta}_{t-1}}}                                                    \\
-            &\hspace{5mm} \mathbf{A} \leftarrow (\mathbf{J}^T \mathbf{J} 
-                + \lambda \mathrm{diag}(\mathbf{J}^T \mathbf{J})).\mathrm{clamp(min, max)}       \\
+            &\hspace{5mm} \mathbf{A} \leftarrow (\mathbf{J}^T \mathbf{J} + \lambda
+                \mathrm{diag}(\mathbf{J}^T \mathbf{J})).\mathrm{diagnal\_clamp(min, max)}        \\
             &\hspace{5mm} \mathbf{R} = \bm{f(\bm{\theta}_{t-1}, \bm{x})} - \bm{y}                \\
             &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
             &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{A}, -\mathbf{J}^T\mathbf{R})     \\
@@ -252,14 +249,14 @@ class LevenbergMarquardt(Optimizer):
         model (nn.Module): a module containing learnable parameters.
         damping (float): Levenberg's damping factor (positive number).
         solver (nn.Module, optional): a linear solver. If ``None``, :meth:`solver.Cholesky` is used.
-            Default: None.
+            Default: ``None``.
         kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
         corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit the kernel
             function. If a kernel is given but a corrector is not specified, auto correction is
             used. Auto correction can be unstable when the robust model has indefinite Hessian.
             Default: ``None``.
-        min (float, optional): the lower-bound of the matrix diagonal to inverse. Default: 1e-6.
-        max (float, optional): the upper-bound of the matrix diagonal to inverse. Default: 1e32.
+        min (float, optional): the lower-bound of the Hessian diagonal. Default: 1e-6.
+        max (float, optional): the upper-bound of the Hessian diagonal. Default: 1e32.
 
     Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`, :meth:`solver.Cholesky`.
 
@@ -274,7 +271,7 @@ class LevenbergMarquardt(Optimizer):
         function. This is useful for residuals like re-projection error, whose last
         dimension is 2.
 
-        Note that auto correction is equivalent to the method of 'square-rooting the kernel'
+        Note that **auto correction** is equivalent to the method of 'square-rooting the kernel'
         mentioned in Section 3.3 of the following paper. This replace the
         :math:`d`-dimensional residual with a one-dimensional one, which loses
         residual-level structural information.
@@ -284,9 +281,9 @@ class LevenbergMarquardt(Optimizer):
           Conference on Computer Vision (ECCV), 2014.
         
         **Therefore, the users need to keep the last dimension of model output and target to
-        1, even if the model residual is a scalar, otherwise the model Jacobian will be a
-        row vector, instead of a matrix, which loses sample-level structural information,
-        but becomes faster.**
+        1, even if the model residual is a scalar. If the model output only has one dimension,
+        the model Jacobian will be a row vector, instead of a matrix, which loses sample-level
+        structural information, although computing Jacobian vector is faster.**
     '''
     def __init__(self, model, damping, solver=None, kernel=None, corrector=None, min=1e-6, max=1e32):
         assert damping > 0, ValueError("damping factor has to be positive: {}".format(damping))
@@ -316,13 +313,13 @@ class LevenbergMarquardt(Optimizer):
 
         Return:
             Tensor: the minimized model loss, i.e.,
-            :math:`\sum_i\rho(\|\bm{y}_i - \bm{f}(\bm{\theta}, \bm{x}_i)\|^2)`.
+            :math:`\sum_i \rho( \|\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\|^2)`.
 
         Note:
             The (non-negative) damping factor :math:`\lambda` can be adjusted at each iteration. If
-            reduction of the residual is rapid, a smaller value can be used, bringing the algorithm
-            closer to the Gauss-Newton algorithm, whereas if an iteration gives insufficient reduction
-            in the residual, :math:`\lambda` can be increased, giving a step closer to the gradient
+            the residual reduces rapidly, a smaller value can be used, bringing the algorithm
+            closer to the Gauss-Newton algorithm, whereas if an iteration gives insufficient residual
+            reduction, :math:`\lambda` can be increased, giving a step closer to the gradient
             descent direction.
 
             See more details of `Levenberg-Marquardt (LM) algorithm
