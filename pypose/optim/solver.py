@@ -33,16 +33,19 @@ class PINV(nn.Module):
     <https://pytorch.org/docs/stable/generated/torch.linalg.pinv.html>`_.
 
     Warning:
-        It is always prefered to use :meth:`LSTSQ`, which is faster and more numerically stable.
+        It is always preferred to use :meth:`LSTSQ`, which is faster and more numerically stable.
 
     Examples:
-        >>> import torch, pypose.optim.solver as ps
-        >>> A, b = torch.randn(3, 3), torch.randn(3, 1)
-        >>> solver = ps.PINV()
+        >>> import torch, pypose.optim.solver as ppos
+        >>> A, b = torch.randn(2, 3, 3), torch.randn(2, 3, 1)
+        >>> solver = ppos.PINV()
         >>> x = solver(A, b)
-        tensor([[ 1.8572],
-                [-1.4063],
-                [-0.7925]])
+        tensor([[[-0.2675],
+                 [-0.1897],
+                 [ 0.2708]],
+                [[-0.3472],
+                 [ 1.1191],
+                 [ 0.3301]]])
     '''
     def __init__(self, atol=None, rtol=None, hermitian=False):
         super().__init__()
@@ -113,13 +116,16 @@ class LSTSQ(nn.Module):
         to be positive definite.
 
     Examples:
-        >>> import torch, pypose.optim.solver as ps
-        >>> A, b = torch.randn(3, 3), torch.randn(3, 1)
-        >>> solver = ps.LSTSQ(driver='gels')
+        >>> import torch, pypose.optim.solver as ppos
+        >>> A, b = torch.randn(2, 3, 3), torch.randn(2, 3, 1)
+        >>> solver = ppos.LSTSQ(driver='gels')
         >>> x = solver(A, b)
-        tensor([[ 1.8572],
-                [-1.4063],
-                [-0.7925]])
+        tensor([[[ 0.9997],
+                 [-1.3288],
+                 [-1.6327]],
+                [[ 3.1639],
+                 [-0.5379],
+                 [-1.2872]]])
     '''
     def __init__(self, rcond=None, driver=None):
         super().__init__()
@@ -170,18 +176,18 @@ class Cholesky(nn.Module):
             Default: ``False``.
 
     Examples:
-        >>> import torch, pypose.optim.solver as ps
-        >>> A = torch.tensor([[1.0000, 0.1000, 0.0000],
-        ...                   [0.1000, 1.0000, 0.2000],
-        ...                   [0.0000, 0.2000, 1.0000]])
-        >>> b = torch.tensor([[1.],
-        ...                   [2.],
-        ...                   [3.]])
-        >>> solver = ps.Cholesky()
+        >>> import torch, pypose.optim.solver as ppos
+        >>> A = torch.tensor([[[1.00, 0.10, 0.00], [0.10, 1.00, 0.20], [0.00, 0.20, 1.00]],
+                              [[1.00, 0.20, 0.10], [0.20, 1.00, 0.20], [0.10, 0.20, 1.00]]])
+        >>> b = torch.tensor([[[1.], [2.], [3.]], [[1.], [2.], [3.]]])
+        >>> solver = ppos.Cholesky()
         >>> x = solver(A, b)
-        tensor([[0.8632],
-                [1.3684],
-                [2.7263]])
+        tensor([[[0.8632],
+                 [1.3684],
+                 [2.7263]],
+                [[0.4575],
+                 [1.3725],
+                 [2.6797]]])
     '''
     def __init__(self, upper=False):
         super().__init__()
