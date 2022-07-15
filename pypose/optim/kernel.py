@@ -25,7 +25,8 @@ class Huber(nn.Module):
         Huber loss function is needed.
 
     Example:
-        >>> kernel = pp.module.Huber()
+        >>> import pypose.optim.kernel as ppok
+        >>> kernel = ppok.Huber()
         >>> input = torch.tensor([0, 0.5, 1, 2, 3])
         >>> kernel(input)
         tensor([0.0000, 0.5000, 1.0000, 1.8284, 2.4641])
@@ -67,7 +68,8 @@ class PseudoHuber(nn.Module):
         input.
 
     Example:
-        >>> kernel = pp.module.PseudoHuber()
+        >>> import pypose.optim.kernel as ppok
+        >>> kernel = ppok.PseudoHuber()
         >>> input = torch.tensor([0, 0.5, 1, 2, 3])
         >>> kernel(input)
         tensor([0.0000, 0.4495, 0.8284, 1.4641, 2.0000])
@@ -103,7 +105,8 @@ class Cauchy(nn.Module):
         input.
 
     Example:
-        >>> kernel = pp.module.Cauchy()
+        >>> import pypose.optim.kernel as ppok
+        >>> kernel = ppok.Cauchy()
         >>> input = torch.tensor([0, 0.5, 1, 2, 3])
         >>> kernel(input)
         tensor([0.0000, 0.4055, 0.6931, 1.0986, 1.3863])

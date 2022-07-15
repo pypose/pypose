@@ -2,9 +2,9 @@ import warnings
 import torch, time
 import pypose as pp
 from torch import nn
-import pypose.optim.solver as pps
-import pypose.optim.kernel as ppk
-import pypose.optim.corrector as ppc
+import pypose.optim.solver as ppos
+import pypose.optim.kernel as ppok
+import pypose.optim.corrector as ppoc
 
 
 class Timer:
@@ -137,9 +137,9 @@ timer = Timer()
 target = pp.identity_se3(2, 2).to(device)
 inputs = pp.randn_SE3(2, 2).to(device)
 posnet = PoseInv(2, 2).to(device)
-solver = pps.Cholesky()
-kernel = ppk.Cauchy()
-corrector = ppc.FastTriggs(kernel)
+solver = ppos.Cholesky()
+kernel = ppok.Cauchy()
+corrector = ppoc.FastTriggs(kernel)
 optimizer = pp.optim.LM(posnet, damping=1e-6, solver=solver, kernel=kernel, corrector=corrector)
 
 for idx in range(10):
