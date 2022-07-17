@@ -8,17 +8,17 @@ class IMUPreintegrator(nn.Module):
     Applies preintegration over IMU input signals.
 
     Args:
-        pos (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
+        pos (torch.Tensor, optional): initial position. Default: torch.zeros(3)
         rot (pypose.SO3, optional): initial rotation. Default: :meth:`pypose.identity_SO3`
-        vel (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
+        vel (torch.Tensor, optional): initial position. Default: torch.zeros(3)
         gravity (float, optional): the gravity acceleration. Default: 9.81007
         gyro_cov (float, optional): covariance of the gyroscope. Default: (1.6968e-4)**2
         acc_cov (float, optional): covariance of the accelerator. Default: (2e-3)**2
-        prop_cov (Bool, optional): flag to propogate the covariance matrix. Default: :obj:`True`
+        prop_cov (Bool, optional): flag to propagate the covariance matrix. Default: :obj:`True`
         reset (Bool, optional): flag to reset the initial states after each time the :obj:`forward`
             function is called. If False, the IMU integrator will use the states from last time
             as the initial states. Note that if the :obj:`init_state` is not :obj:`None` while calling 
-            the :obj:`forward` function, the integrator will use the given inital state Default: :obj:`False`.
+            the :obj:`forward` function, the integrator will use the given initial state Default: :obj:`False`.
     '''
     def __init__(self, pos = torch.zeros(3),
                        rot = pp.identity_SO3(),
@@ -131,7 +131,7 @@ class IMUPreintegrator(nn.Module):
                 \end{bmatrix},
 
         where :math:`\cdot^\wedge` is the skew matrix (:meth:`pypose.vec2skew`),
-        :math:`C \in\mathbf{R}^{9\times 9}` is the covarience matrix,
+        :math:`C \in\mathbf{R}^{9\times 9}` is the covariance matrix,
         and :math:`J_r^k` is the right jacobian (:meth:`pypose.Jr`) of integrated rotation
         :math:`\mathrm{Exp}(w_k{\Delta}t)` at :math:`k`-th time step,
         :math:`C_{g}` and :math:`C_{\mathbf{a}}` are measurement covariance of angular rate
@@ -160,7 +160,7 @@ class IMUPreintegrator(nn.Module):
         Note:
             The implementation is based on Eq. (A7), (A8), (A9), and (A10) of this report:
 
-            * Christian Forster, et al., `IMU Preintegration on Manifold for Ecient Visual-Inertial
+            * Christian Forster, et al., `IMU Preintegration on Manifold for Efficient Visual-Inertial
               Maximum-a-Posteriori Estimation
               <https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf>`_, Technical Report
               GT-IRIM-CP&R-2015-001, 2015.

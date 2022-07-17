@@ -129,7 +129,7 @@ class GaussNewton(Optimizer):
     Note:
         Instead of solving :math:`\mathbf{J}^T\mathbf{J}\delta = -\mathbf{J}^T\mathbf{R}`, we solve
         :math:`\mathbf{J}\delta = -\mathbf{R}` via pseudo inversion, which is more numerically
-        advisible. Therefore, only solvers with pseudo inversion (inverting non-square matrices)
+        advisable. Therefore, only solvers with pseudo inversion (inverting non-square matrices)
         such as :meth:`solver.PINV` and :meth:`solver.LSTSQ` are available.
         More details are in Eq. (5) of the paper "`Robust Bundle Adjustment Revisited`_".
     '''
@@ -190,14 +190,14 @@ class GaussNewton(Optimizer):
             ...     error = optimizer.step(inputs)
             ...     print('Pose Inversion error %.7f @ %d it'%(error, idx))
             ...     if error < 1e-5:
-            ...         print('Early Stoping with error:', error.item())
+            ...         print('Early Stopping with error:', error.item())
             ...         break
             ...
             Pose Inversion error: 1.6865690 @ 0 it
             Pose Inversion error: 0.1065131 @ 1 it
             Pose Inversion error: 0.0002673 @ 2 it
             Pose Inversion error: 0.0000005 @ 3 it
-            Early Stoping with error: 5.21540641784668e-07
+            Early Stopping with error: 5.21540641784668e-07
         '''
         R = self.model(inputs, targets)
         for pg in self.param_groups:
@@ -352,14 +352,14 @@ class LevenbergMarquardt(Optimizer):
             ...     loss = optimizer.step(inputs)
             ...     print('Pose Inversion loss %.7f @ %d it'%(loss, idx))
             ...     if loss < 1e-5:
-            ...         print('Early Stoping with loss:', loss.item())
+            ...         print('Early Stopping with loss:', loss.item())
             ...         break
             ...
             Pose Inversion error: 1.6600330 @ 0 it
             Pose Inversion error: 0.1296970 @ 1 it
             Pose Inversion error: 0.0008593 @ 2 it
             Pose Inversion error: 0.0000004 @ 3 it
-            Early Stoping with error: 4.443569991963159e-07
+            Early Stopping with error: 4.443569991963159e-07
         '''
         R = self.model(inputs, targets)
         for pg in self.param_groups:

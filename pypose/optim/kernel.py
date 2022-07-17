@@ -19,7 +19,7 @@ class Huber(nn.Module):
             be positive. Default: 1.0
 
     Note:
-        The input has to be a non-nagative tensor and the output tensor has the same shape with the
+        The input has to be a non-negative tensor and the output tensor has the same shape with the
         input. Use `torch.nn.HuberLoss
         <https://pytorch.org/docs/stable/generated/torch.nn.HuberLoss.html>`_ instead, if a scalar
         Huber loss function is needed.
@@ -64,7 +64,7 @@ class PseudoHuber(nn.Module):
         delta (float, optional): Specify the slope. The value must be positive. Default: 1.0
 
     Note:
-        The input has to be a non-nagative tensor and the output tensor has the same shape with the
+        The input has to be a non-negative tensor and the output tensor has the same shape with the
         input.
 
     Example:
@@ -101,7 +101,7 @@ class Cauchy(nn.Module):
         delta (float, optional): Specify the Cauchy cost. The value must be positive. Default: 1.0
 
     Note:
-        The input has to be a non-nagative tensor and the output tensor has the same shape with the
+        The input has to be a non-negative tensor and the output tensor has the same shape with the
         input.
 
     Example:
