@@ -36,7 +36,7 @@ class PINV(nn.Module):
         It is always preferred to use :meth:`LSTSQ`, which is faster and more numerically stable.
 
     Examples:
-        >>> import torch, pypose.optim.solver as ppos
+        >>> import pypose.optim.solver as ppos
         >>> A, b = torch.randn(2, 3, 3), torch.randn(2, 3, 1)
         >>> solver = ppos.PINV()
         >>> x = solver(A, b)
@@ -83,17 +83,19 @@ class LSTSQ(nn.Module):
     <https://pytorch.org/docs/stable/generated/torch.linalg.lstsq.html>`_.
 
     Args:
-        rcond (float, optional): used to determine the effective rank of :math:`\mathbf{A}`. It is
-            used only when the fast model is enabled. If ``None``, rcond is set to the machine
-            precision of the dtype of :math:`\mathbf{A}`. Default: ``None``.
+        rcond (float, optional): Cut-off ratio for small singular values. For the purposes of
+            rank determination, singular values are treated as zero if they are smaller than
+            rcond times the largest singular value. It is used only when the fast model is
+            enabled. If ``None``, rcond is set to the machine precision of the dtype of
+            :math:`\mathbf{A}`. Default: ``None``.
         driver (string, optional): chooses the LAPACK/MAGMA function that will be used. It is
             used only when the fast model is enabled. For CPU users, the valid values are ``gels``,
             ``gelsy``, ``gelsd``, ``gelss``. For CUDA users, the only valid driver is ``gels``,
-            which assumes that :math:`\mathbf{A}` is full-rank. If ``None``, ``gelsy`` is used for
-            CPU inputs and ``gels`` for CUDA inputs. Default: ``None``.
+            which assumes that input matrices (:math:`\mathbf{A}`) are full-rank. If ``None``,
+            ``gelsy`` is used for CPU inputs and ``gels`` for CUDA inputs. Default: ``None``.
             To choose the best driver on CPU consider:
 
-            - If :math:`\mathbf{A}` is well-conditioned (its `condition number
+            - If input matrices (:math:`\mathbf{A}`) are well-conditioned (`condition number
               <https://en.wikipedia.org/wiki/Condition_number>`_ is not too large), or you do not
               mind some precision loss.
 
@@ -101,22 +103,22 @@ class LSTSQ(nn.Module):
 
                 - If A is full-rank: ``gels`` (QR)
 
-            - If :math:`\mathbf{A}` is not well-conditioned.
+            - If input matrices (:math:`\mathbf{A}`) are not well-conditioned.
 
                 - ``gelsd`` (tridiagonal reduction and SVD)
 
                 - But if you run into memory issues: ``gelss`` (full SVD).
 
             See full description of `drivers <https://www.netlib.org/lapack/lug/node27.html>`_.
-    
+
     Note:
         This solver is faster and more numerically stable than :meth:`PINV`.
 
-        It is also preferred to use :meth:`Cholesky` if the matrix :math:`\mathbf{A}` is guaranteed
-        to be a complex Hermitian or a real symmetric positive-definite matrix.
+        It is also preferred to use :meth:`Cholesky` if input matrices (:math:`\mathbf{A}`)
+        are guaranteed to complex Hermitian or real symmetric positive-definite.
 
     Examples:
-        >>> import torch, pypose.optim.solver as ppos
+        >>> import pypose.optim.solver as ppos
         >>> A, b = torch.randn(2, 3, 3), torch.randn(2, 3, 1)
         >>> solver = ppos.LSTSQ(driver='gels')
         >>> x = solver(A, b)
@@ -154,8 +156,8 @@ class Cholesky(nn.Module):
 
     where :math:`\mathbf{A}_i \in \mathbb{C}^{M \times N}` and :math:`\bm{b}_i \in
     \mathbb{C}^{M \times 1}` are the :math:`i`-th item of batched linear equations.
-    Note that :math:`\mathbf{A}` has to be complex Hermitian or real symmetric
-    positive-definite matrices.
+    Note that :math:`\mathbf{A}_i` has to be a complex Hermitian or a real symmetric
+    positive-definite matrix.
 
     The solution is given by
 
@@ -164,7 +166,7 @@ class Cholesky(nn.Module):
             \bm{L}_i &= \mathrm{cholesky}(\mathbf{A}_i), \\
             \bm{x}_i &= \mathrm{cholesky\_solve}(\mathbf{b}_i, \bm{L}_i), \\
         \end{align*}
-        
+
     where :math:`\mathrm{cholesky}()` is the `Cholesky decomposition
     <https://en.wikipedia.org/wiki/Cholesky_decomposition>`_ function.
 
@@ -178,7 +180,7 @@ class Cholesky(nn.Module):
             Default: ``False``.
 
     Examples:
-        >>> import torch, pypose.optim.solver as ppos
+        >>> import pypose.optim.solver as ppos
         >>> A = torch.tensor([[[1.00, 0.10, 0.00], [0.10, 1.00, 0.20], [0.00, 0.20, 1.00]],
                               [[1.00, 0.20, 0.10], [0.20, 1.00, 0.20], [0.10, 0.20, 1.00]]])
         >>> b = torch.tensor([[[1.], [2.], [3.]], [[1.], [2.], [3.]]])
