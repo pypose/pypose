@@ -78,8 +78,9 @@ class LSTSQ(nn.Module):
     .. math::
         \bm{x}_i = \mathrm{lstsq}(\mathbf{A}_i, \mathbf{b}_i),
         
-    where :math:`\mathrm{lstsq}()` is the function for directly calculating the matrix multiplication
-    of :math:`\mathbf{b}_i` with the pseudo inversion of :math:`\mathbf{A}_i`.
+    where :math:`\mathrm{lstsq}()` computes a solution to the least squares problem
+    of a system of linear equations. More details go to `torch.linalg.lstsq
+    <https://pytorch.org/docs/stable/generated/torch.linalg.lstsq.html>`_.
 
     Args:
         rcond (float, optional): used to determine the effective rank of :math:`\mathbf{A}`. It is
@@ -109,11 +110,10 @@ class LSTSQ(nn.Module):
             See full description of `drivers <https://www.netlib.org/lapack/lug/node27.html>`_.
     
     Note:
-        This solver is faster and more numerically stable than :meth:`PINV`. More details go to
-        `torch.linalg.lstsq <https://pytorch.org/docs/stable/generated/torch.linalg.lstsq.html>`_.
+        This solver is faster and more numerically stable than :meth:`PINV`.
 
         It is also preferred to use :meth:`Cholesky` if the matrix :math:`\mathbf{A}` is guaranteed
-        to be positive definite.
+        to be a complex Hermitian or a real symmetric positive-definite matrix.
 
     Examples:
         >>> import torch, pypose.optim.solver as ppos
@@ -154,14 +154,16 @@ class Cholesky(nn.Module):
 
     where :math:`\mathbf{A}_i \in \mathbb{C}^{M \times N}` and :math:`\bm{b}_i \in
     \mathbb{C}^{M \times 1}` are the :math:`i`-th item of batched linear equations.
+    Note that :math:`\mathbf{A}` has to be complex Hermitian or real symmetric
+    positive-definite matrices.
 
     The solution is given by
 
     .. math::
         \begin{align*}
-            \bm{L}_i &= \mathrm{cholesky}(\mathbf{A}_i) \\
-            \bm{x}_i &= \mathrm{cholesky\_solve}(\mathbf{b}_i, \bm{L}_i) \\
-        \end{align*},
+            \bm{L}_i &= \mathrm{cholesky}(\mathbf{A}_i), \\
+            \bm{x}_i &= \mathrm{cholesky\_solve}(\mathbf{b}_i, \bm{L}_i), \\
+        \end{align*}
         
     where :math:`\mathrm{cholesky}()` is the `Cholesky decomposition
     <https://en.wikipedia.org/wiki/Cholesky_decomposition>`_ function.
