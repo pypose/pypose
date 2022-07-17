@@ -211,10 +211,10 @@ class GaussNewton(Optimizer):
 
 class LevenbergMarquardt(Optimizer):
     r'''
-    The Levenberg-Marquardt (LM) algorithm, which is also known as the damped least squares (DLS)
-    method for solving non-linear least squares problems. This implementation is for optimizing the
-    model parameters to approximate the targets, which can be a Tensor/LieTensor or a tuple of
-    Tensors/LieTensors.
+    The Levenberg-Marquardt (LM) algorithm solving non-linear least squares problems. It
+    is also known as the damped least squares (DLS) method. This implementation is for
+    optimizing the model parameters to approximate the targets, which can be a
+    Tensor/LieTensor or a tuple of Tensors/LieTensors.
 
     .. math::
         \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
