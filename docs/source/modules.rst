@@ -8,3 +8,4 @@ Modules
 
    :template: autosummary/class-no-inherit.rst
    module.IMUPreintegrator
+   module.LTI
