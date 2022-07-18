@@ -115,13 +115,13 @@ se3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=se3_type)
     with the axis-angle representation of the rotation:
 
     .. math::
-        \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z, \tau_x, \tau_y, \tau_z],
+        \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z],
 
-    where :math:`\begin{pmatrix} \delta_x & \delta_y & \delta_z \end{pmatrix}^T`
-    is the axis-angle vector as in :obj:`pypose.so3`, and
-    :math:`\begin{pmatrix} \tau_x & \tau_y & \tau_z \end{pmatrix}^T = \mathbf{J}^{-1}
-    \begin{pmatrix} t_x & t_y & t_z \end{pmatrix}^T` is the product between the
-    left Jacobian inverse (of SO3's logarithm map) and the translation vector.
+    where :math:`\begin{pmatrix} \tau_x & \tau_y & \tau_z \end{pmatrix}^T =
+    \mathbf{J}^{-1} \begin{pmatrix} t_x & t_y & t_z \end{pmatrix}^T` is the product
+    between the left Jacobian inverse (of SO3's logarithm map) and the translation
+    vector, and :math:`\begin{pmatrix} \delta_x & \delta_y & \delta_z \end{pmatrix}^T`
+    is the axis-angle vector as in :obj:`pypose.so3`.
     See :meth:`pypose.Log` with :obj:`SE3_type` input.
 
     Examples:
@@ -206,9 +206,9 @@ sim3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=sim3_typ
     .. math::
         \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z, \log s],
 
-    where :math:`\begin{pmatrix} \tau_x & \tau_y & \tau_z \end{pmatrix}^T  = \mathbf{W}^{-1}
+    where :math:`\begin{pmatrix} \tau_x & \tau_y & \tau_z \end{pmatrix}^T = \mathbf{W}^{-1}
     \begin{pmatrix} t_x & t_y & t_z \end{pmatrix}^T` is the product between the
-    left Jacobian inverse (of RxSO3's logarithm map) and the translation vector, and
+    inverse of the ":math:`W`-matrix" and the translation vector, and
     :math:`\begin{pmatrix} \delta_x & \delta_y & \delta_z & \log s \end{pmatrix}^T`
     represents the rotation and scaling, as in :obj:`pypose.rxso3`.
     See :meth:`pypose.Log` with :obj:`Sim3_type` input.
