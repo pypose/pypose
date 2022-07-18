@@ -1,2 +1,2 @@
-from .dynamics import _System, LTI
+from .dynamics import LTI
 from .imu_preintegrator import IMUPreintegrator
