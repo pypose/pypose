@@ -64,36 +64,36 @@ class LTI(_System):
         
         assert A.ndimension() == B.ndimension() == C.ndimension() == D.ndimension()
 
-        self.A = A
-        self.B = B
-        self.C = C
-        self.D = D
-        self.c1 = c1
-        self.c2 = c2
+        self._A = A
+        self._B = B
+        self._C = C
+        self._D = D
+        self._c1 = c1
+        self._c2 = c2
     
     @property
     def A(self):
-        return self.A
+        return self._A
     
     @property
     def B(self):
-        return self.B
+        return self._B
     
     @property
     def C(self):
-        return self.C
+        return self._C
     
     @property
     def D(self):
-        return self.D
+        return self._D
     
     @property
     def c1(self):
-        return self.c1
+        return self._c1
     
     @property
     def c2(self):
-        return self.c2
+        return self._c2
     
     def forward(self, x, u):
         r'''
@@ -167,20 +167,20 @@ class LTI(_System):
                     [[-0.6836,  0.3439, -1.3006]]]))
 
         '''
-        if not isinstance(x, Variable) and isinstance(self.A, Variable):
-            A = self.A.data
-            B = self.B.data
-            C = self.C.data
-            D = self.D.data
-            c1 = self.c1.data if self.c1 is not None else 0.
-            c2 = self.c2.data if self.c2 is not None else 0.
+        if not isinstance(x, Variable) and isinstance(self._A, Variable):
+            A = self._A.data
+            B = self._B.data
+            C = self._C.data
+            D = self._D.data
+            c1 = self._c1.data if self._c1 is not None else 0.
+            c2 = self._c2.data if self._c2 is not None else 0.
         else:
-            A = self.A
-            B = self.B
-            C = self.C
-            D = self.D
-            c1 = self.c1 if self.c1 is not None else 0.
-            c2 = self.c2 if self.c2 is not None else 0.
+            A = self._A
+            B = self._B
+            C = self._C
+            D = self._D
+            c1 = self._c1 if self._c1 is not None else 0.
+            c2 = self._c2 if self._c2 is not None else 0.
 
         x_dim, u_dim = x.ndimension(), u.ndimension()
         if x_dim == 1:
