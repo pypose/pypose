@@ -33,7 +33,7 @@ class IMUCorrector(nn.Module):
 
 def get_loss(inte_state, data):
     pos_loss = torch.nn.functional.mse_loss(inte_state['pos'][:,-1,:], data['gt_pos'][:,-1,:])
-    rot_loss = torch.nn.functional.mse_loss(inte_state['rot'][:,-1,:].Log(), data['gt_rot'][:,-1,:].Log())
+    rot_loss = (data['gt_rot'][:,-1,:] * inte_state['rot'][:,-1,:].Inv()).Log().norm()
 
     loss = pos_loss + rot_loss
     return loss, {'pos_loss': pos_loss, 'rot_loss': rot_loss}
