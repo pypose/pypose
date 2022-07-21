@@ -270,8 +270,6 @@ class so3Type(LieType):
     def Jr(self, x):
         """
         Right jacobian of so(3)
-        The code is taken from the Sophus codebase :
-        https://github.com/XueLianjie/BA_schur/blob/3af9a94248d4a272c53cfc7acccea4d0208b77f7/thirdparty/Sophus/sophus/so3.hpp#L113
         """
         K = vec2skew(x)
         theta = torch.linalg.norm(x, dim=-1, keepdim=True).unsqueeze(-1)

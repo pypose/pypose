@@ -76,7 +76,7 @@ def mat2SO3(mat, check=True):
 
     if check:
         e0 = mat @ mat.mT
-        e1 = torch.eye(3, dtype=mat.dtype).repeat(shape[:-2] + (1, 1))
+        e1 = torch.eye(3, dtype=mat.dtype, device = e0.device).repeat(shape[:-2] + (1, 1))
         if not torch.allclose(e0, e1, atol=torch.finfo(e0.dtype).resolution):
             raise ValueError("Input rotation matrices are not all orthogonal matrix")
 
