@@ -2,48 +2,69 @@ import torch as torch
 import torch.nn as nn
 import pypose as pp
 from torch.autograd import Variable
+from torch.autograd.functional import jacobian
+
 
 class _System(nn.Module):
-    def __init__(self,time=False):
+    def __init__(self, time=False):
         super().__init__()
+        self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
         if time:
             self.register_buffer('t',torch.zeros(1))
-            self.register_forward_hook(self.timeplus1)
+            self.register_forward_hook(self.forward_hook)
 
-    def timeplus1(self,module,inputs,outputs):
+    def forward_hook(self, module, inputs, outputs):
+        self.input, self.state = inputs
         self.t.add_(1)
 
-    def forward(self,state,input):
-        state = self.state_transition(state,input)
-        return self.observation(state,input)
-    
+    def forward(self, state, input):
+        r''''''
+        state = self.state_transition(state, input)
+        return self.observation(state, input)
+
     def state_trasition(self):
         pass
 
     def observation(self):
         pass
-    
+
     def reset(self,t=0):
         self.t.fill_(0)
-        
+
     @property
     def A(self):
-        pass
-    
+        if hasattr(self, '_A'):
+            return self._A
+        else:
+            func = lambda x: self.state_trasition(x, self.input)
+            return jacobian(func, self.state, **self.jacargs)
+
     @property
     def B(self):
-        pass
-    
+        if hasattr(self, '_B'):
+            return self._B
+        else:
+            func = lambda x: self.state_trasition(self.state, x)
+            return jacobian(func, self.input, **self.jacargs)
+
     @property
     def C(self):
-        pass
-    
+        if hasattr(self, '_C'):
+            return self._C
+        else:
+            func = lambda x: self.observation(x, self.input)
+            return jacobian(func, self.state, **self.jacargs)
+ 
     @property
     def D(self):
-        pass
+        if hasattr(self, '_D'):
+            return self._D
+        else:
+            func = lambda x: self.observation(self.state, x)
+            return jacobian(func, self.input, **self.jacargs)
+
 
 class LTI(_System):
-    
     r'''
     A sub-class of: obj: '_System' to represent Linear Time-Invariant system.
     
@@ -58,35 +79,12 @@ class LTI(_System):
         
         time = False means the system is time invariant.
     '''
-    
-    def __init__(self, A, B, C, D, c1=None, c2=None, time = False):
-        super(LTI, self).__init__()
-        
-        assert A.ndimension() == B.ndimension() == C.ndimension() == D.ndimension()
+    def __init__(self, A, B, C, D, c1=None, c2=None):
+        super(LTI, self).__init__(time=False)
+        assert A.ndim == B.ndim == C.ndim == D.ndim, "Invalid System Matrices dimensions"
+        self._A, self._B, self._C, self._D = A, B, C, D
+        self._c1, self._c2 = c1, c2
 
-        self._A = A
-        self._B = B
-        self._C = C
-        self._D = D
-        self._c1 = c1
-        self._c2 = c2
-    
-    @property
-    def A(self):
-        return self._A
-    
-    @property
-    def B(self):
-        return self._B
-    
-    @property
-    def C(self):
-        return self._C
-    
-    @property
-    def D(self):
-        return self._D
-    
     @property
     def c1(self):
         return self._c1
@@ -136,28 +134,28 @@ class LTI(_System):
             tensor([[ 0.3925, -0.1799, -0.0653],
                     [-0.6016,  1.9318,  1.1651],
                     [-0.3182,  1.4565,  1.0184]]) 
-                B
+            >>> B
             tensor([[-0.4794, -1.7299],
                     [-1.1820, -0.0606],
                     [-1.2021, -0.5444]]) 
-                C
+            >>> C
             tensor([[-0.1721,  1.6730, -0.6955],
                     [-0.4956,  1.3174,  0.3740],
                     [-0.0835,  0.3706, -1.9351]])
-                D
+            >>> D
             tensor([[ 1.9300e-01, -1.3445e+00],
                     [ 2.6992e-01, -9.1387e-01],
                     [-6.3274e-04,  5.1283e-01]]) 
-                c1
+            >>> c1
             tensor([[[-0.8519, -0.6737, -0.3359]],
                     [[ 0.5543, -0.1456,  1.4389]]]) 
-                c2
+            >>> c2
             tensor([[[-0.7543, -0.6047, -0.6620]],
                     [[ 0.6252,  2.6831, -3.1711]]]) 
-                x
+            >>> x
             tensor([[[ 1.0022, -0.1371,  1.0773]],
                     [[ 0.7227,  0.7777,  1.0332]]]) 
-                u
+            >>> u
             tensor([[[1.7736, 0.7472]],
                     [[0.4841, 0.9187]]])
             >>> lti = LTI(A, B, C, D)
@@ -165,49 +163,30 @@ class LTI(_System):
                     [[-1.7451,  1.6436,  0.8730]]]), 
             tensor([[[-1.8134, -0.4785, -1.8370]],
                     [[-0.6836,  0.3439, -1.3006]]]))
-
         '''
-        if not isinstance(x, Variable) and isinstance(self._A, Variable):
-            A = self._A.data
-            B = self._B.data
-            C = self._C.data
-            D = self._D.data
-            c1 = self._c1.data if self._c1 is not None else 0.
-            c2 = self._c2.data if self._c2 is not None else 0.
-        else:
-            A = self._A
-            B = self._B
-            C = self._C
-            D = self._D
-            c1 = self._c1 if self._c1 is not None else 0.
-            c2 = self._c2 if self._c2 is not None else 0.
 
-        x_dim, u_dim = x.ndimension(), u.ndimension()
-        if x_dim == 1:
+        if x.ndim == 1:
             x = x.unsqueeze(0)
-        if u_dim == 1:
+        if u.ndim == 1:
             u = u.unsqueeze(0)
-            
-        if A.ndimension() >= 3:
-            assert A.ndimension() == B.ndimension() == C.ndimension() == D.ndimension() == x_dim == u_dim
+
+        if self.A.ndim >= 3:
+            assert self.A.ndim == x.ndim == u.ndim
         else:
-            assert A.ndimension() == 2
-            assert B.ndimension() == 2
-            assert C.ndimension() == 2
-            assert D.ndimension() == 2
-            
+            assert self.A.ndim == 2
+
         """
         if c1 is not None:
-            assert c1.ndimension() == x_dim
+            assert c1.ndim == x_dim
         if c2 is not None:
-            assert c2.ndimension() == x_dim
+            assert c2.ndim == x_dim
         """
 
-        z = x.matmul(A.mT) + u.matmul(B.mT) + c1
-        y = x.matmul(C.mT) + u.matmul(D.mT) + c2
-        
-        if x_dim == u_dim == 1:
+        z = x.matmul(self.A.mT) + u.matmul(self.B.mT) + self.c1
+        y = x.matmul(self.C.mT) + u.matmul(self.D.mT) + self.c2
+
+        if x.ndim == u.ndim == 1:
             z = z.squeeze(0)
             y = y.squeeze(0)
-           
+
         return z, y
