@@ -29,13 +29,16 @@ class IMUPreintegrator(nn.Module):
                        prop_cov = True,
                        reset = False):
         super().__init__()
-        self.reset, self.prop_cov, self.gyro_cov, self.acc_cov = reset, prop_cov, gyro_cov, acc_cov
+        self.reset, self.prop_cov = reset, prop_cov
         # Initial status of IMU: (pos)ition, (rot)ation, (vel)ocity, (cov)ariance
         self.register_buffer('gravity', torch.tensor([0, 0, gravity]), persistent=False)
         self.register_buffer('pos', self._check(pos).clone(), persistent=False)
         self.register_buffer('rot', self._check(rot).clone(), persistent=False)
         self.register_buffer('vel', self._check(vel).clone(), persistent=False)
         self.register_buffer('cov', torch.zeros(1, 9, 9), persistent=False)
+        self.register_buffer('gyro_cov', torch.tensor([[gyro_cov, gyro_cov, gyro_cov]]), persistent=False)
+        self.register_buffer('acc_cov', torch.tensor([[acc_cov, acc_cov, acc_cov]]), persistent=False)
+        self.Rij = None # th  referenced rotation of the covariance
 
     def _check(self, obj):
         if obj is not None:
@@ -227,23 +230,40 @@ class IMUPreintegrator(nn.Module):
         assert(0 < len(acc.shape) == len(dt.shape) == len(gyro.shape) <= 3)
         acc = self._check(acc); gyro = self._check(gyro)
         dt = self._check(dt); rot = self._check(rot)
+        B = dt.shape[0]
 
         if init_state is None:
             init_state = {'pos': self.pos, 'rot': self.rot, 'vel': self.vel}
 
-        integrate = self.integrate(init_state, dt, gyro, acc, rot)
-        predict   = self.predict(init_state, integrate)
+        inte_state = self.integrate(init_state, dt, gyro, acc, rot)
+        predict = self.predict(init_state, inte_state)
 
         if self.prop_cov:
             if gyro_cov is None:
-                gyro_cov = self.gyro_cov
+                gyro_cov = self.gyro_cov.repeat([B,1,1])
             if acc_cov is None:
-                acc_cov = self.acc_cov
+                acc_cov = self.acc_cov.repeat([B,1,1])
             if 'cov' not in init_state or init_state['cov'] is None:
-                init_cov = self.cov
+                init_cov = self.cov.expand(B, 9, 9)
             else:
                 init_cov = init_state['cov']
-            cov = self.propagate_cov(integrate, init_cov, gyro_cov, acc_cov)
+            if 'Rij' in init_state:
+                Rij = init_state['Rij']
+            else:
+                Rij = self.Rij # default is None
+
+            if Rij is not None:
+                Rij = Rij * inte_state['rot']
+            else:
+                Rij = inte_state['rot']
+
+            cov_input_state ={
+                'Rij': Rij.detach(),
+                'Rk': inte_state['dr'].detach(),
+                'Ha': pp.vec2skew(inte_state['acc'].detach()),
+                'dt': dt.detach() 
+            }
+            cov = self.propagate_cov(cov_input = cov_input_state, init_cov = init_cov, gyro_cov = gyro_cov, acc_cov = acc_cov)
         else:
             cov = {'cov': None}
 
@@ -252,6 +272,7 @@ class IMUPreintegrator(nn.Module):
             self.rot = predict['rot'][..., -1:, :]
             self.vel = predict['vel'][..., -1:, :]
             self.cov = cov['cov']
+            self.Rij = Rij[..., -1:, :]
 
         return {**predict, **cov}
 
@@ -277,8 +298,8 @@ class IMUPreintegrator(nn.Module):
         incre_t = torch.cumsum(dt, dim = 1)
         incre_t = torch.cat([torch.zeros(B, 1, 1, dtype=dt.dtype, device=dt.device), incre_t], dim =1)
 
-        return {'acc':acc, 'vel':incre_v[...,1:,:], 'pos':incre_p[:,1:,:], 'rot':incre_r[:,1:,:],
-                't':incre_t[...,1:,:], 'dr': dr[:,1:,:], 'dt': dt}
+        return {'acc':a, 'vel':incre_v[...,1:,:], 'pos':incre_p[:,1:,:], 'rot':incre_r[:,1:,:],
+                't':incre_t[...,1:,:], 'dr': dr[:,1:,:]}
 
     @classmethod
     def predict(cls, init_state, integrate):
@@ -289,39 +310,39 @@ class IMUPreintegrator(nn.Module):
         }
 
     @classmethod
-    def propagate_cov(cls, integrate, init_cov, gyro_cov, acc_cov):
-        B, F = integrate['dt'].shape[:2]
-        device = integrate['dt'].device; dtype = integrate['dt'].dtype
-        Cg = torch.eye(3, device=device, dtype=dtype) * gyro_cov
-        Cg = Cg.repeat([B, F, 1, 1])
-        Ca = torch.eye(3, device=device, dtype=dtype) * acc_cov
-        Ca = Ca.repeat([B, F, 1, 1])
+    def propagate_cov(cls, cov_input, init_cov, gyro_cov, acc_cov):
+        ## The input acc_cov and gyro cov should be a vector of 3
+        B, F = cov_input['dt'].shape[:2]
+        device = cov_input['dt'].device; dtype = cov_input['dt'].dtype
 
-        Ha = pp.vec2skew(integrate['acc'])
+        Cg = torch.diag_embed(gyro_cov)
+        Ca = torch.diag_embed(acc_cov)
+
+        # constructing the propagate 
         A = torch.eye(9, device=device, dtype=dtype).repeat([B, F+1, 1, 1])
-        A[:, :-1, 0:3, 0:3] = integrate['dr'].matrix().mT
-        A[:, :-1, 3:6, 0:3] = torch.einsum('...xy,...t -> ...xy', \
-            - integrate['rot'].matrix() @ Ha, integrate['dt'])
-        A[:, :-1, 6:9, 0:3] = torch.einsum('...xy,...t -> ...xy', \
-            - 0.5 * integrate['rot'].matrix() @ Ha, integrate['dt']**2)
-        A[:, :-1, 6:9, 3:6] = torch.einsum('...xy,...t -> ...xy', \
-            torch.eye(3, device=device, dtype=dtype).repeat([B, F, 1, 1]), integrate['dt'])
-
         Bg = torch.zeros(B, F, 9, 3, device=device, dtype=dtype)
-        Bg[..., 0:3, 0:3] = torch.einsum('...xy,...t -> ...xy', integrate['dr'].Log().Jr(), integrate['dt'])
-
         Ba = torch.zeros(B, F, 9, 3, device=device, dtype=dtype)
-        Ba[..., 3:6, 0:3] = torch.einsum('...xy,...t -> ...xy', integrate['rot'].matrix(), integrate['dt'])
-        Ba[..., 6:9, 0:3] = 0.5 * torch.einsum('...xy,...t -> ...xy', integrate['dr'].matrix(), integrate['dt']**2)
+        
+        A[:, :-1, 0:3, 0:3] = cov_input['Rk'].matrix().mT # R_{k,k+1}^T
+        A[:, :-1, 3:6, 0:3] = torch.einsum('...xy,...t -> ...xy', \
+            - cov_input['Rij'].matrix() @ cov_input['Ha'], cov_input['dt'])
+        A[:, :-1, 6:9, 0:3] = torch.einsum('...xy,...t -> ...xy', \
+            - 0.5 * cov_input['Rij'].matrix() @ cov_input['Ha'], cov_input['dt']**2)
+        A[:, :-1, 6:9, 3:6] = torch.einsum('...xy,...t -> ...xy', \
+            torch.eye(3, device=device, dtype=dtype).repeat([B, F, 1, 1]), cov_input['dt'])
+
+        # [J dt, 0, 0]^T
+        Bg[..., 0:3, 0:3] = torch.einsum('...xy,...t -> ...xy', cov_input['Rk'].Jr(), cov_input['dt'])
+
+        # [0, R_{ik}dt, 1/2R_{ik}dt^2]^T
+        Ba[..., 3:6, 0:3] = torch.einsum('...xy,...t -> ...xy', cov_input['Rij'].matrix(), cov_input['dt'])
+        Ba[..., 6:9, 0:3] = 0.5 * torch.einsum('...xy,...t -> ...xy', cov_input['Rij'].matrix(), cov_input['dt']**2)
 
         # the term of B
-        init_cov = init_cov.expand(B, 9, 9)
-        B_cov = torch.einsum('...xy,...t -> ...xy', Bg @ Cg @ Bg.mT + Ba @ Ca @ Ba.mT, 1/integrate['dt'])
+        B_cov = torch.einsum('...xy,...t -> ...xy', Bg @ Cg @ Bg.mT + Ba @ Ca @ Ba.mT, 1/cov_input['dt'])
         B_cov = torch.cat([init_cov[:,None,...], B_cov], dim=1)
 
         A_left_cum = pp.cumprod(A.flip([1]), dim=1).flip([1]) # cumfrom An to I, then flip
         A_right_cum = A_left_cum.mT
-
-        cov = (A_left_cum @ B_cov @ A_right_cum).sum(dim=1)
-
-        return {'cov': cov}
+        cov = torch.sum(A_left_cum @ B_cov @ A_right_cum, dim=1)
+        return {'cov': cov, 'Rij': cov_input['Rij'][..., -1:, :]}
