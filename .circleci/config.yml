@@ -152,3 +152,6 @@ workflows:
           cuda_version: "11.3.1"
           torch_version: "1.11.0"
           python_version: "3.8"
+      - name: Test with pytest
+        run: |
+          DGLBACKEND=pytorch pytest
