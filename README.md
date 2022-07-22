@@ -1,22 +1,27 @@
 # pypose
 PyPose = (GTSAM | G2O) x PyTorch
 
+To connect classic robotics with modern learning methods.
+
 ## 1. For Early Users
 
 1.1 Requirement:
-    
-[PyTorch 1.11+](https://pytorch.org/get-started/locally/) is required.
-    
-On Ubuntu, MasOS, or Windows, run:
-   
-    pip install ninja
-    pip install functorch
 
-1.2 Test locally:
+[PyTorch 1.11+](https://pytorch.org/get-started/locally/) is required.
+
+On Ubuntu, MasOS, or Windows, run:
+
+    pip install ninja pytest functorch
+
+1.2 Install locally:
 
     git clone --recursive https://github.com/pypose/pypose.git
     cd pypose && python setup.py develop
-    
+
+1.3 Run Test
+
+    pytest
+
 To rebuild pypose, run `rm -rf build/ *.so` to clean the previous build first.
 
 ## 2. For Contributors
