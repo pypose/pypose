@@ -7,8 +7,6 @@ To connect classic robotics with modern learning methods.
 
 1.1 Requirement:
 
-[PyTorch 1.11+](https://pytorch.org/get-started/locally/) is required.
-
 On Ubuntu, MasOS, or Windows, run:
 
     pip install -r requirements.txt
