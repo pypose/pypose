@@ -11,7 +11,7 @@ To connect classic robotics with modern learning methods.
 
 On Ubuntu, MasOS, or Windows, run:
 
-    pip install ninja pytest functorch
+    pip install -r requirements.txt
 
 1.2 Install locally:
 
