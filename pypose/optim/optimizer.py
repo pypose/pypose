@@ -46,6 +46,7 @@ class RobustModel(nn.Module):
 
     def kernel_forward(self, module, inputs, outputs):
         # eps is to prevent grad of sqrt() from being inf
+        assert torch.is_floating_point(outputs), "model outputs have to be float type."
         eps = finfo(outputs.dtype).eps
         return self.kernel(outputs.square().sum(-1)).clamp(min=eps).sqrt()
 
