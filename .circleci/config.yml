@@ -75,6 +75,13 @@ commands:
             mkdir -p dist
             python3 setup.py egg_info --tag-build=<< parameters.build_tag >> << parameters.dist_type >>
 
+  run_tests: &run_tests
+    steps:
+      - run:
+          name: Running tests
+          command: |
+            pytest
+
 ##############################################################################
 # Job specs
 ##############################################################################
@@ -135,7 +142,6 @@ jobs:
               }
             }"
 
-
 ##############################################################################
 # Workflows
 ##############################################################################
@@ -152,9 +158,3 @@ workflows:
           cuda_version: "11.3.1"
           torch_version: "1.11.0"
           python_version: "3.8"
-
-run_tests: &run_tests
-  - run:
-      name: Running tests
-      command: |
-        pytest
