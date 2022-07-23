@@ -30,8 +30,8 @@ if __name__ == '__main__':
     parser.add_argument("--integrating-step", type=int, default=1, help="number of integrated steps")
     parser.add_argument("--batch-size", type=int, default=1, help="batch size, only support 1 now")
     parser.add_argument("--step-size", type=int, default=2, help="the size of the integration for one interval")
-    parser.add_argument("--save", type=str, default='./examples/imu/save/', help="location of png files to save")
-    parser.add_argument("--dataroot", type=str, default='./examples/imu/', help="dataset location downloaded")
+    parser.add_argument("--save", type=str, default='./examples/module/imu/save/', help="location of png files to save")
+    parser.add_argument("--dataroot", type=str, default='./examples/module/imu/', help="dataset location downloaded")
     parser.add_argument("--dataname", type=str, default='2011_09_26', help="dataset name")
     parser.add_argument("--datadrive", nargs='+', type=str, default=["0001","0002","0005","0009","0011",
                         "0013","0014","0015","0017","0018","0019","0020","0022","0005"], help="data sequences")
@@ -44,10 +44,10 @@ if __name__ == '__main__':
     for drive in args.datadrive:
         dataset = KITTI_IMU(args.dataroot, args.dataname, drive, duration=args.step_size, step_size=args.step_size, mode='evaluate')
         loader = Data.DataLoader(dataset=dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=False)
-        init_value = dataset.get_init_value()
-        integrator = pp.module.IMUPreintegrator(init_value['pos'], init_value['rot'], init_value['vel'], reset=False).to(args.device)
+        init = dataset.get_init_value()
+        integrator = pp.module.IMUPreintegrator(init['pos'], init['rot'], init['vel'], reset=False).to(args.device)
 
-        poses, poses_gt = [init_value['pos']], [init_value['pos']]
+        poses, poses_gt = [init['pos']], [init['pos']]
         covs = [torch.zeros(9, 9)]
         for idx, data in enumerate(loader):
             data = move_to(data, args.device)

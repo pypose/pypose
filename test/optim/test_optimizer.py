@@ -1,6 +1,6 @@
-import warnings
-import torch
 import time
+import torch
+import warnings
 import pypose as pp
 from torch import nn
 import pypose.optim.solver as ppos
