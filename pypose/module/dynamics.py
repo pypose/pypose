@@ -4,7 +4,7 @@ import pypose as pp
 from torch.autograd.functional import jacobian
 
 
-class _System(nn.Module):
+class _System(nn.Module):                                                # DH: Please follow the documentation style in LTI to document this class.
     def __init__(self, time=False):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
@@ -34,7 +34,7 @@ class _System(nn.Module):
         if hasattr(self, '_A'):
             return self._A
         else:
-            func = lambda x: self.state_trasition(x, self.input)
+            func = lambda x: self.state_trasition(x, self.input)            # DH: TYPO.  So has the Jacobian been ever tested yet??
             return jacobian(func, self.state, **self.jacargs)
 
     @property
@@ -42,7 +42,7 @@ class _System(nn.Module):
         if hasattr(self, '_B'):
             return self._B
         else:
-            func = lambda x: self.state_trasition(self.state, x)
+            func = lambda x: self.state_trasition(self.state, x)            # DH: TYPO
             return jacobian(func, self.input, **self.jacargs)
 
     @property
@@ -191,8 +191,9 @@ class LTI(_System):
 
         return z, y
 
-class CartPole(_System):
-    def __init__(self,dt,length,cartmass,polemass,gravity):
+class CartPole(_System):                                                      # DH: These are examples and should not appear here.  Make a file in pypose/test/ and run the test there.
+                                                                              # DH: Same story for cartpoleTest and NNTest.  And are the tests for Jacobians written yet?
+    def __init__(self,dt,length,cartmass,polemass,gravity):                   # DH: Also, currently the implementation is assuming discrete systems.  Please discretize the dynamics.
         super().__init__(self)
         self._tau = dt
         self._length = length
@@ -203,7 +204,7 @@ class CartPole(_System):
         self._totalMass = self._cartmass + self._polemass
         self._dstate = torch.empty((4)).float()
 
-    def forward(self,state,input):
+    def forward(self,state,input):                                            # DH: If done correctly, forward should NOT be needed.  What is the point of _dstate?
         self._dstate = self.state_transition(state,input)
         return self.observation(state,input)
 
@@ -223,7 +224,7 @@ class CartPole(_System):
 
         return torch.stack((xDot,xAcc,thetaDot,thetaAcc))
     
-    def observation(self,state,input):
+    def observation(self,state,input):                                        # DH: For cartpole, it is sufficient to return the states.
         return state + torch.mul(self._dstate,self._tau)
 
 class LorenzAttractor(_System):
