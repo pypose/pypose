@@ -74,17 +74,6 @@ commands:
             export MAX_JOBS=<< parameters.max_jobs >>
             mkdir -p dist
             python3 setup.py egg_info --tag-build=<< parameters.build_tag >> << parameters.dist_type >>
-  run_tests: &run_tests
-    steps:
-      - run:
-          name: Run pytest checks
-          command: |
-            export "PATH=~/miniconda3/bin:$PATH" && conda init bash && . $HOME/miniconda3/etc/profile.d/conda.sh
-            conda activate pyenv
-            mkdir pytest-results
-            pytest --junitxml=pytest-results/junit.xml
-      - store_test_results:
-          path: pytest-results
 
 ##############################################################################
 # Job specs
@@ -160,7 +149,10 @@ jobs:
             conda activate pyenv
             pip install dist/pypose-*.whl
             pip install -r requirements.txt
-      - run_tests
+            mkdir pytest-results
+            pytest --junitxml=pytest-results/junit.xml
+      - store_test_results:
+          path: pytest-results
 
 ##############################################################################
 # Workflows
