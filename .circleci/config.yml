@@ -115,7 +115,6 @@ jobs:
     resource_class: medium
     steps:
       - setup_env
-      - checkout
       - attach_workspace:
           at: .
       - run:
@@ -152,7 +151,6 @@ jobs:
     resource_class: small
     steps:
       - setup_env
-      - checkout
       - attach_workspace:
           at: .
       - run:
