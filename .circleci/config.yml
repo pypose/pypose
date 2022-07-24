@@ -79,6 +79,8 @@ commands:
       - run:
           name: Run pytest checks
           command: |
+            export "PATH=~/miniconda3/bin:$PATH" && conda init bash && . $HOME/miniconda3/etc/profile.d/conda.sh
+            conda activate pyenv
             mkdir pytest-results
             pytest --junitxml=pytest-results/junit.xml
       - store_test_results:
