@@ -329,3 +329,44 @@ class sim3_Exp(torch.autograd.Function):
         Jl = sim3_Jl(input)
         grad_input = grad_output[..., :-1].unsqueeze(-2) @ Jl
         return grad_input.squeeze(-2)
+
+
+class SO3_mul(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, Y):
+        ctx.save_for_backward(X)
+        Xv, Xw, Yv, Yw = X[..., :3], X[..., 3:], Y[..., :3], Y[..., 3:]
+        Zv = Xw * Yv + Xv * Yw + torch.linalg.cross(Xv, Yv, dim=-1)
+        Zw = Xw * Yw - (Xv * Yv).sum(dim=-1, keepdim=True)
+        return torch.cat([Zv, Zw], -1)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        X = ctx.saved_tensors[0]
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
+        X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
+
+        
+        return X_grad, grad_output
+
+
+def broadcast_inputs(x, y):
+    """ Automatic broadcasting of missing dimensions """
+    if y is None:
+        xs, xd = x.shape[:-1], x.shape[-1]
+        return (x.reshape(-1, xd).contiguous(), ), x.shape[:-1]
+    out_shape = torch.broadcast_shapes(x.shape[:-1], y.shape[:-1])
+    shape = out_shape if out_shape != torch.Size([]) else (1,)
+    x = x.expand(shape+(x.shape[-1],)).reshape(-1,x.shape[-1]).contiguous()
+    y = y.expand(shape+(y.shape[-1],)).reshape(-1,y.shape[-1]).contiguous()
+    return (x, y), tuple(out_shape)
+
+
+def lietensor_mul(lid, x, y=None):
+    x = x.tensor() if hasattr(x, 'ltype') else x
+    y = y.tensor() if hasattr(y, 'ltype') else y
+    input, out_shape = broadcast_inputs(x, y)
+    out = SO3_mul.apply(*input)
+    dim = -1 if out.nelement() != 0 else x.shape[-1]
+    return out.view(out_shape + (dim,))
