@@ -150,6 +150,7 @@ jobs:
     resource_class: small
     steps:
       - setup_env
+      - checkout
       - attach_workspace:
           at: .
       - run:
@@ -159,7 +160,6 @@ jobs:
             conda activate pyenv
             pip install dist/pypose-*.whl
             pip install pytest==7.1.2
-      - checkout
       - run_tests
 
 ##############################################################################
