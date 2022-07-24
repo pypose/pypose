@@ -74,13 +74,15 @@ commands:
             export MAX_JOBS=<< parameters.max_jobs >>
             mkdir -p dist
             python3 setup.py egg_info --tag-build=<< parameters.build_tag >> << parameters.dist_type >>
-
   run_tests: &run_tests
     steps:
       - run:
-          name: Running tests
+          name: Run pytest checks
           command: |
-            pytest
+            mkdir pytest-results
+            pytest --junitxml=pytest-results/junit.xml
+      - store_test_results:
+          path: pytest-results
 
 ##############################################################################
 # Job specs
@@ -141,6 +143,17 @@ jobs:
                 \"pr_num\": \"${CIRCLE_PULL_REQUEST##*/}\"
               }
             }"
+  run_tests:
+    <<: *build_binary_params
+    docker:
+      - image: nvidia/cuda:<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-devel-ubuntu20.04
+    resource_class: small
+    steps:
+      - setup_env
+      - checkout
+      - attach_workspace:
+          at: .
+      - run_tests
 
 ##############################################################################
 # Workflows
@@ -154,6 +167,11 @@ workflows:
           torch_version: "1.11.0"
           python_version: "3.8"
       - build_docs:
+          requires: [linux_build_wheel]
+          cuda_version: "11.3.1"
+          torch_version: "1.11.0"
+          python_version: "3.8"
+      - run_tests:
           requires: [linux_build_wheel]
           cuda_version: "11.3.1"
           torch_version: "1.11.0"
