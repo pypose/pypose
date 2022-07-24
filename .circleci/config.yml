@@ -150,9 +150,16 @@ jobs:
     resource_class: small
     steps:
       - setup_env
-      - checkout
       - attach_workspace:
           at: .
+      - run:
+          name: Setup tests
+          command: |
+            export "PATH=~/miniconda3/bin:$PATH" && conda init bash && . $HOME/miniconda3/etc/profile.d/conda.sh
+            conda activate pyenv
+            pip install dist/pypose-*.whl
+            pip install pytest==7.1.2
+      - checkout
       - run_tests
 
 ##############################################################################
