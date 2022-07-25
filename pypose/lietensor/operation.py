@@ -163,6 +163,13 @@ def sim3_Jl_inv(x):
     return (I7x7 - (1.0/2.0) * Xi + (1.0/12.0) * Xi2 - (1.0/720.0) * Xi4)
 
 
+def SO3_Adj(X):
+    I3x3 = torch.eye(3, device=X.device, dtype=X.dtype).expand(X.shape[:-1]+(3, 3))
+    Xv, Xw = X[..., :3], X[..., 3:]
+    Xw_3x3 = Xw.unsqueeze(-1) * I3x3
+    return 2.0 * Xw.unsqueeze(-1) * (Xw_3x3 + vec2skew(Xv)) - I3x3 + 2.0 * Xv.unsqueeze(-1) * Xv.unsqueeze(-2)
+
+
 class SO3_Log(torch.autograd.Function):
 
     @staticmethod
@@ -346,9 +353,9 @@ class SO3_mul(torch.autograd.Function):
         X = ctx.saved_tensors[0]
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
         X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
-
-        
-        return X_grad, grad_output
+        dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), SO3_Adj(X)).squeeze(-2) 
+        Y_grad = torch.cat((dZxX, zero), dim = -1)
+        return X_grad, Y_grad
 
 
 def broadcast_inputs(x, y):
