@@ -9,7 +9,7 @@ class _System(nn.Module):                                                # DH: P
     A sub-class of :obj:`torch.nn.Module` to build general dynamics.
     
     Args:
-        time
+        time (:obj:`boolean`): Whether the system is time-varying; defaults to False, meaning time-invariant
     '''
     def __init__(self, time=False):
         super().__init__()
