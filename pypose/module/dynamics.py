@@ -1,6 +1,6 @@
+from numpy import vectorize
 import torch as torch
 import torch.nn as nn
-import pypose as pp
 from torch.autograd.functional import jacobian
 
 
@@ -23,8 +23,8 @@ class _System(nn.Module):                                                # DH: P
         self.t.add_(1)
 
     def forward(self, state, input):
-        state = self.state_transition(state, input)
-        return self.observation(state, input)
+        new_state = self.state_transition(state, input)
+        return new_state, self.observation(state, input)
 
     def state_transition(self):
         pass
@@ -33,14 +33,17 @@ class _System(nn.Module):                                                # DH: P
         pass
 
     def reset(self,t=0):
-        self.t.fill_(0)
+        self.t.fill_(0) 
+
+    def set_linearization_point(self, state, input):
+        self.state, self.input = state, input
 
     @property
     def A(self):
         if hasattr(self, '_A'):
             return self._A
         else:
-            func = lambda x: self.state_trasition(x, self.input)            # DH: TYPO.  So has the Jacobian been ever tested yet??
+            func = lambda x: self.state_transition(x, self.input)            # DH: TYPO.  So has the Jacobian been ever tested yet??
             return jacobian(func, self.state, **self.jacargs)
 
     @property
@@ -48,7 +51,7 @@ class _System(nn.Module):                                                # DH: P
         if hasattr(self, '_B'):
             return self._B
         else:
-            func = lambda x: self.state_trasition(self.state, x)            # DH: TYPO
+            func = lambda x: self.state_transition(self.state, x)
             return jacobian(func, self.input, **self.jacargs)
 
     @property
@@ -197,57 +200,54 @@ class LTI(_System):
 
         return z, y
 
-class CartPole(_System):                                                      # DH: These are examples and should not appear here.  Make a file in pypose/test/ and run the test there.
-                                                                              # DH: Same story for cartpoleTest and NNTest.  And are the tests for Jacobians written yet?
-    def __init__(self,dt,length,cartmass,polemass,gravity):                   # DH: Also, currently the implementation is assuming discrete systems.  Please discretize the dynamics.
-        super().__init__(self)
-        self._tau = dt
-        self._length = length
-        self._cartmass = cartmass
-        self._polemass = polemass
-        self._gravity = gravity
-        self._polemassLength = self._polemass*self._length
-        self._totalMass = self._cartmass + self._polemass
-        self._dstate = torch.empty((4)).float()
+# class CartPole(_System):                                                      # DH: These are examples and should not appear here.  Make a file in pypose/test/ and run the test there.
+#                                                                               # DH: Same story for cartpoleTest and NNTest.  And are the tests for Jacobians written yet?
+#     def __init__(self,dt,length,cartmass,polemass,gravity):
+#         super().__init__(self)
+#         self._tau = dt
+#         self._length = length
+#         self._cartmass = cartmass
+#         self._polemass = polemass
+#         self._gravity = gravity
+#         self._polemassLength = self._polemass*self._length
+#         self._totalMass = self._cartmass + self._polemass
 
-    def forward(self,state,input):                                            # DH: If done correctly, forward should NOT be needed.  What is the point of _dstate?
-        self._dstate = self.state_transition(state,input)
-        return self.observation(state,input)
+#     def state_transition(self,state,input):
+#         x,xDot,theta,thetaDot = state
+#         force = input
+#         costheta = torch.cos(theta)
+#         sintheta = torch.sin(theta)
 
-    def state_transition(self,state,input):
-        x,xDot,theta,thetaDot = state
-        force = input
-        costheta = torch.cos(theta)
-        sintheta = torch.sin(theta)
+#         temp = (
+#             force + self._polemassLength * thetaDot**2 * sintheta
+#         ) / self._totalMass
+#         thetaAcc = (self._gravity * sintheta - costheta * temp) / (
+#             self._length * (4.0 / 3.0 - self._polemass * costheta**2 / self._totalMass)
+#         )
+#         xAcc = temp - self._polemassLength * thetaAcc * costheta / self._totalMass
 
-        temp = (
-            force + self._polemassLength * thetaDot**2 * sintheta
-        ) / self._totalMass
-        thetaAcc = (self._gravity * sintheta - costheta * temp) / (
-            self._length * (4.0 / 3.0 - self._polemass * costheta**2 / self._totalMass)
-        )
-        xAcc = temp - self._polemassLength * thetaAcc * costheta / self._totalMass
+#         _dstate = torch.stack((xDot,xAcc,thetaDot,thetaAcc))
 
-        return torch.stack((xDot,xAcc,thetaDot,thetaAcc))
+#         return state+torch.mul(_dstate,self._tau),self.observation(state,input)
     
-    def observation(self,state,input):                                        # DH: For cartpole, it is sufficient to return the states.
-        return state + torch.mul(self._dstate,self._tau)
+#     def observation(self,state,input):
+#         return state
 
-class LorenzAttractor(_System):
-    def __init__(self,dt,model):
-        super().__init__(self)
-        self._tau = dt
-        self._stateTransition = model
+# class LorenzAttractor(_System):
+#     def __init__(self,dt,model):
+#         super().__init__(self)
+#         self._tau = dt
+#         self._stateTransition = model
     
-    def forward(self,state,input):
-        self._dstate = self.state_transition(state,input)
-        return self.observation(state,input)
+#     def forward(self,state,input):
+#         self._dstate = self.state_transition(state,input)
+#         return self.observation(state,input)
 
-    def state_transition(self,state,input):
-        return self._stateTransition(state)
+#     def state_transition(self,state,input):
+#         return self._stateTransition(state)
     
-    def observation(self,state,input):
-        return state + torch.mul(self._dstate,self._tau)
+#     def observation(self,state,input):
+#         return state + torch.mul(self._dstate,self._tau)
 
-    def loss(self,pred,true):
-        return torch.sqrt(torch.sum((pred-true)**2)/pred.size(dim=0))
+#     def loss(self,pred,true):
+#         return torch.sqrt(torch.sum((pred-true)**2)/pred.size(dim=0))
