@@ -5,6 +5,12 @@ from torch.autograd.functional import jacobian
 
 
 class _System(nn.Module):                                                # DH: Please follow the documentation style in LTI to document this class.
+    r'''
+    A sub-class of :obj:`torch.nn.Module` to build general dynamics.
+    
+    Args:
+        time
+    '''
     def __init__(self, time=False):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
