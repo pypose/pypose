@@ -163,11 +163,33 @@ def sim3_Jl_inv(x):
     return (I7x7 - (1.0/2.0) * Xi + (1.0/12.0) * Xi2 - (1.0/720.0) * Xi4)
 
 
+def SO3_Act(X, p):
+    Xv, Xw = X[..., :3], X[..., 3:]
+    uv = torch.linalg.cross(Xv, p, dim=-1)
+    uv += uv
+    return p + Xw * uv + torch.linalg.cross(Xv, uv, dim=-1)
+
+
+def SO3_Act4(X, p):
+    return torch.cat((SO3_Act(X, p[..., :3]), p[..., 3:]), dim=-1)
+
+
 def SO3_Adj(X):
     I3x3 = torch.eye(3, device=X.device, dtype=X.dtype).expand(X.shape[:-1]+(3, 3))
     Xv, Xw = X[..., :3], X[..., 3:]
     Xw_3x3 = Xw.unsqueeze(-1) * I3x3
     return 2.0 * Xw.unsqueeze(-1) * (Xw_3x3 + vec2skew(Xv)) - I3x3 + 2.0 * Xv.unsqueeze(-1) * Xv.unsqueeze(-2)
+
+
+def SE3_Adj(X):
+    Adj = torch.zeros((X.shape[:-1]+(6, 6)), device=X.device, dtype=X.dtype, requires_grad=False)
+    t, q = X[..., :3], X[..., 3:]
+    R3x3 = SO3_Adj(q)
+    tx = vec2skew(t)
+    Adj[..., :3, :3] = R3x3
+    Adj[..., :3, 3:] = torch.matmul(tx, R3x3)
+    Adj[..., 3:, 3:] = R3x3
+    return Adj
 
 
 class SO3_Log(torch.autograd.Function):
@@ -358,6 +380,25 @@ class SO3_mul(torch.autograd.Function):
         return X_grad, Y_grad
 
 
+class SE3_mul(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, Y):
+        ctx.save_for_backward(X)
+        t = X[..., :3] + SO3_Act(X[..., 3:], Y[..., :3])
+        q = SO3_mul.apply(X[..., 3:], Y[..., 3:])
+        return torch.cat((t, q), -1)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        X = ctx.saved_tensors[0]
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
+        X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
+        dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), SE3_Adj(X)).squeeze(-2) 
+        Y_grad = torch.cat((dZxX, zero), dim = -1)
+        return X_grad, Y_grad        
+
+
 def broadcast_inputs(x, y):
     """ Automatic broadcasting of missing dimensions """
     if y is None:
@@ -374,6 +415,9 @@ def lietensor_mul(lid, x, y=None):
     x = x.tensor() if hasattr(x, 'ltype') else x
     y = y.tensor() if hasattr(y, 'ltype') else y
     input, out_shape = broadcast_inputs(x, y)
-    out = SO3_mul.apply(*input)
+    if lid == 1:
+        out = SO3_mul.apply(*input)
+    elif lid == 3:
+        out = SE3_mul.apply(*input)
     dim = -1 if out.nelement() != 0 else x.shape[-1]
     return out.view(out_shape + (dim,))
