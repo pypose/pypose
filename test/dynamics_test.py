@@ -17,14 +17,14 @@ x = torch.randn((N,1,n))
 u = torch.randn((N,1,p))
 """
 
-A = torch.randn((2,3,3))
-B = torch.randn((2,3,2))
-C = torch.randn((2,3,3))
-D = torch.randn((2,3,2))
-c1 = torch.randn((2,1,3))
-c2 = torch.randn((2,1,3))
-x = torch.randn((2,1,3))
-u = torch.randn((2,1,2))
+A = torch.randn((5,4,4))
+B = torch.randn((5,4,2))
+C = torch.randn((5,3,4))
+D = torch.randn((5,3,2))
+c1 = torch.randn((5,1,4))
+c2 = torch.randn((5,1,3))
+x = torch.randn((5,1,4))
+u = torch.randn((5,1,2))
 
 lti = pp.module.LTI(A, B, C, D, c1, c2)
 
