@@ -3,7 +3,6 @@ import torch as torch
 import torch.nn as nn
 from torch.autograd.functional import jacobian
 
-
 class _System(nn.Module):                                                # DH: Please follow the documentation style in LTI to document this class.
     r'''
     A sub-class of :obj:`torch.nn.Module` to build general dynamics.
@@ -23,8 +22,25 @@ class _System(nn.Module):                                                # DH: P
         self.t.add_(1)
 
     def forward(self, state, input):
+        r'''
+        Parameters
+        ----------
+        x : Tensor
+            The state of the dynamic system
+        u : Tensor
+            The input to the dynamic system
+
+        Returns
+        -------
+        new_state   : Tensor
+                      The state of the system at next time step
+        observation : Tensor
+                      The observation of the system at the current step
+        '''
+
         new_state = self.state_transition(state, input)
-        return new_state, self.observation(state, input)
+        observation = self.observation(state, input)
+        return new_state, observation
 
     def state_transition(self):
         pass
@@ -200,54 +216,4 @@ class LTI(_System):
 
         return z, y
 
-# class CartPole(_System):                                                      # DH: These are examples and should not appear here.  Make a file in pypose/test/ and run the test there.
-#                                                                               # DH: Same story for cartpoleTest and NNTest.  And are the tests for Jacobians written yet?
-#     def __init__(self,dt,length,cartmass,polemass,gravity):
-#         super().__init__(self)
-#         self._tau = dt
-#         self._length = length
-#         self._cartmass = cartmass
-#         self._polemass = polemass
-#         self._gravity = gravity
-#         self._polemassLength = self._polemass*self._length
-#         self._totalMass = self._cartmass + self._polemass
-
-#     def state_transition(self,state,input):
-#         x,xDot,theta,thetaDot = state
-#         force = input
-#         costheta = torch.cos(theta)
-#         sintheta = torch.sin(theta)
-
-#         temp = (
-#             force + self._polemassLength * thetaDot**2 * sintheta
-#         ) / self._totalMass
-#         thetaAcc = (self._gravity * sintheta - costheta * temp) / (
-#             self._length * (4.0 / 3.0 - self._polemass * costheta**2 / self._totalMass)
-#         )
-#         xAcc = temp - self._polemassLength * thetaAcc * costheta / self._totalMass
-
-#         _dstate = torch.stack((xDot,xAcc,thetaDot,thetaAcc))
-
-#         return state+torch.mul(_dstate,self._tau),self.observation(state,input)
-    
-#     def observation(self,state,input):
-#         return state
-
-# class LorenzAttractor(_System):
-#     def __init__(self,dt,model):
-#         super().__init__(self)
-#         self._tau = dt
-#         self._stateTransition = model
-    
-#     def forward(self,state,input):
-#         self._dstate = self.state_transition(state,input)
-#         return self.observation(state,input)
-
-#     def state_transition(self,state,input):
-#         return self._stateTransition(state)
-    
-#     def observation(self,state,input):
-#         return state + torch.mul(self._dstate,self._tau)
-
-#     def loss(self,pred,true):
-#         return torch.sqrt(torch.sum((pred-true)**2)/pred.size(dim=0))
+# DH: Same story for cartpoleTest and NNTest.  And are the tests for Jacobians written yet?

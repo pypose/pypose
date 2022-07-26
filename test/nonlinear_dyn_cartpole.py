@@ -31,7 +31,7 @@ class CartPole(ppmd._System):
 
         _dstate = torch.stack((xDot,xAcc,thetaDot,thetaAcc))
 
-        return state+torch.mul(_dstate,self._tau),self.observation(state,input)
+        return state+torch.mul(_dstate,self._tau)
     
     def observation(self,state,input):
         return state
@@ -74,8 +74,8 @@ if __name__ == "__main__":
     xdot_fig = createTimePlot(time,xdot,figname="x dot Plot",xlabel="Time",ylabel="x dot",title="x dot Plot")
     theta_fig = createTimePlot(time,theta,figname="theta Plot",xlabel="Time",ylabel="theta",title="theta Plot")
     thetadot_fig = createTimePlot(time,thetadot,figname="theta dot Plot",xlabel="Time",ylabel="theta dot",title="theta dot Plot")
-    # Set to 1 to see plots
-    if 0:
+    # Set to 0 to hide plots
+    if 1:
         plt.show()
 
     ### Jacobian computations
@@ -83,4 +83,10 @@ if __name__ == "__main__":
     jacob_state, jacob_input = state_all[999,:].T, input[999]
     cartPoleSolver.set_linearization_point(jacob_state,jacob_input)
     A = cartPoleSolver.A
+    B = cartPoleSolver.B
+    C = cartPoleSolver.C
+    D = cartPoleSolver.D
     print(A)
+    print(B)
+    print(C)
+    print(D)
