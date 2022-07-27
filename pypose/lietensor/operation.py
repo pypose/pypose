@@ -181,6 +181,14 @@ def SO3_Adj(X):
     return 2.0 * Xw.unsqueeze(-1) * (Xw_3x3 + vec2skew(Xv)) - I3x3 + 2.0 * Xv.unsqueeze(-1) * Xv.unsqueeze(-2)
 
 
+def SE3_Act(X, p):
+    return X[..., :3] + SO3_Act(X[..., 3:], p)
+
+
+def SE3_Act4(X, p):
+    return torch.cat(((SO3_Act(X[..., 3:], p[..., :3]) + X[..., :3] * p[..., 3:]), p[..., 3:]), dim=-1)
+
+
 def SE3_Adj(X):
     Adj = torch.zeros((X.shape[:-1]+(6, 6)), device=X.device, dtype=X.dtype, requires_grad=False)
     t, q = X[..., :3], X[..., 3:]
@@ -189,6 +197,47 @@ def SE3_Adj(X):
     Adj[..., :3, :3] = R3x3
     Adj[..., :3, 3:] = torch.matmul(tx, R3x3)
     Adj[..., 3:, 3:] = R3x3
+    return Adj
+
+
+def RxSO3_Act(X, p):
+    return X[..., 4:] * SO3_Act(X[..., :4], p)
+
+
+def RxSO3_Act4(X, p):
+    return torch.cat((RxSO3_Act(X, p[..., :3]), p[..., 3:]), dim=-1)
+
+
+def RxSO3_Adj(X):
+    Adj = torch.eye(4, device=X.device, dtype=X.dtype, requires_grad=False).repeat(X.shape[:-1]+(1, 1))
+    Adj[..., :3, :3] = SO3_Adj(X[..., :4])
+    return Adj
+
+
+def RxSo3_Matrix(X):
+    return X[..., 4:].unsqueeze(-1) * SO3_Adj(X[..., :4])
+
+
+def RxSo3_Rotation(X):
+    return SO3_Adj(X[..., :4])
+
+
+def Sim3_Act(X, p):
+    return X[..., :3] + RxSO3_Act(X[..., 3:], p)
+
+
+def Sim3_Act4(X, p):
+    return torch.cat(((RxSO3_Act(X[..., 3:], p[..., :3]) + X[..., :3] * p[..., 3:]), p[..., 3:]), dim=-1)
+
+
+def Sim3_Adj(X):
+    Adj = torch.eye(7, device=X.device, dtype=X.dtype, requires_grad=False).repeat(X.shape[:-1]+(1, 1))
+    R = RxSo3_Rotation(X[..., 3:])
+    tx = vec2skew(X[..., :3])
+    Adj[..., :3, :3] = RxSo3_Matrix(X[..., 3:])
+    Adj[..., :3, 3:6] = torch.matmul(tx, R)
+    Adj[..., :3, 6] = -X[..., :3]
+    Adj[..., 3:6, 3:6] = R
     return Adj
 
 
@@ -399,6 +448,44 @@ class SE3_mul(torch.autograd.Function):
         return X_grad, Y_grad        
 
 
+class RxSO3_mul(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, Y):
+        ctx.save_for_backward(X)
+        q = SO3_mul.apply(X[..., :4], Y[..., :4])
+        s = X[..., 4:] * X[..., 4:]
+        return torch.cat((q, s), -1)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        X = ctx.saved_tensors[0]
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
+        X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
+        dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), RxSO3_Adj(X)).squeeze(-2) 
+        Y_grad = torch.cat((dZxX, zero), dim = -1)
+        return X_grad, Y_grad    
+
+
+class Sim3_mul(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, Y):
+        ctx.save_for_backward(X)
+        t = X[..., :3] + RxSO3_Act(X[..., 3:], Y[..., :3])
+        q = RxSO3_mul.apply(X[..., 3:], Y[..., 3:])
+        return torch.cat((t, q), -1)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        X = ctx.saved_tensors[0]
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
+        X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
+        dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), Sim3_Adj(X)).squeeze(-2) 
+        Y_grad = torch.cat((dZxX, zero), dim = -1)
+        return X_grad, Y_grad   
+
+
 def broadcast_inputs(x, y):
     """ Automatic broadcasting of missing dimensions """
     if y is None:
@@ -417,7 +504,11 @@ def lietensor_mul(lid, x, y=None):
     input, out_shape = broadcast_inputs(x, y)
     if lid == 1:
         out = SO3_mul.apply(*input)
+    elif lid == 2:
+        out = RxSO3_mul.apply(*input)
     elif lid == 3:
         out = SE3_mul.apply(*input)
+    elif lid == 4:
+        out = Sim3_mul.apply(*input)
     dim = -1 if out.nelement() != 0 else x.shape[-1]
     return out.view(out_shape + (dim,))
