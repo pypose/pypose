@@ -1,4 +1,5 @@
 import time
+import copy
 import torch
 import random
 import warnings
@@ -23,9 +24,7 @@ def test_lietensor():
 
     (pp.Log(y.Exp())**2).sin().sum().backward()
 
-    print(y)
-    print(y.lshape)
-    print(y.grad)
+    assert not torch.any(torch.isnan(y.grad))
 
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -41,12 +40,9 @@ def test_lietensor():
     n = 4
     epoch = 3
     net = SO3Layer(n).to(device)
-    print(net.weight)
-    net.weight.data.add_(0.1)
-    print(net.weight)
+    weight = copy.deepcopy(net.weight)
     optimizer = torch.optim.SGD(net.parameters(), lr = 0.1, momentum=0.9)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10,15], gamma=0.1)
-    print(net.weight)
     for i in range(epoch):
         optimizer.zero_grad()
         inputs = pp.randn_SO3(n, device=device)
@@ -55,9 +51,8 @@ def test_lietensor():
         loss.backward()
         optimizer.step()
         scheduler.step()
-        print(loss)
-    print(net.weight)
-    print("Parameter:", count_parameters(net))
+
+    assert not torch.allclose(weight, net.weight)
 
     SO3I = pp.identity_SO3(1, 3, device=device, dtype=torch.float64)
     so3I = pp.identity_so3(2, 1, device=device, requires_grad=True)
@@ -65,24 +60,13 @@ def test_lietensor():
     SE3I = pp.identity_SE3(3, device=device, dtype=torch.float64)
     se3I = pp.identity_se3(2)
 
-    print(SO3I)
-    print(so3I)
-    print(SE3I)
-    print(se3I)
-
     idl1 = pp.identity_like(x)
     idl2 = pp.identity_like(a, requires_grad=True)
 
     rdl1 = pp.randn_like(x)
     rdl2 = pp.randn_like(a, sigma=0.1, requires_grad=True, device=device)
 
-    print(rdl1, '\n', rdl2)
-
     b.Inv()
-    print(b,'\n', b.Inv())
-    print(x,'\n', x.Inv())
-
-    print(pp.Inv(b))
 
     a = pp.randn_SE3(1,5)
     b = pp.randn_SE3(5,1)
@@ -100,8 +84,6 @@ def test_lietensor():
 
     pt = a * points
 
-    print(pt.shape)
-
     a = pp.randn_so3(3)
     I = pp.identity_SO3(3)
     t = I.Retr(a)
@@ -112,23 +94,18 @@ def test_lietensor():
     r = pp.Retr(I, a)
     p = I.Act(a)
 
-    print(r, p)
-
     X = pp.randn_SE3(8, requires_grad=True, dtype=torch.double)
     a = pp.randn_se3(8, dtype=torch.double)
     b = X.Adj(a)
-    assert (b.Exp() * X - X * a.Exp()).abs().mean() < 1e-7
+    torch.testing.assert_close(b.Exp() * X , X * a.Exp())
     J = X.Jinvp(a)
-    print(J)
 
     X = pp.randn_SE3(6, requires_grad=True)
     a = pp.randn_se3(6)
     b = X.AdjT(a)
-    assert (X * b.Exp() - a.Exp() * X).abs().mean() < 1e-6
+    torch.testing.assert_close(X * b.Exp(), a.Exp() * X)
 
     J = pp.Jinvp(X, a)
-    print(J)
-
 
     S = pp.randn_Sim3(4)
     S.Log().Exp()
@@ -139,24 +116,20 @@ def test_lietensor():
     X = pp.randn_Sim3(8, requires_grad=True, dtype=torch.double)
     a = pp.randn_sim3(8, dtype=torch.double)
     b = X.Adj(a)
-    assert (b.Exp() * X - X * a.Exp()).abs().mean() < 1e-7
+    torch.testing.assert_close(b.Exp() * X, X * a.Exp())
 
     X = pp.randn_Sim3(6, requires_grad=True, dtype=torch.double)
     a = pp.randn_sim3(6, dtype=torch.double)
     b = X.AdjT(a)
-    assert (X * b.Exp() - a.Exp() * X).abs().mean() < 1e-7
+    torch.testing.assert_close(X * b.Exp(), a.Exp() * X)
 
     S = pp.randn_RxSO3(6)
     s = pp.randn_rxso3(6)
     s.Exp() * S
 
     X = pp.randn_SE3(8, requires_grad=True, dtype=torch.double)
-    print(X.matrix())
-    print(X.translation())
     assert hasattr(X.view(2,4,7), 'ltype')
     X.lview(2,4)
-    print(X)
-
 
     X = pp.randn_SE3(2, requires_grad=True, dtype=torch.double)
     Y = pp.randn_SE3(2, requires_grad=True, dtype=torch.double)
@@ -167,7 +140,6 @@ def test_lietensor():
     assert isinstance(Z, pp.LieTensor)
     assert isinstance(torch.stack([X,Y], dim=0), pp.LieTensor)
 
-    print(torch.stack([X,Y], dim=0))
     Z1, Z2 = Z.split([2,2], dim=0)
     assert isinstance(Z1, pp.LieTensor)
     assert isinstance(Z2, pp.LieTensor)
@@ -177,65 +149,44 @@ def test_lietensor():
     assert isinstance(a, pp.LieTensor) and isinstance(b, pp.LieTensor)
 
     x = pp.randn_SO3(4)
-    print(x)
     x[0] = pp.randn_SO3(1)
-    print(x)
     y = x.to(device)
-    print(x, y)
-    print(x.to(device))
+
 
     a = pp.randn_SE3()
     y = a.sin()
-    print(type(a.sin().as_subclass(torch.Tensor))) # <class 'pypose.liegroup.group.groups.LieTensor'>
-    print(type(y))
-    print(y)
-
     a = pp.randn_SE3(requires_grad=True)
     b = a.sin()
-    print(type(b)) # <class 'pypose.liegroup.group.groups.LieTensor'>
     c = torch.autograd.grad(b.sum(), a)
-    print(type(c[0])) #
-    print(type(a.tensor()))
 
     a = pp.mat2SO3(torch.eye(3,3))
     b = pp.randn_SO3(2,2)
-    print(a.shape, b.shape)
-    print((a*b).shape)
-
-
     x = pp.randn_so3()
-    print(x)
 
     X = pp.randn_SO3(3,2).to(device)
-    print(X)
     X.identity_()
-    print(X)
 
     euler = torch.randn(5,3).to(device)
     X = pp.euler2SO3(euler)
-    print(X)
 
     for i in range(128):
         x = torch.randn(4, 5, device=device)
         dim = torch.randint(0, 2, (1,)).item()
-        assert torch.allclose(x.cumsum(dim=dim), pp.cumops(x, dim, lambda a, b : a + b), atol=1e-07)
+        torch.testing.assert_close(x.cumsum(dim=dim), pp.cumops(x, dim, lambda a, b : a + b))
 
     for i in range(1, 1000):
         x = torch.randn(i, dtype=torch.float64)
-        print(i, torch.allclose(x.cumsum(0), pp.cumops(x, 0, lambda a, b : a + b)))
+        torch.testing.assert_close(x.cumsum(0), pp.cumops(x, 0, lambda a, b : a + b))
 
     x = pp.randn_SE3(2)
-    print(x, pp.cumprod(x, dim=0))
 
     x = pp.randn_SE3(3)
-    print(x, x.cumprod(dim=0))
-    print(x)
+    y = copy.deepcopy(x)
     x.cumprod_(dim=0)
-    print(x)
+    assert not torch.allclose(x, y)
 
     generator = torch.Generator()
     x = pp.randn_so3(1, 2, sigma= 0.1, generator=generator, dtype=torch.float16)
-    print(x)
 
     x = pp.randn_so3(2,2)
     x.Jr()
@@ -251,11 +202,9 @@ def test_lietensor():
         return x.Exp()
 
     J = jacobian(func, p)
-    print("j:", J)
 
     x = pp.randn_so3(2,1,2, requires_grad=True)
     J = x.Jr()
-    print(x.shape, J.shape)
     assert J.requires_grad is True
 
     class PoseTransform(torch.nn.Module):
@@ -268,11 +217,9 @@ def test_lietensor():
 
     model, inputs = PoseTransform(), pp.randn_SO3()
     J = pp.optim.functional.modjac(model, inputs=inputs, flatten=True)
-    print(J, J.shape)
 
     LT = [pp.randn_SO3, pp.randn_so3, pp.randn_SE3, pp.randn_se3, \
         pp.randn_Sim3, pp.randn_sim3, pp.randn_RxSO3, pp.randn_rxso3]
-
 
     for lt in LT:
         x = lt(random.randint(1, 10), dtype=torch.float64, device=device, requires_grad=True)
