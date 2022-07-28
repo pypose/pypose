@@ -12,8 +12,10 @@ class IMUPreintegrator(nn.Module):
         rot (pypose.SO3, optional): initial rotation. Default: :meth:`pypose.identity_SO3`
         vel (torch.Tensor, optional): initial postion. Default: torch.zeros(3)
         gravity (float, optional): the gravity acceleration. Default: 9.81007
-        gyro_cov (float, optional): covariance of the gyroscope. Default: (1.6968e-4)**2
-        acc_cov (float, optional): covariance of the accelerator. Default: (2e-3)**2
+        gyro_cov: covariance of the gyroscope. If the covaraince of the x, y and z axises are different, 
+            the :obj:`gyro_cov` use the form :code:`torch.Tensor(gyro_cov_x, gyro_cov_y, gyro_cov_z)`. Default: (3.2e-3)**2
+        acc_cov: covariance of the accelerator. If the covaraince of the x, y and z axises are different, 
+            the :obj:`acc_cov` use the form :code:`torch.Tensor(acc_cov_x, acc_cov_y, acc_cov_z)`. Default: (8e-2)**2
         prop_cov (Bool, optional): flag to propogate the covariance matrix. Default: :obj:`True`
         reset (Bool, optional): flag to reset the initial states after each time the :obj:`forward`
             function is called. If False, the IMU integrator will use the states from last time
@@ -24,20 +26,26 @@ class IMUPreintegrator(nn.Module):
                        rot = pp.identity_SO3(),
                        vel = torch.zeros(3),
                        gravity = 9.81007,
-                       gyro_cov = (1.6968e-4)**2,
-                       acc_cov = (2e-3)**2,
+                       gyro_cov = (3.2e-3)**2,
+                       acc_cov = (8e-2)**2,
                        prop_cov = True,
                        reset = False):
         super().__init__()
         self.reset, self.prop_cov = reset, prop_cov
+
+        if isinstance(acc_cov, float):
+            acc_cov = torch.tensor([[acc_cov, acc_cov, acc_cov]])
+        if isinstance(gyro_cov, float):
+            gyro_cov = torch.tensor([[gyro_cov, gyro_cov, gyro_cov]])
+        
         # Initial status of IMU: (pos)ition, (rot)ation, (vel)ocity, (cov)ariance
         self.register_buffer('gravity', torch.tensor([0, 0, gravity]), persistent=False)
         self.register_buffer('pos', self._check(pos).clone(), persistent=False)
         self.register_buffer('rot', self._check(rot).clone(), persistent=False)
         self.register_buffer('vel', self._check(vel).clone(), persistent=False)
         self.register_buffer('cov', torch.zeros(1, 9, 9), persistent=False)
-        self.register_buffer('gyro_cov', torch.tensor([[gyro_cov, gyro_cov, gyro_cov]]), persistent=False)
-        self.register_buffer('acc_cov', torch.tensor([[acc_cov, acc_cov, acc_cov]]), persistent=False)
+        self.register_buffer('gyro_cov', gyro_cov, persistent=False)
+        self.register_buffer('acc_cov', acc_cov, persistent=False)
         self.Rij = None # th  referenced rotation of the covariance
 
     def _check(self, obj):
@@ -69,11 +77,20 @@ class IMUPreintegrator(nn.Module):
                 of the dictionary should be :obj:`{'pos': torch.Tensor, 'rot': pypose.SO3, 'vel':
                 torch.Tensor}`. The initial state given in constructor will be used if not given.
 
-        Note:
-            This layer supports the input shape with :math:`(B, F, H_{in})`, :math:`(F, H_{in})`
+        Shape:
+            Input (:obj:`dt`, :obj:`gyro`, :obj:`acc`): This layer supports the input shape with :math:`(B, F, H_{in})`, :math:`(F, H_{in})`
             and :math:`(H_{in})`, where :math:`B` is the batch size (or the number of IMU),
             :math:`F` is the number of frames (measurements), and :math:`H_{in}` is the raw
             sensor inputs.
+
+            init_state (Optional): The initial state before the integration. It contains :code:`pos`: initial position, 
+            :code:`rot`: initial rotation, :code:`vel`: initial velocity, with the shape :math:`(B, H_{in})`
+                
+            Output: The output is a :obj:`dict` of integration state.
+            It contains the :code:`pos`: position, :code:`rot`: rotation, :code:`vel`: velocity. Each output has the shape :math:`(B, F, H_{out})`,  where :math:`B` is the batch size (or the number of IMU),
+            :math:`F` is the number of frames (measurements), and :math:`H_{out}` is the raw sensor inputs.
+            If the flag :obj:`prop_cov` is True, the output state will also include :code:`cov`: the covariance matrix, 
+            where the shape is :math:`(B, 9, 9)`
 
         IMU Measurements Integration:
 
