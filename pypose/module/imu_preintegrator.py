@@ -154,7 +154,7 @@ class IMUPreintegrator(nn.Module):
                 \end{bmatrix},
 
         where :math:`\cdot^\wedge` is the skew matrix (:meth:`pypose.vec2skew`),
-        :math:`C \in\mathbf{R}^{9\times 9}` is the covarience matrix,
+        :math:`C \in\mathbf{R}^{9\times 9}` is the covariance matrix,
         and :math:`J_r^k` is the right jacobian (:meth:`pypose.Jr`) of integrated rotation
         :math:`\mathrm{Exp}(w_k{\Delta}t)` at :math:`k`-th time step,
         :math:`C_{g}` and :math:`C_{\mathbf{a}}` are measurement covariance of angular rate

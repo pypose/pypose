@@ -260,7 +260,7 @@ class PoseTransform(torch.nn.Module):
         return self.p.Exp() * x
 
 model, inputs = PoseTransform(), pp.randn_SO3()
-J = pp.optim.modjac(model, inputs, flatten=True)
+J = pp.optim.functional.modjac(model, inputs=inputs, flatten=True)
 print(J, J.shape)
 
 LT = [pp.randn_SO3, pp.randn_so3, pp.randn_SE3, pp.randn_se3, \
