@@ -45,8 +45,8 @@ if __name__=="__main__":
         zdot = x[0]*x[1]-beta*x[2]
         return xdot,ydot,zdot
     # Create time span for trajectory prediction
-    tspan = [0.001,10]                                # Simluation time span
-    num_tsteps = 1000                                # Number of time steps
+    tspan = [0.001,10]                                 # Simluation time span
+    num_tsteps = 1000                                  # Number of time steps
     t_eval = np.linspace(tspan[0],tspan[1],num_tsteps) # Vector of all times
     t_step = t_eval[1] - t_eval[0]                     # Find time step size
     # Solve for trajectory
@@ -59,7 +59,7 @@ if __name__=="__main__":
     state = torch.tensor(IC).float()
     pred[:,0] = state;
 
-    stateTransitionOptim = torch.optim.Adam(lorenzSolver.parameters(),lr=0.01)
+    # stateTransitionOptim = torch.optim.Adam(lorenzSolver.parameters(),lr=0.01)
 
     loss = torch.inf
     while loss > 0.1:
@@ -68,8 +68,8 @@ if __name__=="__main__":
             pred[:,i] = next_state 
             state = next_state
         loss = lorenzSolver.loss(sol,pred)
-        loss.backward(retain_graph=True)
-        stateTransitionOptim.step()
+        # loss.backward(retain_graph=True)
+        # stateTransitionOptim.step()
 
     print(lorenzSolver._sigma)
     print(lorenzSolver._beta)

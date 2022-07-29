@@ -82,11 +82,17 @@ if __name__ == "__main__":
     # Find jacobinas at 1000th step
     jacob_state, jacob_input = state_all[999,:].T, input[999]
     cartPoleSolver.set_linearization_point(jacob_state,jacob_input)
-    A = cartPoleSolver.A
-    B = cartPoleSolver.B
-    C = cartPoleSolver.C
-    D = cartPoleSolver.D
-    print(A)
-    print(B)
-    print(C)
-    print(D)
+    A = (cartPoleSolver.A).numpy()
+    B = (cartPoleSolver.B).numpy()
+    C = (cartPoleSolver.C).numpy()
+    D = (cartPoleSolver.D).numpy()
+
+    Atest = np.loadtxt("cartpoleA.txt")
+    Btest = np.loadtxt("cartpoleB.txt")
+
+    print("Error in A: ")
+    print(np.linalg.norm((Atest-A),ord=2))
+    print("Error in B: ")
+    print(np.linalg.norm((Btest-B),ord=2))
+
+    

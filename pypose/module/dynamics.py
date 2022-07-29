@@ -3,7 +3,7 @@ import torch as torch
 import torch.nn as nn
 from torch.autograd.functional import jacobian
 
-class _System(nn.Module):                                                # DH: Please follow the documentation style in LTI to document this class.
+class _System(nn.Module):
     r'''
     A sub-class of :obj:`torch.nn.Module` to build general dynamics.
     
@@ -25,10 +25,10 @@ class _System(nn.Module):                                                # DH: P
         r'''
         Parameters
         ----------
-        x : Tensor
-            The state of the dynamic system
-        u : Tensor
-            The input to the dynamic system
+        state : Tensor
+                The state of the dynamic system
+        input : Tensor
+                The input to the dynamic system
 
         Returns
         -------
@@ -59,7 +59,7 @@ class _System(nn.Module):                                                # DH: P
         if hasattr(self, '_A'):
             return self._A
         else:
-            func = lambda x: self.state_transition(x, self.input)            # DH: TYPO.  So has the Jacobian been ever tested yet??
+            func = lambda x: self.state_transition(x, self.input)
             return jacobian(func, self.state, **self.jacargs)
 
     @property
@@ -85,6 +85,16 @@ class _System(nn.Module):                                                # DH: P
         else:
             func = lambda x: self.observation(self.state, x)
             return jacobian(func, self.input, **self.jacargs)
+    
+    @property
+    def c1(self):
+        if hasattr(self,'_c1'):
+            return self._c1
+    
+    @property
+    def c2(self):
+        if hasattr(self,'_c2'):
+            return self._c2
 
 
 class LTI(_System):
