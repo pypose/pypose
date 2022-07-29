@@ -7,7 +7,7 @@ from .backends import exp, log, inv, mul, adj
 from .backends import adjT, jinvp, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
 from .basics import cumops_, cummul_, cumprod_
-from .operation import RxSO3_Log, SE3_Log, SO3_Log, Sim3_Log, rxso3_Exp, se3_Exp, sim3_Exp, so3_Exp, lietensor_mul
+from .operation import RxSO3_Log, SE3_Log, SO3_Log, Sim3_Log, lietensor_act, rxso3_Exp, se3_Exp, sim3_Exp, so3_Exp, lietensor_mul
 
 
 HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'double',
@@ -77,8 +77,14 @@ class LieType:
         """ action on a points tensor(*, 3[4]) (homogeneous)"""
         assert not self.on_manifold and isinstance(p, torch.Tensor)
         assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
-        act = act3 if p.shape[-1]==3 else act4
-        return self.__op__(self.lid, act, x, p)
+        # act = act3 if p.shape[-1]==3 else act4
+        # return self.__op__(self.lid, act, x, p)
+        if p.shape[-1]==3:
+            out = lietensor_act(self.lid, x, p)
+        else:
+            out = lietensor_act4(self.lid, x, p)
+        return out
+
 
     def Mul(self, x, y):
         # Transform on transform
