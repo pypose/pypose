@@ -77,7 +77,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.item())
                 break
         print('Done', timer.toc())
-        assert idx == 99
+        assert idx == 99, "Optimization requires too many steps."
 
         posnet = PoseInv(2, 2).to(device)
         optimizer = pp.optim.LM(posnet, damping=1e-6)
@@ -90,7 +90,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
         print('Done')
-        assert idx < 10
+        assert idx < 10, "Optimization requires too many steps."
 
 
     def test_optim_liegroup(self):
@@ -117,7 +117,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
         
-        assert idx < 10
+        assert idx < 10, "Optimization requires too many steps."
 
 
     def test_optim_with_kernel(self):
@@ -147,7 +147,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
 
-        assert idx < 10
+        assert idx < 10, "Optimization requires too many steps."
 
 
     def test_optim_trustregion(self):
@@ -175,7 +175,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
 
-        assert idx < 10
+        assert idx < 10, "Optimization requires too many steps."
 
 
 if __name__ == '__main__':

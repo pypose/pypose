@@ -377,8 +377,8 @@ class LevenbergMarquardt(_Optimizer):
             A = J.T @ J
             A.diagonal().clamp_(pg['min'], pg['max'])
             A.diagonal().add_(pg['damping'] * A.diagonal())
-            self.D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
-            self.update_parameter(params = pg['params'], step = self.D)
+            D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
+            self.update_parameter(params = pg['params'], step = D)
         return self.model.loss(inputs, targets)
 
 
@@ -550,7 +550,7 @@ class TrustRegion(_Optimizer):
                 quality = (last - loss) / -((J @ D).mT @ (2 * R.view(-1, 1) + J @ D)).squeeze()
                 self.update_group(pg, quality)
                 if last < loss: # reject step
-                    self.update_parameter(pg['params'], -D)
+                    self.update_parameter(params = pg['params'], step = -D)
                     loss = last
         return loss
 
