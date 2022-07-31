@@ -125,13 +125,13 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
         >>> J.shape
         torch.Size([8, 6])
     '''
-    func, params = functorch.make_functional(model)
+    func, params, buffers = functorch.make_functional_with_buffers(model)
 
     if inputs is None:
-        func_param = lambda *p: func(p)
+        func_param = lambda *p: func(p, buffers)
     else:
         inputs = inputs if isinstance(inputs, tuple) else (inputs,)
-        func_param = lambda *p: func(p, *inputs)
+        func_param = lambda *p: func(p, buffers, *inputs)
 
     J = jacobian(func_param, params, create_graph=create_graph, strict=strict, \
                     vectorize=vectorize, strategy=strategy)

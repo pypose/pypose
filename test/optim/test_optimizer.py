@@ -150,8 +150,37 @@ class TestOptim:
         assert idx < 10
 
 
+    def test_optim_trustregion(self):
+
+        class PoseInv(nn.Module):
+            def __init__(self, *dim):
+                super().__init__()
+                self.pose = pp.Parameter(pp.randn_SE3(*dim))
+
+            def forward(self, inputs):
+                return (self.pose @ inputs).Log()
+
+        timer = Timer()
+        target = pp.identity_se3(2, 2).to(device)
+        inputs = pp.randn_SE3(2, 2).to(device)
+        posnet = PoseInv(2, 2).to(device)
+        solver = ppos.Cholesky()
+        optimizer = pp.optim.TR(posnet, radius=1e4, solver=solver)
+
+        for idx in range(10):
+            loss = optimizer.step(inputs, target)
+            print('Pose loss %.7f @ %dit, Timing: %.3fs'%(loss, idx, timer.end()))
+            if loss < 1e-5:
+                print('Early Stoping!')
+                print('Optimization Early Done with loss:', loss.sum().item())
+                break
+
+        assert idx < 10
+
+
 if __name__ == '__main__':
     test = TestOptim()
     test.test_optim_liealgebra()
     test.test_optim_liegroup()
     test.test_optim_with_kernel()
+    test.test_optim_trustregion()
