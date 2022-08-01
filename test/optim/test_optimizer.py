@@ -150,34 +150,6 @@ class TestOptim:
 
         assert idx < 10, "Optimization requires too many steps."
 
-    def test_optim_trustregion(self):
-
-        class PoseInv(nn.Module):
-            def __init__(self, *dim):
-                super().__init__()
-                self.pose = pp.Parameter(pp.randn_SE3(*dim))
-
-            def forward(self, inputs):
-                return (self.pose @ inputs).Log()
-
-        timer = Timer()
-        target = pp.identity_se3(2, 2).to(device)
-        inputs = pp.randn_SE3(2, 2).to(device)
-        posnet = PoseInv(2, 2).to(device)
-        solver = ppos.Cholesky()
-        strategy = ppst.TrustRegion()
-        optimizer = pp.optim.LM(posnet, solver=solver, strategy=strategy)
-
-        for idx in range(10):
-            loss = optimizer.step(inputs, target)
-            print('Pose loss %.7f @ %dit, Timing: %.3fs'%(loss, idx, timer.end()))
-            if loss < 1e-5:
-                print('Early Stoping!')
-                print('Optimization Early Done with loss:', loss.item())
-                break
-
-        assert idx < 10, "Optimization requires too many steps."
-
     def test_optim_strategy_constant(self):
 
         class PoseInv(nn.Module):
@@ -226,11 +198,37 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.item())
                 break
 
+    def test_optim_trustregion(self):
+        class PoseInv(nn.Module):
+            def __init__(self, *dim):
+                super().__init__()
+                self.pose = pp.Parameter(pp.randn_SE3(*dim))
+
+            def forward(self, inputs):
+                return (self.pose @ inputs).Log().tensor()
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        inputs = pp.randn_SE3(2, 2).to(device)
+        invnet = PoseInv(2, 2).to(device)
+        strategy = pp.optim.strategy.TrustRegion(radius=1e6)
+        optimizer = pp.optim.LM(invnet, strategy=strategy)
+
+        for idx in range(10):
+            loss = optimizer.step(inputs)
+            print('Pose loss %.7f @ %dit'%(loss, idx))
+            if loss < 1e-5:
+                print('Early Stoping!')
+                print('Optimization Early Done with loss:', loss.item())
+                break
+
+        assert idx < 10, "Optimization requires too many steps."
+
+
 if __name__ == '__main__':
     test = TestOptim()
     test.test_optim_liealgebra()
     test.test_optim_liegroup()
     test.test_optim_with_kernel()
-    test.test_optim_trustregion()
     test.test_optim_strategy_constant()
     test.test_optim_strategy_adaptive()
+    test.test_optim_trustregion()
