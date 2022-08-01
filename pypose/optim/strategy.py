@@ -56,10 +56,13 @@ class Adaptive(object):
     .. math::
        \begin{aligned}
             &\rule{113mm}{0.4pt}                                                                 \\
-            &\textbf{input}: \lambda \geq 0~\text{(damping)}, \bm{\rho}~(\text{quality}),
-                             \theta_h~(\text{high}), \theta_l~(\text{low}), \delta_u~(\text{up}),
-                             \delta_d~(\text{down})                                              \\
+            &\textbf{input}: \lambda ~\text{(damping)},
+                             \bm{f}(\bm{\theta})~(\text{model}), \theta_h~(\text{high}),
+                             \theta_l~(\text{low}), \delta_u~(\text{up}), \delta_d~(\text{down}) \\
             &\rule{113mm}{0.4pt}                                                                 \\
+            & \rho = \frac{ \|\bm{f}(\bm{\theta})\|^2 - \|\bm{f}(\bm{\theta} + \delta)\|^2}
+                      {\|\bm{f}(\bm{\theta})\|^2 - \|\bm{f}(\bm{\theta}) + \mathbf{J}\delta\|^2}
+                    ~\text{(step quality)}                                                       \\
             &\textbf{if} ~~ \rho > \theta_h ~ \text{(``very successful'' step)}                  \\
             &\hspace{5mm} \lambda \leftarrow \delta_d \cdot \lambda                              \\
             &\textbf{elif} ~~ \rho > \theta_l ~ \text{(``successful'' step)}                     \\
@@ -81,9 +84,10 @@ class Adaptive(object):
             Defaults: 0.5.
         up (float, optional): the up scaling factor in the range of :math:`(1,\infty)`.
             Defaults: 2.0.
-
+        min (float, optional): the lower-bound of damping factor. Default: 1e-6.
+        max (float, optional): the upper-bound of damping factor. Default: 1e16.
     Note:
-        More details about how quality is calculated and the optimization process go to
+        More details about the optimization process go to
         :meth:`pypose.optim.LevenbergMarquardt`.
 
     Example:
@@ -112,15 +116,14 @@ class Adaptive(object):
         Early Stoping!
         Optimization Early Done with loss: 9.236661990819073e-10
     '''
-    def __init__(self, damping=1e-6, high=0.5, low=1e-3, up=2., down=.5,):
+    def __init__(self, damping=1e-6, high=0.5, low=1e-3, up=2., down=.5, min=1e-6, max=1e16):
         assert damping > 0, ValueError("damping has to be positive: {}".format(damping))
         assert high > 0, ValueError("high has to be positive: {}".format(th1))
         assert low > 0, ValueError("low for decrease has to be positive: {}".format(th2))
         assert 0 < down < 1, ValueError("down factor has to be larger than 1: {}".format(down))
         assert 1 < up, ValueError("up factor has to be larger than 1: {}".format(up))
         self.defaults = {'damping': damping, 'high': high, 'low': low, 'up': up, 'down': down}
-        dtype = torch.get_default_dtype()
-        self.min, self.max = finfo(dtype).tiny, finfo(dtype).max
+        self.min, self.max = min, max
 
     def update(self, pg, last, loss, J, D, R, *args, **kwargs):
         quality = (last - loss) / -((J @ D).mT @ (2 * R + J @ D)).squeeze()
@@ -142,10 +145,13 @@ class TrustRegion(object):
     .. math::
        \begin{aligned}
             &\rule{113mm}{0.4pt}                                                                 \\
-            &\textbf{input}: \Delta \geq 0~\text{(radius)}, \bm{\rho}~(\text{quality}),
-                             \theta_h~(\text{high}), \theta_l~(\text{low}), \delta_u~(\text{up}),
-                             \delta_d~(\text{down})                                              \\
+            &\textbf{input}: \lambda ~\text{(damping)},
+                             \bm{f}(\bm{\theta})~(\text{model}), \theta_h~(\text{high}),
+                             \theta_l~(\text{low}), \delta_u~(\text{up}), \delta_d~(\text{down}) \\
             &\rule{113mm}{0.4pt}                                                                 \\
+            & \rho = \frac{ \|\bm{f}(\bm{\theta})\|^2 - \|\bm{f}(\bm{\theta} + \delta)\|^2}
+                      {\|\bm{f}(\bm{\theta})\|^2 - \|\bm{f}(\bm{\theta}) + \mathbf{J}\delta\|^2}
+                    ~\text{(step quality)}                                                       \\
             &\textbf{if} ~~ \rho > \theta_h ~ \text{(``very successful'' step)}                  \\
             &\hspace{5mm} \lambda \leftarrow \delta_d \cdot \lambda                              \\
             &\textbf{elif} ~~ \rho > \theta_l ~ \text{(``successful'' step)}                     \\
@@ -160,8 +166,8 @@ class TrustRegion(object):
     Args:
         radius (float, optional): the initial radius of the trust region (positive number).
             Default: 1e6.
-        min (float, optional): the lower-bound of the Hessian diagonal. Default: 1e-6.
-        max (float, optional): the upper-bound of the Hessian diagonal. Default: 1e32.
+        min (float, optional): the lower-bound of trust region radius. Default: 1e-6.
+        max (float, optional): the upper-bound of trust region radius. Default: 1e16.
         decrease (float, optional): model cost change when expanding the trust region.
             Default: 1e-1.
         factor (float, optional): factor of expanding or shrinking the trust region.
@@ -197,13 +203,12 @@ class TrustRegion(object):
         Early Stoping!
         Optimization Early Done with loss: 9.236661990819073e-10
     '''
-    def __init__(self, radius=1e6, min=1e-6, max=1e32, decrease=1e-1, factor=2.):
+    def __init__(self, radius=1e6, decrease=1e-1, factor=2., min=1e-6, max=1e16):
         super().__init__()
         assert radius > 0, ValueError("trust region radius has to be positive: {}".format(radius))
         assert decrease > 0, ValueError("min decrease has to be positive: {}".format(decrease))
         assert factor > 0, ValueError("factor for decrease has to be positive: {}".format(factor))
-        damping, dtype = 1 / radius, torch.get_default_dtype()
-        self.min, self.max = finfo(dtype).tiny, finfo(dtype).max
+        self.min, self.max, damping = min, max, 1 / radius
         self.defaults = {'radius':radius, 'damping':damping, 'decrease':decrease, 'factor':factor}
 
     def update(self, pg, last, loss, J, D, R, *args, **kwargs):
