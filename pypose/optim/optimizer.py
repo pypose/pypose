@@ -1,6 +1,7 @@
 import torch, warnings
 from torch import nn, finfo
 from .functional import modjac
+from .strategy import Constant
 from torch.optim import Optimizer
 from .solver import PINV, Cholesky
 
@@ -294,179 +295,15 @@ class LevenbergMarquardt(_Optimizer):
         the model Jacobian will be a row vector, instead of a matrix, which loses sample-level
         structural information, although computing Jacobian vector is faster.**
     '''
-    def __init__(self, model, damping, solver=None, kernel=None, corrector=None, min=1e-6, max=1e32):
-        assert damping > 0, ValueError("damping factor has to be positive: {}".format(damping))
+    def __init__(self, model, solver=None, kernel=None, corrector=None, strategy=None, \
+                       reject=True, min=1e-6, max=1e32):
         assert min > 0, ValueError("min value has to be positive: {}".format(min))
         assert max > 0, ValueError("max value has to be positive: {}".format(max))
-        defaults = {'damping':damping, 'min':min, 'max':max}
+        self.strategy = Constant() if strategy is None else strategy
+        defaults = {**{'min':min, 'max':max}, **self.strategy.defaults}
         super().__init__(model.parameters(), defaults=defaults)
         self.solver = Cholesky() if solver is None else solver
-        if kernel is not None and corrector is None:
-            # auto diff of robust model will be computed
-            self.model = RobustModel(model, kernel, auto=True)
-            self.corrector = Trivial()
-        else:
-            # manually Jacobian correction will be computed
-            self.model = RobustModel(model, kernel, auto=False)
-            self.corrector = Trivial() if corrector is None else corrector
-
-    @torch.no_grad()
-    def step(self, inputs, targets=None):
-        r'''
-        Performs a single optimization step.
-
-        Args:
-            inputs (Tensor/LieTensor or tuple of Tensors/LieTensors): the inputs to the model.
-            targets (Tensor/LieTensor): the model targets to optimize.
-                If not given, the squared model outputs are minimized. Defaults: ``None``.
-
-        Return:
-            Tensor: the minimized model loss, i.e.,
-            :math:`\sum_i \rho( \|\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\|^2)`.
-
-        Note:
-            The (non-negative) damping factor :math:`\lambda` can be adjusted at each iteration. If
-            the residual reduces rapidly, a smaller value can be used, bringing the algorithm
-            closer to the Gauss-Newton algorithm, whereas if an iteration gives insufficient residual
-            reduction, :math:`\lambda` can be increased, giving a step closer to the gradient
-            descent direction.
-
-            See more details of `Levenberg-Marquardt (LM) algorithm
-            <https://en.wikipedia.org/wiki/Levenberg-Marquardt_algorithm>`_ on Wikipedia.
-
-        Note:
-            Different from PyTorch optimizers like
-            `SGD <https://pytorch.org/docs/stable/generated/torch.optim.SGD.html>`_, where the model
-            error has to be a scalar, the output of model :math:`\bm{f}` can be a Tensor/LieTensor or a
-            tuple of Tensors/LieTensors.
-
-        Example:
-            Optimizing a simple module to **approximate pose inversion**.
-
-            >>> class PoseInv(nn.Module):
-            ...     def __init__(self, *dim):
-            ...         super().__init__()
-            ...         self.pose = pp.Parameter(pp.randn_se3(*dim))
-            ...
-            ...     def forward(self, inputs):
-            ...         # the last dimension of the output is 6,
-            ...         # which will be the residual dimension.
-            ...         return (self.pose.Exp() @ inputs).Log()
-            ...
-            >>> posinv = PoseInv(2, 2)
-            >>> inputs = pp.randn_SE3(2, 2)
-            >>> optimizer = pp.optim.LM(posinv, damping=1e-6)
-            ...
-            >>> for idx in range(10):
-            ...     loss = optimizer.step(inputs)
-            ...     print('Pose Inversion loss %.7f @ %d it'%(loss, idx))
-            ...     if loss < 1e-5:
-            ...         print('Early Stopping with loss:', loss.item())
-            ...         break
-            ...
-            Pose Inversion error: 1.6600330 @ 0 it
-            Pose Inversion error: 0.1296970 @ 1 it
-            Pose Inversion error: 0.0008593 @ 2 it
-            Pose Inversion error: 0.0000004 @ 3 it
-            Early Stopping with error: 4.443569991963159e-07
-        '''
-        for pg in self.param_groups:
-            R = self.model(inputs, targets)
-            J = modjac(self.model, inputs=(inputs, targets), flatten=True)
-            R, J = self.corrector(R = R, J = J)
-            A = J.T @ J
-            A.diagonal().clamp_(pg['min'], pg['max'])
-            A.diagonal().add_(pg['damping'] * A.diagonal())
-            D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
-            self.update_parameter(params = pg['params'], step = D)
-        return self.model.loss(inputs, targets)
-
-
-class TrustRegion(_Optimizer):
-    r'''
-    The Trust Region (TR) algorithm solving non-linear least squares problems.
-
-    .. math::
-        \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
-            \rho\left(\|\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\|^2\right),
-
-    where :math:`\bm{f}()` is the model, :math:`\bm{\theta}` is the parameters to be optimized,
-    :math:`\bm{x}` is the model inputs, and :math:`\rho` is a robust kernel function to reduce
-    the effect of outliers. :math:`\rho(x) = x` is used by default.
-
-    .. math::
-       \begin{aligned}
-            &\rule{113mm}{0.4pt}                                                                 \\
-            &\textbf{input}: \lambda \geq 0~\text{(damping)}, \bm{\theta}_0~\text{(params)},
-                \bm{f}~\text{(model)}, \bm{x}~(\text{inputs}), \bm{y}~(\text{targets})           \\
-                &\hspace{12mm} \rho~(\text{kernel})                                              \\
-            &\rule{113mm}{0.4pt}                                                                 \\
-            &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
-            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}
-                {\partial \bm{\theta}_{t-1}}}                                                    \\
-            &\hspace{5mm} \mathbf{A} \leftarrow (\mathbf{J}^T \mathbf{J} + \lambda
-                \mathrm{diag}(\mathbf{J}^T \mathbf{J})).\mathrm{diagnal\_clamp(min, max)}        \\
-            &\hspace{5mm} \mathbf{R} = \bm{f(\bm{\theta}_{t-1}, \bm{x})} - \bm{y}                \\
-            &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
-            &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{A}, -\mathbf{J}^T\mathbf{R})     \\
-            &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}               \\
-            &\rule{113mm}{0.4pt}                                                          \\[-1.ex]
-            &\bf{return} \:  \theta_t                                                     \\[-1.ex]
-            &\rule{113mm}{0.4pt}                                                          \\[-1.ex]
-       \end{aligned}
-
-    Args:
-        model (nn.Module): a module containing learnable parameters.
-        radius (float, optional): The initial radius of the trust region (positive number).
-            Default: 1e5.
-        solver (nn.Module, optional): a linear solver. If ``None``, :meth:`solver.Cholesky` is used.
-            Default: ``None``.
-        kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
-        corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit the kernel
-            function. If a kernel is given but a corrector is not specified, auto correction is
-            used. Auto correction can be unstable when the robust model has indefinite Hessian.
-            Default: ``None``.
-        min (float, optional): the lower-bound of the Hessian diagonal. Default: 1e-6.
-        max (float, optional): the upper-bound of the Hessian diagonal. Default: 1e32.
-
-    Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`, :meth:`solver.Cholesky`.
-
-    Available kernels: :meth:`pypose.module.Huber`; :meth:`module.PseudoHuber`; :meth:`module.Cauchy`.
-
-    Available correctors: :meth:`corrector.FastTriggs`, :meth:`corrector.Triggs`.
-
-    Warning:
-        The output of model :math:`\bm{f}(\bm{\theta},\bm{x}_i)` and targets :math:`\bm{y}_i`
-        can be any shape, while their **last dimension** :math:`d` is always taken as the
-        dimension of model residual, whose inner product will be input to the kernel
-        function. This is useful for residuals like re-projection error, whose last
-        dimension is 2.
-
-        Note that **auto correction** is equivalent to the method of 'square-rooting the kernel'
-        mentioned in Section 3.3 of the following paper. It replaces the
-        :math:`d`-dimensional residual with a one-dimensional one, which loses
-        residual-level structural information.
-
-        * Christopher Zach, `Robust Bundle Adjustment Revisited
-          <https://link.springer.com/chapter/10.1007/978-3-319-10602-1_50>`_, European
-          Conference on Computer Vision (ECCV), 2014.
-
-        **Therefore, the users need to keep the last dimension of model output and target to
-        1, even if the model residual is a scalar. If the model output only has one dimension,
-        the model Jacobian will be a row vector, instead of a matrix, which loses sample-level
-        structural information, although computing Jacobian vector is faster.**
-    '''
-    def __init__(self, model, radius=1e6, solver=None, kernel=None, corrector=None,
-                       min=1e-6, max=1e32, decrease=1e-3, factor=2):
-        assert radius > 0, ValueError("trust region radius has to be positive: {}".format(radius))
-        assert decrease > 0, ValueError("min decrease has to be positive: {}".format(decrease))
-        assert factor > 0, ValueError("factor for decrease has to be positive: {}".format(decrease))
-        assert min > 0, ValueError("min value has to be positive: {}".format(min))
-        assert max > 0, ValueError("max value has to be positive: {}".format(max))
-        defaults = {'radius':torch.tensor(radius), 'decrease':decrease,
-                    'factor':torch.tensor(factor), 'min':min, 'max':max}
-        super().__init__(model.parameters(), defaults=defaults)
-        self.solver = Cholesky() if solver is None else solver
+        self.reject = reject
         if kernel is not None and corrector is None:
             # auto diff of robust model will be computed
             self.model = RobustModel(model, kernel, auto=True)
@@ -543,27 +380,16 @@ class TrustRegion(_Optimizer):
             last = loss = self.model.loss(inputs, targets)
             A = J.T @ J
             while last <= loss:
-                A.diagonal().add_(A.diagonal().clamp(pg['min'], pg['max'])/pg['radius'])
+                A.diagonal().add_(A.diagonal().clamp(pg['min'], pg['max']) * pg['damping'])
                 D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
                 self.update_parameter(pg['params'], D)
                 loss = self.model.loss(inputs, targets)
-                quality = (last - loss) / -((J @ D).mT @ (2 * R.view(-1, 1) + J @ D)).squeeze()
-                self.update_group(pg, quality)
-                if last < loss: # reject step
+                self.strategy.update(pg, last=last, loss=loss, J=J, D=D, R=R.view(-1, 1))
+                if last < loss and self.reject: # reject step
                     self.update_parameter(params = pg['params'], step = -D)
                     loss = last
+                    print('rejecting')
+                else:
+                    break
+                print(quality, pg['damping'])
         return loss
-
-    def update_group(self, pg, quality):
-        if quality > pg['decrease']:
-            pg['radius'] = 3 * pg['radius']
-            pg['factor'] = torch.tensor(2.)
-        elif quality > 0:
-            pg['radius'] = pg['radius']
-            pg['factor'] = torch.tensor(2.)
-        else:
-            pg['radius'] = pg['radius'] / pg['factor']
-            pg['factor'] = 2 * pg['factor']
-        rdtype, fdtype = pg['radius'].dtype, pg['factor'].dtype
-        pg['radius'].clamp_(finfo(rdtype).tiny, finfo(rdtype).max)
-        pg['factor'].clamp_(finfo(fdtype).tiny, finfo(fdtype).max)
