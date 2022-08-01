@@ -379,8 +379,9 @@ class LevenbergMarquardt(_Optimizer):
             R, J = self.corrector(R = R, J = J)
             last = loss = self.model.loss(inputs, targets)
             A = J.T @ J
+            A.diagonal().clamp_(pg['min'], pg['max'])
             while last <= loss:
-                A.diagonal().add_(A.diagonal().clamp(pg['min'], pg['max']) * pg['damping'])
+                A.diagonal().add_(A.diagonal() * pg['damping'])
                 D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
                 self.update_parameter(pg['params'], D)
                 loss = self.model.loss(inputs, targets)
