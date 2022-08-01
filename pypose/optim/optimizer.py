@@ -1,7 +1,7 @@
 import torch, warnings
 from torch import nn, finfo
 from .functional import modjac
-from .strategy import Constant
+from .strategy import TrustRegion
 from torch.optim import Optimizer
 from .solver import PINV, Cholesky
 
@@ -237,19 +237,28 @@ class LevenbergMarquardt(_Optimizer):
     .. math::
        \begin{aligned}
             &\rule{113mm}{0.4pt}                                                                 \\
-            &\textbf{input}: \lambda \geq 0~\text{(damping)}, \bm{\theta}_0~\text{(params)},
+            &\textbf{input}: \lambda~\text{(damping)}, \bm{\theta}_0~\text{(params)},
                 \bm{f}~\text{(model)}, \bm{x}~(\text{inputs}), \bm{y}~(\text{targets})           \\
-                &\hspace{12mm} \rho~(\text{kernel})                                              \\
+            &\hspace{12mm} \rho~(\text{kernel}), \epsilon_{s}~(\text{min}),
+                           \epsilon_{l}~(\text{max})                                             \\
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
-            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}
-                {\partial \bm{\theta}_{t-1}}}                                                    \\
-            &\hspace{5mm} \mathbf{A} \leftarrow (\mathbf{J}^T \mathbf{J} + \lambda
-                \mathrm{diag}(\mathbf{J}^T \mathbf{J})).\mathrm{diagnal\_clamp(min, max)}        \\
             &\hspace{5mm} \mathbf{R} = \bm{f(\bm{\theta}_{t-1}, \bm{x})} - \bm{y}                \\
             &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
-            &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{A}, -\mathbf{J}^T\mathbf{R})     \\
-            &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}               \\
+            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}
+                {\partial \bm{\theta}_{t-1}}}                                                    \\
+            &\hspace{5mm} \mathbf{A} \leftarrow (\mathbf{J}^T \mathbf{J})
+                                     .\mathrm{diagnal\_clamp(\epsilon_{s}, \epsilon_{l})}        \\
+            &\hspace{5mm} \textbf{while}~\text{first iteration}~\textbf{or}~
+                                         \text{loss not decreasing}                              \\
+            &\hspace{10mm} \mathbf{A} \leftarrow \mathbf{A} + \lambda \mathrm{diag}(\mathbf{A})  \\
+            &\hspace{10mm} \bm{\delta} = \mathrm{solver}(\mathbf{A}, -\mathbf{J}^T\mathbf{R})    \\
+            &\hspace{10mm} \lambda \leftarrow \mathrm{strategy}(\lambda,\text{model information})\\
+            &\hspace{10mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}              \\
+            &\hspace{10mm} \textbf{if}~\text{loss not decreasing}~\textbf{or}~
+                                       \text{maximum reject step not reached}                    \\
+            &\hspace{15mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} - \bm{\delta}
+                                                               ~(\text{reject step})             \\
             &\rule{113mm}{0.4pt}                                                          \\[-1.ex]
             &\bf{return} \:  \theta_t                                                     \\[-1.ex]
             &\rule{113mm}{0.4pt}                                                          \\[-1.ex]
@@ -257,22 +266,29 @@ class LevenbergMarquardt(_Optimizer):
 
     Args:
         model (nn.Module): a module containing learnable parameters.
-        damping (float): Levenberg's damping factor (positive number).
         solver (nn.Module, optional): a linear solver. If ``None``, :meth:`solver.Cholesky` is used.
             Default: ``None``.
+        strategy (object, optional): strategy for adjusting the damping factor. If ``None``, the
+            :meth:`strategy.TrustRegion` will be used. Defult: ``None``.
         kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
         corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit the kernel
             function. If a kernel is given but a corrector is not specified, auto correction is
             used. Auto correction can be unstable when the robust model has indefinite Hessian.
             Default: ``None``.
+        reject (integer, optional): the maximum number of rejecting unsuccessfull steps.
+            Default: 16.
         min (float, optional): the lower-bound of the Hessian diagonal. Default: 1e-6.
         max (float, optional): the upper-bound of the Hessian diagonal. Default: 1e32.
 
     Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`, :meth:`solver.Cholesky`.
 
-    Available kernels: :meth:`pypose.module.Huber`; :meth:`module.PseudoHuber`; :meth:`module.Cauchy`.
+    Available kernels: :meth:`pypose.module.Huber`; :meth:`module.PseudoHuber`;
+    :meth:`module.Cauchy`.
 
     Available correctors: :meth:`corrector.FastTriggs`, :meth:`corrector.Triggs`.
+
+    Available strategies: :meth:`strategy.Constant`; :meth:`strategy.Adaptive`;
+    :meth:`strategy.TrustRegion`;
 
     Warning:
         The output of model :math:`\bm{f}(\bm{\theta},\bm{x}_i)` and targets :math:`\bm{y}_i`
@@ -295,15 +311,15 @@ class LevenbergMarquardt(_Optimizer):
         the model Jacobian will be a row vector, instead of a matrix, which loses sample-level
         structural information, although computing Jacobian vector is faster.**
     '''
-    def __init__(self, model, solver=None, kernel=None, corrector=None, strategy=None, \
-                       reject=True, min=1e-6, max=1e32):
+    def __init__(self, model, solver=None, strategy=None, kernel=None, corrector=None, \
+                       reject=16, min=1e-6, max=1e32):
         assert min > 0, ValueError("min value has to be positive: {}".format(min))
         assert max > 0, ValueError("max value has to be positive: {}".format(max))
-        self.strategy = Constant() if strategy is None else strategy
+        self.strategy = TrustRegion() if strategy is None else strategy
         defaults = {**{'min':min, 'max':max}, **self.strategy.defaults}
         super().__init__(model.parameters(), defaults=defaults)
         self.solver = Cholesky() if solver is None else solver
-        self.reject = reject
+        self.reject, self.reject_count = reject, 0
         if kernel is not None and corrector is None:
             # auto diff of robust model will be computed
             self.model = RobustModel(model, kernel, auto=True)
@@ -378,7 +394,7 @@ class LevenbergMarquardt(_Optimizer):
             J = modjac(self.model, inputs=(inputs, targets), flatten=True)
             R, J = self.corrector(R = R, J = J)
             last = loss = self.model.loss(inputs, targets)
-            A = J.T @ J
+            A, self.reject_count = J.T @ J, 0
             A.diagonal().clamp_(pg['min'], pg['max'])
             while last <= loss:
                 A.diagonal().add_(A.diagonal() * pg['damping'])
@@ -386,9 +402,9 @@ class LevenbergMarquardt(_Optimizer):
                 self.update_parameter(pg['params'], D)
                 loss = self.model.loss(inputs, targets)
                 self.strategy.update(pg, last=last, loss=loss, J=J, D=D, R=R.view(-1, 1))
-                if last < loss and self.reject: # reject step
+                if last < loss and self.reject_count < self.reject: # reject step
                     self.update_parameter(params = pg['params'], step = -D)
-                    loss = last
+                    loss, self.reject_count = last, self.reject_count + 1
                 else:
                     break
         return loss
