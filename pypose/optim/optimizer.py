@@ -388,8 +388,6 @@ class LevenbergMarquardt(_Optimizer):
                 if last < loss and self.reject: # reject step
                     self.update_parameter(params = pg['params'], step = -D)
                     loss = last
-                    print('rejecting')
                 else:
                     break
-                print(quality, pg['damping'])
         return loss
