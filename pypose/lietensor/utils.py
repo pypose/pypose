@@ -1416,19 +1416,19 @@ def Inv(x):
         \mathrm{Inv}: Y_i = X_i^{-1}
 
     Args:
-        input (LieTensor): the input LieTensor (Lie Group)
+        input (LieTensor): the input LieTensor (Lie Group or Lie Algebra)
 
     Return:
-        LieTensor: the output LieTensor (Lie Group)
+        LieTensor: the output LieTensor (Lie Group or Lie Algebra)
 
     .. list-table:: List of supported :math:`\mathrm{Inv}` map
         :widths: 20 20 8 20 20
         :header-rows: 1
 
         * - input :obj:`ltype`
-          - :math:`\mathcal{G}` (Lie Group)
+          - LieTensor
           - :math:`\mapsto`
-          - :math:`\mathcal{G}` (Lie Group)
+          - LieTensor
           - output :obj:`ltype`
         * - :obj:`SO3_type`
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times4}`
@@ -1450,15 +1450,35 @@ def Inv(x):
           - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times5}`
           - :obj:`RxSO3_type`
+        * - :obj:`so3_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :obj:`so3_type`
+        * - :obj:`se3_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times6}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times6}`
+          - :obj:`se3_type`
+        * - :obj:`sim3_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times7}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times7}`
+          - :obj:`sim3_type`
+        * - :obj:`rxso3_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
+          - :obj:`rxso3_type`
 
     * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`SO3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`SO3`):
 
-        Let :math:`\mathbf{w}_i`, :math:`\boldsymbol{\nu}_i` be the scalar and vector parts of
-        :math:`\mathbf{x}_i`, respectively. :math:`\mathbf{x}_i=\left[\boldsymbol{\nu}_i, \ \mathbf{w}_i \right]`. :math:`\mathbf{y}` be the output.
+        Let :math:`w_i`, :math:`\boldsymbol{\nu}_i` be the scalar and vector parts of
+        :math:`\mathbf{x}_i`, respectively. :math:`\mathbf{x}_i=\left[\boldsymbol{\nu}_i, \ w_i \right]`. :math:`\mathbf{y}` be the output.
 
         .. math::
-            \mathbf{y}_i = \mathrm{conj}(\mathbf{x}_i)=[-\boldsymbol{\nu}_i, \ \mathbf{w}_i]
+            \mathbf{y}_i = \mathrm{conj}(\mathbf{x}_i)=[-\boldsymbol{\nu}_i, \ w_i]
 
     * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`SE3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`SE3`):
@@ -1476,7 +1496,7 @@ def Inv(x):
         :math:`\mathbf{y}` be the output.
 
         .. math::
-            \mathbf{y}_i = \left[\mathrm{Inv}(\mathbf{q}_i), \ 1/s_i \right]
+            \mathbf{y}_i = \left[\mathrm{conj}(\mathbf{q}_i), \ 1/s_i \right]
 
     * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`Sim3_type` (input :math:`\mathbf{x}`
       is an instance of :meth:`Sim3`):
@@ -1486,6 +1506,12 @@ def Inv(x):
 
         .. math::
             \mathbf{y}_i = \left[-\mathrm{Inv}(^s\mathbf{q}_i)*\mathbf{t}_i, \ \mathrm{Inv}(^s\mathbf{q}_i) \right]
+
+    * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`so3_type` or :obj:`se3_type` or :obj:`sim3_type` or :obj:`rxso3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`so3` or :meth:`se3` or :meth:`sim3` or :meth:`rxso3`):
+
+        .. math::
+            \mathbf{y}_i = -\mathbf{x}_i
 
     Example:
 
@@ -1524,6 +1550,59 @@ def Inv(x):
             >>> x.Inv() # equivalent to: pp.Inv(x)
             Sim3Type LieTensor:
             tensor([-0.9712, -0.2361,  1.0188,  0.2444,  0.5250, -0.5504,  0.6014,  0.9485])
+
+        * :math:`\mathrm{Inv}`: :obj:`so3` :math:`\mapsto` :obj:`so3`
+
+            >>> x = pp.randn_so3()
+            so3Type LieTensor:
+            tensor([ 0.0612, -0.7190,  2.6897])
+            >>> x.Inv() # equivalent to: pp.Inv(x)
+            so3Type LieTensor:
+            tensor([-0.0612,  0.7190, -2.6897])
+
+        * :math:`\mathrm{Inv}`: :obj:`se3` :math:`\mapsto` :obj:`se3`
+
+            >>> x = pp.randn_se3()
+            se3Type LieTensor:
+            tensor([ 0.2837, -1.8318,  1.0104,  2.2385, -0.1980, -0.9487])
+            >>> x.Inv() # equivalent to: pp.Inv(x)
+            se3Type LieTensor:
+            tensor([-0.2837,  1.8318, -1.0104, -2.2385,  0.1980,  0.9487])
+
+        * :math:`\mathrm{Inv}`: :obj:`rxso3` :math:`\mapsto` :obj:`rxso3`
+
+            >>> x = pp.randn_rxso3()
+            rxso3Type LieTensor:
+            tensor([ 1.0414, -0.0087, -0.4427, -1.1343])
+            >>> x.Inv() # equivalent to: pp.Inv(x)
+            rxso3Type LieTensor:
+            tensor([-1.0414,  0.0087,  0.4427,  1.1343])
+
+        * :math:`\mathrm{Inv}`: :obj:`sim3` :math:`\mapsto` :obj:`sim3`
+
+            >>> x = pp.randn_sim3()
+            sim3Type LieTensor:
+            tensor([-0.0724,  1.8174,  2.1810, -0.9324, -0.0952, -0.5792,  0.4318])
+            >>> x.Inv() # equivalent to: pp.Inv(x)
+            sim3Type LieTensor:
+            tensor([ 0.0724, -1.8174, -2.1810,  0.9324,  0.0952,  0.5792, -0.4318])
+
+    Note:
+        One can validate the result by some simple code:
+
+        if input :math:`\mathbf{x}` is the LieTensor from Lie Group, for example :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`SO3_type` :
+
+            >>> x = pp.randn_SO3()
+            >>> x * x.Inv()
+            SO3Type LieTensor:
+            LieTensor([0., 0., 0., 1.])
+
+        if input :math:`\mathbf{x}` is the LieTensor from Lie Algebra, for example :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`so3_type` :
+
+            >>> x = pp.randn_so3()
+            >>> x + x.Inv()
+            tensor([0., 0., 0.])
+
     """
     return x.Inv()
 
