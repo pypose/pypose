@@ -17,7 +17,7 @@ class CartPole(ppmd._System):
 
     def state_transition(self,state,input):
         x,xDot,theta,thetaDot = state
-        force = input
+        force = input.squeeze()
         costheta = torch.cos(theta)
         sintheta = torch.sin(theta)
 
@@ -75,24 +75,18 @@ if __name__ == "__main__":
     theta_fig = createTimePlot(time,theta,figname="theta Plot",xlabel="Time",ylabel="theta",title="theta Plot")
     thetadot_fig = createTimePlot(time,thetadot,figname="theta dot Plot",xlabel="Time",ylabel="theta dot",title="theta dot Plot")
     # Set to 0 to hide plots
-    if 1:
+    if 0:
         plt.show()
 
     ### Jacobian computations
     # Find jacobinas at 1000th step
     jacob_state, jacob_input = state_all[999,:].T, input[999]
-    cartPoleSolver.set_linearization_point(jacob_state,jacob_input)
+    cartPoleSolver.set_linearization_point(jacob_state,jacob_input.unsqueeze(0))
     A = (cartPoleSolver.A).numpy()
     B = (cartPoleSolver.B).numpy()
     C = (cartPoleSolver.C).numpy()
     D = (cartPoleSolver.D).numpy()
-
-    Atest = np.loadtxt("cartpoleA.txt")
-    Btest = np.loadtxt("cartpoleB.txt")
-
-    print("Error in A: ")
-    print(np.linalg.norm((Atest-A),ord=2))
-    print("Error in B: ")
-    print(np.linalg.norm((Btest-B),ord=2))
+    c1 = (cartPoleSolver.c1).numpy()
+    c2 = (cartPoleSolver.c2).numpy()
 
     
