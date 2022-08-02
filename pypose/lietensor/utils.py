@@ -48,7 +48,7 @@ SO3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=SO3_type)
     r'''Internally, SO3 LieTensors are stored as unit quaternions:
 
     .. math::
-        \mathrm{data}[*, :] = [q_x, q_y, q_z, q_w]
+        \mathrm{data}[*, :] = [q_x, q_y, q_z, q_w],
 
     where :math:`q_x^2 + q_y^2 + q_z^2 + q_w^2 = 1`.
     
@@ -73,7 +73,7 @@ so3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=so3_type)
     `axis-angle <https://en.wikipedia.org/wiki/Axis-angle_representation>`_ format:
 
     .. math::
-        \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z]
+        \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z],
 
     with :math:`\delta = \begin{pmatrix} \delta_x & \delta_y & \delta_z \end{pmatrix}^T`
     being the axis of rotation and :math:`\theta = \|{\delta}\|` being the angle.
@@ -93,7 +93,7 @@ SE3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=SE3_type)
     representing the rotation with a vector representing the translation.
 
     .. math::
-        \mathrm{data}[*, :] = [t_x, t_y, t_z, q_x, q_y, q_z, q_w]
+        \mathrm{data}[*, :] = [t_x, t_y, t_z, q_x, q_y, q_z, q_w],
 
     where :math:`\begin{pmatrix} t_x & t_y & t_z \end{pmatrix}^T \in \mathbb{R}^3` is
     the translation and
@@ -111,16 +111,18 @@ SE3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=SE3_type)
     ''')
 
 se3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=se3_type),
-    r'''Internally, se3 LieTensors are stored by concatenating the axis-angle
-    representation of the rotation with the "velocity" vector:
+    r'''Internally, se3 LieTensors are stored by concatenating the "velocity" vector
+    with the axis-angle representation of the rotation:
 
     .. math::
-        \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z, \log t_x, \log t_y, \log t_z]
+        \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z],
 
-    where :math:`\begin{pmatrix} \delta_x & \delta_y & \delta_z \end{pmatrix}^T`
-    is the axis-angle vector as in :obj:`pypose.so3`, and
-    :math:`\begin{pmatrix} \log t_x & \log t_y & \log t_z \end{pmatrix}^T`
-    is the element-wise logarithm of the translation vector from :obj:`pypose.SE3`.
+    where :math:`\begin{pmatrix} \tau_x & \tau_y & \tau_z \end{pmatrix}^T =
+    \mathbf{J}^{-1} \begin{pmatrix} t_x & t_y & t_z \end{pmatrix}^T` is the product
+    between the left Jacobian inverse (of SO3's logarithm map) and the translation
+    vector, and :math:`\begin{pmatrix} \delta_x & \delta_y & \delta_z \end{pmatrix}^T`
+    is the axis-angle vector as in :obj:`pypose.so3`.
+    More details go to :meth:`pypose.Log` with :obj:`SE3_type` input.
 
     Examples:
         >>> pp.se3(torch.randn(2, 6))
@@ -137,7 +139,7 @@ RxSO3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=RxSO3_t
     representing the rotation with a scaling factor:
 
     .. math::
-        \mathrm{data}[*, :] = [q_x, q_y, q_z, q_w, s]
+        \mathrm{data}[*, :] = [q_x, q_y, q_z, q_w, s],
 
     where :math:`\begin{pmatrix} q_x & q_y & q_z & q_w \end{pmatrix}^T`
     is the unit quaternion as in :obj:`pypose.SO3` and
@@ -158,7 +160,7 @@ rxso3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=rxso3_t
     representation of the rotation with the log scale:
 
     .. math::
-        \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z, \log s]
+        \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z, \log s],
 
     where :math:`\begin{pmatrix} \delta_x & \delta_y & \delta_z \end{pmatrix}^T`
     is the axis-angle vector in :obj:`pypose.so3`, and
@@ -179,7 +181,7 @@ Sim3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=Sim3_typ
     vector with an RxSO3:
 
     .. math::
-        \mathrm{data}[*, :] = [t_x, t_y, t_z, q_x, q_y, q_z, q_w, s]
+        \mathrm{data}[*, :] = [t_x, t_y, t_z, q_x, q_y, q_z, q_w, s],
 
     where :math:`\begin{pmatrix} t_x & t_y & t_z \end{pmatrix}^T \in \mathbb{R}^3`
     is the translation vector and
@@ -202,12 +204,15 @@ sim3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=sim3_typ
     vector with the corresponding rxso3:
 
     .. math::
-        \mathrm{data}[*, :] = [\log t_x, \log t_y, \log t_z, \delta_x, \delta_y, \delta_z, \log s]
+        \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z, \log s],
 
-    where :math:`\begin{pmatrix} \log t_x & \log t_y & \log t_z \end{pmatrix}^T`
-    is the log translation vector as in :obj:`pypose.se3`, and
+    where :math:`\begin{pmatrix} \tau_x & \tau_y & \tau_z \end{pmatrix}^T = \mathbf{W}^{-1}
+    \begin{pmatrix} t_x & t_y & t_z \end{pmatrix}^T` is the product between the
+    inverse of the :math:`\mathbf{W}`-matrix and the translation vector, and
     :math:`\begin{pmatrix} \delta_x & \delta_y & \delta_z & \log s \end{pmatrix}^T`
     represents the rotation and scaling, as in :obj:`pypose.rxso3`.
+    More details about :math:`\mathbf{W}`-matrix go to :meth:`pypose.Log` with
+    :obj:`Sim3_type` input.
 
     Examples:
         >>> pp.Sim3(torch.randn(2, 7))
