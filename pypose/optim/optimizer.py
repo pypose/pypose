@@ -4,6 +4,7 @@ from .functional import modjac
 from .strategy import TrustRegion
 from torch.optim import Optimizer
 from .solver import PINV, Cholesky
+from torch.linalg import cholesky_ex
 
 
 class Trivial(torch.nn.Module):
@@ -22,54 +23,87 @@ class Trivial(torch.nn.Module):
 class RobustModel(nn.Module):
     '''
     Standardize a model for least square problems with an option of square-rooting kernel.
-    Then model regression becomes minimizing the outputs of the standardized model.
+    Then model regression becomes minimizing the output of the standardized model.
     This class is used during optimization but is not designed to expose to PyPose users.
     '''
-    def __init__(self, model, kernel=None, auto=False):
+    def __init__(self, model, kernel=None, weight=None, auto=False):
         super().__init__()
         self.model = model
         self.kernel = Trivial() if kernel is None else kernel
+
         if auto:
             self.register_forward_hook(self.kernel_forward)
 
-    def forward(self, inputs, targets):
-        outputs = self.model_forward(inputs)
-        return self.residual(outputs, targets)
+        if weight is not None:
+            weight = self.validate_weight(weight)
+            self.register_buffer('weight', weight)
 
-    def model_forward(self, inputs):
-        if isinstance(inputs, tuple):
-            return self.model(*inputs)
+    @torch.no_grad()
+    def validate(self, weight):
+        weight, info = cholesky_ex(weight, upper=True)
+        assert not torch.any(torch.isnan(weight)), \
+            'Cholesky decomposition failed. Weight is not positive-definite!'
+        return weight
+
+    def forward(self, input, target, weight=None):
+        output = self.model_forward(input)
+        return self.residual(output, target, weight)
+
+    def model_forward(self, input):
+        if isinstance(input, tuple):
+            return self.model(*input)
         else:
-            return self.model(inputs)
+            return self.model(input)
 
-    def residual(self, outputs, targets):
-        return outputs if targets is None else outputs - targets
+    def residual(self, output, target, weight=None):
+        error = (output if target is None else output - target).unsqueeze(-1)
+        if weight is not None:
+            residual = self.validate(weight) @ error
+        elif hasattr(self, 'weight'):
+            residual = self.weight @ error
+        else:
+            residual = error
+        return residual.squeeze(-1)
 
-    def kernel_forward(self, module, inputs, outputs):
+    def kernel_forward(self, module, input, output):
         # eps is to prevent grad of sqrt() from being inf
-        assert torch.is_floating_point(outputs), "model outputs have to be float type."
-        eps = finfo(outputs.dtype).eps
-        return self.kernel(outputs.square().sum(-1)).clamp(min=eps).sqrt()
+        assert torch.is_floating_point(output), "model output have to be float type."
+        eps = finfo(output.dtype).eps
+        return self.kernel(output.square().sum(-1)).clamp(min=eps).sqrt()
 
-    def loss(self, inputs, targets):
-        outputs = self.model_forward(inputs)
-        residual = self.residual(outputs, targets)
+    def loss(self, input, target, weight=None):
+        output = self.model_forward(input)
+        residual = self.residual(output, target, weight)
         return self.kernel(residual.square().sum(-1)).sum()
 
 
 class _Optimizer(Optimizer):
+    r'''
+    Base Class for all second order optimizers.
+    '''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     
     def update_parameter(self, params, step):
+        r'''
+        params are goint to be changed by step calling this function
+        '''
         steps = step.split([p.numel() for p in params if p.requires_grad])
         [p.add_(d.view(p.shape)) for p, d in zip(params, steps) if p.requires_grad]
+
+    def optimize(self, input, target=None, weight=None, scheduler=None, verbose=True):
+        r'''
+
+        '''
+        if scheduler is None:
+            scheduler = Trivial(self, )
+        loss = self.step(input=input, target=target)
 
 
 class GaussNewton(_Optimizer):
     r'''
     The Gauss-Newton (GN) algorithm solving non-linear least squares problems. This implementation
-    is for optimizing the model parameters to approximate the targets, which can be a
+    is for optimizing the model parameters to approximate the target, which can be a
     Tensor/LieTensor or a tuple of Tensors/LieTensors.
 
     .. math::
@@ -77,14 +111,14 @@ class GaussNewton(_Optimizer):
             \rho\left(\|\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\|^2\right),
 
     where :math:`\bm{f}()` is the model, :math:`\bm{\theta}` is the parameters to be optimized,
-    :math:`\bm{x}` is the model inputs, and :math:`\rho` is a robust kernel function to reduce
+    :math:`\bm{x}` is the model input, and :math:`\rho` is a robust kernel function to reduce
     the effect of outliers. :math:`\rho(x) = x` is used by default.
 
     .. math::
        \begin{aligned}
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{input}: \bm{\theta}_0~\text{(params)}, \bm{f}~\text{(model)},
-                \bm{x}~(\text{inputs}), \bm{y}~(\text{targets}), \rho~(\text{kernel})            \\
+                \bm{x}~(\text{input}), \bm{y}~(\text{target}), \rho~(\text{kernel})              \\
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
             &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}
@@ -117,7 +151,7 @@ class GaussNewton(_Optimizer):
     Available correctors: :meth:`corrector.FastTriggs`; :meth:`corrector.Triggs`.
 
     Warning:
-        The output of model :math:`\bm{f}(\bm{\theta},\bm{x}_i)` and targets :math:`\bm{y}_i`
+        The output of model :math:`\bm{f}(\bm{\theta},\bm{x}_i)` and target :math:`\bm{y}_i`
         can be any shape, while their **last dimension** :math:`d` is always taken as the
         dimension of model residual, whose inner product will be input to the kernel
         function. This is useful for residuals like re-projection error, whose last
@@ -157,14 +191,14 @@ class GaussNewton(_Optimizer):
             self.corrector = Trivial() if corrector is None else corrector
 
     @torch.no_grad()
-    def step(self, inputs, targets=None):
+    def step(self, input, target=None, weight=None):
         r'''
         Performs a single optimization step.
 
         Args:
-            inputs (Tensor/LieTensor or tuple of Tensors/LieTensors): the inputs to the model.
-            targets (Tensor/LieTensor): the model targets to approximate.
-                If not given, the model outputs are minimized. Defaults: ``None``.
+            input (Tensor/LieTensor or tuple of Tensors/LieTensors): the input to the model.
+            target (Tensor/LieTensor): the model target to approximate.
+                If not given, the model output is minimized. Defaults: ``None``.
 
         Return:
             Tensor: the minimized model loss, i.e.,
@@ -188,17 +222,17 @@ class GaussNewton(_Optimizer):
             ...         super().__init__()
             ...         self.pose = pp.Parameter(pp.randn_se3(*dim))
             ...
-            ...     def forward(self, inputs):
+            ...     def forward(self, input):
             ...         # the last dimension of the output is 6,
             ...         # which will be the residual dimension.
-            ...         return (self.pose.Exp() @ inputs).Log()
+            ...         return (self.pose.Exp() @ input).Log()
             ...
             >>> posinv = PoseInv(2, 2)
-            >>> inputs = pp.randn_SE3(2, 2)
+            >>> input = pp.randn_SE3(2, 2)
             >>> optimizer = pp.optim.GN(posinv)
             ...
             >>> for idx in range(10):
-            ...     error = optimizer.step(inputs)
+            ...     error = optimizer.step(input)
             ...     print('Pose Inversion error %.7f @ %d it'%(error, idx))
             ...     if error < 1e-5:
             ...         print('Early Stopping with error:', error.item())
@@ -211,19 +245,19 @@ class GaussNewton(_Optimizer):
             Early Stopping with error: 5.21540641784668e-07
         '''
         for pg in self.param_groups:
-            R = self.model(inputs, targets)
-            J = modjac(self.model, inputs=(inputs, targets), flatten=True)
+            R = self.model(input, target, weight)
+            J = modjac(self.model, input=(input, target, weight), flatten=True)
             R, J = self.corrector(R = R, J = J)
             D = self.solver(A = J, b = -R.view(-1, 1))
             self.update_parameter(params = pg['params'], step = D)
-        return self.model.loss(inputs, targets)
+        return self.model.loss(input, target, weight)
 
 
 class LevenbergMarquardt(_Optimizer):
     r'''
     The Levenberg-Marquardt (LM) algorithm solving non-linear least squares problems. It
     is also known as the damped least squares (DLS) method. This implementation is for
-    optimizing the model parameters to approximate the targets, which can be a
+    optimizing the model parameters to approximate the target, which can be a
     Tensor/LieTensor or a tuple of Tensors/LieTensors.
 
     .. math::
@@ -231,14 +265,14 @@ class LevenbergMarquardt(_Optimizer):
             \rho\left(\|\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\|^2\right),
 
     where :math:`\bm{f}()` is the model, :math:`\bm{\theta}` is the parameters to be optimized,
-    :math:`\bm{x}` is the model inputs, and :math:`\rho` is a robust kernel function to reduce
+    :math:`\bm{x}` is the model input, and :math:`\rho` is a robust kernel function to reduce
     the effect of outliers. :math:`\rho(x) = x` is used by default.
 
     .. math::
        \begin{aligned}
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{input}: \lambda~\text{(damping)}, \bm{\theta}_0~\text{(params)},
-                \bm{f}~\text{(model)}, \bm{x}~(\text{inputs}), \bm{y}~(\text{targets})           \\
+                \bm{f}~\text{(model)}, \bm{x}~(\text{input}), \bm{y}~(\text{target})             \\
             &\hspace{12mm} \rho~(\text{kernel}), \epsilon_{s}~(\text{min}),
                            \epsilon_{l}~(\text{max})                                             \\
             &\rule{113mm}{0.4pt}                                                                 \\
@@ -291,7 +325,7 @@ class LevenbergMarquardt(_Optimizer):
     :meth:`strategy.TrustRegion`;
 
     Warning:
-        The output of model :math:`\bm{f}(\bm{\theta},\bm{x}_i)` and targets :math:`\bm{y}_i`
+        The output of model :math:`\bm{f}(\bm{\theta},\bm{x}_i)` and target :math:`\bm{y}_i`
         can be any shape, while their **last dimension** :math:`d` is always taken as the
         dimension of model residual, whose inner product will be input to the kernel
         function. This is useful for residuals like re-projection error, whose last
@@ -312,7 +346,7 @@ class LevenbergMarquardt(_Optimizer):
         structural information, although computing Jacobian vector is faster.**
     '''
     def __init__(self, model, solver=None, strategy=None, kernel=None, corrector=None, \
-                       reject=16, min=1e-6, max=1e32):
+                       weight=None, reject=16, min=1e-6, max=1e32):
         assert min > 0, ValueError("min value has to be positive: {}".format(min))
         assert max > 0, ValueError("max value has to be positive: {}".format(max))
         self.strategy = TrustRegion() if strategy is None else strategy
@@ -322,22 +356,22 @@ class LevenbergMarquardt(_Optimizer):
         self.reject, self.reject_count = reject, 0
         if kernel is not None and corrector is None:
             # auto diff of robust model will be computed
-            self.model = RobustModel(model, kernel, auto=True)
+            self.model = RobustModel(model, kernel, weight, auto=True)
             self.corrector = Trivial()
         else:
             # manually Jacobian correction will be computed
-            self.model = RobustModel(model, kernel, auto=False)
+            self.model = RobustModel(model, kernel, weight, auto=False)
             self.corrector = Trivial() if corrector is None else corrector
 
     @torch.no_grad()
-    def step(self, inputs, targets=None):
+    def step(self, input, target=None, weight=None):
         r'''
         Performs a single optimization step.
 
         Args:
-            inputs (Tensor/LieTensor or tuple of Tensors/LieTensors): the inputs to the model.
-            targets (Tensor/LieTensor): the model targets to optimize.
-                If not given, the squared model outputs are minimized. Defaults: ``None``.
+            input (Tensor/LieTensor or tuple of Tensors/LieTensors): the input to the model.
+            target (Tensor/LieTensor): the model target to optimize.
+                If not given, the squared model output is minimized. Defaults: ``None``.
 
         Return:
             Tensor: the minimized model loss, i.e.,
@@ -367,17 +401,17 @@ class LevenbergMarquardt(_Optimizer):
             ...         super().__init__()
             ...         self.pose = pp.Parameter(pp.randn_se3(*dim))
             ...
-            ...     def forward(self, inputs):
+            ...     def forward(self, input):
             ...         # the last dimension of the output is 6,
             ...         # which will be the residual dimension.
-            ...         return (self.pose.Exp() @ inputs).Log()
+            ...         return (self.pose.Exp() @ input).Log()
             ...
             >>> posinv = PoseInv(2, 2)
-            >>> inputs = pp.randn_SE3(2, 2)
+            >>> input = pp.randn_SE3(2, 2)
             >>> optimizer = pp.optim.LM(posinv, damping=1e-6)
             ...
             >>> for idx in range(10):
-            ...     loss = optimizer.step(inputs)
+            ...     loss = optimizer.step(input)
             ...     print('Pose Inversion loss %.7f @ %d it'%(loss, idx))
             ...     if loss < 1e-5:
             ...         print('Early Stopping with loss:', loss.item())
@@ -390,17 +424,17 @@ class LevenbergMarquardt(_Optimizer):
             Early Stopping with error: 4.443569991963159e-07
         '''
         for pg in self.param_groups:
-            R = self.model(inputs, targets)
-            J = modjac(self.model, inputs=(inputs, targets), flatten=True)
+            R = self.model(input, target, weight)
+            J = modjac(self.model, input=(input, target, weight), flatten=True)
             R, J = self.corrector(R = R, J = J)
-            last = loss = self.model.loss(inputs, targets)
+            last = loss = self.model.loss(input, target, weight)
             A, self.reject_count = J.T @ J, 0
             A.diagonal().clamp_(pg['min'], pg['max'])
             while last <= loss:
                 A.diagonal().add_(A.diagonal() * pg['damping'])
                 D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
                 self.update_parameter(pg['params'], D)
-                loss = self.model.loss(inputs, targets)
+                loss = self.model.loss(input, target, weight)
                 self.strategy.update(pg, last=last, loss=loss, J=J, D=D, R=R.view(-1, 1))
                 if last < loss and self.reject_count < self.reject: # reject step
                     self.update_parameter(params = pg['params'], step = -D)
