@@ -189,6 +189,12 @@ def SO3_Act_Jacobian(p):
     return vec2skew(-p)
 
 
+def SO3_Matrix4x4(X):
+    T = torch.eye(4, device=X.device, dtype=X.dtype, requires_grad=False).repeat(X.shape[:-1]+(1, 1))
+    T[..., :3, :3] = SO3_Matrix(X)
+    return T
+
+
 def SO3_Act4_Jacobian(p):
     J = torch.zeros((p.shape[:-1]+(4, 3)), device=p.device, dtype=p.dtype, requires_grad=False)
     J[..., :3, :3] = SO3_Act_Jacobian(p[..., :3])
@@ -226,6 +232,10 @@ def SE3_Act_Jacobian(p):
     return torch.cat((I3x3, vec2skew(-p)), dim=-1)
 
 
+def SE3_Matrix4x4(X):
+    return SE3_Matrix(X)
+
+
 def SE3_Act4_Jacobian(p):
     J = torch.zeros((p.shape[:-1]+(4, 6)), device=p.device, dtype=p.dtype, requires_grad=False)
     I3x3 = torch.eye(3, device=p.device, dtype=p.dtype).expand(p.shape[:-1]+(3, 3))
@@ -258,6 +268,12 @@ def RxSO3_Rotation(X):
 
 def RxSO3_Act_Jacobian(p):
     return torch.cat((vec2skew(-p), p.unsqueeze(-1)), dim=-1)
+
+
+def RxSO3_Matrix4x4(X):
+    T = torch.eye(4, device=X.device, dtype=X.dtype, requires_grad=False).repeat(X.shape[:-1]+(1, 1))
+    T[..., :3, :3] = RxSO3_Matrix(X)
+    return T
 
 
 def RxSO3_Act4_Jacobian(p):
@@ -295,6 +311,13 @@ def Sim3_Matrix(X):
 
 def Sim3_Act_Jacobian(p):
     return torch.cat((SE3_Act_Jacobian(p), p.unsqueeze(-1)), dim=-1)
+
+
+def Sim3_Matrix4x4(X):
+    T = torch.eye(4, device=X.device, dtype=X.dtype, requires_grad=False).repeat(X.shape[:-1]+(1, 1))
+    T[..., :3, :3] = RxSO3_Matrix(X[..., 3:])
+    T[..., :3, 3] = X[..., :3]
+    return T
 
 
 def Sim3_Act4_Jacobian(p):
@@ -480,12 +503,12 @@ class SO3_Act(torch.autograd.Function):
         uv = torch.linalg.cross(Xv, p, dim=-1)
         uv += uv
         out = p + Xw * uv + torch.linalg.cross(Xv, uv, dim=-1)
-        ctx.save_for_backward(X, p, out)
+        ctx.save_for_backward(X, out)
         return out
 
     @staticmethod
     def backward(ctx, grad_output):
-        X, p, out = ctx.saved_tensors
+        X, out = ctx.saved_tensors
         dq = grad_output[..., :3].unsqueeze(-2)
         m = SO3_Matrix(X)
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
@@ -499,12 +522,12 @@ class SE3_Act(torch.autograd.Function):
     @staticmethod
     def forward(ctx, X, p):
         out = X[..., :3] + SO3_Act.apply(X[..., 3:], p)
-        ctx.save_for_backward(X, p, out)
+        ctx.save_for_backward(X, out)
         return out
 
     @staticmethod
     def backward(ctx, grad_output):
-        X, p, out = ctx.saved_tensors
+        X, out = ctx.saved_tensors
         dq = grad_output[..., :3].unsqueeze(-2)
         m = SE3_Matrix(X)
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
@@ -518,12 +541,12 @@ class RxSO3_Act(torch.autograd.Function):
     @staticmethod
     def forward(ctx, X, p):
         out = X[..., 4:] * SO3_Act.apply(X[..., :4], p)
-        ctx.save_for_backward(X, p, out)
+        ctx.save_for_backward(X, out)
         return out
 
     @staticmethod
     def backward(ctx, grad_output):
-        X, p, out = ctx.saved_tensors
+        X, out = ctx.saved_tensors
         dq = grad_output[..., :3].unsqueeze(-2)
         m = RxSO3_Matrix(X)
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
@@ -537,17 +560,89 @@ class Sim3_Act(torch.autograd.Function):
     @staticmethod
     def forward(ctx, X, p):
         out = X[..., :3] + RxSO3_Act.apply(X[..., 3:], p)
-        ctx.save_for_backward(X, p, out)
+        ctx.save_for_backward(X, out)
         return out
 
     @staticmethod
     def backward(ctx, grad_output):
-        X, p, out = ctx.saved_tensors
+        X, out = ctx.saved_tensors
         dq = grad_output[..., :3].unsqueeze(-2)
         m = Sim3_Matrix(X)
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
         X_grad = dq @ Sim3_Act_Jacobian(out)
         p_grad = dq @ m[..., :3, :3]
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), p_grad.squeeze(-2)
+
+
+class SO3_Act4(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, p):
+        out = torch.cat((SO3_Act.apply(X, p[..., :3]), p[..., 3:]), dim=-1)
+        ctx.save_for_backward(X, out)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        X, out = ctx.saved_tensors
+        dq = grad_output.unsqueeze(-2)
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
+        X_grad = dq @ SO3_Act4_Jacobian(out)
+        p_grad = dq @ SO3_Matrix4x4(X)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), p_grad.squeeze(-2)
+
+
+class SE3_Act4(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, p):
+        out = torch.cat(((SO3_Act.apply(X[..., 3:], p[..., :3]) + X[..., :3] * p[..., 3:]), p[..., 3:]), dim=-1)
+        ctx.save_for_backward(X, out)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        X, out = ctx.saved_tensors
+        dq = grad_output.unsqueeze(-2)
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
+        X_grad = dq @ SE3_Act4_Jacobian(out)
+        p_grad = dq @ SE3_Matrix4x4(X)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), p_grad.squeeze(-2)
+
+
+class RxSO3_Act4(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, p):
+        out = torch.cat((RxSO3_Act.apply(X, p[..., :3]), p[..., 3:]), dim=-1)
+        ctx.save_for_backward(X, out)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        X, out = ctx.saved_tensors
+        dq = grad_output.unsqueeze(-2)
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
+        X_grad = dq @ RxSO3_Act4_Jacobian(out)
+        p_grad = dq @ RxSO3_Matrix4x4(X)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), p_grad.squeeze(-2)
+
+
+class Sim3_Act4(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, p):
+        out = torch.cat(((RxSO3_Act.apply(X[..., 3:], p[..., :3]) + X[..., :3] * p[..., 3:]), p[..., 3:]), dim=-1)
+        ctx.save_for_backward(X, out)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        X, out = ctx.saved_tensors
+        dq = grad_output.unsqueeze(-2)
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
+        X_grad = dq @ Sim3_Act4_Jacobian(out)
+        p_grad = dq @ Sim3_Matrix4x4(X)
         return torch.cat((X_grad.squeeze(-2), zero), dim = -1), p_grad.squeeze(-2)
 
 
@@ -659,13 +754,13 @@ def lietensor_act4(lid, x, p):
     x = x.tensor() if hasattr(x, 'ltype') else x
     input, out_shape = broadcast_inputs(x, p)
     if lid == 1:
-        out = SO3_Act.apply(*input)
-    # elif lid == 2:
-    #     out = RxSO3_mul.apply(*input)
-    # elif lid == 3:
-    #     out = SE3_mul.apply(*input)
-    # elif lid == 4:
-    #     out = Sim3_mul.apply(*input)
+        out = SO3_Act4.apply(*input)
+    elif lid == 2:
+        out = RxSO3_Act4.apply(*input)
+    elif lid == 3:
+        out = SE3_Act4.apply(*input)
+    elif lid == 4:
+        out = Sim3_Act4.apply(*input)
     dim = -1 if out.nelement() != 0 else x.shape[-1]
     return out.view(out_shape + (dim,))
 

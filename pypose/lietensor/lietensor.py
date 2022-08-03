@@ -7,7 +7,7 @@ from .backends import exp, log, inv, mul, adj
 from .backends import adjT, jinvp, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
 from .basics import cumops_, cummul_, cumprod_
-from .operation import RxSO3_Log, SE3_Log, SO3_Log, Sim3_Log, lietensor_act, rxso3_Exp, se3_Exp, sim3_Exp, so3_Exp, lietensor_mul
+from .operation import RxSO3_Log, SE3_Log, SO3_Log, Sim3_Log, lietensor_act, lietensor_act4, rxso3_Exp, se3_Exp, sim3_Exp, so3_Exp, lietensor_mul
 
 
 HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'double',
