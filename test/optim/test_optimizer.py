@@ -6,7 +6,10 @@ from torch import nn
 import pypose.optim.solver as ppos
 import pypose.optim.kernel as ppok
 import pypose.optim.corrector as ppoc
+<<<<<<< HEAD
 import pypose.optim.strategy as ppst
+=======
+>>>>>>> e0ae570 (fixed bugs)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -78,10 +81,17 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.item())
                 break
         print('Done', timer.toc())
+<<<<<<< HEAD
         assert idx == 99, "Optimization requires too many steps."
 
         posnet = PoseInv(2, 2).to(device)
         optimizer = pp.optim.LM(posnet)
+=======
+        assert idx == 99
+
+        posnet = PoseInv(2, 2).to(device)
+        optimizer = pp.optim.LM(posnet, damping=1e-6)
+>>>>>>> e0ae570 (fixed bugs)
 
         for idx in range(10):
             loss = optimizer.step(inputs, target)
@@ -91,7 +101,11 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
         print('Done')
+<<<<<<< HEAD
         assert idx < 10, "Optimization requires too many steps."
+=======
+        assert idx < 10
+>>>>>>> e0ae570 (fixed bugs)
 
 
     def test_optim_liegroup(self):
@@ -108,7 +122,11 @@ class TestOptim:
         inputs = pp.randn_RxSO3(2, 2).to(device)
         target = pp.identity_rxso3(2, 2).to(device)
         posnet = PoseInv(2, 2).to(device)
+<<<<<<< HEAD
         optimizer = pp.optim.LM(posnet)
+=======
+        optimizer = pp.optim.LM(posnet, damping=1e-6)
+>>>>>>> e0ae570 (fixed bugs)
 
         for idx in range(10):
             loss = optimizer.step(inputs, target)
@@ -118,7 +136,11 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
         
+<<<<<<< HEAD
         assert idx < 10, "Optimization requires too many steps."
+=======
+        assert idx < 10
+>>>>>>> e0ae570 (fixed bugs)
 
 
     def test_optim_with_kernel(self):
@@ -138,7 +160,11 @@ class TestOptim:
         solver = ppos.Cholesky()
         kernel = ppok.Cauchy()
         corrector = ppoc.FastTriggs(kernel)
+<<<<<<< HEAD
         optimizer = pp.optim.LM(posnet, solver=solver, kernel=kernel, corrector=corrector)
+=======
+        optimizer = pp.optim.LM(posnet, damping=1e-6, solver=solver, kernel=kernel, corrector=corrector)
+>>>>>>> e0ae570 (fixed bugs)
 
         for idx in range(10):
             loss = optimizer.step(inputs, target)
@@ -148,6 +174,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
 
+<<<<<<< HEAD
         assert idx < 10, "Optimization requires too many steps."
 
     def test_optim_strategy_constant(self):
@@ -222,6 +249,9 @@ class TestOptim:
                 break
 
         assert idx < 10, "Optimization requires too many steps."
+=======
+        assert idx < 10
+>>>>>>> e0ae570 (fixed bugs)
 
 
 if __name__ == '__main__':
@@ -229,6 +259,9 @@ if __name__ == '__main__':
     test.test_optim_liealgebra()
     test.test_optim_liegroup()
     test.test_optim_with_kernel()
+<<<<<<< HEAD
     test.test_optim_strategy_constant()
     test.test_optim_strategy_adaptive()
     test.test_optim_trustregion()
+=======
+>>>>>>> e0ae570 (fixed bugs)

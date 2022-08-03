@@ -88,7 +88,6 @@ def test_lietensor():
     t = I.Retr(a)
 
     I = pp.identity_SE3(3)
-
     p = I.Act(a)
 
     X = pp.randn_SE3(8, requires_grad=True, dtype=torch.double)
