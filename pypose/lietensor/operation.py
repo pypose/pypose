@@ -163,17 +163,6 @@ def sim3_Jl_inv(x):
     return (I7x7 - (1.0/2.0) * Xi + (1.0/12.0) * Xi2 - (1.0/720.0) * Xi4)
 
 
-# def SO3_Act(X, p):
-#     Xv, Xw = X[..., :3], X[..., 3:]
-#     uv = torch.linalg.cross(Xv, p, dim=-1)
-#     uv += uv
-#     return p + Xw * uv + torch.linalg.cross(Xv, uv, dim=-1)
-
-
-# def SO3_Act4(X, p):
-#     return torch.cat((SO3_Act(X, p[..., :3]), p[..., 3:]), dim=-1)
-
-
 def SO3_Adj(X):
     I3x3 = torch.eye(3, device=X.device, dtype=X.dtype).expand(X.shape[:-1]+(3, 3))
     Xv, Xw = X[..., :3], X[..., 3:]
@@ -199,14 +188,6 @@ def SO3_Act4_Jacobian(p):
     J = torch.zeros((p.shape[:-1]+(4, 3)), device=p.device, dtype=p.dtype, requires_grad=False)
     J[..., :3, :3] = SO3_Act_Jacobian(p[..., :3])
     return J
-
-
-# def SE3_Act(X, p):
-#     return X[..., :3] + SO3_Act(X[..., 3:], p)
-
-
-# def SE3_Act4(X, p):
-#     return torch.cat(((SO3_Act(X[..., 3:], p[..., :3]) + X[..., :3] * p[..., 3:]), p[..., 3:]), dim=-1)
 
 
 def SE3_Adj(X):
@@ -244,14 +225,6 @@ def SE3_Act4_Jacobian(p):
     return J
 
 
-# def RxSO3_Act(X, p):
-#     return X[..., 4:] * SO3_Act(X[..., :4], p)
-
-
-# def RxSO3_Act4(X, p):
-#     return torch.cat((RxSO3_Act(X, p[..., :3]), p[..., 3:]), dim=-1)
-
-
 def RxSO3_Adj(X):
     Adj = torch.eye(4, device=X.device, dtype=X.dtype, requires_grad=False).repeat(X.shape[:-1]+(1, 1))
     Adj[..., :3, :3] = SO3_Adj(X[..., :4])
@@ -281,14 +254,6 @@ def RxSO3_Act4_Jacobian(p):
     J[..., :3, :3] = SO3_Act_Jacobian(p[..., :3])
     J[..., :3, 3] = p[..., :3]
     return J
-
-
-# def Sim3_Act(X, p):
-#     return X[..., :3] + RxSO3_Act(X[..., 3:], p)
-
-
-# def Sim3_Act4(X, p):
-#     return torch.cat(((RxSO3_Act(X[..., 3:], p[..., :3]) + X[..., :3] * p[..., 3:]), p[..., 3:]), dim=-1)
 
 
 def Sim3_Adj(X):
@@ -779,5 +744,3 @@ def lietensor_mul(lid, x, y=None):
         out = Sim3_mul.apply(*input)
     dim = -1 if out.nelement() != 0 else x.shape[-1]
     return out.view(out_shape + (dim,))
-
-
