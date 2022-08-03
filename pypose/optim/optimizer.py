@@ -301,7 +301,7 @@ class LevenbergMarquardt(_Optimizer):
             &\hspace{10mm} \bm{\delta} = \mathrm{solver}(\mathbf{A}, -\mathbf{J}^T\mathbf{R})    \\
             &\hspace{10mm} \lambda \leftarrow \mathrm{strategy}(\lambda,\text{model information})\\
             &\hspace{10mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}              \\
-            &\hspace{10mm} \textbf{if}~\text{loss not decreasing}~\textbf{or}~
+            &\hspace{10mm} \textbf{if}~\text{loss not decreasing}~\textbf{and}~
                                        \text{maximum reject step not reached}                    \\
             &\hspace{15mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} - \bm{\delta}
                                                                ~(\text{reject step})             \\
