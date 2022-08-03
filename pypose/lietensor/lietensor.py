@@ -77,8 +77,6 @@ class LieType:
         """ action on a points tensor(*, 3[4]) (homogeneous)"""
         assert not self.on_manifold and isinstance(p, torch.Tensor)
         assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
-        # act = act3 if p.shape[-1]==3 else act4
-        # return self.__op__(self.lid, act, x, p)
         if p.shape[-1]==3:
             out = lietensor_act(self.lid, x, p)
         else:
@@ -89,7 +87,6 @@ class LieType:
     def Mul(self, x, y):
         # Transform on transform
         if not self.on_manifold and isinstance(y, LieTensor) and not y.ltype.on_manifold:
-            # out = self.__op__(self.lid, mul, x, y)
             out = lietensor_mul(self.lid, x, y)
             return LieTensor(out, ltype=x.ltype)
         # Transform on points
