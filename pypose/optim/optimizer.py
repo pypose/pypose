@@ -108,11 +108,13 @@ class GaussNewton(_Optimizer):
 
     .. math::
         \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
-            \rho\left(\|\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\|^2\right),
+            \rho\left((\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)^T \mathbf{W}_i
+            (\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\right),
 
     where :math:`\bm{f}()` is the model, :math:`\bm{\theta}` is the parameters to be optimized,
-    :math:`\bm{x}` is the model input, and :math:`\rho` is a robust kernel function to reduce
-    the effect of outliers. :math:`\rho(x) = x` is used by default.
+    :math:`\bm{x}` is the model input, :math:`\Sigma_i` is a weighted square matrix (positive
+    definite), and :math:`\rho` is a robust kernel function to reduce the effect of outliers.
+    :math:`\rho(x) = x` is used by default.
 
     .. math::
        \begin{aligned}
@@ -121,9 +123,11 @@ class GaussNewton(_Optimizer):
                 \bm{x}~(\text{input}), \bm{y}~(\text{target}), \rho~(\text{kernel})              \\
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
-            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}
-                {\partial \bm{\theta}_{t-1}}}                                                    \\
-            &\hspace{5mm} \mathbf{R} = \bm{f(\bm{\theta}_{t-1}, \bm{x})} - \bm{y}                \\
+            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial } {\partial \bm{\theta}_{t-1}}}
+                          \left(\sqrt{\mathbf{W}}\bm{f}\right)~(\sqrt{\cdot}
+                          \text{is the Cholesky decomposition})                                  \\
+            &\hspace{5mm} \mathbf{R} = \sqrt{\mathbf{W}}
+                        (\bm{f(\bm{\theta}_{t-1}, \bm{x})}-\bm{y})                               \\
             &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
             &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{J}, -\mathbf{R})                 \\
             &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}               \\
@@ -142,6 +146,10 @@ class GaussNewton(_Optimizer):
             the kernel function. If a kernel is given but a corrector is not specified, auto
             correction is used. Auto correction can be unstable when the robust model has
             indefinite Hessian. Default: ``None``.
+        weight (Tensor, optional): a square positive definite matrix defining the weight of
+            model residual. Use this only when all inputs shared the same weight matrices. This is
+            ignored when weight is given when calling :meth:`.step` or :meth:`.optimize` method.
+            Default: ``None``.
 
     Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`.
 
@@ -178,16 +186,16 @@ class GaussNewton(_Optimizer):
         such as :meth:`solver.PINV` and :meth:`solver.LSTSQ` are available.
         More details are in Eq. (5) of the paper "`Robust Bundle Adjustment Revisited`_".
     '''
-    def __init__(self, model, solver=None, kernel=None, corrector=None):
+    def __init__(self, model, solver=None, kernel=None, corrector=None, weight=None):
         super().__init__(model.parameters(), defaults={})
         self.solver = PINV() if solver is None else solver
         if kernel is not None and corrector is None:
             # auto diff of robust model will be computed
-            self.model = RobustModel(model, kernel, auto=True)
+            self.model = RobustModel(model, kernel, weight=weight, auto=True)
             self.corrector = Trivial()
         else:
             # manually Jacobian correction will be computed
-            self.model = RobustModel(model, kernel, auto=False)
+            self.model = RobustModel(model, kernel, weight=weight, auto=False)
             self.corrector = Trivial() if corrector is None else corrector
 
     @torch.no_grad()
@@ -198,11 +206,12 @@ class GaussNewton(_Optimizer):
         Args:
             input (Tensor/LieTensor or tuple of Tensors/LieTensors): the input to the model.
             target (Tensor/LieTensor): the model target to approximate.
-                If not given, the model output is minimized. Defaults: ``None``.
+                If not given, the model output is minimized. Default: ``None``.
+            weight (Tensor, optional): a square positive definite matrix defining the weight of
+                model residual. Default: ``None``.
 
         Return:
-            Tensor: the minimized model loss, i.e.,
-            :math:`\sum_i \rho( \|\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\|^2)`.
+            Tensor: the minimized model loss.
 
         Note:
             Different from PyTorch optimizers like
@@ -262,7 +271,8 @@ class LevenbergMarquardt(_Optimizer):
 
     .. math::
         \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
-            \rho\left(\|\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\|^2\right),
+            \rho\left((\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)^T \mathbf{W}_i
+            (\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\right),
 
     where :math:`\bm{f}()` is the model, :math:`\bm{\theta}` is the parameters to be optimized,
     :math:`\bm{x}` is the model input, and :math:`\rho` is a robust kernel function to reduce
@@ -277,12 +287,14 @@ class LevenbergMarquardt(_Optimizer):
                            \epsilon_{l}~(\text{max})                                             \\
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
-            &\hspace{5mm} \mathbf{R} = \bm{f(\bm{\theta}_{t-1}, \bm{x})} - \bm{y}                \\
-            &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
-            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}}
-                {\partial \bm{\theta}_{t-1}}}                                                    \\
+            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial } {\partial \bm{\theta}_{t-1}}}
+                          \left(\sqrt{\mathbf{W}}\bm{f}\right)~(\sqrt{\cdot}
+                          \text{is the Cholesky decomposition})                                  \\
             &\hspace{5mm} \mathbf{A} \leftarrow (\mathbf{J}^T \mathbf{J})
                                      .\mathrm{diagnal\_clamp(\epsilon_{s}, \epsilon_{l})}        \\
+            &\hspace{5mm} \mathbf{R} = \sqrt{\mathbf{W}}
+                        (\bm{f(\bm{\theta}_{t-1}, \bm{x})}-\bm{y})                               \\
+            &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
             &\hspace{5mm} \textbf{while}~\text{first iteration}~\textbf{or}~
                                          \text{loss not decreasing}                              \\
             &\hspace{10mm} \mathbf{A} \leftarrow \mathbf{A} + \lambda \mathrm{diag}(\mathbf{A})  \\
@@ -308,6 +320,10 @@ class LevenbergMarquardt(_Optimizer):
         corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit the kernel
             function. If a kernel is given but a corrector is not specified, auto correction is
             used. Auto correction can be unstable when the robust model has indefinite Hessian.
+            Default: ``None``.
+        weight (Tensor, optional): a square positive definite matrix defining the weight of
+            model residual. Use this only when all inputs shared the same weight matrices. This is
+            ignored when weight is given when calling :meth:`.step` or :meth:`.optimize` method.
             Default: ``None``.
         reject (integer, optional): the maximum number of rejecting unsuccessfull steps.
             Default: 16.
@@ -372,10 +388,11 @@ class LevenbergMarquardt(_Optimizer):
             input (Tensor/LieTensor or tuple of Tensors/LieTensors): the input to the model.
             target (Tensor/LieTensor): the model target to optimize.
                 If not given, the squared model output is minimized. Defaults: ``None``.
+            weight (Tensor, optional): a square positive definite matrix defining the weight of
+                model residual. Default: ``None``.
 
         Return:
-            Tensor: the minimized model loss, i.e.,
-            :math:`\sum_i \rho( \|\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\|^2)`.
+            Tensor: the minimized model loss.
 
         Note:
             The (non-negative) damping factor :math:`\lambda` can be adjusted at each iteration. If
