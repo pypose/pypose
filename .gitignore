@@ -134,3 +134,7 @@ dmypy.json
 
 # sphinx
 docs/source/generated
+
+*.DS_Store
+examples/imu/2011*
+examples/imu/save
