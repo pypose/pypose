@@ -22,4 +22,5 @@ Optimization
    optim.kernel.Cauchy
    optim.corrector.FastTriggs
    optim.corrector.Triggs
+   optim.scheduler.StopOnPlateau
    optim.functional.modjac
