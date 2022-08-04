@@ -91,14 +91,6 @@ class _Optimizer(Optimizer):
         steps = step.split([p.numel() for p in params if p.requires_grad])
         [p.add_(d.view(p.shape)) for p, d in zip(params, steps) if p.requires_grad]
 
-    def optimize(self, input, target=None, weight=None, scheduler=None, verbose=True):
-        r'''
-
-        '''
-        if scheduler is None:
-            scheduler = Trivial(self, )
-        loss = self.step(input=input, target=target)
-
 
 class GaussNewton(_Optimizer):
     r'''
@@ -258,8 +250,11 @@ class GaussNewton(_Optimizer):
             J = modjac(self.model, input=(input, target, weight), flatten=True)
             R, J = self.corrector(R = R, J = J)
             D = self.solver(A = J, b = -R.view(-1, 1))
+            self.last = self.loss if hasattr(self, 'loss') \
+                        else self.model.loss(input, target, weight)
             self.update_parameter(params = pg['params'], step = D)
-        return self.model.loss(input, target, weight)
+            self.loss = self.model.loss(input, target, weight)
+        return self.loss
 
 
 class LevenbergMarquardt(_Optimizer):
@@ -444,18 +439,19 @@ class LevenbergMarquardt(_Optimizer):
             R = self.model(input, target, weight)
             J = modjac(self.model, input=(input, target, weight), flatten=True)
             R, J = self.corrector(R = R, J = J)
-            last = loss = self.model.loss(input, target, weight)
+            self.last = self.loss = self.loss if hasattr(self, 'loss') \
+                                    else self.model.loss(input, target, weight)
             A, self.reject_count = J.T @ J, 0
             A.diagonal().clamp_(pg['min'], pg['max'])
-            while last <= loss:
+            while self.last <= self.loss:
                 A.diagonal().add_(A.diagonal() * pg['damping'])
                 D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
                 self.update_parameter(pg['params'], D)
-                loss = self.model.loss(input, target, weight)
-                self.strategy.update(pg, last=last, loss=loss, J=J, D=D, R=R.view(-1, 1))
-                if last < loss and self.reject_count < self.reject: # reject step
+                self.loss = self.model.loss(input, target, weight)
+                self.strategy.update(pg, last=self.last, loss=self.loss, J=J, D=D, R=R.view(-1, 1))
+                if self.last < self.loss and self.reject_count < self.reject: # reject step
                     self.update_parameter(params = pg['params'], step = -D)
-                    loss, self.reject_count = last, self.reject_count + 1
+                    self.loss, self.reject_count = self.last, self.reject_count + 1
                 else:
                     break
-        return loss
+        return self.loss
