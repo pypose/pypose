@@ -55,7 +55,7 @@ class StopOnPlateau(_Scheduler):
             'scheduler.step() should be called after optimizer.step()'
 
         if self.verbose:
-            print('StopOnPlateau on step {} get Loss {:.6e} from Loss {:.6e} '\
+            print('StopOnPlateau on step {} Loss {:.6e} --> Loss {:.6e} '\
                   '(reduction/loss: {:.4e}).'.format(self.steps, self.optimizer.last,
                   self.optimizer.loss,
                   (self.optimizer.last - self.optimizer.loss) / self.optimizer.last))

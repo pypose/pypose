@@ -88,7 +88,7 @@ class TestScheduler:
         invnet = PoseInv(2, 2).to(device)
         strategy = pp.optim.strategy.Constant(damping=1e-7)
         optimizer = pp.optim.LM(invnet, strategy=strategy)
-        scheduler = pp.optim.scheduler.StopOnPlateau(optimizer, steps=100, \
+        scheduler = pp.optim.scheduler.StopOnPlateau(optimizer, steps=30, \
             patience=5, decreasing=0, verbose=True)
 
         scheduler.optimize(input=inputs)
