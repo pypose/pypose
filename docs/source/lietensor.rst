@@ -11,7 +11,7 @@ LieTensor
    LieTensor
    Parameter
 
-   :template: autosummary/class.rst
+   :template: autosummary/base.rst
    SO3
    so3
    SE3
