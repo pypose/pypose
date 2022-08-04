@@ -93,7 +93,7 @@ if __name__ == '__main__':
     parser.add_argument("--batch-size", type=int, default=4, help="batch size, only support 1 now")
     parser.add_argument("--window_size", type=int, default=10, help="window_size")
     parser.add_argument("--max_epoches", type=int, default=100, help="max_epoches")
-    parser.add_argument("--dataroot", type=str, default='./examples/imu', help="dataset location downloaded")
+    parser.add_argument("--dataroot", type=str, default='./examples/module/imu', help="dataset location downloaded")
     parser.add_argument("--dataname", type=str, default='2011_09_26', help="dataset name")
     parser.add_argument("--datadrive", nargs='+', type=str, default=[ "0001"], help="data sequences")
     parser.add_argument('--load_ckpt', default=False, action="store_true")
