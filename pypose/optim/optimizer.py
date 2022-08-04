@@ -445,7 +445,11 @@ class LevenbergMarquardt(_Optimizer):
             A.diagonal().clamp_(pg['min'], pg['max'])
             while self.last <= self.loss:
                 A.diagonal().add_(A.diagonal() * pg['damping'])
-                D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
+                try:
+                    D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
+                except e:
+                    print(e, "Linear solver failed. Breaking optimization step...")
+                    break
                 self.update_parameter(pg['params'], D)
                 self.loss = self.model.loss(input, target, weight)
                 self.strategy.update(pg, last=self.last, loss=self.loss, J=J, D=D, R=R.view(-1, 1))

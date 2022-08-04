@@ -57,8 +57,8 @@ class StopOnPlateau(_Scheduler):
         if self.verbose:
             print('StopOnPlateau on step {} Loss {:.6e} --> Loss {:.6e} '\
                   '(reduction/loss: {:.4e}).'.format(self.steps, self.optimizer.last,
-                  self.optimizer.loss,
-                  (self.optimizer.last - self.optimizer.loss) / self.optimizer.last))
+                  self.optimizer.loss, (self.optimizer.last - self.optimizer.loss) /\
+                  (self.optimizer.last + 1e-31)))
 
         self.steps = self.steps + 1
 
