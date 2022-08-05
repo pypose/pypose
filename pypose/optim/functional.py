@@ -130,7 +130,8 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
     if inputs is None:
         func_param = lambda *p: func(p)
     else:
-        func_param = lambda *p: func(p, inputs)
+        inputs = inputs if isinstance(inputs, tuple) else (inputs,)
+        func_param = lambda *p: func(p, *inputs)
 
     J = jacobian(func_param, params, create_graph=create_graph, strict=strict, \
                     vectorize=vectorize, strategy=strategy)
@@ -141,7 +142,7 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
                     for j, p in zip(Jr, params)], dim=1) for Jr in J])
         else:
             J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params)], dim=1)
-
+    assert not torch.any(torch.isnan(J)), 'Jacobian contains Nan! Check your model and inputs!'
     return J
 
 
