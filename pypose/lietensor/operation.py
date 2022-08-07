@@ -733,6 +733,7 @@ def lietensor_act4(lid, x, p):
 def lietensor_mul(lid, x, y=None):
     x = x.tensor() if hasattr(x, 'ltype') else x
     y = y.tensor() if hasattr(y, 'ltype') else y
+    assert x.shape[-1] == y.shape[-1]
     input, out_shape = broadcast_inputs(x, y)
     if lid == 1:
         out = SO3_mul.apply(*input)
