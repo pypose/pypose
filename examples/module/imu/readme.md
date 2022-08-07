@@ -10,7 +10,7 @@ An example for IMU Preintegration
 ## Prepare Dataset
 
 * Download KITTI IMU sample data [2011_09_26.zip](https://github.com/pypose/IMU_preintegration/releases/download/Kitti/2011_09_26.zip).
-* Extract the file to a folder [DATAROOT], so that it looks like:
+* Extract the file to any folder `DATAROOT`, so that it looks like:
 
         DATAROOT
             ├── 2011_09_26
@@ -29,7 +29,9 @@ An example for IMU Preintegration
 
 ## Run:
 
-        python imu_preint.py --dataroot DATAROOT --datadrive 0018 0022
+        python imu_integrator.py --dataroot DATAROOT --datadrive 0018 0022
+
+Note: change `DATAROOT` to the folder you select.
 
 * Data Drive to select:
 
