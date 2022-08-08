@@ -1588,7 +1588,8 @@ def Inv(x):
             tensor([ 0.0724, -1.8174, -2.1810,  0.9324,  0.0952,  0.5792, -0.4318])
 
     Note:
-        One can validate the result by some simple code:
+        Mathematically, only Lie Group has an inverse. For the convenience, we also provide the inverse for the corresponding Lie Algebra.
+        One can validate the results by:
 
         if input :math:`\mathbf{x}` is the LieTensor from Lie Group, for example :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`SO3_type` :
 
