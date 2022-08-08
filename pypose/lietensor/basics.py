@@ -72,9 +72,12 @@ def add(input, other, alpha=1):
     and :math:`\bm{y}` is the output LieTensor.
 
     Note:
-        The ``other`` Tensor is treated as a Lie Algebra during computation. The elements beyond
-        the corresponding shape of a Lie Algebra in the last dimension are ignored. This is
-        because the gradient of a Lie Group is computed as the perturbation in its tangent space:
+        A Lie Group normally requires a larger space than its corresponding Lie Algebra, thus
+        the elements in the last dimension of the ``other`` Tensor (treated as a Lie Algebra
+        in this function) beyond the expected shape of the Lie Algebra are ignored. This is
+        because the gradient of a Lie Group is computed as a left perturbation (a Lie Algebra)
+        in its tangent space and is stored in the LieGroup's :obj:`LieTensor.grad`, which has
+        the same storage space with the LieGroup.
 
         .. math::
             \begin{align*}
@@ -100,6 +103,8 @@ def add(input, other, alpha=1):
     See :meth:`Exp` for Exponential mapping of Lie Algebra.
 
     Examples:
+        The following operations are equivalent.
+
         >>> x = pp.randn_SE3()
         >>> a = torch.randn(6)
         >>> x + a
