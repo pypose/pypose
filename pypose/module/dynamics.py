@@ -45,7 +45,13 @@ class _System(nn.Module):
         \left. \frac{\partial \mathbf{g}}{\partial \overrightarrow{u}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k} \overrightarrow{u}_k + c_2
         \end{align}
 
-    
+    Eqs. (3) and (4) are now in the form of linear state-space equations, where:
+
+    .. math::
+        \bf{A} = \left. \frac{\partial \mathbf{f}}{\partial \overrightarrow{x}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k}\\ , 
+        \bf{B} = \left. \frac{\partial \mathbf{f}}{\partial \overrightarrow{u}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k}\\ , 
+        \bf{C} = \left. \frac{\partial \mathbf{g}}{\partial \overrightarrow{x}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k}\\ , 
+        \bf{D} = \left. \frac{\partial \mathbf{g}}{\partial \overrightarrow{u}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k}
     '''
 
     def __init__(self, time=False):
