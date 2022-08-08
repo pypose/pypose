@@ -102,7 +102,7 @@ class IMUPreintegrator(nn.Module):
             \begin{align*}
                 {\Delta}R_{ik+1} &= {\Delta}R_{ik} \mathrm{Exp} (w_k {\Delta}t) \\
                 {\Delta}v_{ik+1} &= {\Delta}v_{ik} + {\Delta}R_{ik} a_k {\Delta}t \\
-                {\Delta}p_{ik+1} &= {\Delta}v_{ik} + {\Delta}v_{ik} {\Delta}t
+                {\Delta}p_{ik+1} &= {\Delta}p_{ik} + {\Delta}v_{ik} {\Delta}t
                     + \frac{1}{2} {\Delta}R_{ik} a_k {\Delta}t^2
             \end{align*}
 
@@ -121,6 +121,9 @@ class IMUPreintegrator(nn.Module):
 
             - :math:`w_k` is angular rate at the :math:`k`-th time step.
 
+            - :math:`{\Delta}t` is the time interval from time step :math:`k`-th to time 
+              step :math:`{k+1}`-th time step.
+
         Uncertainty Propagation:
 
         .. math::
@@ -134,8 +137,8 @@ class IMUPreintegrator(nn.Module):
         .. math::
             A = \begin{bmatrix}
                   {\Delta}R_{ik+1}^T & 0_{3*3} \\
-                  -{\Delta}R_{ik} (a_k)^\wedge {\Delta}t & I_{3*3} & 0_{3*3} \\
-                  -1/2{\Delta}R_{ik} (a_k)^\wedge {\Delta}t^2 & I_{3*3} {\Delta}t & I_{3*3}
+                  -{\Delta}R_{ik} (a_k^{\wedge}) {\Delta}t & I_{3*3} & 0_{3*3} \\
+                  -1/2{\Delta}R_{ik} (a_k^{\wedge}) {\Delta}t^2 & I_{3*3} {\Delta}t & I_{3*3}
                 \end{bmatrix},
 
         .. math::
@@ -170,8 +173,8 @@ class IMUPreintegrator(nn.Module):
         .. math::
             \begin{align*}
                 R_j &= {\Delta}R_{ij} * R_i                                                     \\
-                v_j &= {\Delta}v_{ij} * R_i   + v_i + g \Delta t_{ij}                           \\
-                p_j &= {\Delta}p_{ij} * R_i   + p_i + v_i \Delta t_{ij} + 1/2 g \Delta t_{ij}^2 \\
+                v_j &= R_i * {\Delta}v_{ij}   + v_i + g \Delta t_{ij}                           \\
+                p_j &= R_i * {\Delta}p_{ij}   + p_i + v_i \Delta t_{ij} + 1/2 g \Delta t_{ij}^2 \\
             \end{align*}
 
         where:
@@ -180,7 +183,8 @@ class IMUPreintegrator(nn.Module):
               are the preintegrated measurements.
             - :math:`R_i`, :math:`v_i`, and :math:`p_i` are the initial state. Default initial values
               are used if :obj:`reset` is True.
-            - :math:`R_j`, :math:`v_j`, and :math:`p_j` are the propagated state variables
+            - :math:`R_j`, :math:`v_j`, and :math:`p_j` are the propagated state variables.
+            - :math:`{\Delta}t_{ij}` is the time interval from frame i to j.
 
         Note:
             The implementation is based on Eq. (A7), (A8), (A9), and (A10) of this report:
