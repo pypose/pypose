@@ -8,21 +8,20 @@ class IMUPreintegrator(nn.Module):
     Applies preintegration over IMU input signals.
 
     Args:
-        pos (torch.Tensor, optional): initial position. Default: torch.zeros(3)
-        rot (pypose.SO3, optional): initial rotation. Default: :meth:`pypose.identity_SO3`
-        vel (torch.Tensor, optional): initial position. Default: torch.zeros(3)
-        gravity (float, optional): the gravity acceleration. Default: 9.81007
-        gyro_cov: covariance of the gyroscope. If the covariance of the x, y and z axises are
-            different, the :obj:`gyro_cov` use the form :code:`torch.Tensor(gyro_cov_x, gyro_cov_y,
-            gyro_cov_z)`. Default: (3.2e-3)**2
-        acc_cov: covariance of the accelerator. If the covariance of the x, y and z axises are
-            different, the :obj:`acc_cov` use the form :code:`torch.Tensor(acc_cov_x, acc_cov_y,
-            acc_cov_z)`. Default: (8e-2)**2
-        prop_cov (Bool, optional): flag to propagate the covariance matrix. Default: :obj:`True`
-        reset (Bool, optional): flag to reset the initial states after each time the :obj:`forward`
-            function is called. If False, the IMU integrator will use the states from last time
-            as the initial states. This flag is ignored if the :obj:`init_state` is not ``None``,
-            the integrator will use the given initial state. Default: :obj:`False`.
+        pos (torch.Tensor, optional): initial position. Default: :obj:`torch.zeros(3)`.
+        rot (pypose.SO3, optional): initial rotation. Default: :meth:`pypose.identity_SO3`.
+        vel (torch.Tensor, optional): initial position. Default: torch.zeros(3).
+        gravity (float, optional): the gravity acceleration. Default: 9.81007.
+        gyro_cov: covariance of the gyroscope. Default: (3.2e-3)**2.
+            Use the form :obj:`torch.Tensor(gyro_cov_x, gyro_cov_y, gyro_cov_z)`, 
+            if the covariance on the three axes are different.
+        acc_cov: covariance of the accelerator. Default: (8e-2)**2. 
+            Use the form :obj:`torch.Tensor(acc_cov_x, acc_cov_y,acc_cov_z)`, 
+            if the covariance on the three axes are different.
+        prop_cov (Bool, optional): flag to propagate the covariance matrix. Default: ``True``.
+        reset (Bool, optional): flag to reset the initial states after the :obj:`forward`
+            function is called. If ``False``, the integration starts from the last integration.
+            This flag is ignored if :obj:`init_state` is not ``None``. Default: ``False``.
     '''
     def __init__(self, pos = torch.zeros(3),
                        rot = pp.identity_SO3(),
@@ -61,48 +60,50 @@ class IMUPreintegrator(nn.Module):
 
     def forward(self, dt, gyro, acc, rot:pp.SO3=None, gyro_cov=None, acc_cov=None, init_state=None):
         r"""
-        Propagate IMU states from duration (:math:`\delta t`), gyroscope (angular rate :math:`\omega`),
-        linear acceleration (:math:`\mathbf{a}`) in body frame, as well as their measurement
-        covariance for gyroscope :math:`C_{g}` and acceleration :math:`C_{\mathbf{a}}`.
-        Known IMU rotation :math:`R` estimation can also be provided for better precision.
+        Propagate IMU states from duration (:math:`\delta t`), gyroscope (angular rate
+        :math:`\omega`), linear acceleration (:math:`\mathbf{a}`) in body frame, as well as
+        their measurement covariance for gyroscope :math:`C_{g}` and acceleration
+        :math:`C_{\mathbf{a}}`. Known IMU rotation estimation :math:`R` can be provided for
+        better precision.
 
         Args:
             dt (torch.Tensor): time interval from last update.
             gyro (torch.Tensor): angular rate (:math:`\omega`) in IMU body frame.
-            acc (torch.Tensor): linear acceleration (:math:`\mathbf{a}`) in IMU body frame.
+            acc (torch.Tensor): linear acceleration (:math:`\mathbf{a}`) in IMU body frame
+                (raw sensor input with gravity).
             rot (:obj:`pypose.SO3`, optional): known IMU rotation.
             gyro_cov (torch.Tensor, optional): covariance matrix of angular rate.
-                Default value is used if not given.
+                If not given, the default state in constructor will be used.
             acc_cov (torch.Tensor, optional): covariance matrix of linear acceleration.
-                Default value is used if not given.
-            init_state (Dict, optional): the initial state for the integration. The structure
-                of the dictionary should be :obj:`{'pos': torch.Tensor, 'rot': pypose.SO3, 'vel':
-                torch.Tensor}`. The initial state given in constructor will be used if not given.
+                If not given, the default state in constructor will be used.
+            init_state (Dict, optional): the initial state of the integration. The dictionary
+                should be in form of :obj:`{'pos': torch.Tensor, 'rot': pypose.SO3, 'vel':
+                torch.Tensor}`. If not given, the initial state in constructor will be used.
 
         Shape:
             - input (:obj:`dt`, :obj:`gyro`, :obj:`acc`): This layer supports the input shape with
               :math:`(B, F, H_{in})`, :math:`(F, H_{in})` and :math:`(H_{in})`, where :math:`B` is
-              the batch size (or the number of IMU), :math:`F` is the number of frames (measurements),
-              and :math:`H_{in}` is the raw sensor signals.
+              the batch size (or the number of IMU), :math:`F` is the number of frames
+              (measurements), and :math:`H_{in}` is the raw sensor signals.
 
-            - init_state (Optional): The initial state before the integration. It contains
+            - init_state (Optional): The initial state of the integration. It contains
               :code:`pos`: initial position, :code:`rot`: initial rotation, :code:`vel`: initial
               velocity, with the shape :math:`(B, H_{in})`
 
-            - output: The output is a :obj:`dict` of integration state.
-              It contains the ``pos``: position, ``rot``: rotation, ``vel``: velocity.
-              Each output has the shape :math:`(B, F, H_{out})`, where :math:`H_{out}` is
-              the corresponding signal dimension. If the flag :obj:`prop_cov` is ``True``, the
-              output will include ``cov``, the covariance matrix with shape :math:`(B, 9, 9)`.
+            - output: a :obj:`dict` of integrated state including ``pos``: position,
+              ``rot``: rotation, and ``vel``: velocity, each of which has a shape
+              :math:`(B, F, H_{out})`, where :math:`H_{out}` is the signal dimension.
+              If :obj:`prop_cov` is ``True``, it will also include ``cov``: covariance
+              matrix in shape of :math:`(B, 9, 9)`.
 
         IMU Measurements Integration:
 
         .. math::
             \begin{align*}
-                {\Delta}R_{ik+1} &= {\Delta}R_{ik} \mathrm{Exp} ((w_k - b_i^g) {\Delta}t) \\
-                {\Delta}v_{ik+1} &= {\Delta}v_{ik} + {\Delta}R_{ik} (a_k - b_i^a) {\Delta}t \\
+                {\Delta}R_{ik+1} &= {\Delta}R_{ik} \mathrm{Exp} ((w_k - b_k^g) {\Delta}t) \\
+                {\Delta}v_{ik+1} &= {\Delta}v_{ik} + {\Delta}R_{ik} (a_k - b_k^a) {\Delta}t \\
                 {\Delta}p_{ik+1} &= {\Delta}v_{ik} + {\Delta}v_{ik} {\Delta}t
-                    + 1/2 {\Delta}R_{ik} (a_k - b_i^a) {\Delta}t^2
+                    + 1/2 {\Delta}R_{ik} (a_k - b_k^a) {\Delta}t^2
             \end{align*}
 
         where:
@@ -120,6 +121,15 @@ class IMUPreintegrator(nn.Module):
 
             - :math:`w_k` is angular rate at the :math:`k`-th time step.
 
+            - :math:`b_k^g` is the gyroscope bias of the sensor at the :math:`k`-th 
+              time step.
+
+            - :math:`b_k^g` is the accleration bias of the sensor at the :math:`k`-th 
+              time step.
+
+        Note: :math:`b_k^g` and :math:`b_k^a` shall be removed from the function inputs: :code:`acc` 
+        and :code:`gyro`.
+
         Uncertainty Propagation:
 
         .. math::
@@ -133,8 +143,8 @@ class IMUPreintegrator(nn.Module):
         .. math::
             A = \begin{bmatrix}
                   {\Delta}R_{ik+1}^T & 0_{3*3} \\
-                  -{\Delta}R_{ik} (a_k - b_i^g)^\wedge {\Delta}t & I_{3*3} & 0_{3*3} \\
-                  -1/2{\Delta}R_{ik} (a_k - b_i^g)^\wedge {\Delta}t^2 & I_{3*3} {\Delta}t & I_{3*3}
+                  -{\Delta}R_{ik} (a_k - b_k^g)^\wedge {\Delta}t & I_{3*3} & 0_{3*3} \\
+                  -1/2{\Delta}R_{ik} (a_k - b_k^g)^\wedge {\Delta}t^2 & I_{3*3} {\Delta}t & I_{3*3}
                 \end{bmatrix},
 
         .. math::
@@ -161,7 +171,8 @@ class IMUPreintegrator(nn.Module):
         and acceleration, respectively.
 
         Note:
-            Output covariance (Shape: (9, 9)) is in the order of rotation, velocity, and position.
+            Output covariance (Shape: :math:`(B, 9, 9)`) is in the order of rotation, velocity,
+            and position.
 
         With IMU preintegration, the propagated IMU status:
 
@@ -280,7 +291,7 @@ class IMUPreintegrator(nn.Module):
             cov_input_state ={
                 'Rij': Rij.detach(),
                 'Rk': inte_state['dr'].detach(),
-                'Ha': pp.vec2skew(inte_state['acc'].detach()),
+                'Ha': pp.vec2skew(inte_state['a'].detach()),
                 'dt': dt.detach() 
             }
             cov = self.propagate_cov(cov_input = cov_input_state, init_cov = init_cov,
@@ -319,7 +330,7 @@ class IMUPreintegrator(nn.Module):
         incre_t = torch.cumsum(dt, dim = 1)
         incre_t = torch.cat([torch.zeros(B, 1, 1, dtype=dt.dtype, device=dt.device), incre_t], dim =1)
 
-        return {'acc':a, 'vel':incre_v[...,1:,:], 'pos':incre_p[:,1:,:], 'rot':incre_r[:,1:,:],
+        return {'a':a, 'vel':incre_v[...,1:,:], 'pos':incre_p[:,1:,:], 'rot':incre_r[:,1:,:],
                 't':incre_t[...,1:,:], 'dr': dr[:,1:,:]}
 
     @classmethod
