@@ -64,7 +64,7 @@ class _System(nn.Module):
 
 class LTI(_System):
     r'''
-    A sub-class of '_System' to represent the dynamics of discrete Linear Time-Invariant (LTI) system.
+    A sub-class of '_System' to represent the dynamics of discrete-time Linear Time-Invariant (LTI) system.
     
     Args:
         A, B, C, D (:obj:`Tensor`): The coefficient matrix in the state-space equation of LTI system,
@@ -74,9 +74,8 @@ class LTI(_System):
     Note:
         According to the actual physical meaning, the dimensions of A, B, C, D must be the consistent,
         whether in batch or not.
-        
-        The system is time invariant.
     '''
+    
     def __init__(self, A, B, C, D, c1=None, c2=None):
         super(LTI, self).__init__(time=False)
         assert A.ndim == B.ndim == C.ndim == D.ndim, "Invalid System Matrices dimensions"
@@ -112,13 +111,13 @@ class LTI(_System):
 
         where we use :math:`\mathbf{x}` and :math:`\mathbf{u}` to represent state and input of the current timestamp of LTI system.
             
-        Here, we consider the discrete system dynamics.  
+        Here, we consider the discrete-time system dynamics.  
         
         Note:
-            :math:`\mathbf{A}`, :math:`\mathbf{B}`, :math:`\mathbf{C}`, :math:`\mathbf{D}`, :math:`\mathbf{x}`, :math:`\mathbf{u}` could only be single input or in a batch,
-            in the batch case, their dimensions must be consistent so that they are multiplied separately for each channel.
+            :math:`\mathbf{A}`, :math:`\mathbf{B}`, :math:`\mathbf{C}`, :math:`\mathbf{D}`, :math:`\mathbf{x}`, :math:`\mathbf{u}` could be a single input or in a batch.
+            In the batch case, their dimensions must be consistent so that they can be multiplied for each channel.
              
-            Note that variables are entered as row vectors.
+            Note that here variables are given as row vectors.
 
         Example:
             >>> A = torch.randn((2,3,3))
@@ -130,14 +129,14 @@ class LTI(_System):
                 state = torch.randn((2,1,3))
                 input = torch.randn((2,1,2))
             >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
-            >>> print(lti(state,input))
+            >>> lti(state,input)
             tensor([[[-8.5639,  0.0523, -0.2576]],
                     [[ 4.1013, -1.5452, -0.0233]]]), 
             tensor([[[-3.5780, -2.2970, -2.9314]],
                     [[-0.4358,  1.7306,  2.7514]]]))
     
         Note:
-            In this general example, all variables are in the batch. User definable as appropriate.
+            In this general example, all variables are in a batch. User definable as appropriate.
             
         '''
 
