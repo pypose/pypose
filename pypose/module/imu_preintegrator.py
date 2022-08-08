@@ -47,7 +47,7 @@ class IMUPreintegrator(nn.Module):
         self.register_buffer('cov', torch.zeros(1, 9, 9), persistent=False)
         self.register_buffer('gyro_cov', gyro_cov, persistent=False)
         self.register_buffer('acc_cov', acc_cov, persistent=False)
-        self.Rij = None # th  referenced rotation of the covariance
+        self.Rij = None # rotation corresponding to the "zero-state" covariance Sigma_ii.
 
     def _check(self, obj):
         if obj is not None:
@@ -100,10 +100,10 @@ class IMUPreintegrator(nn.Module):
 
         .. math::
             \begin{align*}
-                {\Delta}R_{ik+1} &= {\Delta}R_{ik} \mathrm{Exp} ((w_k - b_k^g) {\Delta}t) \\
-                {\Delta}v_{ik+1} &= {\Delta}v_{ik} + {\Delta}R_{ik} (a_k - b_k^a) {\Delta}t \\
+                {\Delta}R_{ik+1} &= {\Delta}R_{ik} \mathrm{Exp} (w_k {\Delta}t) \\
+                {\Delta}v_{ik+1} &= {\Delta}v_{ik} + {\Delta}R_{ik} a_k {\Delta}t \\
                 {\Delta}p_{ik+1} &= {\Delta}v_{ik} + {\Delta}v_{ik} {\Delta}t
-                    + 1/2 {\Delta}R_{ik} (a_k - b_k^a) {\Delta}t^2
+                    + \frac{1}{2} {\Delta}R_{ik} a_k {\Delta}t^2
             \end{align*}
 
         where:
@@ -121,15 +121,6 @@ class IMUPreintegrator(nn.Module):
 
             - :math:`w_k` is angular rate at the :math:`k`-th time step.
 
-            - :math:`b_k^g` is the gyroscope bias of the sensor at the :math:`k`-th 
-              time step.
-
-            - :math:`b_k^g` is the accleration bias of the sensor at the :math:`k`-th 
-              time step.
-
-        Note: :math:`b_k^g` and :math:`b_k^a` shall be removed from the function inputs: :code:`acc` 
-        and :code:`gyro`.
-
         Uncertainty Propagation:
 
         .. math::
@@ -143,8 +134,8 @@ class IMUPreintegrator(nn.Module):
         .. math::
             A = \begin{bmatrix}
                   {\Delta}R_{ik+1}^T & 0_{3*3} \\
-                  -{\Delta}R_{ik} (a_k - b_k^g)^\wedge {\Delta}t & I_{3*3} & 0_{3*3} \\
-                  -1/2{\Delta}R_{ik} (a_k - b_k^g)^\wedge {\Delta}t^2 & I_{3*3} {\Delta}t & I_{3*3}
+                  -{\Delta}R_{ik} (a_k)^\wedge {\Delta}t & I_{3*3} & 0_{3*3} \\
+                  -1/2{\Delta}R_{ik} (a_k)^\wedge {\Delta}t^2 & I_{3*3} {\Delta}t & I_{3*3}
                 \end{bmatrix},
 
         .. math::
