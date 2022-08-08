@@ -9,7 +9,45 @@ class _System(nn.Module):
     
     Args:
         time (:obj:`boolean`): Whether the system is time-varying; defaults to False, meaning time-invariant
+
+    Linearization
+    ----------
+    The nonlinear state-space equation is given as:
+
+    .. math::
+        \begin{align}
+        \overrightarrow{x}_{k+1} &= \mathbf{f}(\overrightarrow{x}_k,\overrightarrow{u}_k) \\
+        \overrightarrow{y}_{k} &= \mathbf{g}(\overrightarrow{x}_k,\overrightarrow{u}_k)
+        \end{align}
+
+    This class provides a means to linearize the system at any point along a trajectory.
+    \bf{Note}: The linearization can be provided for any arbitrary point, not just the equilibrium point(s).
+
+    Suppose we to linearize about :math:`(\overrightarrow{x}^*,\overrightarrow{u}^*)`
+    for an arbitrary equation :math:`h(x,u)`.
+    Through a Taylor series expansion (ignoring higher order terms), we get the following:
+
+    .. math::
+        h(x^*,u^*) = \left. \frac{\partial h}{\partial x} \right|_{x^*,u^*} x^* +
+                     \left. \frac{\partial h}{\partial u} \right|_{x^*,u^*} u^* + c
+    
+    Where :math:`c` is the bias generated due to the system not being at an equilibrium point.
+    If :math:`(x^*,u^*)` specify an equilibrium point, then :math:`c=0`.
+    Applying this to our state-space equations, i.e., Eqs. (1) and (2), we get:
+
+    .. math::
+        \begin{align}
+        \overrightarrow{x}_{k+1} &= \mathbf{f}(\overrightarrow{x}_k,\overrightarrow{u}_k) = 
+        \left. \frac{\partial \mathbf{f}}{\partial \overrightarrow{x}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k} \overrightarrow{x}_k +
+        \left. \frac{\partial \mathbf{f}}{\partial \overrightarrow{u}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k} \overrightarrow{u}_k + c_1 \\
+        \overrightarrow{y}_{k} &= \mathbf{g}(\overrightarrow{x}_k,\overrightarrow{u}_k) = 
+        \left. \frac{\partial \mathbf{g}}{\partial \overrightarrow{x}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k} \overrightarrow{x}_k +
+        \left. \frac{\partial \mathbf{g}}{\partial \overrightarrow{u}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k} \overrightarrow{u}_k + c_2
+        \end{align}
+
+    
     '''
+
     def __init__(self, time=False):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
@@ -43,15 +81,55 @@ class _System(nn.Module):
         return new_state, observation
 
     def state_transition(self, state, input):
+        r'''
+        Parameters
+        ----------
+        state : Tensor
+                The state of the dynamic system
+        input : Tensor
+                The input to the dynamic system
+                
+        Returns
+        ----------
+        new_state   : Tensor
+                      The state of the system at next time step
+        '''
         raise NotImplementedError("The users need to define their own state transition method")
 
     def observation(self, state, input):
+        r'''
+        Parameters
+        ----------
+        state : Tensor
+                The state of the dynamic system
+        input : Tensor
+                The input to the dynamic system
+
+        Returns
+        ----------
+        observation : Tensor
+                      The observation of the system at the current step
+        '''
         raise NotImplementedError("The users need to define their own observation method")
 
     def reset(self,t=0):
         self.t.fill_(0) 
 
     def set_linearization_point(self, state, input):
+        r'''
+        Function to set the point about which the system is to be linearized.
+
+        Parameters
+        ----------
+        state : Tensor
+                The state of the dynamic system
+        input : Tensor
+                The input to the dynamic system
+
+        Returns
+        ----------
+        None
+        '''
         self.state, self.input = state, input
 
     @property
@@ -63,7 +141,7 @@ class _System(nn.Module):
         
         Returns
         ----------
-        A   :   State matrix for linear/linearized system
+        State matrix for linear/linearized system (A)
         '''
         if hasattr(self, '_A'):
             return self._A
@@ -80,7 +158,7 @@ class _System(nn.Module):
         
         Returns
         ----------
-        B   :   Input matrix for linear/linearized system
+        Input matrix for linear/linearized system (B)
         '''
         if hasattr(self, '_B'):
             return self._B
@@ -97,7 +175,7 @@ class _System(nn.Module):
         
         Returns
         ----------
-        C   :   Output matrix for linear/linearized system
+        Output matrix for linear/linearized system (C)
         '''
         if hasattr(self, '_C'):
             return self._C
@@ -114,7 +192,7 @@ class _System(nn.Module):
         
         Returns
         ----------
-        D   :   feedthrough matrix for linear/linearized system
+        Feedthrough matrix for linear/linearized system (D)
         '''
         if hasattr(self, '_D'):
             return self._D
@@ -131,7 +209,7 @@ class _System(nn.Module):
         
         Returns
         ----------
-        c1  :   bias generated by state-transition
+        Bias generated by state-transition (:math:`c_1`)
         '''
         if hasattr(self,'_c1'):
             return self._c1
@@ -147,7 +225,7 @@ class _System(nn.Module):
         
         Returns
         ----------
-        c2  :   bias generated by observation
+        Bias generated by observation (:math:`c_2`)
         '''
         if hasattr(self,'_c2'):
             return self._c2
