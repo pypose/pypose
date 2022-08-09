@@ -16,42 +16,63 @@ class _System(nn.Module):
 
     .. math::
         \begin{align}
-        \overrightarrow{x}_{k+1} &= \mathbf{f}(\overrightarrow{x}_k,\overrightarrow{u}_k) \\
-        \overrightarrow{y}_{k} &= \mathbf{g}(\overrightarrow{x}_k,\overrightarrow{u}_k)
+        \mathbf{x}_{k+1} &= \mathbf{f}(\mathbf{x}_k,\mathbf{u}_k) \\
+        \mathbf{y}_{k} &= \mathbf{g}(\mathbf{x}_k,\mathbf{u}_k)
         \end{align}
 
     This class provides a means to linearize the system at any point along a trajectory.
-    \bf{Note}: The linearization can be provided for any arbitrary point, not just the equilibrium point(s).
 
-    Suppose we to linearize about :math:`(\overrightarrow{x}^*,\overrightarrow{u}^*)`
+    Note: 
+        The linearization can be provided for any arbitrary point, not just the equilibrium point(s).
+
+    Suppose we to linearize about :math:`(x^*,u^*)`
     for an arbitrary equation :math:`h(x,u)`.
     Through a Taylor series expansion (ignoring higher order terms), we get the following:
 
     .. math::
-        h(x^*,u^*) = \left. \frac{\partial h}{\partial x} \right|_{x^*,u^*} x^* +
-                     \left. \frac{\partial h}{\partial u} \right|_{x^*,u^*} u^* + c
+        h(x,u)=h(x^*+\delta x,u^*+\delta u) = h(x^*,u^*) + 
+                                \left. \frac{\partial h}{\partial x} \right|_{x^*,u^*} \delta x +
+                                \left. \frac{\partial h}{\partial u} \right|_{x^*,u^*} \delta u \\
+        \Rightarrow
+        h(x^*,u^*) + h(\delta x,\delta u) = h(x^*,u^*) + 
+                                \left. \frac{\partial h}{\partial x} \right|_{x^*,u^*} \delta x +
+                                \left. \frac{\partial h}{\partial u} \right|_{x^*,u^*} \delta u \\
+        \Rightarrow
+        h(\delta x,\delta u) =  \left. \frac{\partial h}{\partial x} \right|_{x^*,u^*} \delta x +
+                                \left. \frac{\partial h}{\partial u} \right|_{x^*,u^*} \delta u \\
     
-    Where :math:`c` is the bias generated due to the system not being at an equilibrium point.
-    If :math:`(x^*,u^*)` specify an equilibrium point, then :math:`c=0`.
+    Because :math:`(x^*,u^*)` is not necessarily an equilibrium point, we must add a bias term, :math:`c`. 
+    Also, to stay consistent with the linear state-space equation, we allow :math:`\delta x = x^*` and 
+    :math:`\delta u = u^*`. Thus:
+
+    .. math::
+        h(x^*,u^*) = \left. \frac{\partial h}{\partial x} \right|_{x^*,u^*} x^* +
+                     \left. \frac{\partial h}{\partial u} \right|_{x^*,u^*} u^* + c \\
+    
+    Note:
+        If :math:`(x^*,u^*)` specify an equilibrium point, then :math:`c=0`.
     Applying this to our state-space equations, i.e., Eqs. (1) and (2), we get:
 
     .. math::
         \begin{align}
-        \overrightarrow{x}_{k+1} &= \mathbf{f}(\overrightarrow{x}_k,\overrightarrow{u}_k) = 
-        \left. \frac{\partial \mathbf{f}}{\partial \overrightarrow{x}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k} \overrightarrow{x}_k +
-        \left. \frac{\partial \mathbf{f}}{\partial \overrightarrow{u}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k} \overrightarrow{u}_k + c_1 \\
-        \overrightarrow{y}_{k} &= \mathbf{g}(\overrightarrow{x}_k,\overrightarrow{u}_k) = 
-        \left. \frac{\partial \mathbf{g}}{\partial \overrightarrow{x}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k} \overrightarrow{x}_k +
-        \left. \frac{\partial \mathbf{g}}{\partial \overrightarrow{u}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k} \overrightarrow{u}_k + c_2
-        \end{align}
+        \mathbf{x}_{k+1} &= \mathbf{f}(\mathbf{x}_k,\mathbf{u}_k) = 
+        \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}} \right|_{\mathbf{x}_k,\mathbf{u}_k} \mathbf{x}_k +
+        \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\mathbf{x}_k,\mathbf{u}_k} \mathbf{u}_k + 
+        \mathbf{c_1} \\
+        \mathbf{y}_{k} &= \mathbf{g}(\mathbf{x}_k,\mathbf{u}_k) = 
+        \left. \frac{\partial \mathbf{g}}{\partial \mathbf{x}} \right|_{\mathbf{x}_k,\mathbf{u}_k} \mathbf{x}_k +
+        \left. \frac{\partial \mathbf{g}}{\partial \mathbf{u}} \right|_{\mathbf{x}_k,\mathbf{u}_k} \mathbf{u}_k +
+        \mathbf{c_2}
+        \end{align} \\
+        
 
     Eqs. (3) and (4) are now in the form of linear state-space equations, where:
 
     .. math::
-        \bf{A} = \left. \frac{\partial \mathbf{f}}{\partial \overrightarrow{x}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k}\\ , 
-        \bf{B} = \left. \frac{\partial \mathbf{f}}{\partial \overrightarrow{u}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k}\\ , 
-        \bf{C} = \left. \frac{\partial \mathbf{g}}{\partial \overrightarrow{x}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k}\\ , 
-        \bf{D} = \left. \frac{\partial \mathbf{g}}{\partial \overrightarrow{u}} \right|_{\overrightarrow{x}_k,\overrightarrow{u}_k}
+        \bf{A} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}} \right|_{\mathbf{x}_k,\mathbf{u}_k} , 
+        \bf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\mathbf{x}_k,\mathbf{u}_k} , 
+        \bf{C} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{x}} \right|_{\mathbf{x}_k,\mathbf{u}_k} , 
+        \bf{D} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{u}} \right|_{\mathbf{x}_k,\mathbf{u}_k}
     '''
 
     def __init__(self, time=False):
@@ -141,13 +162,7 @@ class _System(nn.Module):
     @property
     def A(self):
         r'''
-        Parameters
-        ----------
-        None
-        
-        Returns
-        ----------
-        State matrix for linear/linearized system (A)
+        State matrix for linear/linearized system (:math:`\mathbf{A}`)
         '''
         if hasattr(self, '_A'):
             return self._A
@@ -158,13 +173,7 @@ class _System(nn.Module):
     @property
     def B(self):
         r'''
-        Parameters
-        ----------
-        None
-        
-        Returns
-        ----------
-        Input matrix for linear/linearized system (B)
+        Input matrix for linear/linearized system (:math:`\mathbf{B}`)
         '''
         if hasattr(self, '_B'):
             return self._B
@@ -175,13 +184,7 @@ class _System(nn.Module):
     @property
     def C(self):
         r'''
-        Parameters
-        ----------
-        None
-        
-        Returns
-        ----------
-        Output matrix for linear/linearized system (C)
+        Output matrix for linear/linearized system (:math:`\mathbf{C}`)
         '''
         if hasattr(self, '_C'):
             return self._C
@@ -192,13 +195,7 @@ class _System(nn.Module):
     @property
     def D(self):
         r'''
-        Parameters
-        ----------
-        None
-        
-        Returns
-        ----------
-        Feedthrough matrix for linear/linearized system (D)
+        Feedthrough matrix for linear/linearized system (:math:`\mathbf{D}`)
         '''
         if hasattr(self, '_D'):
             return self._D
@@ -209,12 +206,6 @@ class _System(nn.Module):
     @property
     def c1(self):
         r'''
-        Parameters
-        ----------
-        None
-        
-        Returns
-        ----------
         Bias generated by state-transition (:math:`c_1`)
         '''
         if hasattr(self,'_c1'):
@@ -225,12 +216,6 @@ class _System(nn.Module):
     @property
     def c2(self):
         r'''
-        Parameters
-        ----------
-        None
-        
-        Returns
-        ----------
         Bias generated by observation (:math:`c_2`)
         '''
         if hasattr(self,'_c2'):
