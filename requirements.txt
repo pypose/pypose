@@ -1,0 +1,4 @@
+torch==1.11.0
+functorch==0.1.1
+ninja==1.10.2.3
+pytest==7.1.2
