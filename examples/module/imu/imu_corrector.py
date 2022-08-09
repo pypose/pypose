@@ -88,10 +88,8 @@ def test(network, loader, device = "cuda:0"):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='configs/base.conf', help='config file path')
     parser.add_argument("--device", type=str, default='cuda:0', help="cuda or cpu")
-    parser.add_argument("--batch-size", type=int, default=4, help="batch size, only support 1 now")
-    parser.add_argument("--window_size", type=int, default=10, help="window_size")
+    parser.add_argument("--batch-size", type=int, default=4, help="batch size")
     parser.add_argument("--max_epoches", type=int, default=100, help="max_epoches")
     parser.add_argument("--dataroot", type=str, default='./examples/module/imu', help="dataset location downloaded")
     parser.add_argument("--dataname", type=str, default='2011_09_26', help="dataset name")
