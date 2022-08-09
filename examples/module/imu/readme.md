@@ -1,6 +1,6 @@
-# IMU preintegration
+# IMU examples
 
-Examples of integrating IMU and training IMU correction model.
+Examples of IMU [preintegrating](./imu_integrator.py) and IMU [correction](./imu_corrector.py).
 
 ## Installation
 
@@ -26,7 +26,7 @@ Examples of integrating IMU and training IMU correction model.
                 ├── calib_imu_to_velo.txt
                 └── calib_velo_to_cam.txt
 
-## IMU Pre-integration:
+# IMU Preintegration:
 
         python imu_integrator.py --dataroot DATAROOT --datadrive 0018 0022
 
@@ -54,9 +54,15 @@ Note: change `DATAROOT` to the folder you select.
                                 data sequences
           --plot3d              plot in 3D space, default: False
 
-## Training IMU Correction model:
+# IMU Correction:
 
         python imu_integrator.py --dataroot DATAROOT
+
+Note: change `DATAROOT` to the folder you select.
+
+* Data Drive to select:
+
+        0001 0002 0005 0009 0011 0013 0014 0015 0017 0018 0019 0020 0022 0005
 
 * Other supported arguments:
 
