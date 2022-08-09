@@ -30,16 +30,18 @@ class _System(nn.Module):
     Through a Taylor series expansion (ignoring higher order terms), we get the following:
 
     .. math::
-        h(x,u)=h(x^*+\delta x,u^*+\delta u) = h(x^*,u^*) + 
+        \begin{aligned}
+        h(x,u)=h(x^*+\delta x,u^*+\delta u) &= h(x^*,u^*) + 
                                 \left. \frac{\partial h}{\partial x} \right|_{x^*,u^*} \delta x +
                                 \left. \frac{\partial h}{\partial u} \right|_{x^*,u^*} \delta u \\
         \Rightarrow
-        h(x^*,u^*) + h(\delta x,\delta u) = h(x^*,u^*) + 
+        h(x^*,u^*) + h(\delta x,\delta u) &= h(x^*,u^*) + 
                                 \left. \frac{\partial h}{\partial x} \right|_{x^*,u^*} \delta x +
                                 \left. \frac{\partial h}{\partial u} \right|_{x^*,u^*} \delta u \\
         \Rightarrow
-        h(\delta x,\delta u) =  \left. \frac{\partial h}{\partial x} \right|_{x^*,u^*} \delta x +
+        h(\delta x,\delta u) &=  \left. \frac{\partial h}{\partial x} \right|_{x^*,u^*} \delta x +
                                 \left. \frac{\partial h}{\partial u} \right|_{x^*,u^*} \delta u \\
+        \end{aligned}
     
     Because :math:`(x^*,u^*)` is not necessarily an equilibrium point, we must add a bias term, :math:`c`. 
     Also, to stay consistent with the linear state-space equation, we allow :math:`\delta x = x^*` and 
