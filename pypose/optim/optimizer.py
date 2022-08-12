@@ -153,9 +153,8 @@ class GaussNewton(_Optimizer):
     Warning:
         The output of model :math:`\bm{f}(\bm{\theta},\bm{x}_i)` and target :math:`\bm{y}_i`
         can be any shape, while their **last dimension** :math:`d` is always taken as the
-        dimension of model residual, whose inner product will be input to the kernel
-        function. This is useful for residuals like re-projection error, whose last
-        dimension is 2.
+        dimension of model residual, whose inner product is the input to the kernel function.
+        This is useful for residuals like re-projection error, whose last dimension is 2.
 
         Note that **auto correction** is equivalent to the method of 'square-rooting the kernel'
         mentioned in Section 3.3 of the following paper. It replaces the
@@ -165,11 +164,12 @@ class GaussNewton(_Optimizer):
         * Christopher Zach, `Robust Bundle Adjustment Revisited
           <https://link.springer.com/chapter/10.1007/978-3-319-10602-1_50>`_, European
           Conference on Computer Vision (ECCV), 2014.
-        
+
         **Therefore, the users need to keep the last dimension of model output and target to
-        1, even if the model residual is a scalar. If the model output only has one dimension,
-        the model Jacobian will be a row vector, instead of a matrix, which loses sample-level
-        structural information, although computing Jacobian vector is faster.**
+        1, even if the model residual is a scalar. If the users flatten all sample residuals 
+        into a vector (residual inner product will be a scalar), the model Jacobian will be a
+        row vector, instead of a matrix, which loses sample-level structural information,
+        although computing Jacobian vector is faster.**
 
     Note:
         Instead of solving :math:`\mathbf{J}^T\mathbf{J}\delta = -\mathbf{J}^T\mathbf{R}`, we solve
