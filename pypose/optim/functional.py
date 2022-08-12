@@ -4,7 +4,7 @@ from torch import nn, Tensor
 from torch.autograd.functional import jacobian
 
 
-def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False, \
+def modjac(model, input=None, create_graph=False, strict=False, vectorize=False, \
                     strategy='reverse-mode', flatten=False):
     r'''
     Compute the model Jacobian with respect to the model parameters.
@@ -25,17 +25,17 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
 
     Args:
         model (torch.nn.Module): a PyTorch model that takes Tensor or LieTensor
-            inputs and returns a tuple of Tensors/LieTensors or a Tensor/LieTensor.
-        inputs (tuple of Tensors/LieTensors or Tensor/LieTensor): inputs to the
+            input and returns a tuple of Tensors/LieTensors or a Tensor/LieTensor.
+        input (tuple of Tensors/LieTensors or Tensor/LieTensor): input to the
             model. Defaults to ``None``.
         create_graph (bool, optional): If ``True``, the Jacobian will be
             computed in a differentiable manner. Note that when ``strict`` is
             ``False``, the result can not require gradients or be disconnected
-            from the inputs.  Defaults to ``False``.
+            from the input.  Defaults to ``False``.
         strict (bool, optional): If ``True``, an error will be raised when we
             detect that there exists an input such that all the outputs are
             independent of it. If ``False``, we return a Tensor of zeros as the
-            jacobian for said inputs, which is the expected mathematical value.
+            jacobian for said input, which is the expected mathematical value.
             Defaults to ``False``.
         vectorize (bool, optional): When computing the jacobian, usually we invoke
             ``autograd.grad`` once per row of the jacobian. If this flag is
@@ -49,7 +49,7 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
             determine whether the Jacobian will be computed with forward or reverse
             mode AD. Currently, ``"forward-mode"`` requires ``vectorized=True``.
             Defaults to ``"reverse-mode"``. If ``func`` has more outputs than
-            inputs, ``"forward-mode"`` tends to be more performant. Otherwise,
+            input, ``"forward-mode"`` tends to be more performant. Otherwise,
             prefer to use ``"reverse-mode"``.
         flatten (bool, optional): If ``True``, all module parameters and outputs
             are flattened and concatenated to form a single vector. The Jacobian
@@ -80,17 +80,17 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
         Calculates Jacobian with respect to all model parameters.
 
         >>> model = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=1)
-        >>> inputs = torch.randn(1, 1, 1)
-        >>> J = pp.optim.modjac(model, inputs)
+        >>> input = torch.randn(1, 1, 1)
+        >>> J = pp.optim.modjac(model, input)
         (tensor([[[[[[[0.3365]]]]]]]), tensor([[[[1.]]]]))
         >>> [j.shape for j in J]
         [torch.Size([1, 1, 1, 1, 1, 1, 1]), torch.Size([1, 1, 1, 1])]
 
         Function with flattened parameters returns a combined Jacobian.
 
-        >>> inputs = torch.randn(2, 2, 2)
+        >>> input = torch.randn(2, 2, 2)
         >>> model = nn.Conv2d(in_channels=2, out_channels=2, kernel_size=1)
-        >>> J = pp.optim.modjac(model, inputs, flatten=True)
+        >>> J = pp.optim.modjac(model, input, flatten=True)
         tensor([[-0.4162,  0.0968,  0.0000,  0.0000,  1.0000,  0.0000],
                 [-0.6042,  1.1886,  0.0000,  0.0000,  1.0000,  0.0000],
                 [ 1.4623,  0.7389,  0.0000,  0.0000,  1.0000,  0.0000],
@@ -112,8 +112,8 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
         ...     def forward(self, x):
         ...         return self.p.Exp() * x
         ...
-        >>> model, inputs = PoseTransform(), pp.randn_SO3()
-        >>> J = pp.optim.modjac(model, inputs, flatten=True)
+        >>> model, input = PoseTransform(), pp.randn_SO3()
+        >>> J = pp.optim.modjac(model, input, flatten=True)
         tensor([[ 0.4670,  0.7041,  0.0029,  0.0000,  0.0000,  0.0000],
                 [-0.6591,  0.4554, -0.2566,  0.0000,  0.0000,  0.0000],
                 [-0.2477,  0.0670,  0.9535,  0.0000,  0.0000,  0.0000],
@@ -125,13 +125,13 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
         >>> J.shape
         torch.Size([8, 6])
     '''
-    func, params = functorch.make_functional(model)
+    func, params, buffers = functorch.make_functional_with_buffers(model)
 
-    if inputs is None:
-        func_param = lambda *p: func(p)
+    if input is None:
+        func_param = lambda *p: func(p, buffers)
     else:
-        inputs = inputs if isinstance(inputs, tuple) else (inputs,)
-        func_param = lambda *p: func(p, *inputs)
+        input = input if isinstance(input, tuple) else (input,)
+        func_param = lambda *p: func(p, buffers, *input)
 
     J = jacobian(func_param, params, create_graph=create_graph, strict=strict, \
                     vectorize=vectorize, strategy=strategy)
@@ -142,17 +142,17 @@ def modjac(model, inputs=None, create_graph=False, strict=False, vectorize=False
                     for j, p in zip(Jr, params)], dim=1) for Jr in J])
         else:
             J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params)], dim=1)
-    assert not torch.any(torch.isnan(J)), 'Jacobian contains Nan! Check your model and inputs!'
+    assert not torch.any(torch.isnan(J)), 'Jacobian contains Nan! Check your model and input!'
     return J
 
 
-def modjacrev(model, inputs, argnums=0, *, has_aux=False):
+def modjacrev(model, input, argnums=0, *, has_aux=False):
     func, params = functorch.make_functional(model)
     jacrev = functorch.jacrev(func, argnums=argnums, has_aux=has_aux)
-    return jacrev(params, inputs)
+    return jacrev(params, input)
 
 
-def modjacfwd(model, inputs, argnums=0, *, has_aux=False):
+def modjacfwd(model, input, argnums=0, *, has_aux=False):
     func, params = functorch.make_functional(model)
     jacfwd = functorch.jacfwd(func, argnums=argnums, has_aux=has_aux)
-    return jacfwd(params, inputs)
+    return jacfwd(params, input)
