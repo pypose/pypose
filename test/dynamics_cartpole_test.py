@@ -81,7 +81,7 @@ if __name__ == "__main__":
     ### Jacobian computations
     # Find jacobinas at 1000th step
     jacob_state, jacob_input = state_all[999,:].T, input[999]
-    cartPoleSolver.set_linearization_point(jacob_state,jacob_input.unsqueeze(0))
+    cartPoleSolver.set_linearization_point(jacob_state,jacob_input.unsqueeze(0),time[999])
     A = (cartPoleSolver.A).numpy()
     B = (cartPoleSolver.B).numpy()
     C = (cartPoleSolver.C).numpy()
