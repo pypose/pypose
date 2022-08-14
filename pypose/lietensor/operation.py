@@ -611,7 +611,7 @@ class Sim3_Act4(torch.autograd.Function):
         return torch.cat((X_grad.squeeze(-2), zero), dim = -1), p_grad.squeeze(-2)
 
 
-class SO3_mul(torch.autograd.Function):
+class SO3_Mul(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, X, Y):
@@ -631,13 +631,13 @@ class SO3_mul(torch.autograd.Function):
         return X_grad, Y_grad
 
 
-class SE3_mul(torch.autograd.Function):
+class SE3_Mul(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, X, Y):
         ctx.save_for_backward(X)
         t = X[..., :3] + SO3_Act.apply(X[..., 3:], Y[..., :3])
-        q = SO3_mul.apply(X[..., 3:], Y[..., 3:])
+        q = SO3_Mul.apply(X[..., 3:], Y[..., 3:])
         return torch.cat((t, q), -1)
 
     @staticmethod
@@ -650,12 +650,12 @@ class SE3_mul(torch.autograd.Function):
         return X_grad, Y_grad        
 
 
-class RxSO3_mul(torch.autograd.Function):
+class RxSO3_Mul(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, X, Y):
         ctx.save_for_backward(X)
-        q = SO3_mul.apply(X[..., :4], Y[..., :4])
+        q = SO3_Mul.apply(X[..., :4], Y[..., :4])
         s = X[..., 4:] * Y[..., 4:]
         return torch.cat((q, s), -1)
 
@@ -669,13 +669,13 @@ class RxSO3_mul(torch.autograd.Function):
         return X_grad, Y_grad    
 
 
-class Sim3_mul(torch.autograd.Function):
+class Sim3_Mul(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, X, Y):
         ctx.save_for_backward(X)
         t = X[..., :3] + RxSO3_Act.apply(X[..., 3:], Y[..., :3])
-        q = RxSO3_mul.apply(X[..., 3:], Y[..., 3:])
+        q = RxSO3_Mul.apply(X[..., 3:], Y[..., 3:])
         return torch.cat((t, q), -1)
 
     @staticmethod
@@ -688,7 +688,7 @@ class Sim3_mul(torch.autograd.Function):
         return X_grad, Y_grad   
 
 
-class SO3_inv(torch.autograd.Function):
+class SO3_Inv(torch.autograd.Function):
     @staticmethod
     def forward(ctx, X):
         Y = torch.cat((-X[..., :3], X[..., 3:]), -1)
@@ -703,10 +703,10 @@ class SO3_inv(torch.autograd.Function):
         return torch.cat((X_grad, zero), dim = -1)
 
 
-class SE3_inv(torch.autograd.Function):
+class SE3_Inv(torch.autograd.Function):
     @staticmethod
     def forward(ctx, X):
-        q_inv = SO3_inv.apply(X[..., 3:]) 
+        q_inv = SO3_Inv.apply(X[..., 3:]) 
         t_inv = -SO3_Act.apply(q_inv, X[..., :3])
         Y = torch.cat((t_inv, q_inv), dim = -1)
         ctx.save_for_backward(Y)
@@ -720,10 +720,10 @@ class SE3_inv(torch.autograd.Function):
         return torch.cat((X_grad, zero), dim = -1)
 
 
-class RxSO3_inv(torch.autograd.Function):
+class RxSO3_Inv(torch.autograd.Function):
     @staticmethod
     def forward(ctx, X):
-        q_inv = SO3_inv.apply(X[..., :4]) 
+        q_inv = SO3_Inv.apply(X[..., :4]) 
         s_inv = 1.0 / X[..., 4:]
         Y = torch.cat((q_inv, s_inv), dim = -1)
         ctx.save_for_backward(Y)
@@ -737,10 +737,10 @@ class RxSO3_inv(torch.autograd.Function):
         return torch.cat((X_grad, zero), dim = -1)
 
 
-class Sim3_inv(torch.autograd.Function):
+class Sim3_Inv(torch.autograd.Function):
     @staticmethod
     def forward(ctx, X):
-        qs_inv = RxSO3_inv.apply(X[..., 3:]) 
+        qs_inv = RxSO3_Inv.apply(X[..., 3:]) 
         t_inv = -RxSO3_Act.apply(qs_inv, X[..., :3])
         Y = torch.cat((t_inv, qs_inv), dim = -1)
         ctx.save_for_backward(Y)
@@ -764,63 +764,3 @@ def broadcast_inputs(x, y):
     x = x.expand(shape+(x.shape[-1],)).reshape(-1,x.shape[-1]).contiguous()
     y = y.expand(shape+(y.shape[-1],)).reshape(-1,y.shape[-1]).contiguous()
     return (x, y), tuple(out_shape)
-
-
-def lietensor_act(lid, x, p):
-    x = x.tensor() if hasattr(x, 'ltype') else x
-    input, out_shape = broadcast_inputs(x, p)
-    if lid == 1:
-        out = SO3_Act.apply(*input)
-    elif lid == 2:
-        out = RxSO3_Act.apply(*input)
-    elif lid == 3:
-        out = SE3_Act.apply(*input)
-    elif lid == 4:
-        out = Sim3_Act.apply(*input)
-    dim = -1 if out.nelement() != 0 else x.shape[-1]
-    return out.view(out_shape + (dim,))
-
-
-def lietensor_act4(lid, x, p):
-    x = x.tensor() if hasattr(x, 'ltype') else x
-    input, out_shape = broadcast_inputs(x, p)
-    if lid == 1:
-        out = SO3_Act4.apply(*input)
-    elif lid == 2:
-        out = RxSO3_Act4.apply(*input)
-    elif lid == 3:
-        out = SE3_Act4.apply(*input)
-    elif lid == 4:
-        out = Sim3_Act4.apply(*input)
-    dim = -1 if out.nelement() != 0 else x.shape[-1]
-    return out.view(out_shape + (dim,))
-
-
-def lietensor_mul(lid, x, y):
-    x = x.tensor() if hasattr(x, 'ltype') else x
-    y = y.tensor() if hasattr(y, 'ltype') else y
-    assert x.shape[-1] == y.shape[-1]
-    input, out_shape = broadcast_inputs(x, y)
-    if lid == 1:
-        out = SO3_mul.apply(*input)
-    elif lid == 2:
-        out = RxSO3_mul.apply(*input)
-    elif lid == 3:
-        out = SE3_mul.apply(*input)
-    elif lid == 4:
-        out = Sim3_mul.apply(*input)
-    dim = -1 if out.nelement() != 0 else x.shape[-1]
-    return out.view(out_shape + (dim,))
-
-
-def lietensor_inv(lid, x):
-    x = x.tensor() if hasattr(x, 'ltype') else x
-    if lid == 1:
-        out = SO3_inv.apply(x)
-    elif lid == 2:
-        out = RxSO3_inv.apply(x)
-    elif lid == 3:
-        out = SE3_inv.apply(x)
-    elif lid == 4:
-        out = Sim3_inv.apply(x)
-    return out
