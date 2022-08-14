@@ -4,4 +4,6 @@ Examples for how to use PyPose
 
 ## List of Examples:
 
-* [IMU Preintegration](./imu)
+* [LieTensor Basics](./lietensor)
+* [IMU Preintegration](./module/imu)
+* [Pose Graph Optimization](./module/pgo)

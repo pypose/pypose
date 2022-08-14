@@ -1,10 +1,9 @@
-# IMU preintegration
+# IMU examples
 
-An example for IMU Preintegration
+Examples of IMU [preintegrating](./imu_integrator.py) and IMU [correction](./imu_corrector.py).
 
 ## Installation
 
-    pip install pykitti
     python -m pip install -U matplotlib
 
 ## Prepare Dataset
@@ -27,7 +26,7 @@ An example for IMU Preintegration
                 ├── calib_imu_to_velo.txt
                 └── calib_velo_to_cam.txt
 
-## Run:
+# IMU Preintegration:
 
         python imu_integrator.py --dataroot DATAROOT --datadrive 0018 0022
 
@@ -54,3 +53,28 @@ Note: change `DATAROOT` to the folder you select.
           --datadrive DATADRIVE [DATADRIVE ...]
                                 data sequences
           --plot3d              plot in 3D space, default: False
+
+# IMU Correction:
+
+        python imu_integrator.py --dataroot DATAROOT
+
+Note: change `DATAROOT` to the folder you select.
+
+* Data Drive to select:
+
+        0001 0002 0005 0009 0011 0013 0014 0015 0017 0018 0019 0020 0022 0005
+
+* Other supported arguments:
+
+        optional arguments:
+        -h, --help            show this help message and exit
+        --device DEVICE       cuda or cpu
+        --batch-size BATCH_SIZE
+                                batch size
+        --max_epoches MAX_EPOCHES
+                                max_epoches
+        --dataroot DATAROOT   dataset location downloaded
+        --dataname DATANAME   dataset name
+        --datadrive DATADRIVE [DATADRIVE ...]
+                                data sequences
+        --load_ckpt

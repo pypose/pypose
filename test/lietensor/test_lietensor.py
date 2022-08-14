@@ -215,8 +215,8 @@ def test_lietensor():
         def forward(self, x):
             return self.p.Exp() * x
 
-    model, inputs = PoseTransform(), pp.randn_SO3()
-    J = pp.optim.functional.modjac(model, inputs=inputs, flatten=True)
+    model, input = PoseTransform(), pp.randn_SO3()
+    J = pp.optim.functional.modjac(model, input=input, flatten=True)
 
     LT = [pp.randn_SO3, pp.randn_so3, pp.randn_SE3, pp.randn_se3, \
         pp.randn_Sim3, pp.randn_sim3, pp.randn_RxSO3, pp.randn_rxso3]
