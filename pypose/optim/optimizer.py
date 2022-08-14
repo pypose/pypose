@@ -142,6 +142,10 @@ class GaussNewton(_Optimizer):
             model residual. Use this only when all inputs shared the same weight matrices. This is
             ignored when weight is given when calling :meth:`.step` or :meth:`.optimize` method.
             Default: ``None``.
+        vectorize (bool, optional): the method of computing Jacobian. If ``True``, the
+            gradient of each scalar in output with respect to the model parameters will be
+            computed in parallel with ``"reverse-mode"``. More details go to
+            :meth:`pypose.optim.functional.modjac`. Default: ``True``.
 
     Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`.
 
@@ -178,9 +182,10 @@ class GaussNewton(_Optimizer):
         such as :meth:`solver.PINV` and :meth:`solver.LSTSQ` are available.
         More details are in Eq. (5) of the paper "`Robust Bundle Adjustment Revisited`_".
     '''
-    def __init__(self, model, solver=None, kernel=None, corrector=None, weight=None):
+    def __init__(self, model, solver=None, kernel=None, corrector=None, weight=None, vectorize=True):
         super().__init__(model.parameters(), defaults={})
         self.solver = PINV() if solver is None else solver
+        self.jackwargs = {'vectorize': vectorize, 'flatten': True}
         if kernel is not None and corrector is None:
             # auto diff of robust model will be computed
             self.model = RobustModel(model, kernel, weight=weight, auto=True)
@@ -247,7 +252,7 @@ class GaussNewton(_Optimizer):
         '''
         for pg in self.param_groups:
             R = self.model(input, target, weight)
-            J = modjac(self.model, input=(input, target, weight), flatten=True)
+            J = modjac(self.model, input=(input, target, weight), **self.jackargs)
             R, J = self.corrector(R = R, J = J)
             D = self.solver(A = J, b = -R.view(-1, 1))
             self.last = self.loss if hasattr(self, 'loss') \
@@ -324,6 +329,10 @@ class LevenbergMarquardt(_Optimizer):
             Default: 16.
         min (float, optional): the lower-bound of the Hessian diagonal. Default: 1e-6.
         max (float, optional): the upper-bound of the Hessian diagonal. Default: 1e32.
+        vectorize (bool, optional): the method of computing Jacobian. If ``True``, the
+            gradient of each scalar in output with respect to the model parameters will be
+            computed in parallel with ``"reverse-mode"``. More details go to
+            :meth:`pypose.optim.functional.modjac`. Default: ``True``.
 
     Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`, :meth:`solver.Cholesky`.
 
@@ -357,12 +366,13 @@ class LevenbergMarquardt(_Optimizer):
         structural information, although computing Jacobian vector is faster.**
     '''
     def __init__(self, model, solver=None, strategy=None, kernel=None, corrector=None, \
-                       weight=None, reject=16, min=1e-6, max=1e32):
+                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True):
         assert min > 0, ValueError("min value has to be positive: {}".format(min))
         assert max > 0, ValueError("max value has to be positive: {}".format(max))
         self.strategy = TrustRegion() if strategy is None else strategy
         defaults = {**{'min':min, 'max':max}, **self.strategy.defaults}
         super().__init__(model.parameters(), defaults=defaults)
+        self.jackwargs = {'vectorize': vectorize, 'flatten': True}
         self.solver = Cholesky() if solver is None else solver
         self.reject, self.reject_count = reject, 0
         if kernel is not None and corrector is None:
@@ -437,7 +447,7 @@ class LevenbergMarquardt(_Optimizer):
         '''
         for pg in self.param_groups:
             R = self.model(input, target, weight)
-            J = modjac(self.model, input=(input, target, weight), flatten=True)
+            J = modjac(self.model, input=(input, target, weight), **self.jackwargs)
             R, J = self.corrector(R = R, J = J)
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target, weight)
@@ -447,8 +457,8 @@ class LevenbergMarquardt(_Optimizer):
                 A.diagonal().add_(A.diagonal() * pg['damping'])
                 try:
                     D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
-                except e:
-                    print(e, "Linear solver failed. Breaking optimization step...")
+                except Exception as e:
+                    print(e, "\nLinear solver failed. Breaking optimization step...")
                     break
                 self.update_parameter(pg['params'], D)
                 self.loss = self.model.loss(input, target, weight)

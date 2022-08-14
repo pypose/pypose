@@ -3,8 +3,7 @@ import math, numbers
 import torch, warnings
 from torch import nn, linalg
 from torch.utils._pytree import tree_map, tree_flatten
-from .backends import exp, log, inv, mul, adj
-from .backends import adjT, jinvp, act3, act4, toMatrix
+from .backends import adj, adjT, jinvp
 from .basics import vec2skew, cumops, cummul, cumprod
 from .basics import cumops_, cummul_, cumprod_
 from .operation import broadcast_inputs
