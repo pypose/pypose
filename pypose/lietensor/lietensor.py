@@ -7,7 +7,14 @@ from .backends import exp, log, inv, mul, adj
 from .backends import adjT, jinvp, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
 from .basics import cumops_, cummul_, cumprod_
-from .operation import RxSO3_Log, SE3_Log, SO3_Log, Sim3_Log, rxso3_Exp, se3_Exp, sim3_Exp, so3_Exp, lietensor_act, lietensor_act4, lietensor_mul, lietensor_inv
+from .operation import broadcast_inputs
+from .operation import SO3_Log, SE3_Log, RxSO3_Log, Sim3_Log
+from .operation import so3_Exp, se3_Exp, rxso3_Exp, sim3_Exp
+from .operation import SO3_Act, SE3_Act, RxSO3_Act, Sim3_Act
+from .operation import SO3_Act4, SE3_Act4, RxSO3_Act4, Sim3_Act4
+from .operation import SO3_mul, SE3_mul, RxSO3_mul, Sim3_mul
+from .operation import SO3_mul, SE3_mul, RxSO3_mul, Sim3_mul
+from .operation import lietensor_act, lietensor_act4, lietensor_mul, lietensor_inv
 
 
 HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'double',
@@ -75,13 +82,16 @@ class LieType:
 
     def Act(self, x, p):
         """ action on a points tensor(*, 3[4]) (homogeneous)"""
-        assert not self.on_manifold and isinstance(p, torch.Tensor)
-        assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
-        if p.shape[-1]==3:
-            out = lietensor_act(self.lid, x, p)
-        else:
-            out = lietensor_act4(self.lid, x, p)
-        return out
+        # assert not self.on_manifold and isinstance(p, torch.Tensor)
+        # assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
+        # if p.shape[-1]==3:
+        #     out = lietensor_act(self.lid, x, p)
+        # else:
+        #     out = lietensor_act4(self.lid, x, p)
+        # return out
+        if not self.on_manifold:
+            raise AttributeError("Lie Group has no Exp attribute")
+        raise NotImplementedError("Instance has no Exp attribute.")
 
 
     def Mul(self, x, y):
@@ -212,6 +222,18 @@ class SO3Type(LieType):
         X = X.tensor() if hasattr(X, 'ltype') else X
         x = SO3_Log.apply(X)
         return LieTensor(x, ltype=so3_type)
+    
+    def Act(self, X, p):
+        assert not self.on_manifold and isinstance(p, torch.Tensor)
+        assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
+        x = x.tensor() if hasattr(x, 'ltype') else x
+        input, out_shape = broadcast_inputs(x, p)
+        if p.shape[-1]==3:
+            out = SO3_Act.apply(*input)
+        else:
+            out = SO3_Act4.apply(*input)
+        dim = -1 if out.nelement() != 0 else x.shape[-1]
+        return out.view(out_shape + (dim,))
 
     @classmethod
     def identity(cls, *size, **kwargs):
