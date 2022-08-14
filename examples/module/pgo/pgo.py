@@ -40,6 +40,7 @@ def plot_and_save(points, pngname, title='', axlim=None):
         ax.set_ylim(axlim[1])
         ax.set_zlim(axlim[2])
     plt.savefig(pngname)
+    print('Saving to', pngname)
     return ax.get_xlim(), ax.get_ylim(), ax.get_zlim()
 
 
@@ -59,8 +60,8 @@ if __name__ == '__main__':
     graph = PoseGraph(data.nodes).to(args.device)
     solver = ppos.Cholesky()
     strategy = ppost.TrustRegion(radius=args.radius)
-    optimizer = pp.optim.LM(graph, solver=solver, strategy=strategy, min=1e-4)
-    scheduler = StopOnPlateau(optimizer, steps=10, patience=10, decreasing=1e-3, verbose=True)
+    optimizer = pp.optim.LM(graph, solver=solver, strategy=strategy, min=1e-4, vectorize=False)
+    scheduler = StopOnPlateau(optimizer, steps=10, patience=3, decreasing=1e-3, verbose=True)
 
     pngname = os.path.join(args.save, args.dataname+'.png')
     axlim = plot_and_save(graph.nodes.translation(), pngname, args.dataname)
