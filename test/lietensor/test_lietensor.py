@@ -73,7 +73,6 @@ def test_lietensor():
     c = pp.randn_SO3(1,5)
 
     e = a * b
-    f = a * c
 
     g = pp.randn_so3(1,5)
     g * 0.1
@@ -89,9 +88,7 @@ def test_lietensor():
     t = I.Retr(a)
 
     I = pp.identity_SE3(3)
-    t = I.Retr(a)
 
-    r = pp.Retr(I, a)
     p = I.Act(a)
 
     X = pp.randn_SE3(8, requires_grad=True, dtype=torch.double)
@@ -215,8 +212,8 @@ def test_lietensor():
         def forward(self, x):
             return self.p.Exp() * x
 
-    model, inputs = PoseTransform(), pp.randn_SO3()
-    J = pp.optim.functional.modjac(model, inputs=inputs, flatten=True)
+    model, input = PoseTransform(), pp.randn_SO3()
+    J = pp.optim.functional.modjac(model, input=input, flatten=True)
 
     LT = [pp.randn_SO3, pp.randn_so3, pp.randn_SE3, pp.randn_se3, \
         pp.randn_Sim3, pp.randn_sim3, pp.randn_RxSO3, pp.randn_rxso3]
