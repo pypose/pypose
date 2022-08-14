@@ -761,13 +761,12 @@ class LieTensor(torch.Tensor):
                 grad_fn=<AliasBackward0>)
     """
     def __init__(self, *data, ltype:LieType):
-        if self.shape[-1:] != ltype.dimension:
-            warnings.warn('The last dimension of a LieTensor has to be corresponding to their ' \
-            'LieType. Ignore this warning if you are using deepcopy. More details go to {}. ' \
-            'If this error happens in an optimization process, where LieType is not a necessary '
-            'structure, we suggest to call .tensor() to convert a LieTensor to Tensor before ' \
-            'passing it to an optimizer. If you believe it is a bug, create an issue on GitHub.' \
-            .format('https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor'))
+        assert self.shape[-1:] == ltype.dimension, 'The last dimension of a LieTensor has to be ' \
+            'corresponding to their LieType. More details go to {}. If this error happens in an ' \
+            'optimization process, where LieType is not a necessary structure, we suggest to '    \
+            'call .tensor() to convert a LieTensor to Tensor before passing it to an optimizer. ' \
+            'If this still happens, create an issue on GitHub please.'.format(
+            'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor')
         self.ltype = ltype
 
     @staticmethod
@@ -783,7 +782,7 @@ class LieTensor(torch.Tensor):
             return super().__repr__()
 
     def new_empty(self, shape):
-        return type(self)(torch.empty(shape), ltype=self.ltype)
+        return torch.Tensor.as_subclass(torch.empty(shape), LieTensor)
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs={}):
