@@ -561,7 +561,8 @@ class SE3_Act4(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, X, p):
-        out = torch.cat(((SO3_Act.apply(X[..., 3:], p[..., :3]) + X[..., :3] * p[..., 3:]), p[..., 3:]), dim=-1)
+        t = SO3_Act.apply(X[..., 3:], p[..., :3]) + X[..., :3] * p[..., 3:]
+        out = torch.cat((t, p[..., 3:]), dim=-1)
         ctx.save_for_backward(X, out)
         return out
 
@@ -597,7 +598,8 @@ class Sim3_Act4(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, X, p):
-        out = torch.cat(((RxSO3_Act.apply(X[..., 3:], p[..., :3]) + X[..., :3] * p[..., 3:]), p[..., 3:]), dim=-1)
+        t = RxSO3_Act.apply(X[..., 3:], p[..., :3]) + X[..., :3] * p[..., 3:]
+        out = torch.cat((t, p[..., 3:]), dim=-1)
         ctx.save_for_backward(X, out)
         return out
 
