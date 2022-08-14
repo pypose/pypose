@@ -252,7 +252,7 @@ class GaussNewton(_Optimizer):
         '''
         for pg in self.param_groups:
             R = self.model(input, target, weight)
-            J = modjac(self.model, input=(input, target, weight), **self.jackargs)
+            J = modjac(self.model, input=(input, target, weight), **self.jackwargs)
             R, J = self.corrector(R = R, J = J)
             D = self.solver(A = J, b = -R.view(-1, 1))
             self.last = self.loss if hasattr(self, 'loss') \
