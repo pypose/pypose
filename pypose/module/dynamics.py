@@ -5,6 +5,90 @@ from torch.autograd.functional import jacobian
 
 
 class System(nn.Module):
+    r'''
+    The class for the simulation and linearization of general time-discrete time-varying dynamics.
+
+    Args:
+        time (:obj:`boolean`): Whether the system is time-varying; defaults to False, meaning time-invariant
+
+    Governing Equation
+    ----------
+    The general state-space equation is given as:
+
+    .. math::
+        \begin{align}
+        \mathbf{x}_{k+1} &= \mathbf{f}(\mathbf{x}_k,\mathbf{u}_k,t_k) \\
+        \mathbf{y}_{k} &= \mathbf{g}(\mathbf{x}_k,\mathbf{u}_k,t_k)
+        \end{align}
+
+    where :math:`k` is the time step; :math:`\mathbf{x}`, :math:`\mathbf{u}`,
+    :math:`\mathbf{y}` are the states, inputs and observations, respectively;
+    :math:`\mathbf{f}` and :math:`\mathbf{g}` are
+    the state transition and observation functions, respectively.
+
+    Note:
+        Here we choose to work with a time-discrete system, since typically in numerical simulations and
+        control applications, the dynamical systems are usually discretized in time.
+
+    To use the class, the user should define two methods :obj:`state_transition` and :obj:`observation`, which are
+    used in the :obj:`forward` method.  The :obj:`forward` method advances the dynamical system by one time step, and
+    is the function that is back-propagated in the learning process.
+
+    Note:
+        The :obj:`forward` method implicitly increments the time step via :obj:`forward_hook`.  As a result, in the
+        implementations of :obj:`state_transition` and :obj:`observation`, one does not need to include the time as
+        the input; instead, one can directly access the current time via the data member :obj:`self.t`.
+
+    Linearization
+    ----------
+    This class provides a means to linearize the system at a reference point :math:`\chi^*=(\mathbf{x}^*,\mathbf{u}^*,t^*)`
+    along a trajectory.  Consider a point :math:`\chi=(\mathbf{x}^*+\delta\mathbf{x},\mathbf{u}^*+\delta\mathbf{u},t^*)`
+    near :math:`\chi^*`.  The goal is to obtain a linear dynamics model for :math:`\chi` that behaves
+    similarly to the nonlinear dynamics when :math:`||\delta\mathbf{x}||` and :math:`||\delta\mathbf{u}||` are sufficiently
+    small.
+
+    The linearization process is the same for :math:`\mathbf{f}` and :math:`\mathbf{g}`, so we only present
+    the case for :math:`\mathbf{f}` in detail below.
+    Ignoring the higher order terms, the Taylor series expansion of :math:`\mathbf{f}` at the reference point
+    :math:`\chi^*` is
+
+    .. math::
+        \begin{aligned}
+        \mathbf{f}(\mathbf{x},\mathbf{u},t^*) &\approx \mathbf{f}(\mathbf{x}^*,\mathbf{u}^*,t^*) + 
+                                \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}} \right|_{\chi^*} \delta \mathbf{x} +
+                                \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*} \delta \mathbf{u} \\
+        &= \mathbf{f}(\mathbf{x}^*,\mathbf{u}^*,t^*) + \mathbf{A}(\mathbf{x}-\mathbf{x}^*) + \mathbf{B}(\mathbf{u}-\mathbf{u}^*) \\
+        &= \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1
+        \end{aligned}
+
+    where we have introduced,
+
+    .. math::
+        \mathbf{A} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}} \right|_{\chi^*},\quad 
+        \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*},\quad
+        \mathbf{c}_1 = \mathbf{f}(\mathbf{x}^*,\mathbf{u}^*,t^*) - \mathbf{A}\mathbf{x}^* - \mathbf{B}\mathbf{u}^*
+
+    Similarly, one can linearize :math:`\mathbf{g}` as
+
+    .. math::
+        \mathbf{g}(\mathbf{x},\mathbf{u},t^*) \approx \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2
+
+    where
+
+    .. math::
+        \mathbf{C} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{x}} \right|_{\chi^*},\quad 
+        \mathbf{D} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{u}} \right|_{\chi^*},\quad
+        \mathbf{c}_2 = \mathbf{g}(\mathbf{x}^*,\mathbf{u}^*,t^*) - \mathbf{C}\mathbf{x}^* - \mathbf{D}\mathbf{u}^*
+
+    Note: 
+        The notion of linearization is slightly different from that in dynamical system theory.
+        First, the linearization is done for any arbitrary point, not just at the equilibrium point(s), and
+        therefore the extra constant terms :math:`\mathbf{c}_1` and :math:`\mathbf{c}_2` are produced.
+        Second, the linearized equations are written for the full states and inputs, :math:`\mathbf{x}` and :math:`\mathbf{u}`,
+        instead of their perturbation terms, :math:`\delta \mathbf{x}` and :math:`\delta \mathbf{u}`
+        so that the model is consistent with, e.g., the LTI model and the iterative LQR solver.
+    '''
+
     def __init__(self, time=False):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
@@ -17,25 +101,93 @@ class System(nn.Module):
         self.t.add_(1)
 
     def forward(self, state, input):
-        state = self.state_transition(state, input)
-        return self.observation(state, input)
+        r'''
+        Parameters
+        ----------
+        state : Tensor
+                The state of the dynamical system
+        input : Tensor
+                The input to the dynamical system
 
-    def state_trasition(self):
-        pass
+        Returns
+        -------
+        new_state   : Tensor
+                      The state of the system at next time step
+        observation : Tensor
+                      The observation of the system at the current step
+        '''
 
-    def observation(self):
-        pass
+        return self.state_transition(state, input), self.observation(state, input)
+
+    def state_transition(self, state, input):
+        r'''
+        Parameters
+        ----------
+        state : Tensor
+                The state of the dynamical system
+        input : Tensor
+                The input to the dynamical system
+        
+        Note:
+            One can access the current time via the data member :obj:`self.t`.
+
+        Returns
+        ----------
+        new_state   : Tensor
+                      The state of the system at next time step
+        '''
+        raise NotImplementedError("The users need to define their own state transition method")
+
+    def observation(self, state, input):
+        r'''
+        Parameters
+        ----------
+        state : Tensor
+                The state of the dynamical system
+        input : Tensor
+                The input to the dynamical system
+        
+        Note:
+            One can access the current time via the data member :obj:`self.t`.
+
+        Returns
+        ----------
+        observation : Tensor
+                      The observation of the system at the current step
+        '''
+        raise NotImplementedError("The users need to define their own observation method")
 
     def reset(self,t=0):
-        self.t.fill_(0)
+        self.t.fill_(t)
+
+    def set_linearization_point(self, state, input, t):
+        r'''
+        Function to set the point about which the system is to be linearized.
+
+        Parameters
+        ----------
+        state : Tensor
+                The state of the dynamical system
+        input : Tensor
+                The input to the dynamical system
+        t     : Tensor
+                The time step of the dynamical system
+
+        Returns
+        ----------
+        None
+        '''
+        self.state, self.input, self.t = state, input, t
 
     @property
     def A(self):
+        r'''
+        State matrix for linear/linearized system (:math:`\mathbf{A}`)
+        '''
         if hasattr(self, '_A'):
             return self._A
-        else:
-            func = lambda x: self.state_trasition(x, self.input)
-            return jacobian(func, self.state, **self.jacargs)
+        func = lambda x: self.state_transition(x, self.input)
+        return jacobian(func, self.state, **self.jacargs)
 
     @A.setter
     def A(self, A):
@@ -43,11 +195,13 @@ class System(nn.Module):
 
     @property
     def B(self):
+        r'''
+        Input matrix for linear/linearized system (:math:`\mathbf{B}`)
+        '''
         if hasattr(self, '_B'):
             return self._B
-        else:
-            func = lambda x: self.state_trasition(self.state, x)
-            return jacobian(func, self.input, **self.jacargs)
+        func = lambda x: self.state_trasition(self.state, x)
+        return jacobian(func, self.input, **self.jacargs)
 
     @B.setter
     def B(self, B):
@@ -55,11 +209,13 @@ class System(nn.Module):
 
     @property
     def C(self):
+        r'''
+        Output matrix for linear/linearized system (:math:`\mathbf{C}`)
+        '''
         if hasattr(self, '_C'):
             return self._C
-        else:
-            func = lambda x: self.observation(x, self.input)
-            return jacobian(func, self.state, **self.jacargs)
+        func = lambda x: self.observation(x, self.input)
+        return jacobian(func, self.state, **self.jacargs)
 
     @C.setter
     def C(self, C):
@@ -67,11 +223,13 @@ class System(nn.Module):
  
     @property
     def D(self):
+        r'''
+        Feedthrough matrix for linear/linearized system (:math:`\mathbf{D}`)
+        '''
         if hasattr(self, '_D'):
             return self._D
-        else:
-            func = lambda x: self.observation(self.state, x)
-            return jacobian(func, self.input, **self.jacargs)
+        func = lambda x: self.observation(self.state, x)
+        return jacobian(func, self.input, **self.jacargs)
 
     @D.setter
     def D(self, D):
@@ -79,7 +237,12 @@ class System(nn.Module):
 
     @property
     def c1(self):
-        return self._c1
+        r'''
+        Constant term generated by state-transition (:math:`\mathbf{c}_1`)
+        '''
+        if hasattr(self,'_c1'):
+            return self._c1
+        return self.state_transition(self.state,self.input)-(self.state).matmul(self.A.mT)-(self.input).matmul(self.B.mT)
 
     @c1.setter
     def c1(self, c1):
@@ -87,7 +250,12 @@ class System(nn.Module):
     
     @property
     def c2(self):
-        return self._c2
+        r'''
+        Constant term generated by observation (:math:`\mathbf{c}_2`)
+        '''
+        if hasattr(self,'_c2'):
+            return self._c2
+        return self.observation(self.state,self.input)-(self.state).matmul(self.C.mT)-(self.input).matmul(self.D.mT)
 
     @c2.setter
     def c2(self, c2):
