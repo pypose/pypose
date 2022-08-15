@@ -2,6 +2,7 @@ import pypose.module.dynamics as ppmd
 import torch as torch
 import numpy as np
 import matplotlib.pyplot as plt
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class neuralnetDynamics(ppmd._System):
     def __init__(self, func, time=False):
