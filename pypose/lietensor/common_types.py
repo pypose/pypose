@@ -1,6 +1,7 @@
-from typing import TypeVar, Union, Tuple, Optional
+from typing import Union, Tuple, Optional
 import collections
 from itertools import repeat
+import torch
 
 def convert_sig_se(sigma):
     if not isinstance(sigma, collections.abc.Iterable):
@@ -48,15 +49,4 @@ _triple = _ntuple(3, "_triple")
 _quadruple = _ntuple(4, "_quadruple")
 _penta = _ntuple(5, "_penta")
 
-# Create some useful type aliases
-T = TypeVar('T')
-_scalar_or_tuple_any_t = Union[T, Tuple[T, ...]] # for all lie type
-_scalar_or_tuple_24_t = Union[T, Tuple[T, T], Tuple[T, T, T, T]] # for SE3 se3
-_scalar_or_tuple_2_t = Union[T, Tuple[T, T]] # for RxSO3, rxso3
-_scalar_or_tuple_35_t = Union[T, Tuple[T, T, T], Tuple[T, T, T, T, T]] # for Sim3, sim3
-
-# For arguments which represent sigma parameters (eg, kernel size, padding)
-_size_any_t = _scalar_or_tuple_any_t[float]
-_size_2_t = _scalar_or_tuple_2_t[float]
-_size_35_t = _scalar_or_tuple_35_t[float]
-_size_24_t = _scalar_or_tuple_24_t[float]
+_size_any_t = Union[float, Tuple[float, ...], torch.Tensor]
