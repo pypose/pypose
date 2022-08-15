@@ -37,6 +37,10 @@ class _System(nn.Module):
             func = lambda x: self.state_trasition(x, self.input)
             return jacobian(func, self.state, **self.jacargs)
 
+    @A.setter
+    def A(self, A):
+        self._A = A
+
     @property
     def B(self):
         if hasattr(self, '_B'):
@@ -45,6 +49,10 @@ class _System(nn.Module):
             func = lambda x: self.state_trasition(self.state, x)
             return jacobian(func, self.input, **self.jacargs)
 
+    @B.setter
+    def B(self, B):
+        self._B = B
+
     @property
     def C(self):
         if hasattr(self, '_C'):
@@ -52,6 +60,10 @@ class _System(nn.Module):
         else:
             func = lambda x: self.observation(x, self.input)
             return jacobian(func, self.state, **self.jacargs)
+
+    @C.setter
+    def C(self, C):
+        self._C = C
  
     @property
     def D(self):
@@ -61,6 +73,10 @@ class _System(nn.Module):
             func = lambda x: self.observation(self.state, x)
             return jacobian(func, self.input, **self.jacargs)
 
+    @D.setter
+    def D(self, D):
+        self._D = D
+
 
 class LTI(_System):
     r'''
@@ -69,11 +85,35 @@ class LTI(_System):
     Args:
         A, B, C, D (:obj:`Tensor`): The coefficient matrix in the state-space equation of LTI system,
         c1 (:obj:`Tensor`): The constant input of the system,
-        c2 (:obj:`Tensor`): The constant output of the system.
+        c2 (:obj:`Tensor`): The constant output of the system,
+        state (:obj:`Tensor`): The state of the current timestamp of LTI system,
+        input (:obj:`Tensor`): The input of the current timestamp of LTI system.
+
+    Return:
+        Tuple of Tensors: The state of the next timestamp (state-transition) and the system output (observation).
+
+    Every linear time-invariant lumped system can be described by a set of equations of the form 
+    which is called the state-space equation.
+
+    .. math::
+        \begin{align*}
+            \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1 \\
+            \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2 \\
+        \end{align*}
+
+    where we use :math:`\mathbf{x}` and :math:`\mathbf{u}` to represent state and input of the current timestamp of LTI system.
+            
+    Here, we consider the discrete-time system dynamics.  
         
     Note:
         According to the actual physical meaning, the dimensions of A, B, C, D must be the consistent,
         whether in batch or not.
+
+        :math:`\mathbf{A}`, :math:`\mathbf{B}`, :math:`\mathbf{C}`, :math:`\mathbf{D}`, :math:`\mathbf{x}`, :math:`\mathbf{u}` 
+        could be a single input or in a batch. In the batch case, their dimensions must be consistent 
+        so that they can be multiplied for each channel.
+             
+        Note that here variables are given as row vectors.
     '''
     
     def __init__(self, A, B, C, D, c1=None, c2=None):
@@ -85,39 +125,21 @@ class LTI(_System):
     @property
     def c1(self):
         return self._c1
+
+    @c1.setter
+    def c1(self, c1):
+        self._c1 = c1
     
     @property
     def c2(self):
         return self._c2
+
+    @c2.setter
+    def c2(self, c2):
+        self._c2 = c2
     
     def forward(self, state, input):
         r'''
-        Args:
-            state (:obj:`Tensor`): The state of the current timestamp of LTI system,
-            input (:obj:`Tensor`): The input of the current timestamp of LTI system.
-
-        Return:
-            Tuple of Tensors: The state of the next timestamp (state-transition) and the system output (observation).
-
-            
-        Every linear time-invariant lumped system can be described by a set of equations of the form
-        which is called the state-space equation.
-        
-        .. math::
-            \begin{align*}
-                \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1 \\
-                \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2 \\
-            \end{align*}
-
-        where we use :math:`\mathbf{x}` and :math:`\mathbf{u}` to represent state and input of the current timestamp of LTI system.
-            
-        Here, we consider the discrete-time system dynamics.  
-        
-        Note:
-            :math:`\mathbf{A}`, :math:`\mathbf{B}`, :math:`\mathbf{C}`, :math:`\mathbf{D}`, :math:`\mathbf{x}`, :math:`\mathbf{u}` could be a single input or in a batch.
-            In the batch case, their dimensions must be consistent so that they can be multiplied for each channel.
-             
-            Note that here variables are given as row vectors.
 
         Example:
             >>> A = torch.randn((2,3,3))
@@ -150,9 +172,7 @@ class LTI(_System):
         return z, y
 
     def state_trasition(self, state, input):
-        state_transition = state.matmul(self._A.mT) + input.matmul(self._B.mT) + self._c1
-        return state_transition
+        return state.matmul(self.A.mT) + input.matmul(self.B.mT) + self.c1
 
     def observation(self, state, input):
-        observation = state.matmul(self._C.mT) + input.matmul(self._D.mT) + self._c2
-        return observation
+        return state.matmul(self.C.mT) + input.matmul(self.D.mT) + self.c2
