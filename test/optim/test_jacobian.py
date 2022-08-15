@@ -24,15 +24,15 @@ class TestJacobian:
                 return self.p * x
 
         model = Model()
-        inputs = torch.randn(2, 2, 2)
+        input = torch.randn(2, 2, 2)
         func, params = functorch.make_functional(model)
-        J = jacobian(lambda *param: func(param, inputs), params)
+        J = jacobian(lambda *param: func(param, input), params)
         self.verify_jacobian(J)
 
         model = nn.Conv2d(2, 2, 2)
-        inputs = torch.randn(2, 2, 2)
+        input = torch.randn(2, 2, 2)
         func, params = functorch.make_functional(model)
-        J = jacobian(lambda *param: func(param, inputs), params)
+        J = jacobian(lambda *param: func(param, input), params)
         self.verify_jacobian(J)
 
 
@@ -47,14 +47,14 @@ class TestJacobian:
             def forward(self):
                 return self.p.Exp()
 
-        model, inputs = PoseTransform().to(device), pp.randn_SO3(device=device)
-        J1 = pp.optim.functional.modjac(model, inputs=None, flatten=True)
+        model, input = PoseTransform().to(device), pp.randn_SO3(device=device)
+        J1 = pp.optim.functional.modjac(model, input=None, flatten=True)
         self.verify_jacobian(J1)
 
         func, params = functorch.make_functional(model)
-        jacrev = functorch.jacrev(lambda *param: func(param, inputs), params)
+        jacrev = functorch.jacrev(lambda *param: func(param, input), params)
 
-        model, inputs = PoseTransform().to(device), pp.randn_SO3(device=device)
+        model, input = PoseTransform().to(device), pp.randn_SO3(device=device)
         huber = pp.optim.kernel.Huber(delta=0.01)
 
         class RobustModel(nn.Module):
@@ -67,7 +67,7 @@ class TestJacobian:
                 return self.kernel(self.module(*args, **kwargs).abs())
 
         model = RobustModel(model, huber)
-        J = pp.optim.functional.modjac(model, inputs=None, flatten=True)
+        J = pp.optim.functional.modjac(model, input=None, flatten=True)
         self.verify_jacobian(J)
 
 
