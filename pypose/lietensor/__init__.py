@@ -13,4 +13,3 @@ from .convert import tensor, translation, rotation, scale, matrix
 from .basics import add, add_, cumops_, cummul_, cumprod_
 from .convert import mat2SO3, mat2SE3, mat2Sim3, mat2RxSO3, from_matrix, matrix, euler2SO3
 from .gradcheck import gradcheck, gradgradcheck
-from .operation import so3_Exp, se3_Exp, rxso3_Exp, sim3_Exp, SO3_Log, SE3_Log, RxSO3_Log, Sim3_Log
