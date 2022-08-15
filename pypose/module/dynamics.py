@@ -3,17 +3,16 @@ import torch as torch
 import torch.nn as nn
 from torch.autograd.functional import jacobian
 
-class _System(nn.Module):
+class System(nn.Module):
     r'''
-    A sub-class of :obj:`torch.nn.Module` for the simulation and linearization of nonlinear
-    time-discrete time-varying dynamics.
+    The class for the simulation and linearization of general time-discrete time-varying dynamics.
 
     Args:
         time (:obj:`boolean`): Whether the system is time-varying; defaults to False, meaning time-invariant
 
     Governing Equation
     ----------
-    The nonlinear state-space equation is given as:
+    The general state-space equation is given as:
 
     .. math::
         \begin{align}
@@ -21,32 +20,30 @@ class _System(nn.Module):
         \mathbf{y}_{k} &= \mathbf{g}(\mathbf{x}_k,\mathbf{u}_k,t_k)
         \end{align}
 
-    where :math:`k` is the time step; :math:`\mathbf{x}\in\mathbb{R}^n`, :math:`\mathbf{u}\in\mathbb{R}^m`,
-    :math:`\mathbf{y}\in\mathbb{R}^p` are the states, inputs and observations, respectively;
-    :math:`\mathbf{f}:\mathbb{R}^n\times\mathbb{R}^m\times\mathbb{R}\mapsto\mathbb{R}^n` and
-    :math:`\mathbf{g}:\mathbb{R}^n\times\mathbb{R}^m\times\mathbb{R}\mapsto\mathbb{R}^p` are
+    where :math:`k` is the time step; :math:`\mathbf{x}`, :math:`\mathbf{u}`,
+    :math:`\mathbf{y}` are the states, inputs and observations, respectively;
+    :math:`\mathbf{f}` and :math:`\mathbf{g}` are
     the state transition and observation functions, respectively.
 
     Note:
         Here we choose to work with a time-discrete system, since typically in numerical simulations and
-        control applications, the dynamical systems are usually discretized in time.  However, in future,
-        the continuous dynamical will also be considered and implemented.
+        control applications, the dynamical systems are usually discretized in time.
 
-    To use the class, the user should define two methods `state_transition` and `observation`, which are
-    used in the `forward` method.  The `forward` method advances the dynamical system by one time step, and
+    To use the class, the user should define two methods :obj:`state_transition` and :obj:`observation`, which are
+    used in the :obj:`forward` method.  The :obj:`forward` method advances the dynamical system by one time step, and
     is the function that is back-propagated in the learning process.
 
     Note:
-        The `forward` method implicitly increments the time step via `forward_hook`.  As a result, in the
-        implementations of `state_transition` and `observation`, one does not need to include the time as
-        the input; instead, one can directly access the current time via the data member `self.t`.
+        The :obj:`forward` method implicitly increments the time step via :obj:`forward_hook`.  As a result, in the
+        implementations of :obj:`state_transition` and :obj:`observation`, one does not need to include the time as
+        the input; instead, one can directly access the current time via the data member :obj:`self.t`.
 
     Linearization
     ----------
     This class provides a means to linearize the system at a reference point :math:`\chi^*=(\mathbf{x}^*,\mathbf{u}^*,t^*)`
     along a trajectory.  Consider a point :math:`\chi=(\mathbf{x}^*+\delta\mathbf{x},\mathbf{u}^*+\delta\mathbf{u},t^*)`
     near :math:`\chi^*`.  The goal is to obtain a linear dynamics model for :math:`\chi` that behaves
-    similarly to the nonlinear dynamics when :math:`\delta\mathbf{x}||` and :math:`\delta\mathbf{u}||` are sufficiently
+    similarly to the nonlinear dynamics when :math:`||\delta\mathbf{x}||` and :math:`||\delta\mathbf{u}||` are sufficiently
     small.
 
     The linearization process is the same for :math:`\mathbf{f}` and :math:`\mathbf{g}`, so we only present
@@ -85,10 +82,10 @@ class _System(nn.Module):
     Note: 
         The notion of linearization is slightly different from that in dynamical system theory.
         First, the linearization is done for any arbitrary point, not just at the equilibrium point(s), and
-        therefore the extra ``bias'' terms :math:`\mathbf{c}_1` and :math:`\mathbf{c}_2` are produced.
+        therefore the extra constant terms :math:`\mathbf{c}_1` and :math:`\mathbf{c}_2` are produced.
         Second, the linearized equations are written for the full states and inputs, :math:`\mathbf{x}` and :math:`\mathbf{u}`,
         instead of their perturbation terms, :math:`\delta \mathbf{x}` and :math:`\delta \mathbf{u}`
-        so that the model is consistent with, e.g., the `LTI` model and the iterative LQR solver.
+        so that the model is consistent with, e.g., the LTI model and the iterative LQR solver.
     '''
 
     def __init__(self, time=False):
@@ -133,7 +130,7 @@ class _System(nn.Module):
                 The input to the dynamical system
         
         Note:
-            One can access the current time via the data member `self.t`.
+            One can access the current time via the data member :obj:`self.t`.
 
         Returns
         ----------
@@ -152,7 +149,7 @@ class _System(nn.Module):
                 The input to the dynamical system
         
         Note:
-            One can access the current time via the data member `self.t`.
+            One can access the current time via the data member :obj:`self.t`.
 
         Returns
         ----------
@@ -162,7 +159,7 @@ class _System(nn.Module):
         raise NotImplementedError("The users need to define their own observation method")
 
     def reset(self,t=0):
-        self.t.fill_(0) 
+        self.t.fill_(t)
 
     def set_linearization_point(self, state, input, t):
         r'''
@@ -230,7 +227,7 @@ class _System(nn.Module):
     @property
     def c1(self):
         r'''
-        Bias generated by state-transition (:math:`c_1`)
+        Constant term generated by state-transition (:math:`\mathbf{c}_1`)
         '''
         if hasattr(self,'_c1'):
             return self._c1
@@ -240,14 +237,14 @@ class _System(nn.Module):
     @property
     def c2(self):
         r'''
-        Bias generated by observation (:math:`c_2`)
+        Constant term generated by observation (:math:`\mathbf{c}_2`)
         '''
         if hasattr(self,'_c2'):
             return self._c2
         self._c2 = self.observation(self.state,self.input)-(self.state).matmul(self.C.mT)-(self.input).matmul(self.D.mT)
         return self._c2
 
-class LTI(_System):
+class LTI(System):
     r'''
     A sub-class of: obj: '_System' to represent Linear Time-Invariant system.
     
