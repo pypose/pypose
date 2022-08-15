@@ -11,8 +11,8 @@ class System(nn.Module):
     Args:
         time (:obj:`boolean`): Whether the system is time-varying; defaults to False, meaning time-invariant
 
-    Governing Equation
-    ----------
+    **Governing Equation**
+    
     The general state-space equation is given as:
 
     .. math::
@@ -39,8 +39,8 @@ class System(nn.Module):
         implementations of :obj:`state_transition` and :obj:`observation`, one does not need to include the time as
         the input; instead, one can directly access the current time via the data member :obj:`self.t`.
 
-    Linearization
-    ----------
+    **Linearization**
+
     This class provides a means to linearize the system at a reference point :math:`\chi^*=(\mathbf{x}^*,\mathbf{u}^*,t^*)`
     along a trajectory.  Consider a point :math:`\chi=(\mathbf{x}^*+\delta\mathbf{x},\mathbf{u}^*+\delta\mathbf{u},t^*)`
     near :math:`\chi^*`.  The goal is to obtain a linear dynamics model for :math:`\chi` that behaves
