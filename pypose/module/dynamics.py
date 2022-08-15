@@ -4,7 +4,7 @@ import pypose as pp
 from torch.autograd.functional import jacobian
 
 
-class _System(nn.Module):
+class System(nn.Module):
     def __init__(self, time=False):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
@@ -77,10 +77,26 @@ class _System(nn.Module):
     def D(self, D):
         self._D = D
 
+    @property
+    def c1(self):
+        return self._c1
 
-class LTI(_System):
+    @c1.setter
+    def c1(self, c1):
+        self._c1 = c1
+    
+    @property
+    def c2(self):
+        return self._c2
+
+    @c2.setter
+    def c2(self, c2):
+        self._c2 = c2
+
+
+class LTI(System):
     r'''
-    A sub-class of '_System' to represent the dynamics of discrete-time Linear Time-Invariant (LTI) system.
+    A sub-class of 'System' to represent the dynamics of discrete-time Linear Time-Invariant (LTI) system.
     
     Args:
         A, B, C, D (:obj:`Tensor`): The coefficient matrix in the state-space equation of LTI system,
@@ -119,24 +135,8 @@ class LTI(_System):
     def __init__(self, A, B, C, D, c1=None, c2=None):
         super(LTI, self).__init__(time=False)
         assert A.ndim == B.ndim == C.ndim == D.ndim, "Invalid System Matrices dimensions"
-        self._A, self._B, self._C, self._D = A, B, C, D
-        self._c1, self._c2 = c1, c2
-
-    @property
-    def c1(self):
-        return self._c1
-
-    @c1.setter
-    def c1(self, c1):
-        self._c1 = c1
-    
-    @property
-    def c2(self):
-        return self._c2
-
-    @c2.setter
-    def c2(self, c2):
-        self._c2 = c2
+        self.A, self.B, self.C, self.D = A, B, C, D
+        self.c1, self.c2 = c1, c2
     
     def forward(self, state, input):
         r'''
