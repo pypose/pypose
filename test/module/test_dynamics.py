@@ -2,32 +2,106 @@ import math
 import sys
 sys.path.append("..")
 import torch as torch
-import pypose as pp
 import torch.nn as nn
+import pypose as pp
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def test_dynamics_cartpole():
     """
     Manually generate a trajectory for a forced cart-pole system and
-    compare the trajectory with the reference from example.
-    Manually obtain the linearization at the final time step and
-    compare the jacobians with the reference from example.
+    compare the trajectory and linearization.
+    The reference data is originally obtained from the cartpole case
+    in the examples folder.
     """
 
-    # TODO @Abhinav
+    # The reference data
+    state_ref = torch.tensor([
+        [0.000000000000000000e+00, 0.000000000000000000e+00, 3.141592653589793116e+00, 0.000000000000000000e+00],
+        [0.000000000000000000e+00, 4.004595033211845673e-18, 3.141592653589793116e+00, 8.009190066423691346e-18],
+        [4.004595033211845793e-20, 4.444370253226554788e-06, 3.141592653589793116e+00, 2.222185126625291286e-06],
+        [4.444370253230559533e-08, 1.333266620835869948e-05, 3.141592675811644586e+00, 6.666333104197371212e-06],
+        [1.777703646158925914e-07, 2.666327252216060868e-05, 3.141592742474975442e+00, 1.333054627928972545e-05]],
+       dtype=torch.float64)
+    A_ref = torch.tensor([[
+        [1.0, 0.01, 0.0, 0.0],
+        [0.0, 1.0, -0.03270001922006555, -3.4808966152769563e-07],
+        [0.0, 0.0, 1.0, 0.01],
+        [0.0, 0.0, -0.06539991042629863, 0.9999998259560131]]],
+       dtype=torch.float64)
+    B_ref = torch.tensor([[0.0], [0.00044444299419410527], [0.0], [0.00022222042025532573]], dtype=torch.float64)
+    C_ref = torch.eye(4, dtype=torch.float64)
+    D_ref = torch.zeros((4,1), dtype=torch.float64)
+    c1_ref = torch.tensor([0.0, 0.10273013763290852, 0.0, 0.20545987669936888], dtype=torch.float64)
+    c2_ref = torch.zeros((4,), dtype=torch.float64)
 
-    # Run examples/module/dynamics/dynamics_cartpole.py to generate data,
-    # including the trajectory and jacobians
+    # The class
+    class CartPole(pp.module.System):
+        def __init__(self):
+            super(CartPole, self).__init__(time=False)
+            self._tau = 0.01
+            self._length = 1.5
+            self._cartmass = 20.0
+            self._polemass = 10.0
+            self._gravity = 9.81
+            self._polemassLength = self._polemass*self._length
+            self._totalMass = self._cartmass + self._polemass
 
-    def dynamics(x, u):
-        # Define the dynamics here
-        pass
+        def state_transition(self,state,input):
+            x,xDot,theta,thetaDot = state
+            force = input.squeeze()
+            costheta = torch.cos(theta)
+            sintheta = torch.sin(theta)
 
-    # Then manually define dynamics, generate the trajectory, and
-    # use the `jacobian` method to linearize the `dynamics` function
+            temp = (
+                force + self._polemassLength * thetaDot**2 * sintheta
+            ) / self._totalMass
+            thetaAcc = (self._gravity * sintheta - costheta * temp) / (
+                self._length * (4.0 / 3.0 - self._polemass * costheta**2 / self._totalMass)
+            )
+            xAcc = temp - self._polemassLength * thetaAcc * costheta / self._totalMass
 
-    # Finally use torch.allclose to compare the trajectories
-    # and the jacobians
+            _dstate = torch.stack((xDot,xAcc,thetaDot,thetaAcc))
+
+            return state+torch.mul(_dstate,self._tau)
+        
+        def observation(self,state,input):
+            return state
+
+    # Time and input
+    dt = 0.01
+    N  = 1000
+    time  = torch.arange(0,N+1) * dt
+    input = torch.sin(time)
+    # Initial state
+    state = torch.tensor([0,0,math.pi,0],dtype=float)
+
+    # Create dynamics solver object
+    cartPoleSolver = CartPole()
+
+    # Calculate trajectory
+    state_all = torch.zeros(N+1,4,dtype=float)
+    state_all[0,:] = state
+    for i in range(N):
+        state_all[i+1], _ = cartPoleSolver.forward(state_all[i],input[i])
+
+    assert torch.allclose(state_ref, state_all[:5])
+
+    # Jacobian computation - Find jacobians at the last step
+    jacob_state, jacob_input = state_all[-1,:].T, input[-1]
+    cartPoleSolver.set_linearization_point(jacob_state,jacob_input.unsqueeze(0),time[-1])
+    A = (cartPoleSolver.A).numpy()
+    B = (cartPoleSolver.B).numpy()
+    C = (cartPoleSolver.C).numpy()
+    D = (cartPoleSolver.D).numpy()
+    c1 = (cartPoleSolver.c1).numpy()
+    c2 = (cartPoleSolver.c2).numpy()
+
+    assert torch.allclose(A_ref, A)
+    assert torch.allclose(B_ref, B)
+    assert torch.allclose(C_ref, C)
+    assert torch.allclose(D_ref, D)
+    assert torch.allclose(c1_ref, c1)
+    assert torch.allclose(c2_ref, c2)
 
 def test_dynamics():
 
