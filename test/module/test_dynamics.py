@@ -40,6 +40,11 @@ def test_dynamics():
 
     print(lti_1(state_1,input_1))
 
+    z_1 = state_1.matmul(A_1.mT) + input_1.matmul(B_1.mT) + c1_1
+    y_1 = state_1.matmul(C_1.mT) + input_1.matmul(D_1.mT) + c2_1
+
+    print(z_1, y_1)
+
 
     #In this example, A, B, C, D, c1, c2 are single inputs, state and input are in a batch.
 
@@ -56,6 +61,11 @@ def test_dynamics():
 
     print(lti_2(state_2,input_2))
 
+    z_2 = state_2.matmul(A_2.mT) + input_2.matmul(B_2.mT) + c1_2
+    y_2 = state_2.matmul(C_2.mT) + input_2.matmul(D_2.mT) + c2_2
+
+    print(z_2, y_2)
+
 
     #In this example, all parameters are single inputs.
 
@@ -71,6 +81,11 @@ def test_dynamics():
     lti_3 = pp.module.LTI(A_3, B_3, C_3, D_3, c1_3, c2_3)
 
     print(lti_3(state_3,input_3))
+
+    z_3 = state_3.matmul(A_3.mT) + input_3.matmul(B_3.mT) + c1_3
+    y_3 = state_3.matmul(C_3.mT) + input_3.matmul(D_3.mT) + c2_3
+
+    print(z_3, y_3)
 
     print('Done')
 
