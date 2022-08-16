@@ -70,16 +70,16 @@ def test_dynamics_cartpole():
     # Time and input
     dt = 0.01
     N  = 1000
-    time  = torch.arange(0,N+1) * dt
+    time  = torch.arange(0,N+1,dtype=torch.float64) * dt
     input = torch.sin(time)
     # Initial state
-    state = torch.tensor([0,0,math.pi,0],dtype=float)
+    state = torch.tensor([0,0,math.pi,0],dtype=torch.float64)
 
     # Create dynamics solver object
     cartPoleSolver = CartPole()
 
     # Calculate trajectory
-    state_all = torch.zeros(N+1,4,dtype=float)
+    state_all = torch.zeros(N+1,4,dtype=torch.float64)
     state_all[0,:] = state
     for i in range(N):
         state_all[i+1], _ = cartPoleSolver.forward(state_all[i],input[i])
@@ -89,19 +89,15 @@ def test_dynamics_cartpole():
     # Jacobian computation - Find jacobians at the last step
     jacob_state, jacob_input = state_all[-1,:].T, input[-1]
     cartPoleSolver.set_linearization_point(jacob_state,jacob_input.unsqueeze(0),time[-1])
-    A = (cartPoleSolver.A).numpy()
-    B = (cartPoleSolver.B).numpy()
-    C = (cartPoleSolver.C).numpy()
-    D = (cartPoleSolver.D).numpy()
-    c1 = (cartPoleSolver.c1).numpy()
-    c2 = (cartPoleSolver.c2).numpy()
 
-    assert torch.allclose(A_ref, A)
-    assert torch.allclose(B_ref, B)
-    assert torch.allclose(C_ref, C)
-    assert torch.allclose(D_ref, D)
-    assert torch.allclose(c1_ref, c1)
-    assert torch.allclose(c2_ref, c2)
+    assert torch.allclose(A_ref, cartPoleSolver.A)
+    assert torch.allclose(B_ref, cartPoleSolver.B)
+    assert torch.allclose(C_ref, cartPoleSolver.C)
+    assert torch.allclose(D_ref, cartPoleSolver.D)
+    assert torch.allclose(c1_ref, cartPoleSolver.c1)
+    assert torch.allclose(c2_ref, cartPoleSolver.c2)
+
+    print('Done')
 
 def test_dynamics():
 
@@ -175,4 +171,5 @@ def test_dynamics():
 
 if __name__ == '__main__':
     test_dynamics()
+    test_dynamics_cartpole()
 

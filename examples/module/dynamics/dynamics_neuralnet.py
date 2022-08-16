@@ -52,6 +52,6 @@ if __name__ == "__main__":
     x_fig = createTimePlot(time,x,figname="x Plot",xlabel="Time",ylabel="x",title="x Plot")
     y_fig = createTimePlot(time,y,figname="y Plot",xlabel="Time",ylabel="y",title="y Plot")
 
-    torch.save([state_all], 'nn_dynamics_data.pt')
+    # torch.save([state_all], 'nn_dynamics_data.pt')
 
     plt.show()

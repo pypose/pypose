@@ -86,7 +86,7 @@ if __name__ == "__main__":
     c1 = (cartPoleSolver.c1).numpy()
     c2 = (cartPoleSolver.c2).numpy()
 
-    torch.save([state_all,A,B,C,D,c1,c2], 'cartpole_data.pt')
+    # torch.save([state_all,A,B,C,D,c1,c2], 'cartpole_data.pt')
 
     plt.show()
     
