@@ -99,7 +99,7 @@ def test_dynamics_cartpole():
 
     print('Done')
 
-def test_dynamics():
+def test_dynamics_lti():
 
     """
     For a System with p inputs, q outputs, and n state variables,
@@ -188,6 +188,5 @@ def test_dynamics():
 
 
 if __name__ == '__main__':
-    test_dynamics()
     test_dynamics_cartpole()
-
+    test_dynamics_lti()
