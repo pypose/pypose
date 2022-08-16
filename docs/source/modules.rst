@@ -7,6 +7,6 @@ Modules
    :nosignatures:
 
    :template: autosummary/class-no-inherit.rst
-   module._System
    module.IMUPreintegrator
+   module.System
    module.LTI
