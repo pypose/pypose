@@ -335,11 +335,11 @@ class LTI(System):
         else:
             assert self.A.ndim == 2,  "Invalid System Matrices dimensions"
 
-        z = self.state_trasition(state, input)
+        z = self.state_transition(state, input)
         y = self.observation(state, input)
         return z, y
 
-    def state_trasition(self, state, input):
+    def state_transition(self, state, input):
         return state.matmul(self.A.mT) + input.matmul(self.B.mT) + self.c1
 
     def observation(self, state, input):
