@@ -200,7 +200,7 @@ class System(nn.Module):
         '''
         if hasattr(self, '_B'):
             return self._B
-        func = lambda x: self.state_trasition(self.state, x)
+        func = lambda x: self.state_transition(self.state, x)
         return jacobian(func, self.input, **self.jacargs)
 
     @B.setter
