@@ -1,9 +1,33 @@
+import math
 import sys
 sys.path.append("..")
 import torch as torch
 import pypose as pp
 import torch.nn as nn
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def test_dynamics_cartpole():
+    """
+    Manually generate a trajectory for a forced cart-pole system and
+    compare the trajectory with the reference from example.
+    Manually obtain the linearization at the final time step and
+    compare the jacobians with the reference from example.
+    """
+
+    # TODO @Abhinav
+
+    # Run examples/module/dynamics/dynamics_cartpole.py to generate data,
+    # including the trajectory and jacobians
+
+    def dynamics(x, u):
+        # Define the dynamics here
+        pass
+
+    # Then manually define dynamics, generate the trajectory, and
+    # use the `jacobian` method to linearize the `dynamics` function
+
+    # Finally use torch.allclose to compare the trajectories
+    # and the jacobians
 
 def test_dynamics():
 
