@@ -42,14 +42,13 @@ if __name__ == "__main__":
     nnSolver = nnDynamics([5,10])
 
     # Calculate trajectory
-    state_all = torch.zeros(N+1,2,dtype=float)
+    state_all = torch.zeros(N+1,2)
     state_all[0,:] = state
     for i in range(N):
         state_all[i+1],_ = nnSolver.forward(state_all[i],input[i])
 
     # Create plots
     x,y = (state_all.T).detach().numpy()
-    time = torch.linspace(0,N*dt,N)
     x_fig = createTimePlot(time,x,figname="x Plot",xlabel="Time",ylabel="x",title="x Plot")
     y_fig = createTimePlot(time,y,figname="y Plot",xlabel="Time",ylabel="y",title="y Plot")
 
