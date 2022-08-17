@@ -33,7 +33,7 @@ if __name__ == "__main__":
     N  = 1000  # Number of time steps
 
     # Time and input
-    time  = torch.arange(0,N+1) * dt
+    time  = torch.arange(0, N+1) * dt
     input = torch.sin(time)
     # Initial state
     state = torch.tensor((0,0))
@@ -42,10 +42,10 @@ if __name__ == "__main__":
     nnSolver = nnDynamics([5,10])
 
     # Calculate trajectory
-    state_all = torch.zeros(N+1,2)
+    state_all = torch.zeros(N+1, 2)
     state_all[0,:] = state
     for i in range(N):
-        state_all[i+1],_ = nnSolver.forward(state_all[i],input[i])
+        state_all[i+1],_ = nnSolver.forward(state_all[i], input[i])
 
     # Create plots
     x,y = (state_all.T).detach().numpy()
