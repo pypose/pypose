@@ -37,17 +37,17 @@ def test_dynamics_cartpole():
     # The class
     class CartPole(pp.module.System):
         def __init__(self):
-            super(CartPole, self).__init__(time=False)
+            super(CartPole, self).__init__(time=True)
             self._tau = 0.01
             self._length = 1.5
             self._cartmass = 20.0
             self._polemass = 10.0
             self._gravity = 9.81
-            self._polemassLength = self._polemass*self._length
+            self._polemassLength = self._polemass * self._length
             self._totalMass = self._cartmass + self._polemass
 
-        def state_transition(self,state,input):
-            x,xDot,theta,thetaDot = state
+        def state_transition(self, state, input, t=None):
+            x, xDot, theta, thetaDot = state
             force = input.squeeze()
             costheta = torch.cos(theta)
             sintheta = torch.sin(theta)
@@ -60,35 +60,35 @@ def test_dynamics_cartpole():
             )
             xAcc = temp - self._polemassLength * thetaAcc * costheta / self._totalMass
 
-            _dstate = torch.stack((xDot,xAcc,thetaDot,thetaAcc))
+            _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
 
-            return state+torch.mul(_dstate,self._tau)
-        
-        def observation(self,state,input):
+            return state + torch.mul(_dstate, self._tau)
+
+        def observation(self, state, input, t=None):
             return state
 
     # Time and input
     dt = 0.01
     N  = 1000
-    time  = torch.arange(0,N+1,dtype=torch.float64) * dt
+    time  = torch.arange(0, N+1, dtype=torch.float64) * dt
     input = torch.sin(time)
     # Initial state
-    state = torch.tensor([0,0,math.pi,0],dtype=torch.float64)
+    state = torch.tensor([0,0,math.pi,0], dtype=torch.float64)
 
     # Create dynamics solver object
     cartPoleSolver = CartPole()
 
     # Calculate trajectory
-    state_all = torch.zeros(N+1,4,dtype=torch.float64)
+    state_all = torch.zeros(N+1, 4, dtype=torch.float64)
     state_all[0,:] = state
     for i in range(N):
-        state_all[i+1], _ = cartPoleSolver.forward(state_all[i],input[i])
+        state_all[i+1], _ = cartPoleSolver.forward(state_all[i], input[i])
 
     assert torch.allclose(state_ref, state_all[:5])
 
     # Jacobian computation - Find jacobians at the last step
     jacob_state, jacob_input = state_all[-1,:].T, input[-1]
-    cartPoleSolver.set_linearization_point(jacob_state,jacob_input.unsqueeze(0),time[-1])
+    cartPoleSolver.set_ref_point(jacob_state, jacob_input.unsqueeze(0), time[-1])
 
     assert torch.allclose(A_ref, cartPoleSolver.A)
     assert torch.allclose(B_ref, cartPoleSolver.B)
@@ -99,6 +99,115 @@ def test_dynamics_cartpole():
 
     print('Done')
 
+def test_dynamics_floquet():
+    """
+    Manually generate a trajectory for a floquet system (which is time-varying)
+    and compare the trajectory and linearization against alternative solutions.
+    This is for testing a time-varying system.
+    """
+    N     = 80                    # Number of time steps
+    idx   = 5                     # The step to compute jacobians
+    time  = torch.arange(0, N+1)  # Time steps
+    state = torch.tensor([1, 1])  # Initial state
+
+    # The reference data
+    def f(x, t):
+        cc = torch.cos(2*math.pi*t/100)
+        ss = torch.sin(2*math.pi*t/100)
+        ff = torch.atleast_1d(torch.sin(2*math.pi*t/50))
+        A = torch.tensor([
+            [1., cc/10],
+            [cc/10, 1.]])
+        B = torch.tensor([[ss], [1.]])
+        return (A.matmul(x) + B.matmul(ff)).squeeze(), A, B
+
+    state_ref = torch.zeros(N+1, 2)
+    state_ref[0] = state
+    for i in range(N):
+        state_ref[i+1], _, _ = f(state_ref[i], time[i])
+    obser_ref = state_ref[:-1] + time[:-1].reshape(-1,1)
+
+    _, A0_N, B0_N = f(torch.tensor([0.,0.]), torch.tensor(N))
+    _, A0_i, B0_i = f(torch.tensor([0.,0.]), torch.tensor(idx))
+    c2_N = torch.ones(2) * N
+    c2_i = torch.ones(2) * idx
+    C0 = torch.eye(2)
+    D0 = torch.zeros(2,1)
+    c1 = torch.zeros(2)
+
+    # The class
+    class Floquet(pp.module.System):
+        def __init__(self):
+            super(Floquet, self).__init__(time=True)
+
+        def state_transition(self, state, input, t):
+            cc = torch.cos(2*math.pi*t/100)
+            ss = torch.sin(2*math.pi*t/100)
+            A = torch.tensor([
+                [1., cc/10],
+                [cc/10, 1.]])
+            B = torch.tensor([
+                [ss],
+                [1.]])
+            return (state.matmul(A) + B.matmul(input)).squeeze()
+
+        def observation(self, state, input, t):
+            return state + t
+
+    # Input
+    input = torch.sin(2*math.pi*time/50)
+
+    # Create dynamics solver object
+    solver = Floquet()
+
+    # Calculate trajectory
+    state_all = torch.zeros(N+1, 2)
+    state_all[0] = state
+    obser_all = torch.zeros(N, 2)
+
+    for i in range(N):
+        state_all[i+1], obser_all[i] = solver(state_all[i], input[i])
+
+    assert torch.allclose(state_all, state_ref)
+    assert torch.allclose(obser_all, obser_ref)
+
+    # # For debugging
+    # import matplotlib.pyplot as plt
+    # f, ax = plt.subplots(nrows=4, sharex=True)
+    # for _i in range(2):
+    #     ax[_i].plot(time, state_all[:,_i], label='pp')
+    #     ax[_i].plot(time, state_ref[:,_i], label='np')
+    #     ax[_i].set_ylabel(f'State {_i}')
+    # for _i in range(2):
+    #     ax[_i+2].plot(time[:-1], obser_all[:,_i], label='pp')
+    #     ax[_i+2].plot(time[:-1], obser_ref[:,_i], label='np')
+    #     ax[_i+2].set_ylabel(f'Observation {_i}')
+    # ax[-1].set_xlabel('time')
+    # ax[-1].legend()
+    # plt.show()
+
+    # Jacobian computation - at the last step
+    # Note for c1, the values are supposed to be zero, but due to numerical
+    # errors the values can be ~ 1e-7, and hence we increase the atol
+    # Same story below
+    solver.set_ref_point()
+    assert torch.allclose(A0_N, solver.A)
+    assert torch.allclose(B0_N, solver.B)
+    assert torch.allclose(C0, solver.C)
+    assert torch.allclose(D0, solver.D)
+    assert torch.allclose(c1, solver.c1, atol=1e-6)
+    assert torch.allclose(c2_N, solver.c2)
+
+    # Jacobian computation - at the step idx
+    solver.set_ref_point(state=state_all[idx], input=input[idx], t=time[idx])
+    assert torch.allclose(A0_i, solver.A)
+    assert torch.allclose(B0_i, solver.B)
+    assert torch.allclose(C0, solver.C)
+    assert torch.allclose(D0, solver.D)
+    assert torch.allclose(c1, solver.c1, atol=1e-6)
+    assert torch.allclose(c2_i, solver.c2)
+
+
 def test_dynamics_lti():
 
     """
@@ -106,27 +215,27 @@ def test_dynamics_lti():
     A, B, C, D are n*n n*p q*n and q*p constant matrices.
     N: channels
 
-    A = torch.randn((N,n,n))
-    B = torch.randn((N,n,p))
-    C = torch.randn((N,q,n))
-    D = torch.randn((N,q,p))
-    c1 = torch.randn(N,1,n)
-    c2 = torch.randn(N,1,q)
-    state = torch.randn((N,1,n))
-    input = torch.randn((N,1,p))
+    A = torch.randn((N, n, n))
+    B = torch.randn((N, n, p))
+    C = torch.randn((N, q, n))
+    D = torch.randn((N, q, p))
+    c1 = torch.randn(N, 1, n)
+    c2 = torch.randn(N, 1, q)
+    state = torch.randn((N, 1, n))
+    input = torch.randn((N, 1, p))
     """
 
     # The most general case that all parameters are in the batch. 
     # The user could change the corresponding values according to the actual physical system and directions above.
 
-    A_1 = torch.randn((5,4,4))
-    B_1 = torch.randn((5,4,2))
-    C_1 = torch.randn((5,3,4))
-    D_1 = torch.randn((5,3,2))
-    c1_1 = torch.randn((5,1,4))
-    c2_1 = torch.randn((5,1,3))
-    state_1 = torch.randn((5,1,4))
-    input_1 = torch.randn((5,1,2))
+    A_1 = torch.randn((5, 4, 4))
+    B_1 = torch.randn((5, 4, 2))
+    C_1 = torch.randn((5, 3, 4))
+    D_1 = torch.randn((5, 3, 2))
+    c1_1 = torch.randn((5, 1, 4))
+    c2_1 = torch.randn((5, 1, 3))
+    state_1 = torch.randn((5, 1, 4))
+    input_1 = torch.randn((5, 1, 2))
 
     lti_1 = pp.module.LTI(A_1, B_1, C_1, D_1, c1_1, c2_1)
   
@@ -143,14 +252,14 @@ def test_dynamics_lti():
 
     #In this example, A, B, C, D, c1, c2 are single inputs, state and input are in a batch.
 
-    A_2 = torch.randn((4,4))
-    B_2 = torch.randn((4,2))
-    C_2 = torch.randn((3,4))
-    D_2 = torch.randn((3,2))
-    c1_2 = torch.randn((1,4))
-    c2_2 = torch.randn((1,3))
-    state_2 = torch.randn((5,1,4))
-    input_2 = torch.randn((5,1,2))
+    A_2 = torch.randn((4, 4))
+    B_2 = torch.randn((4, 2))
+    C_2 = torch.randn((3, 4))
+    D_2 = torch.randn((3, 2))
+    c1_2 = torch.randn((1, 4))
+    c2_2 = torch.randn((1, 3))
+    state_2 = torch.randn((5, 1, 4))
+    input_2 = torch.randn((5, 1, 2))
 
     lti_2 = pp.module.LTI(A_2, B_2, C_2, D_2, c1_2, c2_2)
 
@@ -165,14 +274,14 @@ def test_dynamics_lti():
 
     # In this example, all parameters are single inputs.
 
-    A_3 = torch.randn((4,4))
-    B_3 = torch.randn((4,2))
-    C_3 = torch.randn((3,4))
-    D_3 = torch.randn((3,2))
-    c1_3 = torch.randn((1,4))
-    c2_3 = torch.randn((1,3))
-    state_3 = torch.randn((1,4))
-    input_3 = torch.randn((1,2))
+    A_3 = torch.randn((4, 4))
+    B_3 = torch.randn((4, 2))
+    C_3 = torch.randn((3, 4))
+    D_3 = torch.randn((3, 2))
+    c1_3 = torch.randn((1, 4))
+    c2_3 = torch.randn((1, 3))
+    state_3 = torch.randn((1, 4))
+    input_3 = torch.randn((1, 2))
 
     lti_3 = pp.module.LTI(A_3, B_3, C_3, D_3, c1_3, c2_3)
 
@@ -189,4 +298,5 @@ def test_dynamics_lti():
 
 if __name__ == '__main__':
     test_dynamics_cartpole()
+    test_dynamics_floquet()
     test_dynamics_lti()

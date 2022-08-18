@@ -16,7 +16,7 @@ class CartPole(System):
         self.polemassLength = self.polemass * self.length
         self.totalMass = self.cartmass + self.polemass
 
-    def state_transition(self, state, input):
+    def state_transition(self, state, input, t=None):
         x, xDot, theta, thetaDot = state
         force = input.squeeze()
         costheta = torch.cos(theta)
@@ -29,16 +29,16 @@ class CartPole(System):
     
         xAcc = temp - self.polemassLength * thetaAcc * costheta / self.totalMass
 
-        _dstate = torch.stack((xDot,xAcc,thetaDot,thetaAcc))
+        _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
 
-        return state + torch.mul(_dstate,self.tau)
+        return state + torch.mul(_dstate, self.tau)
 
-    def observation(self, state, input):
+    def observation(self, state, input, t=None):
         return state
 
 def createTimePlot(x, y, figname="Un-named plot", title=None, xlabel=None, ylabel=None):
     f = plt.figure(figname)
-    plt.plot(x,y)
+    plt.plot(x, y)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     N = 1000    # Number of time steps
 
     # Time and input
-    time  = torch.arange(0,N+1) * dt
+    time  = torch.arange(0, N+1) * dt
     input = torch.sin(time)
     # Initial state
     state = torch.tensor([0, 0, np.pi, 0], dtype=float)
@@ -70,7 +70,7 @@ if __name__ == "__main__":
         state_all[i+1], _ = cartPoleSolver(state_all[i], input[i])
 
     # Create time plots to show dynamics
-    x,xdot,theta,thetadot = state_all.T
+    x, xdot, theta, thetadot = state_all.T
     x_fig = createTimePlot(time, x, figname="x Plot", xlabel="Time", ylabel="x", title="x Plot")
     xdot_fig = createTimePlot(time, xdot, figname="x dot Plot", xlabel="Time", ylabel="x dot", title="x dot Plot")
     theta_fig = createTimePlot(time ,theta, figname="theta Plot", xlabel="Time", ylabel="theta", title="theta Plot")
@@ -78,13 +78,13 @@ if __name__ == "__main__":
 
     # Jacobian computation - Find jacobians at the last step
     jacob_state, jacob_input = state_all[-1,:].T, input[-1]
-    cartPoleSolver.set_linearization_point(jacob_state, jacob_input.unsqueeze(0), time[-1])
-    A = (cartPoleSolver.A).numpy()
-    B = (cartPoleSolver.B).numpy()
-    C = (cartPoleSolver.C).numpy()
-    D = (cartPoleSolver.D).numpy()
-    c1 = (cartPoleSolver.c1).numpy()
-    c2 = (cartPoleSolver.c2).numpy()
+    cartPoleSolver.set_ref_point(jacob_state, jacob_input.unsqueeze(0), time[-1])
+    A = cartPoleSolver.A
+    B = cartPoleSolver.B
+    C = cartPoleSolver.C
+    D = cartPoleSolver.D
+    c1 = cartPoleSolver.c1
+    c2 = cartPoleSolver.c2
 
     plt.show()
     
