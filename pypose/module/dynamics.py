@@ -293,7 +293,7 @@ class LTI(System):
     
     def __init__(self, A, B, C, D, c1=None, c2=None):
         super(LTI, self).__init__(time=True)
-        assert A.ndim in (2,3), "Invalid System Matrices dimensions"
+        assert A.ndim in (2, 3), "Invalid System Matrices dimensions"
         assert A.ndim == B.ndim == C.ndim == D.ndim, "Invalid System Matrices dimensions"
         self.A, self.B, self.C, self.D = A, B, C, D
         self.c1, self.c2 = c1, c2
