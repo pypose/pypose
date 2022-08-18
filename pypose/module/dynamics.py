@@ -332,41 +332,13 @@ class LTI(System):
 
     def state_transition(self, state, input, t):
         r'''
-        Perform one step of linear state transition.
-        
-        Parameters
-        ----------
-        state : Tensor
-                The state of the dynamical system.
-        input : Tensor
-                The input to the dynamical system.
-        t     : Tensor
-                The time step of the dynamical system.
-
-        Returns
-        ----------
-        next_state : Tensor
-                     The state of the dynamic system at the next step.
+        Perform one step of LTI state transition.
         '''
         return state.matmul(self.A.mT) + input.matmul(self.B.mT) + self.c1
 
     def observation(self, state, input, t):
         r'''
-        Return observation of linear system at current step.
-        
-        Parameters
-        ----------
-        state : Tensor
-                The state of the dynamical system.
-        input : Tensor
-                The input to the dynamical system.
-        t     : Tensor
-                The time step of the dynamical system.
-
-        Returns
-        ----------
-        observation : Tensor
-                      The observation of the linear system at the current step.
+        Return observation of LTI system at current step.
         '''
         return state.matmul(self.C.mT) + input.matmul(self.D.mT) + self.c2
 
