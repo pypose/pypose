@@ -29,9 +29,9 @@ class CartPole(System):
     
         xAcc = temp - self.polemassLength * thetaAcc * costheta / self.totalMass
 
-        _dstate = torch.stack((xDot,xAcc,thetaDot,thetaAcc))
+        _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
 
-        return state + torch.mul(_dstate,self.tau)
+        return state + torch.mul(_dstate, self.tau)
 
     def observation(self, state, input):
         return state
