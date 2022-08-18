@@ -13,10 +13,10 @@ class nnDynamics(System):
             torch.nn.ReLU(),
             torch.nn.Linear(hiddenSize[1], 2))
     
-    def state_transition(self, state, input):
+    def state_transition(self, state, input, t=None):
         return self.net(state) + input
     
-    def observation(self, state, input):
+    def observation(self, state, input, t=None):
         return state
 
 def createTimePlot(x, y, figname="Un-named plot", title=None, xlabel=None, ylabel=None):
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     time  = torch.arange(0, N + 1) * dt
     input = torch.sin(time)
     # Initial state
-    state = torch.tensor([0, 0])
+    state = torch.tensor([0,0])
 
     # Create solver object
     nnSolver = nnDynamics([5, 10])
