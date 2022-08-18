@@ -267,7 +267,8 @@ class LTI(System):
         c1 (:obj:`Tensor`): The constant input of the system,
         c2 (:obj:`Tensor`): The constant output of the system.
 
-    Every linear time-invariant lumped system can be described by a set of equations of the form 
+    Every linear time-invariant lumped system can be described by a set of equations 
+    of the form 
     which is called the state-space equation.
 
     .. math::
@@ -276,16 +277,20 @@ class LTI(System):
             \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2 \\
         \end{align*}
 
-    where we use :math:`\mathbf{x}` and :math:`\mathbf{u}` to represent state and input of the current timestamp of LTI system.
+    where we use :math:`\mathbf{x}` and :math:`\mathbf{u}` to represent state and input 
+    of the current timestamp of LTI system.
             
     Here, we consider the discrete-time system dynamics.  
         
     Note:
-        According to the actual physical meaning, the dimensions of A, B, C, D must be the consistent, 
+        According to the actual physical meaning, the dimensions of A, B, C, D must be
+         the consistent, 
         whether in batch or not.
 
-        :math:`\mathbf{A}`, :math:`\mathbf{B}`, :math:`\mathbf{C}`, :math:`\mathbf{D}`, :math:`\mathbf{x}`, :math:`\mathbf{u}` 
-        could be a single input or in a batch. In the batch case, their dimensions must be consistent 
+        :math:`\mathbf{A}`, :math:`\mathbf{B}`, :math:`\mathbf{C}`, :math:`\mathbf{D}`,
+         :math:`\mathbf{x}`, :math:`\mathbf{u}` 
+        could be a single input or in a batch. In the batch case, their dimensions must 
+        be consistent 
         so that they can be multiplied for each channel.
              
         Note that here variables are given as row vectors.
@@ -303,13 +308,13 @@ class LTI(System):
 
         Example:
             >>> A = torch.randn((2, 3, 3))
-                B = torch.randn((2, 3, 2))
-                C = torch.randn((2, 3, 3))
-                D = torch.randn((2, 3, 2))
-                c1 = torch.randn((2, 1, 3))
-                c2 = torch.randn((2, 1, 3))
-                state = torch.randn((2, 1, 3))
-                input = torch.randn((2, 1, 2))
+            >>> B = torch.randn((2, 3, 2))
+            >>> C = torch.randn((2, 3, 3))
+            >>> D = torch.randn((2, 3, 2))
+            >>> c1 = torch.randn((2, 1, 3))
+            >>> c2 = torch.randn((2, 1, 3))
+            >>> state = torch.randn((2, 1, 3))
+            >>> input = torch.randn((2, 1, 2))
             >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
             >>> lti(state, input)
             tensor([[[-8.5639,  0.0523, -0.2576]],
@@ -326,9 +331,43 @@ class LTI(System):
         return super(LTI, self).forward(state, input)
 
     def state_transition(self, state, input, t):
+        r'''
+        Perform one step of linear state transition.
+        
+        Parameters
+        ----------
+        state : Tensor
+                The state of the dynamical system.
+        input : Tensor
+                The input to the dynamical system.
+        t     : Tensor
+                The time step of the dynamical system.
+
+        Returns
+        ----------
+        next_state : Tensor
+                     The state of the dynamic system at the next step.
+        '''
         return state.matmul(self.A.mT) + input.matmul(self.B.mT) + self.c1
 
     def observation(self, state, input, t):
+        r'''
+        Return observation of linear system at current step.
+        
+        Parameters
+        ----------
+        state : Tensor
+                The state of the dynamical system.
+        input : Tensor
+                The input to the dynamical system.
+        t     : Tensor
+                The time step of the dynamical system.
+
+        Returns
+        ----------
+        observation : Tensor
+                      The observation of the linear system at the current step.
+        '''
         return state.matmul(self.C.mT) + input.matmul(self.D.mT) + self.c2
 
     @property
