@@ -77,6 +77,13 @@ def se3_Jl_inv(x):
     Jl_inv_6x6[..., 3:, 3:] = Jl_inv_3x3
     return Jl_inv_6x6
 
+def se3_adj(x):
+    adj_6x6 = torch.zeros((x.shape[:-1]+(6, 6)), device=x.device, dtype=x.dtype, requires_grad=False)
+    Phi = vec2skew(x[..., 3:])
+    adj_6x6[..., :3, :3] = Phi
+    adj_6x6[..., :3, 3:] = vec2skew(x[..., :3])
+    adj_6x6[..., 3:, 3:] = Phi
+    return adj_6x6
 
 def rxso3_Ws(x):
     rotation, sigma = x[..., :3], x[..., 3]
