@@ -38,7 +38,7 @@ if __name__ == "__main__":
     # Time, Input, Initial state
     time  = torch.arange(0, N+1)
     input = torch.sin(2*math.pi*time/50)
-    state = torch.tensor([1, 1])
+    state = torch.tensor([1., 1.])
 
     # Create dynamics solver object
     solver = Floquet()
@@ -69,7 +69,7 @@ if __name__ == "__main__":
 
     # Jacobian computation - Find jacobians at the 5th step
     idx = 5
-    solver.set_ref_point(state=state_all[idx], input=input[idx], t=time[idx])
+    solver.set_ref_point(ref_state=state_all[idx], ref_input=input[idx], ref_t=time[idx])
     [print(_v, getattr(solver, _v)) for _v in vars]
 
     plt.show()

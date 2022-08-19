@@ -8,10 +8,14 @@ Examples for defining general time-discrete time-varying dynamical systems
 
 ## Run:
 
-    + The classical Cart-Pole example
+    + The classical Cart-Pole example, nonlinear time-invariant system
 
-        python dynamics_cartpole.py
+        python cartpole.py
 
-    + Dynamics defined using a neural network
+    + A Floquet system example, linear time-varying system
 
-        python dynamics_neuralnet.py
+        python floquet.py
+
+    + Dynamics defined using a neural network, nonlinear time-invariant system
+
+        python neuralnet.py

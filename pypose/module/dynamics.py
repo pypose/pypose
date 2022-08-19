@@ -72,33 +72,49 @@ class System(nn.Module):
 
     Example:
 
-        A simple linear time-varying system.
+        A simple linear time-varying system.  Here we just show an example for advancing one
+        time step of the system at a given time step and computing the linearization.
+        For generating one trajecotry given a series of inputs and advanced use of linearization,
+        see the `examples` folder.
 
         >>> import math
         >>> import pypose as pp
         >>> import torch
         >>> class Floquet(pp.module.System):
-        ...    def __init__(self):
-        ...        super(Floquet, self).__init__()
+        ...     def __init__(self):
+        ...         super(Floquet, self).__init__()
         ...
-        ...    def state_transition(self, state, input, t):
-        ...        cc = torch.cos(2*math.pi*t/100)
-        ...        ss = torch.sin(2*math.pi*t/100)
-        ...        A = torch.tensor([
-        ...            [1., cc/10],
-        ...            [cc/10, 1.]])
-        ...        B = torch.tensor([
-        ...            [ss],
-        ...            [1.]])
-        ...        return (state.matmul(A) + B.matmul(input)).squeeze()
+        ...     def state_transition(self, state, input, t):
+        ...         cc = torch.cos(2*math.pi*t/100)
+        ...         ss = torch.sin(2*math.pi*t/100)
+        ...         A = torch.tensor([
+        ...             [1., cc/10],
+        ...             [cc/10, 1.]])
+        ...         B = torch.tensor([
+        ...             [ss],
+        ...             [1.]])
+        ...         return (state.matmul(A) + B.matmul(input)).squeeze()
         ...
-        ...    def observation(self, state, input, t):
-        ...        return state + t
+        ...     def observation(self, state, input, t):
+        ...         return state + t
         ...
-        >>>    solver = Floquet()
-        >>>    input = torch.sin(2*math.pi*8./50.)
-        >>>    state_curr = torch.tensor([1, 1])
-        >>>    state_next, obs_next = solver(state_curr, input)
+        >>> solver = Floquet()
+        >>> time_curr = 8.       # We start from t=8, and advance one step to t=9
+        >>> input = torch.sin(2*math.pi*torch.tensor(time_curr)/50.)
+        >>> state_curr = torch.tensor([1., 1.])
+        >>> solver.reset(t=time_curr)
+        >>> state_next, obser_curr = solver(state_curr, input)
+        >>> solver.set_ref_point()
+        >>> print(state_next)
+        >>> print(obser_curr)
+        >>> print(solver.A)
+        >>> print(solver.B)
+        tensor([1.4944, 1.9320])
+        tensor([9., 9.])
+        tensor([[1.0000, 0.0844],
+                [0.0844, 1.0000]])
+        tensor([[0.5358],
+                [1.0000]])
     '''
 
     def __init__(self):
@@ -123,7 +139,8 @@ class System(nn.Module):
             time varying system. One can directly access the current time via the property :obj:`t`.
         '''
         self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
-        return self.state_transition(self.state, self.input, self._t), self.observation(self.state, self.input, self._t)
+        return self.state_transition(self.state, self.input, self.sys_time), \
+            self.observation(self.state, self.input, self.sys_time)
 
     def state_transition(self, state, input, t=None):
         r'''
@@ -177,12 +194,12 @@ class System(nn.Module):
         '''
         self._ref_state = torch.tensor(self.state) if ref_state is None else torch.atleast_1d(ref_state)
         self._ref_input = torch.tensor(self.input) if ref_input is None else torch.atleast_1d(ref_input)
-        self._ref_t = self._t if ref_t is None else ref_t
+        self._ref_t = self.sys_time if ref_t is None else ref_t
         self._ref_f = self.state_transition(self._ref_state, self._ref_input, self._ref_t)
         self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
 
     @property
-    def t(self):
+    def sys_time(self):
         r'''
             System time, automatically advanced by :obj:`forward_hook`.
         '''

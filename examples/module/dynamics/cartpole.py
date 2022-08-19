@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
     # Jacobian computation - Find jacobians at the last step
     jacob_state, jacob_input = state_all[-1,:].T, input[-1]
-    cartPoleSolver.set_ref_point(jacob_state, jacob_input.unsqueeze(0), time[-1])
+    cartPoleSolver.set_ref_point(ref_state=jacob_state, ref_input=jacob_input.unsqueeze(0), ref_t=time[-1])
     A = cartPoleSolver.A
     B = cartPoleSolver.B
     C = cartPoleSolver.C

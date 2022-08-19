@@ -5,7 +5,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class nnDynamics(System):
     def __init__(self, hiddenSize):
-        super().__init__(time)
+        super().__init__()
         self.net = torch.nn.Sequential(
             torch.nn.Linear(2, hiddenSize[0]),
             torch.nn.ReLU(),

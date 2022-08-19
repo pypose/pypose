@@ -88,7 +88,7 @@ def test_dynamics_cartpole():
 
     # Jacobian computation - Find jacobians at the last step
     jacob_state, jacob_input = state_all[-1,:].T, input[-1]
-    cartPoleSolver.set_ref_point(jacob_state, jacob_input.unsqueeze(0), time[-1])
+    cartPoleSolver.set_ref_point(ref_state=jacob_state, ref_input=jacob_input.unsqueeze(0),ref_t=time[-1])
 
     assert torch.allclose(A_ref, cartPoleSolver.A)
     assert torch.allclose(B_ref, cartPoleSolver.B)
@@ -199,7 +199,7 @@ def test_dynamics_floquet():
     assert torch.allclose(c2_N, solver.c2)
 
     # Jacobian computation - at the step idx
-    solver.set_ref_point(state=state_all[idx], input=input[idx], t=time[idx])
+    solver.set_ref_point(ref_state=state_all[idx], ref_input=input[idx], ref_t=time[idx])
     assert torch.allclose(A0_i, solver.A)
     assert torch.allclose(B0_i, solver.B)
     assert torch.allclose(C0, solver.C)
