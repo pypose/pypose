@@ -71,6 +71,7 @@ class System(nn.Module):
         solver.
 
     Example:
+
         A simple linear time-varying system.
 
         >>> import math
@@ -79,7 +80,7 @@ class System(nn.Module):
         >>> class Floquet(pp.module.System):
         ...    def __init__(self):
         ...        super(Floquet, self).__init__()
-``
+        ...
         ...    def state_transition(self, state, input, t):
         ...        cc = torch.cos(2*math.pi*t/100)
         ...        ss = torch.sin(2*math.pi*t/100)
@@ -90,10 +91,10 @@ class System(nn.Module):
         ...            [ss],
         ...            [1.]])
         ...        return (state.matmul(A) + B.matmul(input)).squeeze()
-
+        ...
         ...    def observation(self, state, input, t):
         ...        return state + t
-
+        ...
         >>>    solver = Floquet()
         >>>    input = torch.sin(2*math.pi*8./50.)
         >>>    state_curr = torch.tensor([1, 1])
