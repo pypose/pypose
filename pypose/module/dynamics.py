@@ -6,7 +6,7 @@ from torch.autograd.functional import jacobian
 
 class System(nn.Module):
     r'''
-    The general base class of discrete-time system dynamics model.
+    The base class of a general discrete-time system dynamics model.
     
     The state transision function :math:`\mathbf{f}` and observation functions
     :math:`\mathbf{g}` are given by:
@@ -24,13 +24,13 @@ class System(nn.Module):
         time (:obj:`bool`): Whether the system is time-varying. Default: ``False``.
 
     Note:
-        Here we choose to work with a time-discrete system, since typically in numerical
+        Here we choose to work with a discrete-time system, since typically in numerical
         simulations and control applications, the dynamical systems are usually discretized
         in time.
 
         The first time step is **0**.
 
-    To use the class, the user should define two methods :obj:`state_transition` and
+    To use the class, the user need to define two methods :obj:`state_transition` and
     :obj:`observation`, which are used in the :obj:`forward` method. The :obj:`forward`
     method advances the dynamical system by one time step, and is the function that is
     back-propagated in the learning process.
@@ -39,7 +39,7 @@ class System(nn.Module):
 
         **Linearization**
 
-        This class provides a means to linearize the system at a reference point
+        This class provides an approach to linearize the system at a reference point
         :math:`\chi^*=(\mathbf{x}^*, \mathbf{u}^*, t^*)` along a trajectory. Consider a point
         :math:`\chi=(\mathbf{x}^*+\delta\mathbf{x}, \mathbf{u}^*+\delta\mathbf{u}, t^*)` near
         :math:`\chi^*`. We have
@@ -65,11 +65,11 @@ class System(nn.Module):
         :obj:`c1`, and :obj:`c2`.
 
         The notion of linearization is slightly different from that in dynamical system
-        theory. First, the linearization is done for any arbitrary point, not just at
+        theory. First, the linearization can be done for arbitrary point(s), not limit to
         the equilibrium point(s), and therefore the extra constant terms :math:`\mathbf{c}_1`
-        and :math:`\mathbf{c}_2` are produced. Second, the linearized equations are written
-        for the full states and inputs, :math:`\mathbf{x}` and :math:`\mathbf{u}`, instead
-        of their perturbation terms, :math:`\delta \mathbf{x}` and :math:`\delta \mathbf{u}`
+        and :math:`\mathbf{c}_2` are produced. Second, the linearized equations are represented
+        by the full states and inputs: :math:`\mathbf{x}` and :math:`\mathbf{u}`, rather than
+         the perturbation format: :math:`\delta \mathbf{x}` and :math:`\delta \mathbf{u}`
         so that the model is consistent with, e.g., the LTI model and the iterative LQR
         solver.
 
@@ -96,9 +96,8 @@ class System(nn.Module):
 
         Note:
             The :obj:`forward` method implicitly increments the time step via :obj:`forward_hook`.
-            As a result, in the implementations of :obj:`state_transition` and :obj:`observation`, 
-            one does not need to include the time as the input; instead, one can directly access
-            the current time via the data member :obj:`self._t`.
+            :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity such as 
+            time varying system. One can directly access the current time via the property :obj:`t`.
         '''
         self.state, self.input = state, input
         return self.state_transition(self.state, self.input, self._t), self.observation(self.state, self.input, self._t)
@@ -117,8 +116,7 @@ class System(nn.Module):
             Tensor: The state of the system at next time step
 
         Note:
-            The users need to define this method and can access the current time via the data
-            member :obj:`self._t`.
+            The users need to define this method and can access the current time via the property :obj:`t`.
         '''
         raise NotImplementedError("The users need to define their own state transition method")
 
@@ -136,8 +134,7 @@ class System(nn.Module):
             Tensor: The observation of the system at the current step
 
         Note:
-            The users need to define this method and can access the current time via the data
-            member :obj:`self._t`.
+            The users need to define this method and can access the current time via the property :obj:`t`.
         '''
         raise NotImplementedError("The users need to define their own observation method")
 
@@ -146,22 +143,20 @@ class System(nn.Module):
 
     def set_ref_point(self, state=None, input=None, t=None):
         r'''
-        Function to set the reference point about which the system is to be linearized.
+        Function to set the reference point for linearization.
 
-        If `state=None` the reference point is the one from the last time step.
+        If `state = None` the reference point is the one from the last time step.
 
-        Parameters
-        ----------
-        state : Tensor
-                The state of the dynamical system.  Default: :obj:`None`.
-        input : Tensor
-                The input to the dynamical system.  Default: :obj:`None`.
-        t     : Tensor
-                The time step of the dynamical system.  Default: :obj:`None`.
+        Args: 
+            state : Tensor
+                    The state of the dynamical system.  Default: :obj:`None`.
+            input : Tensor
+                    The input to the dynamical system.  Default: :obj:`None`.
+            t     : Tensor
+                    The time step of the dynamical system.  Default: :obj:`None`.
 
-        Returns
-        ----------
-        None
+        Returns:
+            None
         '''
         if state is None:
             # In this case self.state, self.input would have been set by forward.
