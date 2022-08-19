@@ -8,7 +8,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # We consider a Floquet system, which is periodic and an example of time-varying systems
 class Floquet(System):
     def __init__(self):
-        super(Floquet, self).__init__(time=True)
+        super(Floquet, self).__init__()
 
     def state_transition(self, state, input, t):
         cc = torch.cos(2*math.pi*t/100)
