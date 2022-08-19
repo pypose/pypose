@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class nnDynamics(System):
-    def __init__(self, hiddenSize, time=False):
+    def __init__(self, hiddenSize):
         super().__init__(time)
         self.net = torch.nn.Sequential(
             torch.nn.Linear(2, hiddenSize[0]),

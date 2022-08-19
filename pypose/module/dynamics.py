@@ -20,9 +20,6 @@ class System(nn.Module):
     where :math:`k`, :math:`\mathbf{x}`, :math:`\mathbf{u}`, :math:`\mathbf{y}` are the time
     step, states, inputs, and observations, respectively.
 
-    Args:
-        time (:obj:`bool`): Whether the system is time-varying. Default: ``False``.
-
     Note:
         Here we choose to work with a discrete-time system, since typically in numerical
         simulations and control applications, the dynamical systems are usually discretized
@@ -77,12 +74,11 @@ class System(nn.Module):
         TODO
     '''
 
-    def __init__(self, time=False):
+    def __init__(self):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
-        if time:
-            self.register_buffer('_t',torch.zeros(1))
-            self.register_forward_hook(self.forward_hook)
+        self.register_buffer('_t',torch.zeros(1))
+        self.register_forward_hook(self.forward_hook)
 
     def forward_hook(self, module, inputs, outputs):
         r'''
@@ -99,10 +95,10 @@ class System(nn.Module):
             :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity such as 
             time varying system. One can directly access the current time via the property :obj:`t`.
         '''
-        self.state, self.input = state, input
+        self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
         return self.state_transition(self.state, self.input, self._t), self.observation(self.state, self.input, self._t)
 
-    def state_transition(self, state, input, t):
+    def state_transition(self, state, input, t=None):
         r'''
         Args:
             state : Tensor
@@ -158,29 +154,15 @@ class System(nn.Module):
         Returns:
             None
         '''
-        if state is None:
-            # In this case self.state, self.input would have been set by forward.
-            self.time = self._t
-        else:
-            self.state, self.input, self.time = state, input, t
-        self.f0 = self.state_transition(self.state, self.input, self.time)
-        self.g0 = self.observation(self.state, self.input, self.time)
+        self._ref_state = torch.tensor(self.state) if state is None else torch.atleast_1d(state)
+        self._ref_input = torch.tensor(self.input) if input is None else torch.atleast_1d(input)
+        self._ref_t = self._t if t is None else t
+        self._ref_f = self.state_transition(self._ref_state, self._ref_input, self._ref_t)
+        self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
 
     @property
-    def state(self):
-        return self._state
-
-    @state.setter
-    def state(self, val):
-        self._state = torch.atleast_1d(val)
-
-    @property
-    def input(self):
-        return self._input
-
-    @input.setter
-    def input(self, val):
-        self._input = torch.atleast_1d(val)
+    def t(self):
+        return self._t
 
     @property
     def A(self):
@@ -189,10 +171,9 @@ class System(nn.Module):
 
         .. math::
             \mathbf{A} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}} \right|_{\chi^*}
-
         '''
-        func = lambda x: self.state_transition(x, self.input, self.time)
-        return jacobian(func, self.state, **self.jacargs)
+        func = lambda x: self.state_transition(x, self._ref_input, self._ref_t)
+        return jacobian(func, self._ref_state, **self.jacargs)
 
     @property
     def B(self):
@@ -202,8 +183,8 @@ class System(nn.Module):
         .. math::
             \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
-        func = lambda x: self.state_transition(self.state, x, self.time)
-        return jacobian(func, self.input, **self.jacargs)
+        func = lambda x: self.state_transition(self._ref_state, x, self._ref_t)
+        return jacobian(func, self._ref_input, **self.jacargs)
 
     @property
     def C(self):
@@ -213,8 +194,8 @@ class System(nn.Module):
         .. math::
             \mathbf{C} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{x}} \right|_{\chi^*}
         '''
-        func = lambda x: self.observation(x, self.input, self.time)
-        return jacobian(func, self.state, **self.jacargs)
+        func = lambda x: self.observation(x, self._ref_input, self._ref_t)
+        return jacobian(func, self._ref_state, **self.jacargs)
  
     @property
     def D(self):
@@ -225,8 +206,8 @@ class System(nn.Module):
             \mathbf{D} = \left. \frac{\partial \mathbf{g}}
                                 {\partial \mathbf{u}} \right|_{\chi^*}
         '''
-        func = lambda x: self.observation(self.state, x, self.time)
-        return jacobian(func, self.input, **self.jacargs)
+        func = lambda x: self.observation(self._ref_state, x, self._ref_t)
+        return jacobian(func, self._ref_input, **self.jacargs)
 
     @property
     def c1(self):
@@ -238,7 +219,7 @@ class System(nn.Module):
                            - \mathbf{A}\mathbf{x}^* - \mathbf{B}\mathbf{u}^*
         '''
         # Potential performance loss here - self.A and self.B involves jacobian eval
-        return self.f0 - self.state.matmul(self.A.mT) - self.input.matmul(self.B.mT)
+        return self._ref_f - self._ref_state.matmul(self.A.mT) - self._ref_input.matmul(self.B.mT)
     
     @property
     def c2(self):
@@ -250,7 +231,7 @@ class System(nn.Module):
                            - \mathbf{C}\mathbf{x}^* - \mathbf{D}\mathbf{u}^*
         '''
         # Potential performance loss here - self.C and self.D involves jacobian eval
-        return self.g0 - self.state.matmul(self.C.mT) - self.input.matmul(self.D.mT)
+        return self._ref_g - self._ref_state.matmul(self.C.mT) - self._ref_input.matmul(self.D.mT)
 
 
 class LTI(System):
@@ -292,7 +273,7 @@ class LTI(System):
     '''
     
     def __init__(self, A, B, C, D, c1=None, c2=None):
-        super(LTI, self).__init__(time=True)
+        super(LTI, self).__init__()
         assert A.ndim in (2, 3), "Invalid System Matrices dimensions"
         assert A.ndim == B.ndim == C.ndim == D.ndim, "Invalid System Matrices dimensions"
         self.A, self.B, self.C, self.D = A, B, C, D
@@ -325,13 +306,13 @@ class LTI(System):
 
         return super(LTI, self).forward(state, input)
 
-    def state_transition(self, state, input, t):
+    def state_transition(self, state, input, t=None):
         r'''
         Perform one step of LTI state transition.
         '''
         return state.matmul(self.A.mT) + input.matmul(self.B.mT) + self.c1
 
-    def observation(self, state, input, t):
+    def observation(self, state, input, t=None):
         r'''
         Return observation of LTI system at current step.
         '''

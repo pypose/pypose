@@ -37,7 +37,7 @@ def test_dynamics_cartpole():
     # The class
     class CartPole(pp.module.System):
         def __init__(self):
-            super(CartPole, self).__init__(time=True)
+            super(CartPole, self).__init__()
             self._tau = 0.01
             self._length = 1.5
             self._cartmass = 20.0
@@ -138,7 +138,7 @@ def test_dynamics_floquet():
     # The class
     class Floquet(pp.module.System):
         def __init__(self):
-            super(Floquet, self).__init__(time=True)
+            super(Floquet, self).__init__()
 
         def state_transition(self, state, input, t):
             cc = torch.cos(2*math.pi*t/100)

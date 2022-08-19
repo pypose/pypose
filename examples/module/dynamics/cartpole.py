@@ -7,7 +7,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Create class for cart-pole dynamics
 class CartPole(System):
     def __init__(self, dt, length, cartmass, polemass, gravity):
-        super(CartPole, self).__init__(time=False)
+        super(CartPole, self).__init__()
         self.tau = dt
         self.length = length
         self.cartmass = cartmass
