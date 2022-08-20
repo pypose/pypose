@@ -1038,11 +1038,12 @@ class Parameter(LieTensor, nn.Parameter):
             gradient. Default: True
 
     Examples:
-        >>> x = pp.Parameter(pp.randn_so3(2))
-        >>> x.sum().backward() # Just test. There is no physical meaning
+        >>> import torch, pypose as pp
+        >>> x = pp.Parameter(pp.randn_SO3(2))
+        >>> x.Log().sum().backward()
         >>> x.grad
-        tensor([[1., 1., 1.],
-                [1., 1., 1.]])
+        tensor([[0.8590, 1.4069, 0.6261, 0.0000],
+                [1.2869, 1.0748, 0.5385, 0.0000]])
     '''
     def __init__(self, data, **kwargs):
         self.ltype = data.ltype
