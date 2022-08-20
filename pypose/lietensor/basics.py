@@ -122,6 +122,86 @@ def add(input, other, alpha=1):
     '''
     return input.add(other, alpha)
 
+def mul(input, other):
+    r'''
+    Multiplies input LieTensor by other.
+
+    .. math::
+        \bm{y}_i =
+        \bm{x}_i \times \bm{a}_i
+
+    where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` value,
+    and :math:`\bm{y}` is the output value.
+
+    Args:
+        input (:obj:`LieTensor`) the input LieTensor (Lie Group or Lie Algebra).
+
+        other (:obj:`Tensor` or :obj:`LieTensor`): the value for input to be multiplied by.
+
+    Return:
+        the product with the same type as ``other``
+    
+        :obj:`LieTensor` @ :obj:`LieTensor` -> :obj:`LieTensor` (group multiplication) 
+        
+        :obj:`LieTensor` @ :obj:`Tensor` -> :obj:`Tensor` (group action)
+
+    Examples:
+        >>> x = pp.randn_SO3()
+        >>> a = torch.randn(4)
+        >>> x * a
+        tensor([ 0.2354, -0.9344, -0.0361,  1.3125])
+        >>> x @ a
+        tensor([ 0.2354, -0.9344, -0.0361,  1.3125])
+        >>> pp.mul(x, a)
+        tensor([ 0.2354, -0.9344, -0.0361,  1.3125])
+
+        >>> a = pp.randn_SO3()
+        >>> x * a
+        SO3Type LieTensor:
+        LieTensor([-0.7324, -0.4761, -0.2069,  0.4406])
+        >>> x @ a
+        SO3Type LieTensor:
+        LieTensor([-0.7324, -0.4761, -0.2069,  0.4406])
+        >>> pp.mul(x, a)
+        SO3Type LieTensor:
+        LieTensor([-0.7324, -0.4761, -0.2069,  0.4406])
+    '''
+    return input.__mul__(other)
+
+def matmul(input, other):
+    r'''
+    Calculates matrix product of input and other
+
+    .. math::
+        \bm{y}_i =
+        \bm{x}_i \times \bm{a}_i
+
+    where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` value,
+    and :math:`\bm{y}` is the output value.
+
+    Args:
+        input (:obj:`LieTensor`) the input LieTensor (Lie Group or Lie Algebra).
+
+        other (:obj:`Tensor` or :obj:`LieTensor`): the value for input to be multiplied by.
+
+    Return:
+        the product with the same type as ``other``
+    
+        :obj:`LieTensor` @ :obj:`LieTensor` -> :obj:`LieTensor` (group multiplication) 
+        
+        :obj:`LieTensor` @ :obj:`Tensor` -> :obj:`Tensor` (group action)
+
+    Examples:
+        >>> x = pp.randn_SO3()
+        >>> a = torch.randn(4)
+        >>> pp.matmul(x, a)
+        tensor([-0.7160, -1.3886, -0.9513,  1.8266])
+        >>> a = pp.SO3(a)
+        >>> pp.matmul(x, a)
+        SO3Type LieTensor:
+        LieTensor([ 0.7985, -1.4480, -1.9396,  0.4313])
+    '''
+    return input.__matmul__(other)
 
 def cumops_(input, dim, ops):
     r'''

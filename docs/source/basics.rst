@@ -10,6 +10,8 @@ Basics
     :template: autosummary/class.rst
     add
     add_
+    mul
+    matmul
     Exp
     Log
     Inv
