@@ -132,6 +132,10 @@ def mul(input, other):
 
     where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` value,
     and :math:`\bm{y}` is the output value.
+    
+    :obj:`LieTensor` @ :obj:`LieTensor` -> :obj:`LieTensor` (group multiplication) 
+        
+    :obj:`LieTensor` @ :obj:`Tensor` -> :obj:`Tensor` (group action)
 
     Args:
         input (:obj:`LieTensor`) the input LieTensor (Lie Group or Lie Algebra).
@@ -140,10 +144,6 @@ def mul(input, other):
 
     Return:
         the product with the same type as ``other``
-    
-        :obj:`LieTensor` @ :obj:`LieTensor` -> :obj:`LieTensor` (group multiplication) 
-        
-        :obj:`LieTensor` @ :obj:`Tensor` -> :obj:`Tensor` (group action)
 
     Examples:
         >>> x = pp.randn_SO3()
@@ -178,18 +178,18 @@ def matmul(input, other):
 
     where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` value,
     and :math:`\bm{y}` is the output value.
+    
+    :obj:`LieTensor` @ :obj:`LieTensor` -> :obj:`LieTensor` (group multiplication) 
+        
+    :obj:`LieTensor` @ :obj:`Tensor` -> :obj:`Tensor` (group action)
 
     Args:
         input (:obj:`LieTensor`) the input LieTensor (Lie Group or Lie Algebra).
 
         other (:obj:`Tensor` or :obj:`LieTensor`): the value for input to be multiplied by.
 
-    Return:
+    Return: 
         the product with the same type as ``other``
-    
-        :obj:`LieTensor` @ :obj:`LieTensor` -> :obj:`LieTensor` (group multiplication) 
-        
-        :obj:`LieTensor` @ :obj:`Tensor` -> :obj:`Tensor` (group action)
 
     Examples:
         >>> x = pp.randn_SO3()
