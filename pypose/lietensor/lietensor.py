@@ -766,7 +766,7 @@ class LieTensor(torch.Tensor):
             'optimization process, where LieType is not a necessary structure, we suggest to '    \
             'call .tensor() to convert a LieTensor to Tensor before passing it to an optimizer. ' \
             'If this still happens, create an issue on GitHub please.'.format(
-            'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor')
+            'https://pypose.org/docs/main/generated/pypose.LieTensor')
         self.ltype = ltype
 
     @staticmethod
@@ -796,7 +796,7 @@ class LieTensor(torch.Tensor):
                     lt = torch.Tensor.as_subclass(t, LieTensor)
                     lt.ltype = ltype
                     if lt.shape[-1:] != lt.ltype.dimension:
-                        link = 'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor'
+                        link = 'https://pypose.org/docs/main/generated/pypose.LieTensor'
                         warnings.warn('Tensor Shape Invalid by calling {}, go to {}'.format(func, link))
                     return lt
                 return t

@@ -81,7 +81,7 @@ def modjac(model, input=None, create_graph=False, strict=False, vectorize=False,
 
         >>> model = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=1)
         >>> input = torch.randn(1, 1, 1)
-        >>> J = pp.optim.modjac(model, input)
+        >>> J = pp.optim.functional.modjac(model, input)
         (tensor([[[[[[[0.3365]]]]]]]), tensor([[[[1.]]]]))
         >>> [j.shape for j in J]
         [torch.Size([1, 1, 1, 1, 1, 1, 1]), torch.Size([1, 1, 1, 1])]
@@ -90,7 +90,7 @@ def modjac(model, input=None, create_graph=False, strict=False, vectorize=False,
 
         >>> input = torch.randn(2, 2, 2)
         >>> model = nn.Conv2d(in_channels=2, out_channels=2, kernel_size=1)
-        >>> J = pp.optim.modjac(model, input, flatten=True)
+        >>> J = pp.optim.functional.modjac(model, input, flatten=True)
         tensor([[-0.4162,  0.0968,  0.0000,  0.0000,  1.0000,  0.0000],
                 [-0.6042,  1.1886,  0.0000,  0.0000,  1.0000,  0.0000],
                 [ 1.4623,  0.7389,  0.0000,  0.0000,  1.0000,  0.0000],
@@ -113,7 +113,7 @@ def modjac(model, input=None, create_graph=False, strict=False, vectorize=False,
         ...         return self.p.Exp() * x
         ...
         >>> model, input = PoseTransform(), pp.randn_SO3()
-        >>> J = pp.optim.modjac(model, input, flatten=True)
+        >>> J = pp.optim.functional.modjac(model, input, flatten=True)
         tensor([[ 0.4670,  0.7041,  0.0029,  0.0000,  0.0000,  0.0000],
                 [-0.6591,  0.4554, -0.2566,  0.0000,  0.0000,  0.0000],
                 [-0.2477,  0.0670,  0.9535,  0.0000,  0.0000,  0.0000],
@@ -142,7 +142,14 @@ def modjac(model, input=None, create_graph=False, strict=False, vectorize=False,
                     for j, p in zip(Jr, params)], dim=1) for Jr in J])
         else:
             J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params)], dim=1)
-    assert not torch.any(torch.isnan(J)), 'Jacobian contains Nan! Check your model and input!'
+
+    if isinstance(J, tuple):
+        assert not torch.any(torch.stack([torch.any(torch.isnan(j)) for j in J])), \
+            'Jacobian contains Nan! Check your model and input!'
+    else:
+        assert not torch.any(torch.isnan(J)), \
+            'Jacobian contains Nan! Check your model and input!'
+
     return J
 
 
