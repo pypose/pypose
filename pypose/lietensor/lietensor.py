@@ -1035,7 +1035,7 @@ class Parameter(LieTensor, nn.Parameter):
     Args:
         data (LieTensor): parameter LieTensor.
         requires_grad (bool, optional): if the parameter requires
-            gradient. Default: True
+            gradient. Default: ``True``
 
     Examples:
         >>> import torch, pypose as pp
