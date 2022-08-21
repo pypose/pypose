@@ -103,12 +103,6 @@ class LieType:
 
     def AdjT(self, X, a):
         ''' Exp(a) * X = X * Exp(AdjT) '''
-        # if self.on_manifold:
-        #     raise AttributeError("Has no AdjT attribute")
-        # assert not X.ltype.on_manifold and a.ltype.on_manifold, "ltype Invalid"
-        # assert X.ltype.lid == a.ltype.lid, "ltype Invalid"
-        # out = self.__op__(self.lid, adjT, X, a)
-        # return LieTensor(out, ltype=a.ltype)
         if not self.on_manifold:
             raise AttributeError("Lie Group has no AdjT attribute")
         raise NotImplementedError("Instance has no AdjT attribute.")
