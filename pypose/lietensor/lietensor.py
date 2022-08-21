@@ -14,6 +14,7 @@ from .operation import SO3_Act4, SE3_Act4, RxSO3_Act4, Sim3_Act4
 from .operation import SO3_Mul, SE3_Mul, RxSO3_Mul, Sim3_Mul
 from .operation import SO3_Inv, SE3_Inv, RxSO3_Inv, Sim3_Inv
 from .operation import SO3_AdjXa, SE3_AdjXa, RxSO3_AdjXa, Sim3_AdjXa
+from .operation import SO3_AdjTXa
 
 
 HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'double',
@@ -102,12 +103,15 @@ class LieType:
 
     def AdjT(self, X, a):
         ''' Exp(a) * X = X * Exp(AdjT) '''
-        if self.on_manifold:
-            raise AttributeError("Has no AdjT attribute")
-        assert not X.ltype.on_manifold and a.ltype.on_manifold, "ltype Invalid"
-        assert X.ltype.lid == a.ltype.lid, "ltype Invalid"
-        out = self.__op__(self.lid, adjT, X, a)
-        return LieTensor(out, ltype=a.ltype)
+        # if self.on_manifold:
+        #     raise AttributeError("Has no AdjT attribute")
+        # assert not X.ltype.on_manifold and a.ltype.on_manifold, "ltype Invalid"
+        # assert X.ltype.lid == a.ltype.lid, "ltype Invalid"
+        # out = self.__op__(self.lid, adjT, X, a)
+        # return LieTensor(out, ltype=a.ltype)
+        if not self.on_manifold:
+            raise AttributeError("Lie Group has no AdjT attribute")
+        raise NotImplementedError("Instance has no AdjT attribute.")
 
     def Jinvp(self, X, p):
         if self.on_manifold:
@@ -244,6 +248,15 @@ class SO3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         input, out_shape = broadcast_inputs(X, a)
         out = SO3_AdjXa.apply(*input)
+        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        out = out.view(out_shape + (dim,))
+        return LieTensor(out, ltype=so3_type)
+
+    def AdjT(self, X, a):
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        a = a.tensor() if hasattr(a, 'ltype') else a
+        input, out_shape = broadcast_inputs(X, a)
+        out = SO3_AdjTXa.apply(*input)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=so3_type)
