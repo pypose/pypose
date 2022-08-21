@@ -414,6 +414,15 @@ class SE3Type(LieType):
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=se3_type)
 
+    def Jinvp(self, X, a):
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        a = a.tensor() if hasattr(a, 'ltype') else a
+        (X, a), out_shape = broadcast_inputs(X, a)
+        out = (se3_Jl_inv(SE3_Log.apply(X)) @ a.unsqueeze(-1)).squeeze(-1)
+        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        out = out.view(out_shape + (dim,))
+        return LieTensor(out, ltype=se3_type)
+
     @classmethod
     def identity(cls, *size, **kwargs):
         data = torch.tensor([0., 0., 0., 0., 0., 0., 1.], **kwargs)
