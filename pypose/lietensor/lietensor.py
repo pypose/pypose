@@ -485,7 +485,14 @@ class Sim3Type(LieType):
         out = Sim3_Inv.apply(X)
         return LieTensor(out, ltype=Sim3_type)
 
-
+    def Adj(self, X, a):
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        a = a.tensor() if hasattr(a, 'ltype') else a
+        input, out_shape = broadcast_inputs(X, a)
+        out = Sim3_AdjXa.apply(*input)
+        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        out = out.view(out_shape + (dim,))
+        return LieTensor(out, ltype=sim3_type)
 
     def rotation(self, input):
         return LieTensor(input.tensor()[..., 3:7], ltype=SO3_type)
