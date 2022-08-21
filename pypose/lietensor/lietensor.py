@@ -654,6 +654,15 @@ class RxSO3Type(LieType):
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=rxso3_type)
 
+    def Jinvp(self, X, a):
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        a = a.tensor() if hasattr(a, 'ltype') else a
+        (X, a), out_shape = broadcast_inputs(X, a)
+        out = (rxso3_Jl_inv(RxSO3_Log.apply(X)) @ a.unsqueeze(-1)).squeeze(-1)
+        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        out = out.view(out_shape + (dim,))
+        return LieTensor(out, ltype=rxso3_type)
+
     def rotation(self, input):
         return LieTensor(input.tensor()[..., 0:4], ltype=SO3_type)
 
