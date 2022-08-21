@@ -109,11 +109,9 @@ class LieType:
         raise NotImplementedError("Instance has no AdjT attribute.")
 
     def Jinvp(self, X, p):
-        if self.on_manifold:
-            raise AttributeError("ltype has no Jinvp attribute")
-        assert isinstance(p, LieTensor) and p.ltype.on_manifold, "Args p has to be Lie Algebra"
-        out = self.__op__(self.lid, jinvp, X, p)
-        return LieTensor(out, ltype=p.ltype)
+        if not self.on_manifold:
+            raise AttributeError("Lie Group has no Jinvp attribute")
+        raise NotImplementedError("Instance has no Jinvp attribute.")
 
     def matrix(self, input):
         """ To 4x4 matrix """
