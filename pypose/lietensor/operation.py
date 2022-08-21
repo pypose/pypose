@@ -625,26 +625,22 @@ class Sim3_Act4(torch.autograd.Function):
         return torch.cat((X_grad.squeeze(-2), zero), dim = -1), p_grad.squeeze(-2)
 
 
-# class SO3_AdjXa(torch.autograd.Function):
+class SO3_AdjXa(torch.autograd.Function):
 
-#     @staticmethod
-#     def forward(ctx, X, a):
-#         adj_matrix = SO3_Adj(X)
-#         out = adj_matrix @ a
-#         ctx.save_for_backward(X, out, adj_matrix)
-#         return out
+    @staticmethod
+    def forward(ctx, X, a):
+        adj_matrix = SO3_Adj(X)
+        out = (adj_matrix @ a.unsqueeze(-1)).squeeze(-1)
+        ctx.save_for_backward(out, adj_matrix)
+        return out
 
-#     @staticmethod
-#     def backward(ctx, grad_output):
-#         X, out, adj_matrix = ctx.saved_tensors
-#         a_grad = grad_output @ adj_matrix
-#         X_grad = -
-
-#         dq = grad_output.unsqueeze(-2)
-#         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
-#         X_grad = dq @ SO3_Act4_Jacobian(out)
-#         p_grad = dq @ SO3_Matrix4x4(X)
-#         return torch.cat((X_grad.squeeze(-2), zero), dim = -1), p_grad.squeeze(-2)
+    @staticmethod
+    def backward(ctx, grad_output):
+        out, adj_matrix = ctx.saved_tensors
+        X_grad = -grad_output.unsqueeze(-2) @ so3_adj(out)
+        a_grad = grad_output.unsqueeze(-2) @ adj_matrix
+        zero = torch.zeros(out.shape[:-1]+(1,), device=out.device, dtype=out.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad.squeeze(-2)
 
 
 class SO3_Mul(torch.autograd.Function):
