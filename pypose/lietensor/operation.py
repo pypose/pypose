@@ -857,6 +857,23 @@ class SO3_AdjTXa(torch.autograd.Function):
         return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad
 
 
+class SE3_AdjTXa(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, a):
+        ctx.save_for_backward(X, a)
+        out = SE3_AdjXa.apply(SE3_Inv.apply(X), a)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        X, a = ctx.saved_tensors
+        a_grad = SE3_AdjXa.apply(X, grad_output)
+        X_grad = -a.unsqueeze(-2) @ se3_adj(a_grad)
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad
+
+
 def broadcast_inputs(x, y):
     """ Automatic broadcasting of missing dimensions """
     if y is None:
