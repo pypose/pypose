@@ -273,6 +273,7 @@ class LevenbergMarquardt(_Optimizer):
         \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
             \rho\left((\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)^T \mathbf{W}_i
             (\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\right),
+
     where :math:`\bm{f}()` is the model, :math:`\bm{\theta}` is the parameters to be optimized,
     :math:`\bm{x}` is the model input, :math:`\mathbf{W}_i` is a weighted square matrix (positive
     definite), and :math:`\rho` is a robust kernel function to reduce the effect of outliers.
