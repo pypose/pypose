@@ -143,7 +143,7 @@ def mul(input, other):
         other (:obj:`Tensor` or :obj:`LieTensor`): the value for input to be multiplied by.
 
     Return:
-        the product with the same type as ``other``
+        Tensor/LieTensor: the product with the same type as ``other``.
 
     Examples:
         >>> x = pp.randn_SO3()
@@ -189,7 +189,7 @@ def matmul(input, other):
         other (:obj:`Tensor` or :obj:`LieTensor`): the value for input to be multiplied by.
 
     Return: 
-        the product with the same type as ``other``
+        Tensor/LieTensor: the product with the same type as ``other``.
 
     Examples:
         >>> x = pp.randn_SO3()
