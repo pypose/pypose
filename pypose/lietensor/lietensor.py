@@ -15,6 +15,7 @@ from .operation import SO3_Mul, SE3_Mul, RxSO3_Mul, Sim3_Mul
 from .operation import SO3_Inv, SE3_Inv, RxSO3_Inv, Sim3_Inv
 from .operation import SO3_AdjXa, SE3_AdjXa, RxSO3_AdjXa, Sim3_AdjXa
 from .operation import SO3_AdjTXa, SE3_AdjTXa, RxSO3_AdjTXa, Sim3_AdjTXa
+from .operation import so3_Jl_inv, se3_Jl_inv, rxso3_Jl_inv, sim3_Jl_inv
 
 
 HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'double',
@@ -251,6 +252,15 @@ class SO3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         input, out_shape = broadcast_inputs(X, a)
         out = SO3_AdjTXa.apply(*input)
+        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        out = out.view(out_shape + (dim,))
+        return LieTensor(out, ltype=so3_type)
+
+    def Jinvp(self, X, a):
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        a = a.tensor() if hasattr(a, 'ltype') else a
+        (X, a), out_shape = broadcast_inputs(X, a)
+        out = (so3_Jl_inv(SO3_Log.apply(X)) @ a.unsqueeze(-1)).squeeze(-1)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=so3_type)
