@@ -457,15 +457,6 @@ class se3Type(LieType):
     def translation(self, input):
         return input.Exp().translation()
 
-    def Jinvp(self, X, a):
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        a = a.tensor() if hasattr(a, 'ltype') else a
-        (X, a), out_shape = broadcast_inputs(X, a)
-        out = (sim3_Jl_inv(Sim3_Log.apply(X)) @ a.unsqueeze(-1)).squeeze(-1)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
-        out = out.view(out_shape + (dim,))
-        return LieTensor(out, ltype=se3_type)
-
     @classmethod
     def identity(cls, *size, **kwargs):
         return SE3_type.Log(SE3_type.identity(*size, **kwargs))
@@ -539,6 +530,14 @@ class Sim3Type(LieType):
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=sim3_type)
 
+    def Jinvp(self, X, a):
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        a = a.tensor() if hasattr(a, 'ltype') else a
+        (X, a), out_shape = broadcast_inputs(X, a)
+        out = (sim3_Jl_inv(Sim3_Log.apply(X)) @ a.unsqueeze(-1)).squeeze(-1)
+        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        out = out.view(out_shape + (dim,))
+        return LieTensor(out, ltype=sim3_type)
 
     def rotation(self, input):
         return LieTensor(input.tensor()[..., 3:7], ltype=SO3_type)
