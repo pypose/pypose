@@ -13,7 +13,7 @@ from .operation import SO3_Act, SE3_Act, RxSO3_Act, Sim3_Act
 from .operation import SO3_Act4, SE3_Act4, RxSO3_Act4, Sim3_Act4
 from .operation import SO3_Mul, SE3_Mul, RxSO3_Mul, Sim3_Mul
 from .operation import SO3_Inv, SE3_Inv, RxSO3_Inv, Sim3_Inv
-from .operation import SO3_AdjXa
+from .operation import SO3_AdjXa, SE3_AdjXa
 
 
 HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'double',
@@ -384,6 +384,15 @@ class SE3Type(LieType):
 
     def translation(self, input):
         return input.tensor()[..., 0:3]
+
+    def Adj(self, X, a):
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        a = a.tensor() if hasattr(a, 'ltype') else a
+        input, out_shape = broadcast_inputs(X, a)
+        out = SE3_AdjXa.apply(*input)
+        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        out = out.view(out_shape + (dim,))
+        return LieTensor(out, ltype=se3_type)
 
     @classmethod
     def identity(cls, *size, **kwargs):
