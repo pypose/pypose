@@ -137,12 +137,15 @@ def rxso3_Jl(x):
     J[..., :3, :3] = so3_Jl(x[..., :3])
     return J
 
-
 def rxso3_Jl_inv(x):
     J_inv = torch.eye(4, device=x.device, dtype=x.dtype).repeat(x.shape[:-1]+(1, 1))
     J_inv[..., :3, :3] = so3_Jl_inv(x[..., :3])
     return J_inv
 
+def rxso3_adj(x):
+    adj_4x4 = torch.zeros((x.shape[:-1]+(4, 4)), device=x.device, dtype=x.dtype, requires_grad=False)
+    adj_4x4[..., :3, :3] = vec2skew(x[..., :3])
+    return adj_4x4
 
 def sim3_adj(x):
     tau, phi, sigma = x[..., :3], x[..., 3:6], x[..., 6:]
