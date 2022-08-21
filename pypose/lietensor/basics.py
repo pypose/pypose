@@ -138,7 +138,7 @@ def mul(input, other):
     :obj:`LieTensor` @ :obj:`Tensor` -> :obj:`Tensor` (group action)
 
     Args:
-        input (:obj:`LieTensor`) the input LieTensor (Lie Group or Lie Algebra).
+        input (:obj:`LieTensor`): the input LieTensor (Lie Group or Lie Algebra).
 
         other (:obj:`Tensor` or :obj:`LieTensor`): the value for input to be multiplied by.
 
@@ -184,7 +184,7 @@ def matmul(input, other):
     :obj:`LieTensor` @ :obj:`Tensor` -> :obj:`Tensor` (group action)
 
     Args:
-        input (:obj:`LieTensor`) the input LieTensor (Lie Group or Lie Algebra).
+        input (:obj:`LieTensor`): the input LieTensor (Lie Group or Lie Algebra).
 
         other (:obj:`Tensor` or :obj:`LieTensor`): the value for input to be multiplied by.
 
