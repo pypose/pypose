@@ -123,11 +123,13 @@ class LieType:
 
     def translation(self, input):
         warnings.warn("Instance has no translation. Zero vector(s) is returned.")
-        return torch.zeros(input.lshape + (3,), dtype=input.dtype, device=input.device, requires_grad=input.requires_grad)
+        return torch.zeros(input.lshape + (3,), dtype=input.dtype, device=input.device,
+            requires_grad=input.requires_grad)
 
     def scale(self, input):
         warnings.warn("Instance has no scale. Scalar one(s) is returned.")
-        return torch.ones(input.lshape + (1,), dtype=input.dtype, device=input.device, requires_grad=input.requires_grad)
+        return torch.ones(input.lshape + (1,), dtype=input.dtype, device=input.device,
+            requires_grad=input.requires_grad)
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -143,25 +145,6 @@ class LieType:
     def randn(self, *args, sigma=1., **kwargs):
         scaled_sigma = 2.*sigma/math.sqrt(3)
         return scaled_sigma * torch.randn(*(tuple(args)+self.manifold), **kwargs)
-
-    @classmethod
-    def __op__(cls, lid, op, x, y=None):
-        inputs, out_shape = cls.__broadcast_inputs(x, y)
-        out = op.apply(lid, *inputs)
-        dim = -1 if out.nelement() != 0 else x.shape[-1]
-        return out.view(out_shape + (dim,))
-
-    @classmethod
-    def __broadcast_inputs(self, x, y):
-        """ Automatic broadcasting of missing dimensions """
-        if y is None:
-            xs, xd = x.shape[:-1], x.shape[-1]
-            return (x.reshape(-1, xd).contiguous(), ), x.shape[:-1]
-        out_shape = torch.broadcast_shapes(x.shape[:-1], y.shape[:-1])
-        shape = out_shape if out_shape != torch.Size([]) else (1,)
-        x = x.expand(shape+(x.shape[-1],)).reshape(-1,x.shape[-1]).contiguous()
-        y = y.expand(shape+(y.shape[-1],)).reshape(-1,y.shape[-1]).contiguous()
-        return (x, y), tuple(out_shape)
 
     @classmethod
     def cumops(self, X, dim, ops):
@@ -898,7 +881,8 @@ class LieTensor(torch.Tensor):
                     lt.ltype = ltype
                     if lt.shape[-1:] != lt.ltype.dimension:
                         link = 'https://pypose.org/docs/main/generated/pypose.LieTensor'
-                        warnings.warn('Tensor Shape Invalid by calling {}, go to {}'.format(func, link))
+                        warnings.warn('Tensor Shape Invalid by calling {}, ' \
+                            'go to {}'.format(func, link))
                     return lt
                 return t
             return tree_map(warp, data)
@@ -931,18 +915,20 @@ class LieTensor(torch.Tensor):
 
     def lview(self, *shape):
         r'''
-        Returns a new LieTensor with the same data as the self tensor but of a different :obj:`lshape`.
+        Returns a new LieTensor with the same data as the self tensor but of a different
+        :obj:`lshape`.
 
         Args:
             shape (torch.Size or int...): the desired size
 
         Returns:
-            A new lieGroup tensor sharing with the same data as the self tensor but of a different shape.
+            A new lieGroup tensor sharing with the same data as the self tensor but of a
+            different shape.
 
         Note:
             The only difference from :meth:`view` is the last dimension is hidden.
 
-            See `Tensor.view <https://pytorch.org/docs/stable/generated/torch.Tensor.view.html?highlight=view#torch.Tensor.view>`_
+            See `Tensor.view <https://tinyurl.com/mrds8nmd>`_
             for its usage.
 
         Examples:
