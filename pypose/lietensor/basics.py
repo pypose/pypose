@@ -122,6 +122,7 @@ def add(input, other, alpha=1):
     '''
     return input.add(other, alpha)
 
+
 def mul(input, other):
     r'''
     Multiplies input LieTensor by other.
@@ -136,39 +137,30 @@ def mul(input, other):
     Args:
         input (:obj:`LieTensor`): the input LieTensor (Lie Group or Lie Algebra).
 
-        other (:obj:`Number`, :obj:`Tensor`, or :obj:`LieTensor`): the value for input to be multiplied by.
+        other (:obj:`Number`, :obj:`Tensor`, or :obj:`LieTensor`): the value for input to be
+            multiplied by.
 
     Return:
         :obj:`Tensor`/:obj:`LieTensor`: the product of ``input`` and ``other``.
 
     .. list-table:: List of :obj:`pypose.mul` cases 
-        :widths: 25 6 30 6 25
+        :widths: 25 30 25
         :header-rows: 1
 
         * - input :obj:`LieTensor`
-          - :math:`*`
           - other
-          - :math:`=` 
           - output
         * - Lie Algebra
-          - :math:`*`
           - :obj:`Number`
-          - :math:`=` 
           - :obj:`Lie Algebra`
         * - Lie Group
-          - :math:`*`
           - :obj:`Tensor` :math:`\in \mathbb{R^{*\times3}}`
-          - :math:`=` 
           - :obj:`Tensor`
         * - Lie Group
-          - :math:`*`
           - :obj:`Tensor` :math:`\in \mathbb{R^{*\times4}}`
-          - :math:`=` 
           - :obj:`Tensor`
         * - Lie Algebra or Lie Group
-          - :math:`*`
           - :obj:`LieTensor`
-          - :math:`=` 
           - :obj:`LieTensor`
 
     See :obj:`Act()` for multiplying by a Tensor.
@@ -194,7 +186,8 @@ def mul(input, other):
             so3Type LieTensor:
             LieTensor([ 1.5090, -5.1231,  3.8919])
 
-        * :obj:`Lie Group` :math:`*` :obj:`Tensor` :math:`\in \mathbb{R^{*\times3}}` :math:`=` :obj:`Tensor`
+        * :obj:`Lie Group` :math:`*` :obj:`Tensor` :math:`\in \mathbb{R^{*\times3}}`
+          :math:`=` :obj:`Tensor`
 
             >>> x = pp.randn_SO3()
             >>> a = torch.randn(3)
@@ -204,7 +197,8 @@ def mul(input, other):
             >>> x * a
             >>> tensor([-1.9929,  1.2682, -1.5167])
 
-        * :obj:`Lie Group` :math:`*` :obj:`Tensor` :math:`\in \mathbb{R^{*\times4}}` :math:`=` :obj:`Tensor`
+        * :obj:`Lie Group` :math:`*` :obj:`Tensor` :math:`\in \mathbb{R^{*\times4}}`
+          :math:`=` :obj:`Tensor`
 
             >>> a = torch.randn(4)
             >>> a
@@ -222,7 +216,8 @@ def mul(input, other):
             SO3Type LieTensor:
             LieTensor([-0.0935, -0.4392,  0.8670,  0.2162])
     '''
-    return input.__mul__(other)
+    return input * other
+
 
 def matmul(input, other):
     r'''
@@ -244,28 +239,20 @@ def matmul(input, other):
         :obj:`Tensor`/:obj:`LieTensor`: the product of ``input`` and ``other``.
 
     .. list-table:: List of :obj:`pypose.matmul` cases 
-        :widths: 25 6 30 6 25
+        :widths: 25 30 25
         :header-rows: 1
 
         * - input :obj:`LieTensor`
-          - @
           - other
-          - :math:`=` 
           - output
         * - Lie Group
-          - @
           - :obj:`Tensor` :math:`\in \mathbb{R^{*\times3}}`
-          - :math:`=` 
           - :obj:`Tensor`
         * - Lie Group
-          - @
           - :obj:`Tensor` :math:`\in \mathbb{R^{*\times4}}`
-          - :math:`=` 
           - :obj:`Tensor`
         * - Lie Algebra or Lie Group
-          - @
           - :obj:`LieTensor`
-          - :math:`=` 
           - :obj:`LieTensor`
 
     See :obj:`Act()` for multiplying by a Tensor.
@@ -286,7 +273,8 @@ def matmul(input, other):
         so3Type LieTensor:
         LieTensor([-1.8603,  0.1879,  0.2031])
 
-        * :obj:`Lie Group` @ :obj:`Tensor` :math:`\in \mathbb{R^{*\times3}}` :math:`=` :obj:`Tensor`
+        * :obj:`Lie Group` @ :obj:`Tensor` :math:`\in \mathbb{R^{*\times3}}`
+          :math:`=` :obj:`Tensor`
 
             >>> x = pp.randn_SO3()
             >>> a = torch.randn(3)
@@ -296,7 +284,8 @@ def matmul(input, other):
             >>> x @ a
             tensor([-0.8599,  0.4530,  1.1068])
 
-        * :obj:`Lie Group` @ :obj:`Tensor` :math:`\in \mathbb{R^{*\times4}}` :math:`=` :obj:`Tensor`
+        * :obj:`Lie Group` @ :obj:`Tensor` :math:`\in \mathbb{R^{*\times4}}`
+          :math:`=` :obj:`Tensor`
 
             >>> a = torch.randn(4)
             >>> a 
@@ -304,7 +293,8 @@ def matmul(input, other):
             >>> x @ a
             tensor([-1.1741, -0.2477,  1.0479, -0.3036])
     '''
-    return input.__matmul__(other)
+    return input @ other
+
 
 def cumops_(input, dim, ops):
     r'''

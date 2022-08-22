@@ -1634,7 +1634,7 @@ def Inv(x):
 
 @assert_ltype
 def Mul(x, y):
-    return x * y
+    return x @ y
 
 
 @assert_ltype
