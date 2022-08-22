@@ -86,7 +86,7 @@ class System(nn.Module):
         ...                           [cc/10,    1.]])
         ...         B = torch.tensor([[ss],
         ...                           [1.]])
-        ...         return (state.matmul(A) + B.matmul(input)).squeeze()
+        ...         return state.matmul(A) + B.matmul(input)
         ...
         ...     def observation(self, state, input, t):
         ...         return state + t
