@@ -191,7 +191,7 @@ def test_lietensor():
 
     x = pp.randn_SO3(2, device=device)
     p = pp.randn_so3(2, device=device)
-    # x.Jinvp(p)
+    x.Jinvp(p)
 
     from torch.autograd.functional import jacobian
 
