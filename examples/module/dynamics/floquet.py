@@ -64,12 +64,12 @@ if __name__ == "__main__":
 
     # Jacobian computation - Find jacobians at the last step
     vars = ['A', 'B', 'C', 'D', 'c1', 'c2']
-    solver.set_ref_point()
+    solver.set_refpoint()
     [print(_v, getattr(solver, _v)) for _v in vars]
 
     # Jacobian computation - Find jacobians at the 5th step
     idx = 5
-    solver.set_ref_point(ref_state=state_all[idx], ref_input=input[idx], ref_t=time[idx])
+    solver.set_refpoint(state=state_all[idx], input=input[idx], t=time[idx])
     [print(_v, getattr(solver, _v)) for _v in vars]
 
     plt.show()

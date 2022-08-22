@@ -21,23 +21,21 @@ class System(nn.Module):
     step, states, inputs, and observations, respectively.
 
     Note:
-        Here we choose to work with a discrete-time system, since typically in numerical
-        simulations and control applications, the dynamical systems are usually discretized
-        in time.
-
-        The first time step is **0**.
-
-    To use the class, the user need to define two methods :obj:`state_transition` and
-    :obj:`observation`, which are used in the :obj:`forward` method. The :obj:`forward`
-    method advances the dynamical system by one time step, and is the function that is
-    back-propagated in the learning process.
+        To use the class, the users need to inherit this class and define methods
+        :obj:`state_transition` and :obj:`observation`, which are automaticall called by
+        internal :obj:`forward` method.
+        The system timestamp (starting from **0**) is also self-added automatically once
+        the :obj:`forward` method is called.
 
     Note:
 
-        **Linearization**
+        This class provides automatic **linearlization** at a reference point
+        :math:`\chi^*=(\mathbf{x}^*, \mathbf{u}^*, t^*)` along a trajectory.
+        One can directly call those linearized system matrices as properties including
+        :obj:`A`, :obj:`B`, :obj:`C`, :obj:`D`, :obj:`c1`, and :obj:`c2`, after calling
+        a method :obj:`set_refpoint`.
 
-        This class provides an approach to linearize the system at a reference point
-        :math:`\chi^*=(\mathbf{x}^*, \mathbf{u}^*, t^*)` along a trajectory. Consider a point
+        Consider a point
         :math:`\chi=(\mathbf{x}^*+\delta\mathbf{x}, \mathbf{u}^*+\delta\mathbf{u}, t^*)` near
         :math:`\chi^*`. We have
 
@@ -58,9 +56,6 @@ class System(nn.Module):
             \mathbf{g}(\mathbf{x}, \mathbf{u}, t^*) \approx \mathbf{C}\mathbf{x} \
                         + \mathbf{D}\mathbf{u} + \mathbf{c}_2
 
-        One can directly call those properties :obj:`A`, :obj:`B`, :obj:`C`, :obj:`D`, 
-        :obj:`c1`, and :obj:`c2`.
-
         The notion of linearization is slightly different from that in dynamical system
         theory. First, the linearization can be done for arbitrary point(s), not limit to
         the equilibrium point(s), and therefore the extra constant terms :math:`\mathbf{c}_1`
@@ -68,7 +63,7 @@ class System(nn.Module):
         by the full states and inputs: :math:`\mathbf{x}` and :math:`\mathbf{u}`, rather than 
         the perturbation format: :math:`\delta \mathbf{x}` and :math:`\delta \mathbf{u}`
         so that the model is consistent with, e.g., the LTI model and the iterative LQR
-        solver.
+        solver. More details go to :meth:`LTI`.
 
     Example:
 
@@ -85,26 +80,25 @@ class System(nn.Module):
         ...         super(Floquet, self).__init__()
         ...
         ...     def state_transition(self, state, input, t):
-        ...         cc = torch.cos(2*math.pi*t/100)
-        ...         ss = torch.sin(2*math.pi*t/100)
-        ...         A = torch.tensor([
-        ...             [1., cc/10],
-        ...             [cc/10, 1.]])
-        ...         B = torch.tensor([
-        ...             [ss],
-        ...             [1.]])
+        ...         cc = torch.cos(2 * math.pi * t / 100)
+        ...         ss = torch.sin(2 * math.pi * t / 100)
+        ...         A = torch.tensor([[   1., cc/10],
+        ...                           [cc/10,    1.]])
+        ...         B = torch.tensor([[ss],
+        ...                           [1.]])
         ...         return (state.matmul(A) + B.matmul(input)).squeeze()
         ...
         ...     def observation(self, state, input, t):
         ...         return state + t
         ...
         >>> solver = Floquet()
-        >>> time_curr = 8.       # We start from t=8, and advance one step to t=9
-        >>> input = torch.sin(2*math.pi*torch.tensor(time_curr)/50.)
+        >>> time_curr = 8 # We start from t = 8, and advance one step to t = 9
+        >>> input = torch.sin(2 * math.pi * torch.tensor(time_curr) / 50)
         >>> state_curr = torch.tensor([1., 1.])
-        >>> solver.reset(t=time_curr)
+        >>> solver.reset(t = time_curr)
         >>> state_next, obser_curr = solver(state_curr, input)
-        >>> solver.set_ref_point()
+        ... 
+        >>> solver.set_refpoint()
         >>> print(state_next)
         >>> print(obser_curr)
         >>> print(solver.A)
@@ -135,12 +129,13 @@ class System(nn.Module):
 
         Note:
             The :obj:`forward` method implicitly increments the time step via :obj:`forward_hook`.
-            :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity such as 
-            time varying system. One can directly access the current time via the property :obj:`t`.
+            :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity
+            such as time varying system. One can directly access the current system time via the
+            property :obj:`systime`.
         '''
         self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
-        return self.state_transition(self.state, self.input, self.sys_time), \
-            self.observation(self.state, self.input, self.sys_time)
+        return self.state_transition(self.state, self.input, self.systime), \
+            self.observation(self.state, self.input, self.systime)
 
     def state_transition(self, state, input, t=None):
         r'''
@@ -153,7 +148,8 @@ class System(nn.Module):
             Tensor: The state of the system at next time step
 
         Note:
-            The users need to define this method and can access the current time via the property :obj:`t`.
+            The users need to define this method and can access the current time via the property
+            :obj:`systime`.
         '''
         raise NotImplementedError("The users need to define their own state transition method")
 
@@ -168,38 +164,41 @@ class System(nn.Module):
             Tensor: The observation of the system at the current step
 
         Note:
-            The users need to define this method and can access the current time via the property :obj:`t`.
+            The users need to define this method and can access the current system time via the
+            property :obj:`systime`.
         '''
         raise NotImplementedError("The users need to define their own observation method")
 
     def reset(self, t=0):
         self._t.fill_(t)
 
-    def set_ref_point(self, ref_state=None, ref_input=None, ref_t=None):
+    def set_refpoint(self, state=None, input=None, t=None):
         r'''
         Function to set the reference point for linearization.
 
-        If `ref_state = None` the reference point is the one from the most recent time step.
-
         Args: 
-            ref_state (:obj:`Tensor`): The state of the dynamical system.  Default: :obj:`None`.
-            ref_input (:obj:`Tensor`): The input to the dynamical system.  Default: :obj:`None`.
-            ref_t (:obj:`Tensor`): The time step of the dynamical system.  Default: :obj:`None`.
+            state (:obj:`Tensor`): The reference state of the dynamical system. If ``None``,
+                the the most recent state is taken. Default: ``None``.
+            input (:obj:`Tensor`): The reference input to the dynamical system. If ``None``,
+                the the most recent input is taken. Default: ``None``.
+            t (:obj:`Tensor`): The reference time step of the dynamical system. If ``None``,
+                the the most recent timestamp is taken. Default: ``None``.
 
         Returns:
             None
-                
+
         Warning:
-            For nonlinear systems, the users have to call this function before getting the linearized system.
+            For nonlinear systems, the users have to call this function before getting the
+            linearized system.
         '''
-        self._ref_state = torch.tensor(self.state) if ref_state is None else torch.atleast_1d(ref_state)
-        self._ref_input = torch.tensor(self.input) if ref_input is None else torch.atleast_1d(ref_input)
-        self._ref_t = self.sys_time if ref_t is None else ref_t
+        self._ref_state = torch.tensor(self.state) if state is None else torch.atleast_1d(state)
+        self._ref_input = torch.tensor(self.input) if input is None else torch.atleast_1d(input)
+        self._ref_t = self.systime if t is None else t
         self._ref_f = self.state_transition(self._ref_state, self._ref_input, self._ref_t)
         self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
 
     @property
-    def sys_time(self):
+    def systime(self):
         r'''
             System time, automatically advanced by :obj:`forward_hook`.
         '''
@@ -287,8 +286,7 @@ class LTI(System):
         c1 (:obj:`Tensor`): The constant input of LTI system,
         c2 (:obj:`Tensor`): The constant output of LTI system.
 
-    Every linear time-invariant lumped system can be described by a set of equations 
-    (state-space equation) of the form:
+    A linear time-invariant lumped system can be described by state-space equation of the form:
 
     .. math::
         \begin{align*}
@@ -296,29 +294,24 @@ class LTI(System):
             \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2 \\
         \end{align*}
 
-    where we use :math:`\mathbf{x}` and :math:`\mathbf{u}` to represent state and input 
-    of the current timestamp of LTI system.
-            
-    Here, we consider the discrete-time system dynamics.  
-        
-    Note:
-        According to the actual physical meaning, the dimensions of A, B, C, D must be 
-        the consistent, whether in batch or not. :obj:`A`, :obj:`B`, :obj:`C`, :obj:`D`, 
-        :obj:`x`, :obj:`u` could be a single input or in a batch. In the batch case, 
-        their dimensions must be consistent so that they can be multiplied for each channel.
-             
-        Here, variables are given as row vectors.
+    where :math:`\mathbf{x}` and :math:`\mathbf{u}` are state and input of the current
+    timestamp of LTI system.
 
+    Note:
+        The variables including state and input are row vectors, which is the last dimension of
+        a Tensor. :obj:`A`, :obj:`B`, :obj:`C`, :obj:`D`, :obj:`x`, :obj:`u` could be a single
+        matrix or batched matrices. In the batch case, their dimensions must be consistent so that
+        they can be multiplied for each channel.
 
     Example:
-        >>> A = torch.randn((2, 3, 3))
-        >>> B = torch.randn((2, 3, 2))
-        >>> C = torch.randn((2, 3, 3))
-        >>> D = torch.randn((2, 3, 2))
-        >>> c1 = torch.randn((2, 1, 3))
-        >>> c2 = torch.randn((2, 1, 3))
-        >>> state = torch.randn((2, 1, 3))
-        >>> input = torch.randn((2, 1, 2))
+        >>> A = torch.randn(2, 3, 3)
+        >>> B = torch.randn(2, 3, 2)
+        >>> C = torch.randn(2, 3, 3)
+        >>> D = torch.randn(2, 3, 2)
+        >>> c1 = torch.randn(2, 1, 3)
+        >>> c2 = torch.randn(2, 1, 3)
+        >>> state = torch.randn(2, 1, 3)
+        >>> input = torch.randn(2, 1, 2)
         >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
         >>> lti(state, input)
         tensor([[[-8.5639,  0.0523, -0.2576]],

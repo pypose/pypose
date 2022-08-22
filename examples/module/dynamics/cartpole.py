@@ -71,14 +71,14 @@ if __name__ == "__main__":
 
     # Create time plots to show dynamics
     x, xdot, theta, thetadot = state_all.T
-    x_fig = createTimePlot(time, x, figname="x Plot", xlabel="Time", ylabel="x", title="x Plot")
+    x_fig = createTimePlot(time, x, figname ="x Plot", xlabel="Time", ylabel="x", title="x Plot")
     xdot_fig = createTimePlot(time, xdot, figname="x dot Plot", xlabel="Time", ylabel="x dot", title="x dot Plot")
-    theta_fig = createTimePlot(time ,theta, figname="theta Plot", xlabel="Time", ylabel="theta", title="theta Plot")
+    theta_fig = createTimePlot(time, theta, figname="theta Plot", xlabel="Time", ylabel="theta", title="theta Plot")
     thetadot_fig = createTimePlot(time, thetadot, figname="theta dot Plot", xlabel="Time", ylabel="theta dot", title="theta dot Plot")
 
     # Jacobian computation - Find jacobians at the last step
     jacob_state, jacob_input = state_all[-1,:].T, input[-1]
-    cartPoleSolver.set_ref_point(ref_state=jacob_state, ref_input=jacob_input.unsqueeze(0), ref_t=time[-1])
+    cartPoleSolver.set_refpoint(state=jacob_state, input=jacob_input.unsqueeze(0), t=time[-1])
     A = cartPoleSolver.A
     B = cartPoleSolver.B
     C = cartPoleSolver.C
