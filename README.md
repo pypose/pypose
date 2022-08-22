@@ -1,5 +1,4 @@
 # pypose
-PyPose = (GTSAM | G2O) x PyTorch
 
 To connect classic robotics with modern learning methods.
 
@@ -9,7 +8,7 @@ To connect classic robotics with modern learning methods.
 
 On Ubuntu, MasOS, or Windows, run:
 
-    pip install -r requirements.txt
+    pip install -r requirements/main.txt
 
 1.2 Install locally:
 
@@ -19,8 +18,6 @@ On Ubuntu, MasOS, or Windows, run:
 1.3 Run Test
 
     pytest
-
-To rebuild pypose, run `rm -rf build/ *.so` to clean the previous build first.
 
 ## 2. For Contributors
 
