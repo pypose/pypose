@@ -35,6 +35,8 @@ def so3_Jl_inv(x):
     coef2[~idx] = 1.0 / 12.0
     return (I - 0.5 * K + coef2 * (K @ K))
 
+def so3_adj(x):
+    return vec2skew(x)
 
 def calcQ(x):
     tau, phi = x[..., :3], x[..., 3:]
@@ -75,6 +77,13 @@ def se3_Jl_inv(x):
     Jl_inv_6x6[..., 3:, 3:] = Jl_inv_3x3
     return Jl_inv_6x6
 
+def se3_adj(x):
+    adj_6x6 = torch.zeros((x.shape[:-1]+(6, 6)), device=x.device, dtype=x.dtype, requires_grad=False)
+    Phi = vec2skew(x[..., 3:])
+    adj_6x6[..., :3, :3] = Phi
+    adj_6x6[..., :3, 3:] = vec2skew(x[..., :3])
+    adj_6x6[..., 3:, 3:] = Phi
+    return adj_6x6
 
 def rxso3_Ws(x):
     rotation, sigma = x[..., :3], x[..., 3]
@@ -128,12 +137,15 @@ def rxso3_Jl(x):
     J[..., :3, :3] = so3_Jl(x[..., :3])
     return J
 
-
 def rxso3_Jl_inv(x):
     J_inv = torch.eye(4, device=x.device, dtype=x.dtype).repeat(x.shape[:-1]+(1, 1))
     J_inv[..., :3, :3] = so3_Jl_inv(x[..., :3])
     return J_inv
 
+def rxso3_adj(x):
+    adj_4x4 = torch.zeros((x.shape[:-1]+(4, 4)), device=x.device, dtype=x.dtype, requires_grad=False)
+    adj_4x4[..., :3, :3] = vec2skew(x[..., :3])
+    return adj_4x4
 
 def sim3_adj(x):
     tau, phi, sigma = x[..., :3], x[..., 3:6], x[..., 6:]
@@ -613,6 +625,78 @@ class Sim3_Act4(torch.autograd.Function):
         return torch.cat((X_grad.squeeze(-2), zero), dim = -1), p_grad.squeeze(-2)
 
 
+class SO3_AdjXa(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, a):
+        adj_matrix = SO3_Adj(X)
+        out = (adj_matrix @ a.unsqueeze(-1)).squeeze(-1)
+        ctx.save_for_backward(out, adj_matrix)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        out, adj_matrix = ctx.saved_tensors
+        X_grad = -grad_output.unsqueeze(-2) @ so3_adj(out)
+        a_grad = grad_output.unsqueeze(-2) @ adj_matrix
+        zero = torch.zeros(out.shape[:-1]+(1,), device=out.device, dtype=out.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad.squeeze(-2)
+
+
+class SE3_AdjXa(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, a):
+        adj_matrix = SE3_Adj(X)
+        out = (adj_matrix @ a.unsqueeze(-1)).squeeze(-1)
+        ctx.save_for_backward(out, adj_matrix)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        out, adj_matrix = ctx.saved_tensors
+        X_grad = -grad_output.unsqueeze(-2) @ se3_adj(out)
+        a_grad = grad_output.unsqueeze(-2) @ adj_matrix
+        zero = torch.zeros(out.shape[:-1]+(1,), device=out.device, dtype=out.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad.squeeze(-2)
+
+
+class RxSO3_AdjXa(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, a):
+        adj_matrix = RxSO3_Adj(X)
+        out = (adj_matrix @ a.unsqueeze(-1)).squeeze(-1)
+        ctx.save_for_backward(out, adj_matrix)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        out, adj_matrix = ctx.saved_tensors
+        X_grad = -grad_output.unsqueeze(-2) @ rxso3_adj(out)
+        a_grad = grad_output.unsqueeze(-2) @ adj_matrix
+        zero = torch.zeros(out.shape[:-1]+(1,), device=out.device, dtype=out.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad.squeeze(-2)
+
+
+class Sim3_AdjXa(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, a):
+        adj_matrix = Sim3_Adj(X)
+        out = (adj_matrix @ a.unsqueeze(-1)).squeeze(-1)
+        ctx.save_for_backward(out, adj_matrix)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        out, adj_matrix = ctx.saved_tensors
+        X_grad = -grad_output.unsqueeze(-2) @ sim3_adj(out)
+        a_grad = grad_output.unsqueeze(-2) @ adj_matrix
+        zero = torch.zeros(out.shape[:-1]+(1,), device=out.device, dtype=out.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad.squeeze(-2)
+
+
 class SO3_Mul(torch.autograd.Function):
 
     @staticmethod
@@ -754,6 +838,74 @@ class Sim3_Inv(torch.autograd.Function):
         X_grad = -(grad_output[..., :-1].unsqueeze(-2) @ Sim3_Adj(Y)).squeeze(-2)
         zero = torch.zeros(Y.shape[:-1]+(1,), device=Y.device, dtype=Y.dtype)
         return torch.cat((X_grad, zero), dim = -1)
+
+
+class SO3_AdjTXa(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, a):
+        ctx.save_for_backward(X, a)
+        out = SO3_AdjXa.apply(SO3_Inv.apply(X), a)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        X, a = ctx.saved_tensors
+        a_grad = SO3_AdjXa.apply(X, grad_output)
+        X_grad = -a.unsqueeze(-2) @ so3_adj(a_grad)
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad
+
+
+class SE3_AdjTXa(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, a):
+        ctx.save_for_backward(X, a)
+        out = SE3_AdjXa.apply(SE3_Inv.apply(X), a)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        X, a = ctx.saved_tensors
+        a_grad = SE3_AdjXa.apply(X, grad_output)
+        X_grad = -a.unsqueeze(-2) @ se3_adj(a_grad)
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad
+
+
+class RxSO3_AdjTXa(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, a):
+        ctx.save_for_backward(X, a)
+        out = RxSO3_AdjXa.apply(RxSO3_Inv.apply(X), a)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        X, a = ctx.saved_tensors
+        a_grad = RxSO3_AdjXa.apply(X, grad_output)
+        X_grad = -a.unsqueeze(-2) @ rxso3_adj(a_grad)
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad
+
+
+class Sim3_AdjTXa(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, a):
+        ctx.save_for_backward(X, a)
+        out = Sim3_AdjXa.apply(Sim3_Inv.apply(X), a)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        X, a = ctx.saved_tensors
+        a_grad = Sim3_AdjXa.apply(X, grad_output)
+        X_grad = -a.unsqueeze(-2) @ sim3_adj(a_grad)
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad
 
 
 def broadcast_inputs(x, y):
