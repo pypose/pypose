@@ -21,7 +21,7 @@ VERSION = find_version("pypose/_version.py")
 
 
 # NOTE: PyPose MUST only require PyTorch
-requirements = ['torch==1.12.1', 'functorch==0.2.1', 'packaging']
+requirements = ['functorch==0.2.1', 'packaging']
 
 # open readme file and set long description
 with open("README.md", encoding="utf-8") as fh:
