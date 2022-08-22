@@ -136,7 +136,7 @@ def mul(input, other):
     Args:
         input (:obj:`LieTensor`): the input LieTensor (Lie Group or Lie Algebra).
 
-        other (:obj:`Scalar`, :obj:`Tensor`, or :obj:`LieTensor`): the value for input to be multiplied by.
+        other (:obj:`Number`, :obj:`Tensor`, or :obj:`LieTensor`): the value for input to be multiplied by.
 
     Return:
         :obj:`Tensor`/:obj:`LieTensor`: the product of ``input`` and ``other``.
