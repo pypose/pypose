@@ -131,3 +131,6 @@ dmypy.json
 
 # sphinx
 docs/source/generated
+
+# Operating system
+.DS_Store
