@@ -8,7 +8,7 @@ class System(nn.Module):
     r'''
     The base class of a general discrete-time system dynamics model.
     
-    The state transision function :math:`\mathbf{f}` and observation functions
+    The state transision function :math:`\mathbf{f}` and observation function
     :math:`\mathbf{g}` are given by:
 
     .. math::
@@ -18,11 +18,11 @@ class System(nn.Module):
         \end{aligned}
 
     where :math:`k`, :math:`\mathbf{x}`, :math:`\mathbf{u}`, :math:`\mathbf{y}` are the time
-    step, states, inputs, and observations, respectively.
+    step, state(s), input(s), and observation(s), respectively.
 
     Note:
-        To use the class, the users need to inherit this class and define methods
-        :obj:`state_transition` and :obj:`observation`, which are automaticall called by
+        To use the class, users need to inherit this class and define methods
+        :obj:`state_transition` and :obj:`observation`, which are automatically called by
         internal :obj:`forward` method.
         The system timestamp (starting from **0**) is also self-added automatically once
         the :obj:`forward` method is called.
@@ -130,7 +130,7 @@ class System(nn.Module):
         Note:
             The :obj:`forward` method implicitly increments the time step via :obj:`forward_hook`.
             :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity
-            such as time varying system. One can directly access the current system time via the
+            such as time-varying system. One can directly access the current system time via the
             property :obj:`systime`.
         '''
         self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
@@ -142,7 +142,7 @@ class System(nn.Module):
         Args:
             state (:obj:`Tensor`): The state of the dynamical system
             input (:obj:`Tensor`): The input to the dynamical system
-            t (:obj:`Tensor`): The time step of the dynamical system.  Default: :obj:`None`.
+            t (:obj:`Tensor`): The time step of the dynamical system.  Default: ``None``.
 
         Returns:
             Tensor: The state of the system at next time step
@@ -158,7 +158,7 @@ class System(nn.Module):
         Args:
             state (:obj:`Tensor`): The state of the dynamical system
             input (:obj:`Tensor`): The input to the dynamical system
-            t (:obj:`Tensor`): The time step of the dynamical system.  Default: :obj:`None`.
+            t (:obj:`Tensor`): The time step of the dynamical system.  Default: ``None``.
 
         Returns:
             Tensor: The observation of the system at the current step
@@ -352,7 +352,7 @@ class LTI(System):
 
     def observation(self, state, input, t=None):
         r'''
-        Return observation of LTI system at current step.
+        Return the observation of LTI system at current time step.
 
         .. math::
             \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2 \\
