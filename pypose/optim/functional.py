@@ -1,10 +1,10 @@
 import torch, functorch
 import sys, math, warnings
 from torch import nn, Tensor
-from torch.autograd.functional import jacobian
+# from torch.autograd.functional import jacobian
+from .sparse_jacobian import jacobian
 
-
-def modjac(model, input=None, create_graph=False, strict=False, vectorize=False, \
+def modjac(model, input=None, sparsity='dense', create_graph=False, strict=False, vectorize=False, \
                     strategy='reverse-mode', flatten=False):
     r'''
     Compute the model Jacobian with respect to the model parameters.
@@ -133,7 +133,7 @@ def modjac(model, input=None, create_graph=False, strict=False, vectorize=False,
         input = input if isinstance(input, tuple) else (input,)
         func_param = lambda *p: func(p, buffers, *input)
 
-    J = jacobian(func_param, params, create_graph=create_graph, strict=strict, \
+    J = jacobian(func_param, params, sparsity=sparsity, create_graph=create_graph, strict=strict, \
                     vectorize=vectorize, strategy=strategy)
 
     if flatten and isinstance(J, tuple):
