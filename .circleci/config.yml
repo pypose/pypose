@@ -150,7 +150,7 @@ jobs:
             export "PATH=~/miniconda3/bin:$PATH" && conda init bash && . $HOME/miniconda3/etc/profile.d/conda.sh
             conda activate pyenv
             pip install dist/pypose-*.whl
-            pip install -r requirements.txt
+            pip install -r requirements/main.txt
             mkdir pytest-results
             pytest --junitxml=pytest-results/junit.xml
       - store_test_results:
