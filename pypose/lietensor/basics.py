@@ -181,7 +181,7 @@ def mul(input, other):
         .. math::
             {i}^2 = {j}^2 = {k}^2 = {ijk} = -1,
 
-        Using these definitions, the product of these quaternions yields
+        Using these definitions, the product of these quaternions is
         
         .. math:: 
             \bm{x} \ast \bm{a} = 
@@ -357,7 +357,7 @@ def matmul(input, other):
         .. math::
             {i}^2 = {j}^2 = {k}^2 = {ijk} = -1,
 
-        Using these definitions, the product of these quaternions yields
+        Using these definitions, the product of these quaternions is
         
         .. math:: 
             \bm{x} \times \bm{a} = 
