@@ -1,3 +1,5 @@
+from ._version import __version__
+
 from .lietensor import LieTensor, Parameter, SO3, so3, SE3, se3, Sim3, sim3, RxSO3, rxso3
 from .lietensor import randn_like, randn_SE3, randn_SO3, randn_so3, randn_se3
 from .lietensor import randn_Sim3, randn_sim3, randn_RxSO3, randn_rxso3
