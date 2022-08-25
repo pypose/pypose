@@ -30,15 +30,10 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
 
 class LieType:
     '''LieTensor Type Base Class'''
-    def __init__(self, lid, dimension, embedding, manifold):
-        self._lid       = lid                     # LieType ID
+    def __init__(self, dimension, embedding, manifold):
         self._dimension = torch.Size([dimension]) # Data dimension
         self._embedding = torch.Size([embedding]) # Embedding dimension
         self._manifold  = torch.Size([manifold])  # Manifold dimension
-
-    @property
-    def lid(self):
-        return self._lid
 
     @property
     def dimension(self):
@@ -173,7 +168,7 @@ class LieType:
 
 class SO3Type(LieType):
     def __init__(self):
-        super().__init__(1, 4, 4, 3)
+        super().__init__(4, 4, 3)
 
     def Log(self, X):
         X = X.tensor() if hasattr(X, 'ltype') else X
@@ -280,7 +275,7 @@ class SO3Type(LieType):
 
 class so3Type(LieType):
     def __init__(self):
-        super().__init__(1, 3, 4, 3)
+        super().__init__(3, 4, 3)
 
     def Exp(self, x):
         x = x.tensor() if hasattr(x, 'ltype') else x
@@ -325,7 +320,7 @@ class so3Type(LieType):
 
 class SE3Type(LieType):
     def __init__(self):
-        super().__init__(3, 7, 7, 6)
+        super().__init__(7, 7, 6)
 
     def Log(self, X):
         X = X.tensor() if hasattr(X, 'ltype') else X
@@ -418,7 +413,7 @@ class SE3Type(LieType):
 
 class se3Type(LieType):
     def __init__(self):
-        super().__init__(3, 6, 7, 6)
+        super().__init__(6, 7, 6)
 
     def Exp(self, x):
         x = x.tensor() if hasattr(x, 'ltype') else x
@@ -449,7 +444,7 @@ class se3Type(LieType):
 
 class Sim3Type(LieType):
     def __init__(self):
-        super().__init__(4, 8, 8, 7)
+        super().__init__(8, 8, 7)
 
     def Log(self, X):
         X = X.tensor() if hasattr(X, 'ltype') else X
@@ -545,7 +540,7 @@ class Sim3Type(LieType):
 
 class sim3Type(LieType):
     def __init__(self):
-        super().__init__(4, 7, 8, 7)
+        super().__init__(7, 8, 7)
 
     def Exp(self, x):
         x = x.tensor() if hasattr(x, 'ltype') else x
@@ -579,7 +574,7 @@ class sim3Type(LieType):
 
 class RxSO3Type(LieType):
     def __init__(self):
-        super().__init__(2, 5, 5, 4)
+        super().__init__(5, 5, 4)
 
     def Log(self, X):
         X = X.tensor() if hasattr(X, 'ltype') else X
@@ -672,7 +667,7 @@ class RxSO3Type(LieType):
 
 class rxso3Type(LieType):
     def __init__(self):
-        super().__init__(2, 4, 5, 4)
+        super().__init__(4, 5, 4)
 
     def Exp(self, x):
         x = x.tensor() if hasattr(x, 'ltype') else x
