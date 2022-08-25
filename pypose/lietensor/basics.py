@@ -200,6 +200,17 @@ def mul(input, other):
             q_wq_w' - q_{xyz} \cdot q_{xyz}' + q_wq_{xyz}' + q_w'q_{xyz} + 
             q_{xyz} \times q_{xyz}'
 
+        Alternatively, using the Hamilton product, we have the following
+
+        .. math::
+            (\bm{x} \ast \bm{a})_{q_w} = q_wq_w' - q_xq_x' - q_yq_y' - q_zq_z',
+        .. math::
+            (\bm{x} \ast \bm{a})_{q_x} = q_wq_x' + q_xq_w' + q_yq_z' - q_zq_y',
+        .. math::
+            (\bm{x} \ast \bm{a})_{q_y} = q_wq_y' - q_xq_z' + q_yq_w' + q_zq_x,
+        .. math::
+            (\bm{x} \ast \bm{a})_{q_z} = q_wq_z' + q_xq_y' - q_yq_x' + q_zq_w',
+
     * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`SE3_type`
       (input :math:`\bm{x}` is an instance of :meth:`SE3`):
 
@@ -241,13 +252,22 @@ def mul(input, other):
         .. math::
             \bm{x} = [t_x, t_y, t_z, q_x, q_y, q_z, q_w, s],
         .. math::
-            \bm{x} = [t_x', t_y', t_z', q_x', q_y', q_z', q_w', s'],
+            \bm{a} = [t_x', t_y', t_z', q_x', q_y', q_z', q_w', s'],
         
-        Peforms same calculations as with :obj:`RxSO3_type` to calculate the 
-        quaternion and scaling factor of the product :math:`(\bm{x} \ast \bm{a})_{q, s}`,
-        using an SE3 type instead of an SO3 type. Uses the same calculations as with 
-        :obj:`SE3_type` to calculate the translational vector of the product 
-        :math:`(\bm{x} \ast \bm{a})_{t}`.
+        Based off of the calculations for the previous types, we have the following
+
+        .. math::
+            (\bm{x} \ast \bm{a})_{q_w} = q_wq_w' - q_xq_x' - q_yq_y' - q_zq_z',
+        .. math::
+            (\bm{x} \ast \bm{a})_{q_x} = q_wq_x' + q_xq_w' + q_yq_z' - q_zq_y',
+        .. math::
+            (\bm{x} \ast \bm{a})_{q_y} = q_wq_y' - q_xq_z' + q_yq_w' + q_zq_x,
+        .. math::
+            (\bm{x} \ast \bm{a})_{q_z} = q_wq_z' + q_xq_y' - q_yq_x' + q_zq_w',
+        .. math::
+            (\bm{x} \ast \bm{a})_{s} = ss'
+        .. math::
+            (\bm{x} \ast \bm{a})_{t} = \bm{x}_q \ast \bm{a}_t + \bm{x}_t
 
     Examples:
         The following operations are equivalent.
@@ -376,6 +396,17 @@ def matmul(input, other):
             q_wq_w' - q_{xyz} \cdot q_{xyz}' + q_wq_{xyz}' + q_w'q_{xyz} + 
             q_{xyz} \times q_{xyz}'
 
+        Alternatively, using the Hamilton product, we have the following
+
+        .. math::
+            (\bm{x} \times \bm{a})_{q_w} = q_wq_w' - q_xq_x' - q_yq_y' - q_zq_z',
+        .. math::
+            (\bm{x} \times \bm{a})_{q_x} = q_wq_x' + q_xq_w' + q_yq_z' - q_zq_y',
+        .. math::
+            (\bm{x} \times \bm{a})_{q_y} = q_wq_y' - q_xq_z' + q_yq_w' + q_zq_x,
+        .. math::
+            (\bm{x} \times \bm{a})_{q_z} = q_wq_z' + q_xq_y' - q_yq_x' + q_zq_w',
+
     * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`SE3_type`
       (input :math:`\bm{x}` is an instance of :meth:`SE3`):
 
@@ -417,13 +448,22 @@ def matmul(input, other):
         .. math::
             \bm{x} = [t_x, t_y, t_z, q_x, q_y, q_z, q_w, s],
         .. math::
-            \bm{x} = [t_x', t_y', t_z', q_x', q_y', q_z', q_w', s'],
+            \bm{a} = [t_x', t_y', t_z', q_x', q_y', q_z', q_w', s'],
         
-        Peforms same calculations as with :obj:`RxSO3_type` to calculate the 
-        quaternion and scaling factor of the product :math:`(\bm{x} \times \bm{a})_{q, s}`,
-        using an SE3 type instead of an SO3 type. Uses the same calculations as with 
-        :obj:`SE3_type` to calculate the translational vector of the product 
-        :math:`(\bm{x} \times \bm{a})_{t}`.
+        Based off of the calculations for the previous types, we have the following
+
+        .. math::
+            (\bm{x} \times \bm{a})_{q_w} = q_wq_w' - q_xq_x' - q_yq_y' - q_zq_z',
+        .. math::
+            (\bm{x} \times \bm{a})_{q_x} = q_wq_x' + q_xq_w' + q_yq_z' - q_zq_y',
+        .. math::
+            (\bm{x} \times \bm{a})_{q_y} = q_wq_y' - q_xq_z' + q_yq_w' + q_zq_x,
+        .. math::
+            (\bm{x} \times \bm{a})_{q_z} = q_wq_z' + q_xq_y' - q_yq_x' + q_zq_w',
+        .. math::
+            (\bm{x} \times \bm{a})_{s} = ss'
+        .. math::
+            (\bm{x} \times \bm{a})_{t} = \bm{x}_q \times \bm{a}_t + \bm{x}_t
 
     Examples:
         The following operations are equivalent.
