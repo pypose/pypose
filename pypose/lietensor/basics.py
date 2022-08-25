@@ -160,8 +160,11 @@ def mul(input, other):
           - :obj:`Tensor` :math:`\in \mathbb{R^{*\times4}}`
           - :obj:`Tensor`
         * - Lie Group
-          - :obj:`Lie Group (input.ltype)` 
+          - :obj:`Lie Group` 
           - :obj:`Lie Group`
+
+    When multiplying a Lie Group by another Lie Group, they must have the 
+    same Lie type.
 
     See :obj:`Act()` for multiplying by a Tensor.
 
@@ -171,11 +174,14 @@ def mul(input, other):
       (input :math:`\bm{x}` is an instance of :meth:`SO3`):
 
         .. math::
-            \bm{x} = [q_x, q_y, q_z, q_w] = q_xi + q_yj + q_zk + q_w,
+            q_i = [q_i^x, q_i^y, q_i^z, q_i^w],
+            
         .. math::
-            \bm{a} = [q_x', q_y', q_z', q_w'] = q_x'i + q_y'j + q_z'k + q_w',
+            \bm{x}_i = [q_i] = q_i^xi + q_i^yj + q_i^zk + q_i^w,
+        .. math::
+            \bm{a}_i = [q_i'] = q_i^{x'}i + q_i^{y'}j + q_i^{z'}k + q_i^{w'},
 
-        where :math:`\bm{i}`, :math:`\bm{j}`, :math:`\bm{k}`, and :math:`\bm{1}` 
+        and :math:`i`, :math:`j`, :math:`k`, and :math:`1` 
         represent the standard basis of quaternions and 
 
         .. math::
@@ -184,90 +190,64 @@ def mul(input, other):
         Using these definitions, the product of these quaternions is
         
         .. math:: 
-            \bm{x} \ast \bm{a} = 
-            (q_xi + q_yj + q_zk + q_w) \ast (q_x'i + q_y'j + q_z'k + q_w'),
-        
-        And rearranging terms simplifies this product to
+            \bm{y}_i = 
+            (q_i^xi + q_i^yj + q_i^zk + q_i^w) \ast (q_i^{x'}i + q_i^{y'}j + q_i^{z'}k + q_i^{w'}),
+
+        Using the Hamilton product, we have the following
 
         .. math::
-            (\bm{x} \ast \bm{a})_{xyz} = 
-            q_{xyz} \times q_{xyz}' + q_wq_{xyz}' + q_w'q_{xyz},
-        .. math::
-            (\bm{x} \ast \bm{a})_{w} = 
-            q_wq_w' - q_{xyz} \cdot q_{xyz}',
-        .. math::
-            \bm{x} \ast \bm{a} = 
-            q_wq_w' - q_{xyz} \cdot q_{xyz}' + q_wq_{xyz}' + q_w'q_{xyz} + 
-            q_{xyz} \times q_{xyz}'
-
-        Alternatively, using the Hamilton product, we have the following
-
-        .. math::
-            (\bm{x} \ast \bm{a})_{q_w} = q_wq_w' - q_xq_x' - q_yq_y' - q_zq_z',
-        .. math::
-            (\bm{x} \ast \bm{a})_{q_x} = q_wq_x' + q_xq_w' + q_yq_z' - q_zq_y',
-        .. math::
-            (\bm{x} \ast \bm{a})_{q_y} = q_wq_y' - q_xq_z' + q_yq_w' + q_zq_x,
-        .. math::
-            (\bm{x} \ast \bm{a})_{q_z} = q_wq_z' + q_xq_y' - q_yq_x' + q_zq_w',
+            {\displaystyle \bm{y}_i={\begin{bmatrix}
+              q_i^wq_i^{w'} & -q_i^xq_i^{x'} & -q_i^yq_i^{y'} & -q_i^zq_i^{z'}\\
+              q_i^wq_i^{x'} & q_i^xq_i^{w'} & q_i^yq_i^{z'} & -q_i^zq_i^{y'}\\
+              q_i^wq_i^{y'} & -q_i^xq_i^{z'} & q_i^yq_i^{w'} & q_i^zq_i^{x'}\\
+              q_i^wq_i^{z'} & q_i^xq_i^{y'} & -q_i^yq_i^{x'} & q_i^zq_i^{w'}
+              \end{bmatrix}
+            }}
 
     * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`SE3_type`
       (input :math:`\bm{x}` is an instance of :meth:`SE3`):
 
+        .. math:: 
+            t_i = [t_i^x, t_i^y, t_i^z],
         .. math::
-            \bm{x} = [t_x, t_y, t_z, q_x, q_y, q_z, q_w],
+            \bm{x}_i = [t_i, q_i],
         .. math::
-            \bm{a} = [t_x', t_y', t_z', q_x', q_y', q_z', q_w'],
+            \bm{a}_i = [t_i', q_i'],
 
         Peforms same calculations as with :obj:`SO3_type` to calculate the 
-        quaternion of the product :math:`(\bm{x} \ast \bm{a})_{q}`, and, 
-        calculates the translational vector with the method below,
+        quaternion of the product, and, calculates the translational vector 
+        with the method below,
 
         .. math::
-            \bm{x}_{t} = [t_x, t_y, t_z],
-        .. math::
-            \bm{a}_{t} = [t_x', t_y', t_z'],
-        .. math::
-            \bm{x}_{q} = [q_x, q_y, q_z, q_w],
-        .. math::
-            (\bm{x} \ast \bm{a})_{t} = \bm{x}_q \ast \bm{a}_t + \bm{x}_t
+            \bm{y}_i = [q_i \ast t_i' + t_i, q_i * q_i']
             
     * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`RxSO3_type`
       (input :math:`\bm{x}` is an instance of :meth:`RxSO3`)
 
         .. math::
-            \bm{x} = [q_x, q_y, q_z, q_w, s],
+            \bm{x}_i = [q_i, s_i]
         .. math::
-            \bm{a} = [q_x', q_y', q_z', q_w', s'],
+            \bm{a}_i = [q_i', s_i']
 
         Peforms same calculations as with :obj:`SO3_type` to calculate the 
-        quaternion of the product :math:`(\bm{x} \ast \bm{a})_{q}`, and 
+        quaternion of the product 
 
         .. math::
-            (\bm{x} \ast \bm{a})_{s} = ss'
+            \bm{y}_i = [q_i \ast q_i', s_is_i']
 
     * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`Sim3_type`
       (input :math:`\bm{x}` is an instance of :meth:`Sim3`):
 
         .. math::
-            \bm{x} = [t_x, t_y, t_z, q_x, q_y, q_z, q_w, s],
-        .. math::
-            \bm{a} = [t_x', t_y', t_z', q_x', q_y', q_z', q_w', s'],
-        
-        Based off of the calculations for the previous types, we have the following
+            \bm{x}_i = [t_i, q_i, s_i],
+            \bm{a}_i = [t_i', q_i', s_i']
+
+        Peforms same calculations as with :obj:`RxSO3_type` to calculate the 
+        quaternion and scaling factor of the product, and uses same :obj:`SE3_type` 
+        calculations for the translational vector.
 
         .. math::
-            (\bm{x} \ast \bm{a})_{q_w} = q_wq_w' - q_xq_x' - q_yq_y' - q_zq_z',
-        .. math::
-            (\bm{x} \ast \bm{a})_{q_x} = q_wq_x' + q_xq_w' + q_yq_z' - q_zq_y',
-        .. math::
-            (\bm{x} \ast \bm{a})_{q_y} = q_wq_y' - q_xq_z' + q_yq_w' + q_zq_x,
-        .. math::
-            (\bm{x} \ast \bm{a})_{q_z} = q_wq_z' + q_xq_y' - q_yq_x' + q_zq_w',
-        .. math::
-            (\bm{x} \ast \bm{a})_{s} = ss'
-        .. math::
-            (\bm{x} \ast \bm{a})_{t} = \bm{x}_q \ast \bm{a}_t + \bm{x}_t
+            \bm{y}_i = [q_i \ast t_i' + t_i, q_i \ast q_i', s_is_i'] 
 
     Examples:
         The following operations are equivalent.

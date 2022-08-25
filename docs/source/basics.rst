@@ -11,7 +11,6 @@ Basics
     add
     add_
     mul
-    matmul
     Exp
     Log
     Inv
