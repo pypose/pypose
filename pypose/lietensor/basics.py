@@ -125,14 +125,14 @@ def add(input, other, alpha=1):
 
 def mul(input, other):
     r'''
-    Multiplies input LieTensor by other.
+    Multiply input LieTensor by other.
 
     .. math::
         \bm{y}_i =
         \bm{x}_i \ast \bm{a}_i
 
-    where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` value,
-    and :math:`\bm{y}` is the output value.
+    where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` Tensor or
+    LieTensor, and :math:`\bm{y}` is the output.
 
     Args:
         input (:obj:`LieTensor`): the input LieTensor (Lie Group or Lie Algebra).
@@ -166,131 +166,93 @@ def mul(input, other):
     When multiplying a Lie Group by another Lie Group, they must have the 
     same Lie type.
 
-    See :obj:`Act()` for multiplying by a Tensor.
-
-    For multpilying by a :obj:`Lie Group`, see below:
+    Note:
+        - When ``other`` is a Tensor, this operator is equivalent to :meth:`Act`.
+        - When ``other`` is a number and ``input`` is a Lie Algebra, this operator performs
+          simple element-wise multiplication.
+        - When ``input`` is a Lie Group, more details are shown below.
    
     * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`SO3_type`
       (input :math:`\bm{x}` is an instance of :meth:`SO3`):
 
-        .. math::
-            q_i = [q_i^x, q_i^y, q_i^z, q_i^w],
-            
-        .. math::
-            \bm{x}_i = [q_i] = q_i^xi + q_i^yj + q_i^zk + q_i^w,
-        .. math::
-            \bm{a}_i = [q_i'] = q_i^{x'}i + q_i^{y'}j + q_i^{z'}k + q_i^{w'},
-
-        and :math:`i`, :math:`j`, :math:`k`, and :math:`1` 
-        represent the standard basis of quaternions and 
-
-        .. math::
-            {i}^2 = {j}^2 = {k}^2 = {ijk} = -1,
-
-        Using these definitions, the product of these quaternions is
+      .. math::
+        {\displaystyle \bm{y}_i={\begin{bmatrix}
+              q_i^wq_i^{w'} - q_i^xq_i^{x'} -q_i^yq_i^{y'} - q_i^zq_i^{z'}\\
+              q_i^wq_i^{x'} + q_i^xq_i^{w'} +q_i^yq_i^{z'} - q_i^zq_i^{y'}\\
+              q_i^wq_i^{y'} - q_i^xq_i^{z'} +q_i^yq_i^{w'} + q_i^zq_i^{x'}\\
+              q_i^wq_i^{z'} + q_i^xq_i^{y'} -q_i^yq_i^{x'} + q_i^zq_i^{w'}
+              \end{bmatrix}
+        }^T},
+    
+      where :math:`\bm{x}_i = [q_i^x, q_i^y, q_i^z, q_i^w]` and
+      :math:`\bm{a}_i = [q_i^{x'}, q_i^{y'}, q_i^{z'}, q_i^{w'}]` are the ``input``
+      and ``other`` LieTensor, respectively
         
+    Note:
+        :math:`\mathbf{y}_i` can be simply derived by taking the complex number multiplication.
+
         .. math:: 
             \bm{y}_i = 
-            (q_i^xi + q_i^yj + q_i^zk + q_i^w) \ast (q_i^{x'}i + q_i^{y'}j + q_i^{z'}k + q_i^{w'}),
+            (q_i^x\mathbf{i} + q_i^y\mathbf{j} + q_i^z\mathbf{k} + q_i^w) \ast 
+            (q_i^{x'}\mathbf{i} + q_i^{y'}\mathbf{j} + q_i^{z'}\mathbf{k} + q_i^{w'}),
 
-        Using the Hamilton product, we have the following
+        where and :math:`\mathbf{i}` :math:`\mathbf{j}`, and :math:`\mathbf{k}` are the imaginary
+        units.
 
         .. math::
-            {\displaystyle \bm{y}_i={\begin{bmatrix}
-              q_i^wq_i^{w'} & -q_i^xq_i^{x'} & -q_i^yq_i^{y'} & -q_i^zq_i^{z'}\\
-              q_i^wq_i^{x'} & q_i^xq_i^{w'} & q_i^yq_i^{z'} & -q_i^zq_i^{y'}\\
-              q_i^wq_i^{y'} & -q_i^xq_i^{z'} & q_i^yq_i^{w'} & q_i^zq_i^{x'}\\
-              q_i^wq_i^{z'} & q_i^xq_i^{y'} & -q_i^yq_i^{x'} & q_i^zq_i^{w'}
-              \end{bmatrix}
-            }}
+            \mathbf{i}^2 = \mathbf{j}^2 = \mathbf{k}^2 = \mathbf{ijk} = -1
 
     * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`SE3_type`
       (input :math:`\bm{x}` is an instance of :meth:`SE3`):
 
-        .. math:: 
-            t_i = [t_i^x, t_i^y, t_i^z],
         .. math::
-            \bm{x}_i = [t_i, q_i],
-        .. math::
-            \bm{a}_i = [t_i', q_i'],
-
-        Peforms same calculations as with :obj:`SO3_type` to calculate the 
-        quaternion of the product, and, calculates the translational vector 
-        with the method below,
-
-        .. math::
-            \bm{y}_i = [q_i \ast t_i' + t_i, q_i * q_i']
+            \bm{y}_i = [\mathbf{q}_i * \mathbf{t}_i' + \mathbf{t}_i,
+                        \mathbf{q}_i * \mathbf{q}_i']
+        
+        where :math:`\bm{x}_i = [\mathbf{t}_i, \mathbf{q}_i]` and
+        :math:`\bm{a}_i = [\mathbf{t}_i', \mathbf{q}_i']` are the ``input`` and ``other``
+        LieTensor, respectively; :math:`\mathbf{t}_i`, :math:`\mathbf{t}_i'` and
+        :math:`\mathbf{q}_i`, :math:`\mathbf{q}_i'` are their translation and :obj:`SO3`
+        parts, respectively; the operator :math:`\ast` denotes the obj:`SO3_type`
+        multiplication introduced above.
             
     * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`RxSO3_type`
       (input :math:`\bm{x}` is an instance of :meth:`RxSO3`)
 
         .. math::
-            \bm{x}_i = [q_i, s_i]
-        .. math::
-            \bm{a}_i = [q_i', s_i']
+            \bm{y}_i = [\mathbf{q}_i * \mathbf{q}_i', s_is_i']
 
-        Peforms same calculations as with :obj:`SO3_type` to calculate the 
-        quaternion of the product 
-
-        .. math::
-            \bm{y}_i = [q_i \ast q_i', s_is_i']
+        where :math:`s_i` and :math:`s_i'` are the scale parts of the ``input`` and
+        ``other`` LieTensor, respectively.
 
     * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`Sim3_type`
       (input :math:`\bm{x}` is an instance of :meth:`Sim3`):
 
         .. math::
-            \bm{x}_i = [t_i, q_i, s_i],
-            \bm{a}_i = [t_i', q_i', s_i']
+            \bm{y}_i = [\mathbf{q}_i * \mathbf{t}_i' + \mathbf{t}_i,
+                            \mathbf{q}_i * \mathbf{q}_i', s_is_i'] 
 
-        Peforms same calculations as with :obj:`RxSO3_type` to calculate the 
-        quaternion and scaling factor of the product, and uses same :obj:`SE3_type` 
-        calculations for the translational vector.
-
-        .. math::
-            \bm{y}_i = [q_i \ast t_i' + t_i, q_i \ast q_i', s_is_i'] 
+        where :math:`\bm{x}_i = [\mathbf{t}_i, \mathbf{q}_i, s_i]` and
+        :math:`\bm{a}_i = [\mathbf{t}_i', \mathbf{q}_i', s_i']` are the ``input`` and
+        ``other`` LieTensor, respectively.
 
     Examples:
-        The following operations are equivalent.
+        * :obj:`Lie Algebra` :math:`*` :obj:`Number` :math:`\mapsto` :obj:`Lie Algebra`
 
-        >>> x = pp.randn_so3()
-        >>> x
-        so3Type LieTensor:
-        LieTensor([ 0.3018, -1.0246,  0.7784])
-        >>> a = 5
-        >>> x * a
-        so3Type LieTensor:
-        LieTensor([ 1.5090, -5.1231,  3.8919])
-        >>> pp.mul(x, 5)
-        so3Type LieTensor:
-        LieTensor([ 1.5090, -5.1231,  3.8919])
-
-        * :obj:`Lie Algebra` :math:`*` :obj:`Number` :math:`=` :obj:`Lie Algebra`
-
+            >>> x = pp.randn_so3()
+            >>> x
+            so3Type LieTensor:
+            LieTensor([ 0.3018, -1.0246,  0.7784])
+            >>> a = 5
+            >>> # The following two operations are equivalent.
             >>> x * a
             so3Type LieTensor:
             LieTensor([ 1.5090, -5.1231,  3.8919])
+            >>> pp.mul(x, 5)
+            so3Type LieTensor:
+            LieTensor([ 1.5090, -5.1231,  3.8919])
 
-        * :obj:`Lie Group` :math:`*` :obj:`Tensor` :math:`\in \mathbb{R^{*\times3}}`
-          :math:`=` :obj:`Tensor`
-
-            >>> x = pp.randn_SO3()
-            >>> a = torch.randn(3)
-            >>> x, a
-            (SO3Type LieTensor:
-            LieTensor([0.0092, 0.3450, 0.7255, 0.5954]), tensor([ 2.2862,  0.8660, -1.3799]))
-            >>> x * a
-            >>> tensor([-1.9929,  1.2682, -1.5167])
-
-        * :obj:`Lie Group` :math:`*` :obj:`Tensor` :math:`\in \mathbb{R^{*\times4}}`
-          :math:`=` :obj:`Tensor`
-
-            >>> a = torch.randn(4)
-            >>> a
-            tensor([-1.4565,  0.3828, -0.6383,  1.4504])
-            >>> x * a
-            >>> tensor([-0.1755, -1.6004,  0.2886,  1.4504])
-
-        * :obj:`LieTensor` :math:`*` :obj:`LieTensor` :math:`=` :obj:`LieTensor`
+        * :obj:`LieTensor` :math:`*` :obj:`LieTensor` :math:`\mapsto` :obj:`LieTensor`
 
             >>> a = pp.randn_SO3()
             >>> a
@@ -301,187 +263,6 @@ def mul(input, other):
             LieTensor([-0.0935, -0.4392,  0.8670,  0.2162])
     '''
     return input * other
-
-
-def matmul(input, other):
-    r'''
-    Performs matrix multiplication with input LieTensor and other
-
-    .. math::
-        \bm{y}_i =
-        \bm{x}_i \times \bm{a}_i
-
-    where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` value,
-    and :math:`\bm{y}` is the output value.
-
-    Args:
-        input (:obj:`LieTensor`): the input LieTensor (Lie Group or Lie Algebra).
-
-        other (:obj:`Tensor` or :obj:`LieTensor`): the value for input to be multiplied by.
-
-    Return:
-        :obj:`Tensor`/:obj:`LieTensor`: the product of ``input`` and ``other``.
-
-    .. list-table:: List of :obj:`pypose.matmul` cases 
-        :widths: 25 30 25
-        :header-rows: 1
-
-        * - input :obj:`LieTensor`
-          - other
-          - output
-        * - Lie Group
-          - :obj:`Tensor` :math:`\in \mathbb{R^{*\times3}}`
-          - :obj:`Tensor`
-        * - Lie Group
-          - :obj:`Tensor` :math:`\in \mathbb{R^{*\times4}}`
-          - :obj:`Tensor`
-        * - Lie Group
-          - :obj:`Lie Group (input.ltype)` 
-          - :obj:`Lie Group`
-
-    See :obj:`Act()` for multiplying by a Tensor.
-
-    For multpilying by a :obj:`Lie Group`, see below:
-   
-    * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`SO3_type`
-      (input :math:`\bm{x}` is an instance of :meth:`SO3`):
-
-        .. math::
-            \bm{x} = [q_x, q_y, q_z, q_w] = q_xi + q_yj + q_zk + q_w,
-        .. math::
-            \bm{a} = [q_x', q_y', q_z', q_w'] = q_x'i + q_y'j + q_z'k + q_w',
-
-        where :math:`\bm{i}`, :math:`\bm{j}`, :math:`\bm{k}`, and :math:`\bm{1}` 
-        represent the standard basis of quaternions and 
-
-        .. math::
-            {i}^2 = {j}^2 = {k}^2 = {ijk} = -1,
-
-        Using these definitions, the product of these quaternions is
-        
-        .. math:: 
-            \bm{x} \times \bm{a} = 
-            (q_xi + q_yj + q_zk + q_w) \times (q_x'i + q_y'j + q_z'k + q_w'),
-        
-        And rearranging terms simplifies this product to
-
-        .. math::
-            (\bm{x} \times \bm{a})_{xyz} = 
-            q_{xyz} \times q_{xyz}' + q_wq_{xyz}' + q_w'q_{xyz},
-        .. math::
-            (\bm{x} \times \bm{a})_{w} = 
-            q_wq_w' - q_{xyz} \cdot q_{xyz}',
-        .. math::
-            \bm{x} \times \bm{a} = 
-            q_wq_w' - q_{xyz} \cdot q_{xyz}' + q_wq_{xyz}' + q_w'q_{xyz} + 
-            q_{xyz} \times q_{xyz}'
-
-        Alternatively, using the Hamilton product, we have the following
-
-        .. math::
-            (\bm{x} \times \bm{a})_{q_w} = q_wq_w' - q_xq_x' - q_yq_y' - q_zq_z',
-        .. math::
-            (\bm{x} \times \bm{a})_{q_x} = q_wq_x' + q_xq_w' + q_yq_z' - q_zq_y',
-        .. math::
-            (\bm{x} \times \bm{a})_{q_y} = q_wq_y' - q_xq_z' + q_yq_w' + q_zq_x,
-        .. math::
-            (\bm{x} \times \bm{a})_{q_z} = q_wq_z' + q_xq_y' - q_yq_x' + q_zq_w',
-
-    * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`SE3_type`
-      (input :math:`\bm{x}` is an instance of :meth:`SE3`):
-
-        .. math::
-            \bm{x} = [t_x, t_y, t_z, q_x, q_y, q_z, q_w],
-        .. math::
-            \bm{a} = [t_x', t_y', t_z', q_x', q_y', q_z', q_w'],
-
-        Peforms same calculations as with :obj:`SO3_type` to calculate the 
-        quaternion of the product :math:`(\bm{x} \times \bm{a})_{q}`, and, 
-        calculates the translational vector with the method below,
-
-        .. math::
-            \bm{x}_{t} = [t_x, t_y, t_z],
-        .. math::
-            \bm{a}_{t} = [t_x', t_y', t_z'],
-        .. math::
-            \bm{x}_{q} = [q_x, q_y, q_z, q_w],
-        .. math::
-            (\bm{x} \times \bm{a})_{t} = \bm{x}_q \times \bm{a}_t + \bm{x}_t
-            
-    * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`RxSO3_type`
-      (input :math:`\bm{x}` is an instance of :meth:`RxSO3`)
-
-        .. math::
-            \bm{x} = [q_x, q_y, q_z, q_w, s],
-        .. math::
-            \bm{a} = [q_x', q_y', q_z', q_w', s'],
-
-        Peforms same calculations as with :obj:`SO3_type` to calculate the 
-        quaternion of the product :math:`(\bm{x} \times \bm{a})_{q}`, and 
-
-        .. math::
-            (\bm{x} \times \bm{a})_{s} = ss'
-
-    * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`Sim3_type`
-      (input :math:`\bm{x}` is an instance of :meth:`Sim3`):
-
-        .. math::
-            \bm{x} = [t_x, t_y, t_z, q_x, q_y, q_z, q_w, s],
-        .. math::
-            \bm{a} = [t_x', t_y', t_z', q_x', q_y', q_z', q_w', s'],
-        
-        Based off of the calculations for the previous types, we have the following
-
-        .. math::
-            (\bm{x} \times \bm{a})_{q_w} = q_wq_w' - q_xq_x' - q_yq_y' - q_zq_z',
-        .. math::
-            (\bm{x} \times \bm{a})_{q_x} = q_wq_x' + q_xq_w' + q_yq_z' - q_zq_y',
-        .. math::
-            (\bm{x} \times \bm{a})_{q_y} = q_wq_y' - q_xq_z' + q_yq_w' + q_zq_x,
-        .. math::
-            (\bm{x} \times \bm{a})_{q_z} = q_wq_z' + q_xq_y' - q_yq_x' + q_zq_w',
-        .. math::
-            (\bm{x} \times \bm{a})_{s} = ss'
-        .. math::
-            (\bm{x} \times \bm{a})_{t} = \bm{x}_q \times \bm{a}_t + \bm{x}_t
-
-    Examples:
-        The following operations are equivalent.
-
-        >>> x = pp.randn_so3()
-        >>> a = pp.randn_so3()
-        >>> x, a
-        (so3Type LieTensor:
-        LieTensor([ 0.6835,  0.6479, -1.0084]), so3Type LieTensor:
-        LieTensor([-2.7218,  0.2900, -0.2014]))
-        >>> x @ a
-        so3Type LieTensor:
-        LieTensor([-1.8603,  0.1879,  0.2031])
-        >>> pp.matmul(x, a)
-        so3Type LieTensor:
-        LieTensor([-1.8603,  0.1879,  0.2031])
-
-        * :obj:`Lie Group` @ :obj:`Tensor` :math:`\in \mathbb{R^{*\times3}}`
-          :math:`=` :obj:`Tensor`
-
-            >>> x = pp.randn_SO3()
-            >>> a = torch.randn(3)
-            >>> x, a
-            (SO3Type LieTensor:
-            LieTensor([-0.1576,  0.1065,  0.0651,  0.9796]), tensor([-1.0442,  0.2388,  1.0111]))
-            >>> x @ a
-            tensor([-0.8599,  0.4530,  1.1068])
-
-        * :obj:`Lie Group` @ :obj:`Tensor` :math:`\in \mathbb{R^{*\times4}}`
-          :math:`=` :obj:`Tensor`
-
-            >>> a = torch.randn(4)
-            >>> a 
-            tensor([-1.4010, -0.3532,  0.6713, -0.3036])
-            >>> x @ a
-            tensor([-1.1741, -0.2477,  1.0479, -0.3036])
-    '''
-    return input @ other
 
 
 def cumops_(input, dim, ops):
