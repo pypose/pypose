@@ -252,7 +252,7 @@ def mul(input, other):
             so3Type LieTensor:
             LieTensor([ 1.5090, -5.1231,  3.8919])
 
-        * :obj:`Lie Group` :math:`*` :obj:`Tensor` :math:`\mapsto` :obj:`Lie Group`
+        * :obj:`Lie Group` :math:`*` :obj:`Tensor` :math:`\mapsto` :obj:`Tensor`
 
             >>> x = pp.randn_SO3()
             >>> a = torch.randn(3)
