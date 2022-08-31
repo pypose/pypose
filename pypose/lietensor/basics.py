@@ -186,7 +186,7 @@ def mul(input, other):
     
       where :math:`\bm{x}_i = [q_i^x, q_i^y, q_i^z, q_i^w]` and
       :math:`\bm{a}_i = [q_i^{x'}, q_i^{y'}, q_i^{z'}, q_i^{w'}]` are the ``input``
-      and ``other`` LieTensor, respectively
+      and ``other`` LieTensor, respectively.
         
     Note:
         :math:`\mathbf{y}_i` can be simply derived by taking the complex number multiplication.
@@ -258,7 +258,8 @@ def mul(input, other):
             >>> a = torch.randn(3)
             >>> x, a
             (SO3Type LieTensor:
-            LieTensor([ 0.6047, -0.2129, -0.1781,  0.7465]), tensor([-0.1811, -0.2278, -1.9956]))
+            LieTensor([ 0.6047, -0.2129, -0.1781,  0.7465]),
+            tensor([-0.1811, -0.2278, -1.9956]))
             >>> x * a
             tensor([ 0.9089,  1.6984, -0.5969])
             >>> a = torch.randn(4)
@@ -283,7 +284,8 @@ def mul(input, other):
             >>> a = pp.randn_SE3()
             >>> x, a
             (SE3Type LieTensor:
-            LieTensor([ 0.7819,  1.8541, -0.2857, -0.1970,  0.4742,  0.1109,  0.8509]), SE3Type LieTensor:
+            LieTensor([ 0.7819,  1.8541, -0.2857, -0.1970,  0.4742,  0.1109,  0.8509]),
+            SE3Type LieTensor:
             LieTensor([ 0.6039, -1.4076,  0.3496,  0.7297,  0.3971,  0.2849,  0.4783]))
             >>> x * a
             SE3Type LieTensor:
@@ -295,7 +297,8 @@ def mul(input, other):
             >>> a = pp.randn_RxSO3()
             >>> x, a
             (RxSO3Type LieTensor:
-            LieTensor([-0.7518, -0.6481,  0.0933, -0.0775,  1.5791]), RxSO3Type LieTensor:
+            LieTensor([-0.7518, -0.6481,  0.0933, -0.0775,  1.5791]),
+            RxSO3Type LieTensor:
             LieTensor([ 0.2757,  0.3102, -0.4086,  0.8129,  0.6593]))
             >>> x * a
             RxSO3Type LieTensor:
@@ -307,14 +310,12 @@ def mul(input, other):
             >>> a = pp.randn_Sim3()
             >>> x, a
             (Sim3Type LieTensor:
-            LieTensor([-0.3439, -0.2309, -0.6571,  0.3170, -0.6594, -0.1100,  0.6728,
-                        0.6296]), Sim3Type LieTensor:
-            LieTensor([-0.7434,  1.8613, -2.1315,  0.7688, -0.0268,  0.0520,  0.6367,
-                        1.7745]))
+            LieTensor([-0.3439, -0.2309, -0.6571,  0.3170, -0.6594, -0.1100,  0.6728, 0.6296]),
+            Sim3Type LieTensor:
+            LieTensor([-0.7434,  1.8613, -2.1315,  0.7688, -0.0268,  0.0520,  0.6367, 1.7745]))
             >>> x * a
             Sim3Type LieTensor:
-            LieTensor([ 0.5740,  1.3197, -0.2752,  0.6819, -0.5389,  0.4634,  0.1727,
-                        1.1172])
+            LieTensor([ 0.5740,  1.3197, -0.2752,  0.6819, -0.5389,  0.4634,  0.1727, 1.1172])
     '''
     return input * other
 
