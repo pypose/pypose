@@ -975,9 +975,15 @@ class LieTensor(torch.Tensor):
         return self.add(other=other)
 
     def __mul__(self, other):
+        r'''
+        See :meth:`pypose.mul`
+        '''
         return self.ltype.Mul(self, other)
 
     def __matmul__(self, other):
+        r'''
+        See :meth:`pypose.matmul`
+        '''
         if isinstance(other, LieTensor):
             return self.ltype.Mul(self, other)
         else: # Same with: self.ltype.matrix(self) @ other

@@ -123,6 +123,203 @@ def add(input, other, alpha=1):
     return input.add(other, alpha)
 
 
+def mul(input, other):
+    r'''
+    Multiply input LieTensor by other.
+
+    .. math::
+        \bm{y}_i =
+        \bm{x}_i \ast \bm{a}_i
+
+    where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` Tensor or
+    LieTensor, and :math:`\bm{y}` is the output.
+
+    Args:
+        input (:obj:`LieTensor`): the input LieTensor (Lie Group or Lie Algebra).
+
+        other (:obj:`Number`, :obj:`Tensor`, or :obj:`LieTensor`): the value for input to be
+            multiplied by.
+
+    Return:
+        :obj:`Tensor`/:obj:`LieTensor`: the product of ``input`` and ``other``.
+
+    .. list-table:: List of :obj:`pypose.mul` cases 
+        :widths: 25 30 25
+        :header-rows: 1
+
+        * - input :obj:`LieTensor`
+          - other
+          - output
+        * - Lie Algebra
+          - :obj:`Number`
+          - :obj:`Lie Algebra`
+        * - Lie Group
+          - :obj:`Tensor` :math:`\in \mathbb{R^{*\times3}}`
+          - :obj:`Tensor`
+        * - Lie Group
+          - :obj:`Tensor` :math:`\in \mathbb{R^{*\times4}}`
+          - :obj:`Tensor`
+        * - Lie Group
+          - :obj:`Lie Group` 
+          - :obj:`Lie Group`
+
+    When multiplying a Lie Group by another Lie Group, they must have the 
+    same Lie type.
+
+    Note:
+        - When ``other`` is a Tensor, this operator is equivalent to :meth:`Act`.
+        - When ``other`` is a number and ``input`` is a Lie Algebra, this operator performs
+          simple element-wise multiplication.
+        - When ``input`` is a Lie Group, more details are shown below.
+   
+    * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`SO3_type`
+      (input :math:`\bm{x}` is an instance of :meth:`SO3`):
+
+      .. math::
+        {\displaystyle \bm{y}_i={\begin{bmatrix}
+              q_i^wq_i^{w'} - q_i^xq_i^{x'} -q_i^yq_i^{y'} - q_i^zq_i^{z'}\\
+              q_i^wq_i^{x'} + q_i^xq_i^{w'} +q_i^yq_i^{z'} - q_i^zq_i^{y'}\\
+              q_i^wq_i^{y'} - q_i^xq_i^{z'} +q_i^yq_i^{w'} + q_i^zq_i^{x'}\\
+              q_i^wq_i^{z'} + q_i^xq_i^{y'} -q_i^yq_i^{x'} + q_i^zq_i^{w'}
+              \end{bmatrix}
+        }^T},
+    
+      where :math:`\bm{x}_i = [q_i^x, q_i^y, q_i^z, q_i^w]` and
+      :math:`\bm{a}_i = [q_i^{x'}, q_i^{y'}, q_i^{z'}, q_i^{w'}]` are the ``input``
+      and ``other`` LieTensor, respectively.
+        
+    Note:
+        :math:`\mathbf{y}_i` can be simply derived by taking the complex number multiplication.
+
+        .. math:: 
+            \bm{y}_i = 
+            (q_i^x\mathbf{i} + q_i^y\mathbf{j} + q_i^z\mathbf{k} + q_i^w) \ast 
+            (q_i^{x'}\mathbf{i} + q_i^{y'}\mathbf{j} + q_i^{z'}\mathbf{k} + q_i^{w'}),
+
+        where and :math:`\mathbf{i}` :math:`\mathbf{j}`, and :math:`\mathbf{k}` are the imaginary
+        units.
+
+        .. math::
+            \mathbf{i}^2 = \mathbf{j}^2 = \mathbf{k}^2 = \mathbf{ijk} = -1
+
+    * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`SE3_type`
+      (input :math:`\bm{x}` is an instance of :meth:`SE3`):
+
+        .. math::
+            \bm{y}_i = [\mathbf{q}_i * \mathbf{t}_i' + \mathbf{t}_i,
+                        \mathbf{q}_i * \mathbf{q}_i']
+        
+        where :math:`\bm{x}_i = [\mathbf{t}_i, \mathbf{q}_i]` and
+        :math:`\bm{a}_i = [\mathbf{t}_i', \mathbf{q}_i']` are the ``input`` and ``other``
+        LieTensor, respectively; :math:`\mathbf{t}_i`, :math:`\mathbf{t}_i'` and
+        :math:`\mathbf{q}_i`, :math:`\mathbf{q}_i'` are their translation and :obj:`SO3`
+        parts, respectively; the operator :math:`\ast` denotes the obj:`SO3_type`
+        multiplication introduced above.
+            
+    * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`RxSO3_type`
+      (input :math:`\bm{x}` is an instance of :meth:`RxSO3`)
+
+        .. math::
+            \bm{y}_i = [\mathbf{q}_i * \mathbf{q}_i', s_is_i']
+
+        where :math:`s_i` and :math:`s_i'` are the scale parts of the ``input`` and
+        ``other`` LieTensor, respectively.
+
+    * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`Sim3_type`
+      (input :math:`\bm{x}` is an instance of :meth:`Sim3`):
+
+        .. math::
+            \bm{y}_i = [\mathbf{q}_i * \mathbf{t}_i' + \mathbf{t}_i,
+                            \mathbf{q}_i * \mathbf{q}_i', s_is_i'] 
+
+        where :math:`\bm{x}_i = [\mathbf{t}_i, \mathbf{q}_i, s_i]` and
+        :math:`\bm{a}_i = [\mathbf{t}_i', \mathbf{q}_i', s_i']` are the ``input`` and
+        ``other`` LieTensor, respectively.
+
+    Examples:
+        * :obj:`Lie Algebra` :math:`*` :obj:`Number` :math:`\mapsto` :obj:`Lie Algebra`
+
+            >>> x = pp.randn_so3()
+            >>> x
+            so3Type LieTensor:
+            LieTensor([ 0.3018, -1.0246,  0.7784])
+            >>> a = 5
+            >>> # The following two operations are equivalent.
+            >>> x * a
+            so3Type LieTensor:
+            LieTensor([ 1.5090, -5.1231,  3.8919])
+            >>> pp.mul(x, 5)
+            so3Type LieTensor:
+            LieTensor([ 1.5090, -5.1231,  3.8919])
+
+        * :obj:`Lie Group` :math:`*` :obj:`Tensor` :math:`\mapsto` :obj:`Tensor`
+
+            >>> x = pp.randn_SO3()
+            >>> a = torch.randn(3)
+            >>> x, a
+            (SO3Type LieTensor:
+            LieTensor([ 0.6047, -0.2129, -0.1781,  0.7465]),
+            tensor([-0.1811, -0.2278, -1.9956]))
+            >>> x * a
+            tensor([ 0.9089,  1.6984, -0.5969])
+            >>> a = torch.randn(4)
+            >>> a 
+            tensor([ 1.5236, -1.2757, -0.7140,  0.2467])
+            >>> x * a
+            tensor([ 1.6588, -0.4687, -1.2196,  0.2467]
+
+        * :obj:`SO3_type` :math:`*` :obj:`SO3_type` :math:`\mapsto` :obj:`SO3_type`
+
+            >>> a = pp.randn_SO3()
+            >>> a
+            SO3Type LieTensor:
+            LieTensor([ 0.0118, -0.7042, -0.4516,  0.5478])
+            >>> x * a
+            SO3Type LieTensor:
+            LieTensor([ 0.3108, -0.3714, -0.8579,  0.1715])
+
+        * :obj:`SE3_type` :math:`*` :obj:`SE3_type` :math:`\mapsto` :obj:`SE3_type`
+
+            >>> x = pp.randn_SE3()
+            >>> a = pp.randn_SE3()
+            >>> x, a
+            (SE3Type LieTensor:
+            LieTensor([ 0.7819,  1.8541, -0.2857, -0.1970,  0.4742,  0.1109,  0.8509]),
+            SE3Type LieTensor:
+            LieTensor([ 0.6039, -1.4076,  0.3496,  0.7297,  0.3971,  0.2849,  0.4783]))
+            >>> x * a
+            SE3Type LieTensor:
+            LieTensor([ 1.8949,  0.7456, -0.3104,  0.6177,  0.7017, -0.1287,  0.3308])
+
+        * :obj:`RxSO3_type` :math:`*` :obj:`RxSO3_type` :math:`\mapsto` :obj:`RxSO3_type`
+
+            >>> x = pp.randn_RxSO3()
+            >>> a = pp.randn_RxSO3()
+            >>> x, a
+            (RxSO3Type LieTensor:
+            LieTensor([-0.7518, -0.6481,  0.0933, -0.0775,  1.5791]),
+            RxSO3Type LieTensor:
+            LieTensor([ 0.2757,  0.3102, -0.4086,  0.8129,  0.6593]))
+            >>> x * a
+            RxSO3Type LieTensor:
+            LieTensor([-0.3967, -0.8323,  0.0530,  0.3835,  1.0411])
+
+        * :obj:`Sim3_type` :math:`*` :obj:`Sim3_type` :math:`\mapsto` :obj:`Sim3_type`
+
+            >>> x = pp.randn_Sim3()
+            >>> a = pp.randn_Sim3()
+            >>> x, a
+            (Sim3Type LieTensor:
+            LieTensor([-0.3439, -0.2309, -0.6571,  0.3170, -0.6594, -0.1100,  0.6728, 0.6296]),
+            Sim3Type LieTensor:
+            LieTensor([-0.7434,  1.8613, -2.1315,  0.7688, -0.0268,  0.0520,  0.6367, 1.7745]))
+            >>> x * a
+            Sim3Type LieTensor:
+            LieTensor([ 0.5740,  1.3197, -0.2752,  0.6819, -0.5389,  0.4634,  0.1727, 1.1172])
+    '''
+    return input * other
+
+
 def cumops_(input, dim, ops):
     r'''
         Inplace version of :meth:`pypose.cumops`
