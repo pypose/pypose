@@ -85,7 +85,7 @@ def add(input, other, alpha=1):
                 \displaystyle \lim_{\bm{\tau} \to \bm{0}} \frac{f(\bm{\tau} \oplus \mathcal{X})
                     \ominus f(\mathcal{X})}{\bm{\tau}} \\
                 & = \left. \frac{\partial \mathrm{Log} (\mathrm{Exp}(\bm{\tau}) \times \mathcal{X})
-                    \times f(\mathcal{X})^{-1}}{\partial \bm{\tau}}\right|_{\bm{\tau=\bm{0}}}
+                    \times f(\mathcal{X})^{-1})}{\partial \bm{\tau}}\right|_{\bm{\tau=\bm{0}}}
             \end{align*},
 
         where :math:`\mathcal{X}` is a Lie Group and :math:`\bm{\tau}` is its left perturbation.
