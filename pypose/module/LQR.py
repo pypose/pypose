@@ -1,30 +1,29 @@
 import torch as torch
+import time
 
 class DP_LQR:
 
-    def __init__(self, n_state, n_ctrl, T, current_x=None, current_u=None):
+    def __init__(self, n_state, n_ctrl, T):
         
         self.n_state = n_state
         self.n_ctrl = n_ctrl
         self.T = T
-        self.current_x = current_x
-        self.current_u = current_u
 
     def DP_LQR_backward(self, C, c, F, f):
 
         Ks = []
         ks = []
         Vtp1 = vtp1 = None
-        for t in range(self.T-1, -1, -1): #range(start, stop, step): the stop number itself is always omitted.
+        for t in range(self.T-1, -1, -1): 
             if t == self.T-1:
                 Qt = C[t]
                 qt = c[t]
             else:
                 Ft = F[t]
                 Ft_T = Ft.transpose(1,2)
-                Qt = C[t] + Ft_T.matmul(Vtp1).matmul(Ft)
-                if f is None or f.numel() == 0: #alias for nelement(): count the number of elements of the tensor
-                    qt = c[t] + Ft_T.bmm(vtp1.unsqueeze(2)).squeeze(2) #Tensor multiplied Nonetype
+                Qt = C[t] + Ft_T.bmm(Vtp1).bmm(Ft)
+                if f is None or f.numel() == 0:
+                    qt = c[t] + Ft_T.bmm(vtp1.unsqueeze(2)).squeeze(2) 
                 else:
                     ft = f[t]
                     qt = c[t] + Ft_T.bmm(Vtp1).bmm(ft.unsqueeze(2)).squeeze(2) + \
@@ -43,8 +42,8 @@ class DP_LQR:
                 kt = -(1./Qt_uu.squeeze(2))*qt_u
             else:
                 Qt_uu_inv = [torch.linalg.pinv(Qt_uu[i]) for i in range(Qt_uu.shape[0])]
-                Qt_uu_inv = torch.stack(Qt_uu_inv) #Concatenates a sequence of tensors along a new dimension. All tensors need to be of the same size.
-                Kt = -Qt_uu_inv.matmul(Qt_ux)
+                Qt_uu_inv = torch.stack(Qt_uu_inv)
+                Kt = -Qt_uu_inv.bmm(Qt_ux)
                 kt = -Qt_uu_inv.bmm(qt_u.unsqueeze(2)).squeeze(2)
 
             Kt_T = Kt.transpose(1,2)
@@ -60,9 +59,6 @@ class DP_LQR:
         return Ks, ks
 
     def DP_LQR_forward(self, x_init, C, c, F, f, Ks, ks):
-        x = self.current_x
-        u = self.current_u
-        #current_cost = None
 
         new_u = []
         new_x = [x_init]
@@ -85,7 +81,6 @@ class DP_LQR:
 
                 new_x.append(new_xtp1)
 
-            #new_xut_T = new_xut.mT
 
             obj = 0.5*new_xut.unsqueeze(1).bmm(C[t]).bmm(new_xut.unsqueeze(2)).squeeze(1).squeeze(1) + torch.bmm(new_xut.unsqueeze(1), c[t].unsqueeze(2)).squeeze(1).squeeze(1)
             objs.append(obj)
@@ -93,12 +88,11 @@ class DP_LQR:
             tau.append(new_xut)
 
         objs = torch.stack(objs)
-            #current_cost = torch.sum(objs, dim=0)
 
         new_u = torch.stack(new_u)
         new_x = torch.stack(new_x)
 
-        return new_x, new_u, objs, tau #,current_X
+        return new_x, new_u, objs, tau
 
 
     def DP_LQR_costates(self, tau, C, c, F):

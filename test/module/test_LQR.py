@@ -53,7 +53,7 @@ def test_LQR_linear():
         for x in [C, c, R, S, F, f, x_init]]
 
     u_lqr = None
-    LQR_DP  = pp.module.DP_LQR(n_state, n_ctrl, T, None, None)
+    LQR_DP  = pp.module.DP_LQR(n_state, n_ctrl, T)
     Ks, ks = LQR_DP.DP_LQR_backward(C, c, F, f)
     x_lqr, u_lqr, objs_lqr, tau = LQR_DP.DP_LQR_forward(x_init, C, c, F, f, Ks, ks)
     tau_lqr = torch.cat((x_lqr, u_lqr), 2)
@@ -62,7 +62,7 @@ def test_LQR_linear():
     lambda_dual = LQR_DP.DP_LQR_costates(tau, C, c, F)
     
     lambda_dual_test = []
-    Cs = []
+    
     for t in range(T-1, -1, -1):
         t_rev_new = T-1-t
         tau_t = tau[t_rev_new]
