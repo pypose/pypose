@@ -12,6 +12,7 @@
 
 import os
 import sys
+import pypose_sphinx_theme
 
 proj_root = os.path.abspath(os.path.join(__file__, "..", "..", ".."))
 sys.path.insert(0, proj_root)
@@ -64,7 +65,8 @@ latex_elements = {
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinx_rtd_theme"
+html_theme = "pypose_sphinx_theme"
+html_theme_path = [pypose_sphinx_theme.get_html_theme_path()]
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
