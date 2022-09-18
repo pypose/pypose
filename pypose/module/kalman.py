@@ -113,27 +113,3 @@ class EKF(nn.Module):
         P = (torch.eye(sh.shape[0]) - K.matmul(self.model.C)).matmul(P)
         x = x_tposed.T
         return x, P
-
-
-class UKF(nn.Module):
-    """
-    https://www.mathworks.com/matlabcentral/fileexchange/18217-learning-the-unscented-kalman-filter?s_tid=FX_rc1_behav
-    https://pykalman.github.io/#unscentedkalmanfilter
-    """
-
-    def __init__(self, model):
-        super().__init__()
-        self.model = model
-
-    def forward(self, x, y, P, U):
-        L = x.size()
-        m = y.size()
-        alpha = 1e-3
-        ki = 0
-        beta = 2
-        lmbda = alpha ** 2 * (L + ki) - L
-        c = L + lmbda
-
-    @staticmethod
-    def unscented_transform(y, sgma, Wm, Wc, n, R):
-        L = sgma.shape[2]
