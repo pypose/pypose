@@ -47,7 +47,7 @@ if __name__ == '__main__':
         author_email = 'chenwang@dr.com',
         url = 'https://pypose.org',
         download_url = 'https://github.com/pypose/pypose',
-        license = 'BSD 3-Clause License',
+        license = 'BSD 4-Clause License',
         description = 'To connect classic robotics with modern learning methods.',
         long_description=long_description,
         long_description_content_type='text/markdown',

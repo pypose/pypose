@@ -109,7 +109,11 @@ class System(nn.Module):
                 [0.0844, 1.0000]])
         tensor([[0.5358],
                 [1.0000]])
-    """
+    
+    Note:
+        More practical examples can be found at `examples/module/dynamics
+        <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
+    '''
 
     def __init__(self):
         super().__init__()
@@ -341,8 +345,12 @@ class LTI(System):
 
     Note:
         In this general example, all variables are in a batch. User definable as appropriate.
-    """
-
+    
+    Note:
+        More practical examples can be found at `examples/module/dynamics
+        <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
+    '''
+    
     def __init__(self, A, B, C, D, c1=None, c2=None):
         super(LTI, self).__init__()
         assert A.ndim in (2, 3), "Invalid System Matrices dimensions"
