@@ -5,7 +5,7 @@ from torch.autograd.functional import jacobian
 
 
 class System(nn.Module):
-    r"""
+    r'''
     The base class of a general discrete-time system dynamics model.
     
     The state transision function :math:`\mathbf{f}` and observation function
@@ -109,22 +109,26 @@ class System(nn.Module):
                 [0.0844, 1.0000]])
         tensor([[0.5358],
                 [1.0000]])
-    """
+
+    Note:
+        More practical examples can be found at `examples/module/dynamics
+        <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
+    '''
 
     def __init__(self):
         super().__init__()
-        self.jacargs = {"vectorize": True, "strategy": "reverse-mode"}
-        self.register_buffer("_t", torch.zeros(1))
+        self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
+        self.register_buffer('_t',torch.zeros(1))
         self.register_forward_hook(self.forward_hook)
 
     def forward_hook(self, module, inputs, outputs):
-        r"""
+        r'''
         Automatically advances the time step.
-        """
+        '''
         self._t.add_(1)
 
     def forward(self, state, input):
-        r"""
+        r'''
         Defines the computation performed at every call that advances the system by one time step.
 
         Note:
@@ -132,15 +136,13 @@ class System(nn.Module):
             :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity
             such as time-varying system. One can directly access the current system time via the
             property :obj:`systime`.
-        """
+        '''
         self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
-        return (
-            self.state_transition(self.state, self.input, self.systime),
-            self.observation(self.state, self.input, self.systime),
-        )
+        return self.state_transition(self.state, self.input, self.systime), \
+            self.observation(self.state, self.input, self.systime)
 
     def state_transition(self, state, input, t=None):
-        r"""
+        r'''
         Args:
             state (:obj:`Tensor`): The state of the dynamical system
             input (:obj:`Tensor`): The input to the dynamical system
@@ -152,13 +154,11 @@ class System(nn.Module):
         Note:
             The users need to define this method and can access the current time via the property
             :obj:`systime`.
-        """
-        raise NotImplementedError(
-            "The users need to define their own state transition method"
-        )
+        '''
+        raise NotImplementedError("The users need to define their own state transition method")
 
     def observation(self, state, input, t=None):
-        r"""
+        r'''
         Args:
             state (:obj:`Tensor`): The state of the dynamical system
             input (:obj:`Tensor`): The input to the dynamical system
@@ -170,16 +170,14 @@ class System(nn.Module):
         Note:
             The users need to define this method and can access the current system time via the
             property :obj:`systime`.
-        """
-        raise NotImplementedError(
-            "The users need to define their own observation method"
-        )
+        '''
+        raise NotImplementedError("The users need to define their own observation method")
 
     def reset(self, t=0):
         self._t.fill_(t)
 
     def set_refpoint(self, state=None, input=None, t=None):
-        r"""
+        r'''
         Function to set the reference point for linearization.
 
         Args: 
@@ -196,106 +194,92 @@ class System(nn.Module):
         Warning:
             For nonlinear systems, the users have to call this function before getting the
             linearized system.
-        """
-        self._ref_state = (
-            torch.tensor(self.state) if state is None else torch.atleast_1d(state)
-        )
-        self._ref_input = (
-            torch.tensor(self.input) if input is None else torch.atleast_1d(input)
-        )
+        '''
+        self._ref_state = torch.tensor(self.state) if state is None else torch.atleast_1d(state)
+        self._ref_input = torch.tensor(self.input) if input is None else torch.atleast_1d(input)
         self._ref_t = self.systime if t is None else t
-        self._ref_f = self.state_transition(
-            self._ref_state, self._ref_input, self._ref_t
-        )
+        self._ref_f = self.state_transition(self._ref_state, self._ref_input, self._ref_t)
         self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
 
     @property
     def systime(self):
-        r"""
+        r'''
             System time, automatically advanced by :obj:`forward_hook`.
-        """
+        '''
         return self._t
 
     @property
     def A(self):
-        r"""
+        r'''
         Linear/linearized system state matrix.
 
         .. math::
             \mathbf{A} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}} \right|_{\chi^*}
-        """
+        '''
         func = lambda x: self.state_transition(x, self._ref_input, self._ref_t)
         return jacobian(func, self._ref_state, **self.jacargs)
 
     @property
     def B(self):
-        r"""
+        r'''
         Linear/linearized system input matrix.
 
         .. math::
             \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
-        """
+        '''
         func = lambda x: self.state_transition(self._ref_state, x, self._ref_t)
         return jacobian(func, self._ref_input, **self.jacargs)
 
     @property
     def C(self):
-        r"""
+        r'''
         Linear/linearized system output matrix.
 
         .. math::
             \mathbf{C} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{x}} \right|_{\chi^*}
-        """
+        '''
         func = lambda x: self.observation(x, self._ref_input, self._ref_t)
         return jacobian(func, self._ref_state, **self.jacargs)
-
+ 
     @property
     def D(self):
-        r"""
+        r'''
         Linear/Linearized system observation matrix.
 
         .. math::
             \mathbf{D} = \left. \frac{\partial \mathbf{g}}
                                 {\partial \mathbf{u}} \right|_{\chi^*}
-        """
+        '''
         func = lambda x: self.observation(self._ref_state, x, self._ref_t)
         return jacobian(func, self._ref_input, **self.jacargs)
 
     @property
     def c1(self):
-        r"""
+        r'''
         Constant term generated by state-transition.
 
         .. math::
             \mathbf{c}_1 = \mathbf{f}(\mathbf{x}^*, \mathbf{u}^*, t^*)
                            - \mathbf{A}\mathbf{x}^* - \mathbf{B}\mathbf{u}^*
-        """
+        '''
         # Potential performance loss here - self.A and self.B involves jacobian eval
-        return (
-            self._ref_f
-            - self._ref_state.matmul(self.A.mT)
-            - self._ref_input.matmul(self.B.mT)
-        )
-
+        return self._ref_f - self._ref_state.matmul(self.A.mT) - self._ref_input.matmul(self.B.mT)
+    
     @property
     def c2(self):
-        r"""
+        r'''
         Constant term generated by observation.
 
         .. math::
             \mathbf{c}_2 = \mathbf{g}(\mathbf{x}^*, \mathbf{u}^*, t^*)
                            - \mathbf{C}\mathbf{x}^* - \mathbf{D}\mathbf{u}^*
-        """
+        '''
         # Potential performance loss here - self.C and self.D involves jacobian eval
-        return (
-            self._ref_g
-            - self._ref_state.matmul(self.C.mT)
-            - self._ref_input.matmul(self.D.mT)
-        )
+        return self._ref_g - self._ref_state.matmul(self.C.mT) - self._ref_input.matmul(self.D.mT)
 
 
 class LTI(System):
-    r"""
+    r'''
     Discrete-time Linear Time-Invariant (LTI) system.
     
     Args:
@@ -341,53 +325,53 @@ class LTI(System):
 
     Note:
         In this general example, all variables are in a batch. User definable as appropriate.
-    """
 
+    Note:
+        More practical examples can be found at `examples/module/dynamics
+        <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
+    '''
+    
     def __init__(self, A, B, C, D, c1=None, c2=None):
         super(LTI, self).__init__()
         assert A.ndim in (2, 3), "Invalid System Matrices dimensions"
-        assert (
-            A.ndim == B.ndim == C.ndim == D.ndim
-        ), "Invalid System Matrices dimensions"
+        assert A.ndim == B.ndim == C.ndim == D.ndim, "Invalid System Matrices dimensions"
         self.A, self.B, self.C, self.D = A, B, C, D
         self.c1, self.c2 = c1, c2
-
+    
     def forward(self, state, input):
-        r"""
+        r'''
         Perform one step advance for the LTI system.
 
-        """
+        '''
         if self.A.ndim >= 3:
-            assert (
-                self.A.ndim == state.ndim == input.ndim
-            ), "Invalid System Matrices dimensions"
+            assert self.A.ndim == state.ndim == input.ndim,  "Invalid System Matrices dimensions"
 
         return super(LTI, self).forward(state, input)
 
     def state_transition(self, state, input, t=None):
-        r"""
+        r'''
         Perform one step of LTI state transition.
 
         .. math::
             \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1 \\
 
-        """
+        '''
         return state.matmul(self.A.mT) + input.matmul(self.B.mT) + self.c1
 
     def observation(self, state, input, t=None):
-        r"""
+        r'''
         Return the observation of LTI system at current time step.
 
         .. math::
             \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2 \\
-        """
+        '''
         return state.matmul(self.C.mT) + input.matmul(self.D.mT) + self.c2
 
     @property
     def A(self):
-        r"""
+        r'''
         System state matrix :obj:`A`
-        """
+        '''
         return self._A
 
     @A.setter
@@ -396,9 +380,9 @@ class LTI(System):
 
     @property
     def B(self):
-        r"""
+        r'''
         System input matrix :obj:`B`
-        """
+        '''
         return self._B
 
     @B.setter
@@ -407,9 +391,9 @@ class LTI(System):
 
     @property
     def C(self):
-        r"""
+        r'''
         System output matrix :obj:`C`
-        """
+        '''
         return self._C
 
     @C.setter
@@ -418,9 +402,9 @@ class LTI(System):
 
     @property
     def D(self):
-        r"""
+        r'''
         System observation matrix :obj:`D`
-        """
+        '''
         return self._D
 
     @D.setter
@@ -429,9 +413,9 @@ class LTI(System):
 
     @property
     def c1(self):
-        r"""
+        r'''
         Constant input :obj:`c1`
-        """
+        '''
         return self._c1
 
     @c1.setter
@@ -440,52 +424,11 @@ class LTI(System):
 
     @property
     def c2(self):
-        r"""
+        r'''
         Constant output :obj:`c2`
-        """
+        '''
         return self._c2
 
     @c2.setter
     def c2(self, c2):
         self._c2 = c2
-
-
-class LTINoise(LTI):
-    r"""
-    Discrete-time Linear Time-Invariant (LTI) system with process and measurement noise. 
-    See :obj:`LTI` for more information.
-
-    Args:
-        Q (:obj:`Tensor`): The process noise covariance
-        R (:obj:`Tensor`): The measurement noise covariance
-    """
-
-    def __init__(self, A, B, C, D, Q, R, c1=None, c2=None):
-        super(LTINoise, self).__init__(A, B, C, D, c1, c2)
-        # both are square matricies
-        self.register_buffer("Q", torch.eye(A.shape) if Q is None else Q)
-        self.register_buffer("R", torch.eye(C.shape[0]) if R is None else R)
-
-    def state_transition(self, state, input):
-        r"""
-        Perform one step of LTI state transition.
-
-        .. math::
-            \mathbf{w} \sim (0, \mathbf{Q}) \\
-            \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1 + \mathbf{w}
-        
-        """
-        w = self.Q @ torch.randn(state.shape)  # gaussian noise
-        return super().state_transition(state, input) + w
-
-    def observation(self, state, input):
-        r"""
-        Return the observation of LTI system at current time step.
-
-        .. math::
-            \mathbf{v} \sim (0, \mathbf{R}) \\
-            \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2 + \mathbf{v}
-        
-        """
-        v = self.R @ torch.randn(self.R.shape)  # gaussian noise
-        return super().observation(state, input) + v
