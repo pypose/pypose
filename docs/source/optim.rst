@@ -20,6 +20,10 @@ Optimization
    optim.kernel.Huber
    optim.kernel.PseudoHuber
    optim.kernel.Cauchy
+   optim.kernel.SoftLOne
+   optim.kernel.Arctan
+   optim.kernel.Tolerant
+   optim.kernel.Scale
    optim.corrector.FastTriggs
    optim.corrector.Triggs
    optim.scheduler.StopOnPlateau
