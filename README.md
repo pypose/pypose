@@ -6,7 +6,7 @@ To connect classic robotics with modern learning methods.
 
 1.1 Requirement:
 
-On Ubuntu, MasOS, or Windows, run:
+On Ubuntu, MacOS, or Windows, run:
 
     pip install -r requirements/main.txt
 
