@@ -2,8 +2,6 @@ import math, torch
 from torch import nn, Tensor
 
 
-
-
 class Huber(nn.Module):
     r"""The robust Huber kernel cost function.
 
