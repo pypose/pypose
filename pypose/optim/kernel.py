@@ -1,6 +1,6 @@
-import torch
+import math, torch
 from torch import nn, Tensor
-import math
+
 
 
 
@@ -127,19 +127,17 @@ class Cauchy(nn.Module):
         return self.delta2 * (input/self.delta2 + 1).log()
 
 
-
 class SoftLOne(nn.Module):
     r"""The robust SoftLOne kernel cost function.
 
     .. math::
-        \bm{y}_i=2\left ( \delta \sqrt{\frac{1}{{\delta{}}^{2}}+\bm{x}_i}- {{\delta{}}^{2}}\right )
+        \bm{y}_i=2\left ( \delta \sqrt{\frac{1}{{\delta{}}^{2}}+\bm{x}_i}- 1\right )
 
     where :math:`\delta` (delta) is a hyperparameter, :math:`\bm{x}` and :math:`\bm{y}` are the
     input and output tensors, respectively.
 
     Args:
         delta (float, optional): Specify the SoftLOne cost. The value must be positive. Default: 1.0
-
 
     Note:
         The input has to be a non-negative tensor and the output tensor has the same shape with the
@@ -164,7 +162,8 @@ class SoftLOne(nn.Module):
             input (torch.Tensor): the input tensor (non-negative).
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
-        return 2*(self.delta1*(1/self.delta2+input).sqrt()-self.delta2)
+        return 2*(self.delta1*(1/self.delta2+input).sqrt()-1)
+
 
 class Arctan(nn.Module):
     r"""The robust Arctan kernel cost function.
@@ -192,7 +191,6 @@ class Arctan(nn.Module):
     def __init__(self, delta: float = 1.0) -> None:
         super().__init__()
         assert delta > 0, ValueError("delta has to be positive: {}".format(delta))
-        self.delta1 = delta
         self.delta2 = delta**2
 
     def forward(self, input: Tensor) -> Tensor:
@@ -210,7 +208,7 @@ class Tolerant(nn.Module):
     .. math::
         \bm{y}_i = b\log (1+e^{\frac{\bm{x}_i-a}{b}})-b\log (1+e^{\frac{-a}{b}})
 
-    where :\bm{a}  and \bm{b} are hyperparameters, :math:`\bm{x}` and :math:`\bm{y}` are the
+    where :math:`\bm{a}`  and :math:`\bm{b}` are hyperparameters, :math:`\bm{x}` and :math:`\bm{y}` are the
     input and output tensors, respectively.
 
     Args:
@@ -225,50 +223,51 @@ class Tolerant(nn.Module):
         >>> import pypose.optim.kernel as ppok
         >>> kernel = ppok.Tolerant()
         >>> input = torch.tensor([0, 0.5, 1, 2, 3])
-        >>> kernel(input, 1.0, 1.0)
+        >>> kernel(input)
         tensor([0.0000, 0.4636, 0.7854, 1.1071, 1.2490])
     """
-    def __init__(self) -> None:
+    def __init__(self, a: float=1.0, b: float=1.0) -> None:
         super().__init__()
+        self.a = a
+        self.b = b
 
-
-    def forward(self, input: Tensor, a: float, b :float) -> Tensor:
+    def forward(self, input: Tensor) -> Tensor:
         '''
         Args:
             input (torch.Tensor): the input tensor (non-negative).
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
-        return b * (1 + math.exp((input-a)/b)).log() - b * (1 + math.exp(-a/b))
-
+        return self.b * (1 + math.exp((input-self.a)/self.b)).log() - self.b * (1 + math.exp(-self.a/self.b))
 
 
 class Scale(nn.Module):
     r"""The robust Scale kernel cost function.
 
     .. math::
-        \bm{y}_i=a*\bm{x}_i
+        \bm{y}_i=\delta*\bm{x}_i
 
-    where \bm{a} is scalar, :math:`\bm{x}`, :math:`\bm{y}` is the input
-    and output kernal function, respectively.
-
+    where :math:`\delta` (delta) is a scalar, :math:`\bm{x}` and :math:`\bm{y}` are the input
+    and output tensors, respectively.
 
     Note:
-        The input has to be a kernal function and the output is a kernal function
-        with the same shape as input
+        The input has to be a non-negative tensor and the output tensor has the same shape with
+        the input.
 
     Example:
         >>> import pypose.optim.kernel as ppok
         >>> kernel = ppok.Scale()
-        >>> input = ppok.Huber()
-        >>> kernel(input, 1.0)
+        >>> input = torch.tensor([0, 0.5, 1, 2, 3])
+        >>> kernel(input)
+        tensor([0.0000, 0.5000, 1.0000, 2.0000, 3.0000])
     """
-    def __init__(self) -> None:
+    def __init__(self, delta: float = 1.0) -> None:
         super().__init__()
-
-    def forward(self, input , a: float):
+        assert delta > 0, ValueError("delta has to be positive: {}".format(delta))
+        self.delta = delta
+    def forward(self, input):
         '''
         Args:
-            input (optim.kernal): the input kernal.
+            input (torch.Tensor): the input tensor (non-negative).
         '''
-        return a * input
+        return self.delta * input
 
