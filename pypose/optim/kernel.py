@@ -1,6 +1,7 @@
 import torch
 from torch import nn, Tensor
 import math
+import pypose.optim.kernel as kernal
 
 
 class Huber(nn.Module):
@@ -207,7 +208,8 @@ class Tolerant(nn.Module):
     r"""The robust Tolerant kernel cost function.
 
     .. math::
-        \bm{y}_i = \delta ^{2}b\log \left ( 1+\frac{e^{\left ( \bm{x}_i-a)/b \right )}}{\delta ^{^{2}}} \right ) - \delta ^{2}b\log \left ( 1+\frac{e^{-a/b}}{\delta ^{2}} \right )
+        \bm{y}_i = \delta ^{2}b\log \left ( 1+\frac{e^{\left ( \bm{x}_i-a)/b \right )}}{\delta ^{^{2}}} \right )
+        - \delta ^{2}b\log \left ( 1+\frac{e^{-a/b}}{\delta ^{2}} \right )
 
     where :math:`\delta` (delta) is a hyperparameter, :math:`\bm{x}`,a,b and :math:`\bm{y}` are the
     input and output tensors, respectively.
@@ -234,7 +236,7 @@ class Tolerant(nn.Module):
         self.delta1 = delta
         self.delta2 = delta**2
 
-    def forward(self, input: Tensor, a: Tensor, b: Tensor) -> Tensor:
+    def forward(self, input: Tensor, a: float, b: float) -> Tensor:
         '''
         Args:
             input (torch.Tensor): the input tensor (non-negative).
@@ -261,12 +263,12 @@ class Scale(nn.Module):
         >>> import pypose.optim.kernel as ppok
         >>> kernel = ppok.Scale()
         >>> input = ppok.Huber
-        >>> kernel(input, 2)
+        >>> kernel(input, 2.0)
     """
     def __init__(self) -> None:
         super().__init__()
 
-    def forward(self, input , a):
+    def forward(self, input:kernal , a: float):
         '''
         Args:
             input (optim.kernal): the input kernal.
