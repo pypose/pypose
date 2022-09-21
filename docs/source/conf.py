@@ -10,9 +10,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 
-import os
-import sys
-import re
+import os, sys, re
 import pypose_sphinx_theme
 
 proj_root = os.path.abspath(os.path.join(__file__, "..", "..", ".."))
