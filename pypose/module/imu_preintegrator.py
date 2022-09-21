@@ -252,6 +252,10 @@ class IMUPreintegrator(nn.Module):
                         :width: 300
 
                     Fig. 2. Estimated Rotation.
+
+        Note:
+            The examples generating the above figures can be found at `examples/module/imu
+            <https://github.com/pypose/pypose/tree/main/examples/module/imu>`_.
         """
         assert(0 < len(acc.shape) == len(dt.shape) == len(gyro.shape) <= 3)
         acc = self._check(acc); gyro = self._check(gyro)

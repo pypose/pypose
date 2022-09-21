@@ -33,3 +33,5 @@ Note: change `DATAROOT` to the folder you select.
           --save SAVE           location of png files to save
           --dataroot DATAROOT   dataset location downloaded
           --dataname DATANAME   dataset name
+          --no-vectorize        to save memory
+          --vectorize           to accelerate computation
