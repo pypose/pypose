@@ -1,7 +1,7 @@
 import torch
 from torch import nn, Tensor
 import math
-import pypose.optim.kernel as kernal
+
 
 
 class Huber(nn.Module):
@@ -208,41 +208,37 @@ class Tolerant(nn.Module):
     r"""The robust Tolerant kernel cost function.
 
     .. math::
-        \bm{y}_i = \delta ^{2}b\log \left ( 1+\frac{e^{\left ( \bm{x}_i-a)/b \right )}}{\delta ^{^{2}}} \right )
-        - \delta ^{2}b\log \left ( 1+\frac{e^{-a/b}}{\delta ^{2}} \right )
+        \bm{y}_i = b\log (1+e^{\frac{\bm{x}_i-a}{b}})-b\log (1+e^{\frac{-a}{b}})
 
-    where :math:`\delta` (delta) is a hyperparameter, :math:`\bm{x}`,a,b and :math:`\bm{y}` are the
+    where :\bm{a}  and \bm{b} are hyperparameters, :math:`\bm{x}` and :math:`\bm{y}` are the
     input and output tensors, respectively.
 
     Args:
-        delta (float, optional): Specify the Tolerant cost. The value must be positive. Default: 1.0
+        a (float, optional): Specify the Tolerant cost. The value must be positive. Default: 1.0
+        b (float, optional): Specify the Tolerant cost. The value must be positive. Default: 1.0
 
     Note:
-        The input has to be a non-negative tensor and the output tensor has the same shape with the
-        input. The input a,b have the same shape with the input
+        The input has to be a non-negative tensor and the output tensor has the same shape with
+        the input.
 
     Example:
         >>> import pypose.optim.kernel as ppok
         >>> kernel = ppok.Tolerant()
         >>> input = torch.tensor([0, 0.5, 1, 2, 3])
-        >>> a = torch.tensor([0, 0.5, 1, 2, 3])
-        >>> b = torch.tensor([0, 0.5, 1, 2, 3])
-        >>> kernel(input, a, b)
+        >>> kernel(input, 1.0, 1.0)
         tensor([0.0000, 0.4636, 0.7854, 1.1071, 1.2490])
     """
-    def __init__(self, delta: float = 1.0) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        assert delta > 0, ValueError("delta has to be positive: {}".format(delta))
-        self.delta1 = delta
-        self.delta2 = delta**2
 
-    def forward(self, input: Tensor, a: float, b: float) -> Tensor:
+
+    def forward(self, input: Tensor, a: float, b :float) -> Tensor:
         '''
         Args:
             input (torch.Tensor): the input tensor (non-negative).
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
-        return self.delta2 * b * (1 + math.exp((input-a)/b)/self.delta2).log() - self.delta2 * b * (1 + math.exp(-a/b)/self.delta2)
+        return b * (1 + math.exp((input-a)/b)).log() - b * (1 + math.exp(-a/b))
 
 
 
@@ -252,23 +248,24 @@ class Scale(nn.Module):
     .. math::
         \bm{y}_i=a*\bm{x}_i
 
-    where a is scale parameter, :math:`\bm{x}`, :math:`\bm{y}` is the input and output kernal function, respectively.
+    where \bm{a} is scalar, :math:`\bm{x}`, :math:`\bm{y}` is the input
+    and output kernal function, respectively.
 
 
     Note:
-        The input has to be a kernal function and the output  has the same shape with the
-        input.
+        The input has to be a kernal function and the output is a kernal function
+        with the same shape as input
 
     Example:
         >>> import pypose.optim.kernel as ppok
         >>> kernel = ppok.Scale()
-        >>> input = ppok.Huber
-        >>> kernel(input, 2.0)
+        >>> input = ppok.Huber()
+        >>> kernel(input, 1.0)
     """
     def __init__(self) -> None:
         super().__init__()
 
-    def forward(self, input:kernal , a: float):
+    def forward(self, input , a: float):
         '''
         Args:
             input (optim.kernal): the input kernal.
