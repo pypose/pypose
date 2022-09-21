@@ -12,6 +12,7 @@
 
 import os
 import sys
+import re
 import pypose_sphinx_theme
 
 proj_root = os.path.abspath(os.path.join(__file__, "..", "..", ".."))
@@ -25,7 +26,15 @@ copyright = '2022, PyPose Contributors'
 author = 'PyPose Contributors'
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.1'
+def find_version(file_path: str) -> str:
+    version_file = open(file_path).read()
+    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]", version_file, re.M)
+    if not version_match:
+        raise RuntimeError(f"Unable to find version string in {file_path}")
+    return version_match.group(1)
+
+version = find_version(os.path.join(proj_root, "pypose/_version.py"))
+
 
 
 # -- General configuration ---------------------------------------------------
@@ -67,6 +76,12 @@ latex_elements = {
 #
 html_theme = "pypose_sphinx_theme"
 html_theme_path = [pypose_sphinx_theme.get_html_theme_path()]
+html_theme_options = {
+    'pytorch_project': 'docs',
+    'collapse_navigation': False,
+    'display_version': True,
+    'logo_only': False,
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
