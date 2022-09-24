@@ -1,4 +1,4 @@
-import math, torch
+import torch
 from torch import nn, Tensor
 
 
@@ -31,8 +31,8 @@ class Huber(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.5000, 1.0000, 1.8284, 2.4641])
 
-        * - .. figure:: /_static/img/module/Kernal/Huber.png
-                        :width: 500
+    .. figure:: /_static/img/module/Kernal/Huber.png
+                        :width: 600
     """
     def __init__(self, delta: float = 1.0) -> None:
         super().__init__()
@@ -77,8 +77,8 @@ class PseudoHuber(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.4495, 0.8284, 1.4641, 2.0000])
 
-        * - .. figure:: /_static/img/module/Kernal/PseudoHuber.png
-                        :width: 500
+    .. figure:: /_static/img/module/Kernal/PseudoHuber.png
+                        :width: 600
     """
     def __init__(self, delta: float = 1.0) -> None:
         super().__init__()
@@ -117,8 +117,8 @@ class Cauchy(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.4055, 0.6931, 1.0986, 1.3863])
 
-        * - .. figure:: /_static/img/module/Kernal/Cauchy.png
-                        :width: 500
+    .. figure:: /_static/img/module/Kernal/Cauchy.png
+                        :width: 600
     """
     def __init__(self, delta: float = 1.0) -> None:
         super().__init__()
@@ -157,8 +157,8 @@ class SoftLOne(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.4495, 0.8284, 1.4641, 2.0000])
 
-        * - .. figure:: /_static/img/module/Kernal/SoftLOne.png
-                        :width: 500
+     .. figure:: /_static/img/module/Kernal/SoftLOne.png
+                        :width: 600
     """
     def __init__(self, delta: float = 1.0) -> None:
         super().__init__()
@@ -198,8 +198,8 @@ class Arctan(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.4636, 0.7854, 1.1071, 1.2490])
 
-        * - .. figure:: /_static/img/module/Kernal/Arctan.png
-                        :width: 500
+    .. figure:: /_static/img/module/Kernal/Arctan.png
+                        :width: 600
     """
     def __init__(self, delta: float = 1.0) -> None:
         super().__init__()
@@ -238,8 +238,8 @@ class Tolerant(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.4636, 0.7854, 1.1071, 1.2490])
 
-        * - .. figure:: /_static/img/module/Kernal/Tolerant.png
-                        :width: 500
+    .. figure:: /_static/img/module/Kernal/Tolerant.png
+                        :width: 600
     """
     def __init__(self, a: float = 1.0, b: float = -1.0) -> None:
         super().__init__()
@@ -254,8 +254,8 @@ class Tolerant(nn.Module):
             input (torch.Tensor): the input tensor (non-negative).
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
-        part1 = (1 + math.exp((input-self.a) / self.b)).log()
-        part2 = (1 + math.exp(-self.a / self.b))
+        part1 = (1 + ((input-self.a) / self.b).exp()).log()
+        part2 = (1 + (-self.a / self.b).exp())
         return self.b * part1 - self.b * part2
 
 
@@ -269,7 +269,7 @@ class Scale(nn.Module):
     and output tensors, respectively.
 
     Args:
-        delta (float): Specify the Arctan scale. Should be between 0 and 1.  Default: 1.0
+        delta (float): Specify the scale factor. Should be between 0 and 1.  Default: 1.0
 
     Note:
         The input has to be a non-negative tensor and the output tensor has the same shape with
@@ -282,8 +282,8 @@ class Scale(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.5000, 1.0000, 2.0000, 3.0000])
 
-        * - .. figure:: /_static/img/module/Kernal/scale.png
-                        :width: 500
+     .. figure:: /_static/img/module/Kernal/scale.png
+                        :width: 600
     """
     def __init__(self, delta: float = 1.0) -> None:
         super().__init__()
