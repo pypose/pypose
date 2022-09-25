@@ -31,7 +31,7 @@ class Huber(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.5000, 1.0000, 1.8284, 2.4641])
 
-    .. figure:: /_static/img/module/Kernal/Huber.png
+    .. figure:: /_static/img/optim/kernel/huber.png
                         :width: 600
     """
     def __init__(self, delta: float = 1.0) -> None:
@@ -77,7 +77,7 @@ class PseudoHuber(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.4495, 0.8284, 1.4641, 2.0000])
 
-    .. figure:: /_static/img/module/Kernal/PseudoHuber.png
+    .. figure:: /_static/img/optim/kernel/pseudohuber.png
                         :width: 600
     """
     def __init__(self, delta: float = 1.0) -> None:
@@ -117,7 +117,7 @@ class Cauchy(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.4055, 0.6931, 1.0986, 1.3863])
 
-    .. figure:: /_static/img/module/Kernal/Cauchy.png
+    .. figure:: /_static/img/optim/kernel/cauchy.png
                         :width: 600
     """
     def __init__(self, delta: float = 1.0) -> None:
@@ -157,7 +157,7 @@ class SoftLOne(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.4495, 0.8284, 1.4641, 2.0000])
 
-     .. figure:: /_static/img/module/Kernal/SoftLOne.png
+     .. figure:: /_static/img/optim/kernel/softlone.png
                         :width: 600
     """
     def __init__(self, delta: float = 1.0) -> None:
@@ -198,7 +198,7 @@ class Arctan(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.4636, 0.7854, 1.1071, 1.2490])
 
-    .. figure:: /_static/img/module/Kernal/Arctan.png
+    .. figure:: /_static/img/optim/kernel/arctan.png
                         :width: 600
     """
     def __init__(self, delta: float = 1.0) -> None:
@@ -238,7 +238,7 @@ class Tolerant(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.4636, 0.7854, 1.1071, 1.2490])
 
-    .. figure:: /_static/img/module/Kernal/Tolerant.png
+    .. figure:: /_static/img/optim/kernel/tolerant.png
                         :width: 600
     """
     def __init__(self, a: float = 1.0, b: float = -1.0) -> None:
@@ -282,7 +282,7 @@ class Scale(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.5000, 1.0000, 2.0000, 3.0000])
 
-     .. figure:: /_static/img/module/Kernal/scale.png
+     .. figure:: /_static/img/optim/kernel/scale.png
                         :width: 600
     """
     def __init__(self, delta: float = 1.0) -> None:
