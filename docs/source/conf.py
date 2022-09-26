@@ -23,6 +23,9 @@ project = 'PyPose'
 copyright = '2022, PyPose Contributors'
 author = 'PyPose Contributors'
 
+# set by release script
+RELEASE = os.environ.get('RELEASE', False)
+
 # The full version, including alpha/beta/rc tags
 def find_version(file_path: str) -> str:
     version_file = open(file_path).read()
@@ -33,6 +36,11 @@ def find_version(file_path: str) -> str:
 
 version = find_version(os.path.join(proj_root, "pypose/_version.py"))
 
+release = "main"
+if RELEASE:
+    version = '.'.join(version.split('.')[:2])
+    html_title = " ".join((project, version, "documentation"))
+    release = version
 
 
 # -- General configuration ---------------------------------------------------
