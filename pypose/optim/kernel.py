@@ -157,7 +157,7 @@ class SoftLOne(nn.Module):
         >>> kernel(input)
         tensor([0.0000, 0.4495, 0.8284, 1.4641, 2.0000])
 
-     .. figure:: /_static/img/optim/kernel/softLOne.png
+     .. figure:: /_static/img/optim/kernel/softlone.png
                         :width: 600
     """
     def __init__(self, delta: float = 1.0) -> None:
