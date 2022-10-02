@@ -4,30 +4,34 @@
 
 -----
 
-## Current Features
+### Current Features
 
-### [LieTensor](https://pypose.org/docs/main/modules/)
+##### [LieTensor](https://pypose.org/docs/main/modules/)
 
 - Lie Group: [`SO3`](https://pypose.org/docs/main/generated/pypose.SO3/), [`SE3`](https://pypose.org/docs/main/generated/pypose.SE3/), [`Sim3`](https://pypose.org/docs/main/generated/pypose.Sim3/), [`RxSO3`](https://pypose.org/docs/main/generated/pypose.RxSO3/)
 - Lie Algebra: [`so3`](https://pypose.org/docs/main/generated/pypose.so3/), [`se3`](https://pypose.org/docs/main/generated/pypose.se3/), [`sim3`](https://pypose.org/docs/main/generated/pypose.sim3/), [`rxso3`](https://pypose.org/docs/main/generated/pypose.rxso3/)
 
-### [Modules](https://pypose.org/docs/main/modules/)
+##### [Modules](https://pypose.org/docs/main/modules/)
 
 - [`System`](https://pypose.org/docs/main/generated/pypose.module.System)
 - [`IMUPreintegration`](https://pypose.org/docs/main/generated/pypose.module.IMUPreintegrator/)
 - ......
 
-### [Second-order Optimizers](https://pypose.org/docs/main/optim/)
+##### [Second-order Optimizers](https://pypose.org/docs/main/optim/)
 
 - [`GaussNewton`](https://pypose.org/docs/main/generated/pypose.optim.GaussNewton)
 - [`LevenbergMarquardt`](https://pypose.org/docs/main/generated/pypose.optim.LevenbergMarquardt/)
 - ......
 
-### Efficiency based design
-We support parallel computing for Jacobian of LieTensor.
+##### Efficiency-based design
 
-<img width="836" alt="image" src="https://user-images.githubusercontent.com/8695500/193468407-acbadb86-15d9-45d3-b7ef-864db744df38.png">
+- We support parallel computing for Jacobian of LieTensor.
 
+<img width="700" alt="image" src="https://user-images.githubusercontent.com/8695500/193468407-acbadb86-15d9-45d3-b7ef-864db744df38.png">
+
+Efficiency comparison of Lie group operations on CPU and GPU (we take Theseus performance as 1×).
+
+More information about efficiency comparison goes to the paper.
 
 ## Getting Started
     
@@ -43,7 +47,6 @@ pip install pypose
 git clone https://github.com/pypose/pypose.git && cd pypose
 python setup.py develop
 ```
-
 
 #### For Early Users
 
@@ -68,11 +71,11 @@ cd pypose && python setup.py develop
 pytest
 ```
 
-#####  For Contributors
+####  For Contributors
 
-1 Make sure the above installation is correct. 
+1. Make sure the above installation is correct. 
 
-2 Go to [CONTRIBUTING.md](CONTRIBUTING.md)
+2. Go to [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Citing PyPose
 
