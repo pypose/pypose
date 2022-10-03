@@ -27,7 +27,7 @@ Deep learning has had remarkable success in robotic perception, but its data-cen
 - [`LevenbergMarquardt`](https://pypose.org/docs/main/generated/pypose.optim.LevenbergMarquardt/)
 - ......
 
-##### PyPose is highly efficient and we support parallel computing for Jacobian of LieTensor.
+##### PyPose is highly efficient and we support parallel computing for Jacobian of LieTensor. See following comparison.
 
 <img width="700" alt="image" src="https://user-images.githubusercontent.com/8695500/193468407-acbadb86-15d9-45d3-b7ef-864db744df38.png">
 
