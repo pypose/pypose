@@ -12,8 +12,8 @@ Deep learning has had remarkable success in robotic perception, but its data-cen
 
 ##### [LieTensor](https://pypose.org/docs/main/modules/)
 
-- Lie Group: [`SO3`](https://pypose.org/docs/main/generated/pypose.SO3/), [`SE3`](https://pypose.org/docs/main/generated/pypose.SE3/), [`Sim3`](https://pypose.org/docs/main/generated/pypose.Sim3/), [`RxSO3`](https://pypose.org/docs/main/generated/pypose.RxSO3/)
-- Lie Algebra: [`so3`](https://pypose.org/docs/main/generated/pypose.so3/), [`se3`](https://pypose.org/docs/main/generated/pypose.se3/), [`sim3`](https://pypose.org/docs/main/generated/pypose.sim3/), [`rxso3`](https://pypose.org/docs/main/generated/pypose.rxso3/)
+- Lie group: [`SO3`](https://pypose.org/docs/main/generated/pypose.SO3/), [`SE3`](https://pypose.org/docs/main/generated/pypose.SE3/), [`Sim3`](https://pypose.org/docs/main/generated/pypose.Sim3/), [`RxSO3`](https://pypose.org/docs/main/generated/pypose.RxSO3/)
+- Lie algebra: [`so3`](https://pypose.org/docs/main/generated/pypose.so3/), [`se3`](https://pypose.org/docs/main/generated/pypose.se3/), [`sim3`](https://pypose.org/docs/main/generated/pypose.sim3/), [`rxso3`](https://pypose.org/docs/main/generated/pypose.rxso3/)
 
 ##### [Modules](https://pypose.org/docs/main/modules/)
 
@@ -27,17 +27,17 @@ Deep learning has had remarkable success in robotic perception, but its data-cen
 - [`LevenbergMarquardt`](https://pypose.org/docs/main/generated/pypose.optim.LevenbergMarquardt/)
 - ......
 
-##### PyPose is highly efficient and we support parallel computing for Jacobian of LieTensor. See following comparison.
+##### PyPose is highly efficient and supports parallel computing for Jacobian of Lie group and Lie algebra. See following comparison.
 
 <img width="700" alt="image" src="https://user-images.githubusercontent.com/8695500/193468407-acbadb86-15d9-45d3-b7ef-864db744df38.png">
 
-Efficiency comparison of Lie group operations on CPU and GPU (we take Theseus performance as 1×).
+Efficiency comparisons of Lie group operations on CPU and GPU (we take Theseus performance as 1×).
 
 More information about efficiency comparison goes to [our paper for PyPose](https://arxiv.org/abs/2209.15428).
 
 ## Getting Started
     
-### Installing
+### Installation
 
 #### Install from **pypi**
 ```bash
@@ -50,7 +50,7 @@ git clone https://github.com/pypose/pypose.git && cd pypose
 python setup.py develop
 ```
 
-#### For Early Users
+#### For early users
 
 1. Requirement:
 
@@ -67,20 +67,20 @@ git clone  https://github.com/pypose/pypose.git
 cd pypose && python setup.py develop
 ```
 
-3. Run Test
+3. Run tests
 
 ```bash
 pytest
 ```
 
-####  For Contributors
+####  For contributors
 
 1. Make sure the above installation is correct. 
 
 2. Go to [CONTRIBUTING.md](CONTRIBUTING.md)
 
 
-#### Example
+#### Examples
 
 1. The following code sample shows how to rotate random points and compute the gradient of batched rotation.
 
@@ -108,7 +108,7 @@ pytest
             [-0.2659,  0.5709, -0.3855]])
 ```
 
-2. This example shows how to estimate batched transform inverse by a second-order optimizer. Two usage options for a `scheduler` are provided, each of which can work independently.
+2. This example shows how to estimate batched inverse of transform by a second-order optimizer. Two usage options for a `scheduler` are provided, each of which can work independently.
 
 ```python
 >>> import torch, pypose as pp
@@ -144,6 +144,8 @@ pytest
 
 >>> # Note: remove one of the above options for usage!
 ```
+
+For more usage, see [Documentation](https://pypose.org/docs). For more applications, see [Examples](https://github.com/pypose/pypose/tree/main/examples).
 
 ## Citing PyPose
 
