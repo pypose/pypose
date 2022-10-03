@@ -33,7 +33,7 @@ Deep learning has had remarkable success in robotic perception, but its data-cen
 
 Efficiency comparison of Lie group operations on CPU and GPU (we take Theseus performance as 1×).
 
-More information about efficiency comparison goes to the [paper](https://arxiv.org/abs/2209.15428).
+More information about efficiency comparison goes to [our paper for PyPose](https://arxiv.org/abs/2209.15428).
 
 ## Getting Started
     
