@@ -1,6 +1,10 @@
-# pypose
+# PyPose: A Library for Robot Learning with Physics-based Optimization
 
-#### To connect classic robotics with modern learning methods.
+![robot](https://user-images.githubusercontent.com/8695500/193484553-2da66824-4461-4aca-ad8c-b17c05bef067.png)
+
+-----
+
+Deep learning has had remarkable success in robotic perception, but its data-centric nature suffers when it comes to generalizing to ever-changing environments. By contrast, physics-based optimization generalizes better, but it does not perform as well in complicated tasks due to the lack of high-level semantic information and the reliance on manual parametric tuning. To take advantage of these two complementary worlds, we present PyPose: a **robotics-oriented**, **PyTorch-based** library that combines **deep perceptual models** with **physics-based optimization techniques**. Our design goal for PyPose is to make it **user-friendly**, **efficient**, and **interpretable** with a tidy and well-organized architecture. Using an **imperative style interface**, it can be easily integrated into **real-world robotic applications**. 
 
 -----
 
@@ -23,15 +27,13 @@
 - [`LevenbergMarquardt`](https://pypose.org/docs/main/generated/pypose.optim.LevenbergMarquardt/)
 - ......
 
-##### Efficiency-based design
-
-- We support parallel computing for Jacobian of LieTensor.
+##### PyPose is highly efficient and we support parallel computing for Jacobian of LieTensor.
 
 <img width="700" alt="image" src="https://user-images.githubusercontent.com/8695500/193468407-acbadb86-15d9-45d3-b7ef-864db744df38.png">
 
 Efficiency comparison of Lie group operations on CPU and GPU (we take Theseus performance as 1×).
 
-More information about efficiency comparison goes to the paper.
+More information about efficiency comparison goes to the [paper](https://arxiv.org/abs/2209.15428).
 
 ## Getting Started
     
@@ -149,7 +151,7 @@ If you use PyPose, please cite the paper below.
 @article{wang2022pypose,
   title   = {{PyPose: A Library for Robot Learning with Physics-based Optimization}},
   author  = {Chen Wang, Dasong Gao, Kuan Xu, Junyi Geng, Yaoyu Hu, Yuheng Qiu, Bowen Li, Fan Yang, Brady Moon, Abhinav Pandey, Aryan, Jiahe Xu, Tianhao Wu, Haonan He, Daning Huang, Zhongqiang Ren, Shibo Zhao, Taimeng Fu, Pranay Reddy, Xiao Lin, Wenshan Wang, Jingnan Shi, Rajat Talak, Han Wang, Huai Yu, Shanzhao Wang, Ananth Kashyap, Rohan Bandaru, Karthik Dantu, Jiajun Wu, Luca Carlone, Marco Hutter, Sebastian Scherer},
-  journal = {arXiv},
+  journal={arXiv preprint arXiv:2209.15428},
   year    = {2022}
 }
 ```
