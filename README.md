@@ -141,6 +141,8 @@ pytest
 >>> while scheduler.continual:
         loss = optimizer.step(input)
         scheduler.step(loss)
+
+>>> # Note: remove one of the above options for usage!
 ```
 
 ## Citing PyPose
