@@ -147,7 +147,7 @@ pytest
 
 ## Citing PyPose
 
-If you use PyPose, please cite the paper below.
+If you use PyPose, please cite the paper below. You may also [download it here](https://arxiv.org/abs/2209.15428).
 
 ```bibtex
 @article{wang2022pypose,
