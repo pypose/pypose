@@ -1,0 +1,4 @@
+sphinx
+sphinxcontrib.katex
+sphinx_rtd_theme
+functorch==0.2.1

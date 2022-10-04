@@ -12,12 +12,11 @@ pip install -r requirements.txt
 make html
 ```
 
-2. Then open the generated HTML page: `docs/build/index.html`.
+2. Then open the generated HTML page: `docs/build/html/index.html`.
 
 3. To clean and rebuild the doc:
 ```
 make clean
-rm -r source/generated
 ```
 
 

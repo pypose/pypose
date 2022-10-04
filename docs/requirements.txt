@@ -1,4 +1,5 @@
 sphinx
 sphinxcontrib.katex
-sphinx_rtd_theme
-torch
+pypose_sphinx_theme
+torch==1.12.1
+functorch==0.2.1
