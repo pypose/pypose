@@ -1,4 +1,4 @@
-# PyPose: A Library for Robot Learning with Physics-based Optimization
+## PyPose: A Library for Robot Learning with Physics-based Optimization
 
 ![robot](https://user-images.githubusercontent.com/8695500/193484553-2da66824-4461-4aca-ad8c-b17c05bef067.png)
 
