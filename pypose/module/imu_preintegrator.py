@@ -265,7 +265,7 @@ class IMUPreintegrator(nn.Module):
         if init_state is None:
             init_state = {'pos': self.pos, 'rot': self.rot, 'vel': self.vel}
 
-        inte_state = self.integrate(init_state, dt, gyro, acc, rot)
+        inte_state = self.integrate(dt, gyro, acc, rot, init_state['rot'])
         predict = self.predict(init_state, inte_state)
 
         if self.prop_cov:
@@ -307,15 +307,17 @@ class IMUPreintegrator(nn.Module):
 
         return {**predict, **cov}
 
-    def integrate(self, init_state, dt, gyro, acc, rot:pp.SO3=None):
+    def integrate(self, dt, gyro, acc, rot:pp.SO3=None, init_rot:pp.SO3=None):
         B, F = dt.shape[:2]
         dr = torch.cat([pp.identity_SO3(B, 1, dtype=dt.dtype, device=dt.device), pp.so3(gyro*dt).Exp()], dim=1)
         incre_r = pp.cumprod(dr, dim = 1, left=False)
-        inte_rot = init_state['rot'] * incre_r
 
         if isinstance(rot, pp.LieTensor):
             a = acc - rot.Inv() @ self.gravity
         else:
+            if init_rot is None:
+                init_rot = pp.identity_SO3(B, 1, dtype=dt.dtype, device=dt.device)
+            inte_rot = inte_rot * incre_r
             a = acc - inte_rot[:,1:,:].Inv() @ self.gravity
 
         dv = torch.zeros(B, 1, 3, dtype=dt.dtype, device=dt.device)
