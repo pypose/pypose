@@ -1,4 +1,4 @@
-# PyPose: A Library for Robot Learning with Physics-based Optimization
+## PyPose: A Library for Robot Learning with Physics-based Optimization
 
 ![robot](https://user-images.githubusercontent.com/8695500/193484553-2da66824-4461-4aca-ad8c-b17c05bef067.png)
 
@@ -26,6 +26,8 @@ Deep learning has had remarkable success in robotic perception, but its data-cen
 - [`GaussNewton`](https://pypose.org/docs/main/generated/pypose.optim.GaussNewton)
 - [`LevenbergMarquardt`](https://pypose.org/docs/main/generated/pypose.optim.LevenbergMarquardt/)
 - ......
+
+Want more features? [Create an issue here](https://github.com/pypose/pypose/issues) to requst new features.
 
 ##### PyPose is highly efficient and supports parallel computing for Jacobian of Lie group and Lie algebra. See following comparison.
 
@@ -131,7 +133,7 @@ pytest
 >>> # 1st option, full optimization
 >>> scheduler.optimize(input=input)
 
->>> # 2st option, step optimization
+>>> # 2nd option, step optimization
 >>> while scheduler.continual:
         loss = optimizer.step(input)
         scheduler.step(loss)
