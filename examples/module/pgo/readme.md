@@ -26,15 +26,14 @@ Note: change `DATAROOT` to the folder you select.
         Pose Graph Optimization
 
         optional arguments:
-          -h, --help            show this help message and exit
-          --device DEVICE       cuda or cpu
-          --damping DAMPING     damping factor
-          --radius RADIUS       damping factor
-          --save SAVE           location of png files to save
-          --dataroot DATAROOT   dataset location downloaded
-          --dataname DATANAME   dataset name
-          --no-vectorize        to save memory
-          --vectorize           to accelerate computation
+          -h, --help           show this help message and exit
+          --device DEVICE      cuda or cpu
+          --radius RADIUS      trust region radius
+          --save SAVE          files location to save
+          --dataroot DATAROOT  dataset location
+          --dataname DATANAME  dataset name
+          --no-vectorize       to save memory
+          --vectorize          to accelerate computation
 
 ## Note
 
