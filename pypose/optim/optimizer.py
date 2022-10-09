@@ -79,14 +79,14 @@ class RobustModel(nn.Module):
 
 class _Optimizer(Optimizer):
     r'''
-    Base Class for all second order optimizers.
+    Base class for all second order optimizers.
     '''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     
     def update_parameter(self, params, step):
         r'''
-        params are goint to be changed by step calling this function
+        params will be updated by calling this function
         '''
         steps = step.split([p.numel() for p in params if p.requires_grad])
         [p.add_(d.view(p.shape)) for p, d in zip(params, steps) if p.requires_grad]
