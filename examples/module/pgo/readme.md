@@ -37,4 +37,4 @@ Note: change `DATAROOT` to the folder you select.
 
 ## Note
 
-The current implementation of PGO is not using sparse matrices. Therefore, when the number of poses is very big, the memory consumption can be large and running speed can be slow. The sparse matrices will be integrated in the next main release, while the API will be mostly unchanged, only internal logic will be updated.
+The current implementation of PGO is not using sparse matrices. Therefore, when the number of poses is very big, the memory consumption can be large (`--vectorize`) or running speed can be slow (`--no-vectorize`). The sparse matrices will be integrated in the next main release, while the API will be mostly unchanged, only internal logic will be updated.
