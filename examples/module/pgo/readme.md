@@ -26,10 +26,15 @@ Note: change `DATAROOT` to the folder you select.
         Pose Graph Optimization
 
         optional arguments:
-          -h, --help            show this help message and exit
-          --device DEVICE       cuda or cpu
-          --damping DAMPING     damping factor
-          --radius RADIUS       damping factor
-          --save SAVE           location of png files to save
-          --dataroot DATAROOT   dataset location downloaded
-          --dataname DATANAME   dataset name
+          -h, --help           show this help message and exit
+          --device DEVICE      cuda or cpu
+          --radius RADIUS      trust region radius
+          --save SAVE          files location to save
+          --dataroot DATAROOT  dataset location
+          --dataname DATANAME  dataset name
+          --no-vectorize       to save memory
+          --vectorize          to accelerate computation
+
+## Note
+
+The current implementation of PGO is not using sparse matrices. Therefore, when the number of poses is very big, the memory consumption can be large (`--vectorize`) or running speed can be slow (`--no-vectorize`). The sparse matrices will be integrated in the next main release, while the API will be mostly unchanged, only internal logic will be updated.
