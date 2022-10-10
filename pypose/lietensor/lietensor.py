@@ -69,8 +69,8 @@ class LieType:
         raise NotImplementedError("Instance has no Exp attribute.")
 
     def Inv(self, x):
-        if not self.on_manifold:
-            raise AttributeError("Lie Group has no Inv attribute")
+        if self.on_manifold:
+            return - x
         raise NotImplementedError("Instance has no Inv attribute.")
 
     def Act(self, X, p):
@@ -206,8 +206,6 @@ class SO3Type(LieType):
         raise NotImplementedError('Invalid __mul__ operation')
     
     def Inv(self, X):
-        if self.on_manifold:
-            return LieTensor(-X, ltype=SO3_type)
         X = X.tensor() if hasattr(X, 'ltype') else X
         out = SO3_Inv.apply(X)
         return LieTensor(out, ltype=SO3_type)
@@ -358,8 +356,6 @@ class SE3Type(LieType):
         raise NotImplementedError('Invalid __mul__ operation')
 
     def Inv(self, X):
-        if self.on_manifold:
-            return LieTensor(-X, ltype=SE3_type)
         X = X.tensor() if hasattr(X, 'ltype') else X
         out = SE3_Inv.apply(X)
         return LieTensor(out, ltype=SE3_type)
@@ -482,8 +478,6 @@ class Sim3Type(LieType):
         raise NotImplementedError('Invalid __mul__ operation')
 
     def Inv(self, X):
-        if self.on_manifold:
-            return LieTensor(-X, ltype=Sim3_type)
         X = X.tensor() if hasattr(X, 'ltype') else X
         out = Sim3_Inv.apply(X)
         return LieTensor(out, ltype=Sim3_type)
@@ -612,8 +606,6 @@ class RxSO3Type(LieType):
         raise NotImplementedError('Invalid __mul__ operation')
 
     def Inv(self, X):
-        if self.on_manifold:
-            return LieTensor(-X, ltype=RxSO3_type)
         X = X.tensor() if hasattr(X, 'ltype') else X
         out = RxSO3_Inv.apply(X)
         return LieTensor(out, ltype=RxSO3_type)
