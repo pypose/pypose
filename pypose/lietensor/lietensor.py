@@ -15,7 +15,7 @@ from .operation import SO3_Act4, SE3_Act4, RxSO3_Act4, Sim3_Act4
 from .operation import SO3_AdjXa, SE3_AdjXa, RxSO3_AdjXa, Sim3_AdjXa
 from .operation import SO3_AdjTXa, SE3_AdjTXa, RxSO3_AdjTXa, Sim3_AdjTXa
 from .operation import so3_Jl_inv, se3_Jl_inv, rxso3_Jl_inv, sim3_Jl_inv
-from .common_types import _size_any_t, _size_2_t, _size_35_t, _size_24_t, convert_sig_se, convert_sig_sim, convert_sig_rxs
+from .common_types import _size_any_t, convert_sig_se, convert_sig_sim, convert_sig_rxs
 import collections
 
 
@@ -415,7 +415,7 @@ class SE3Type(LieType):
     def add_(cls, input, other):
         return input.copy_(LieTensor(other[..., :6], ltype=se3_type).Exp() * input)
 
-    def randn_like(self, *args, sigma:_size_24_t=1.0, **kwargs):
+    def randn_like(self, *args, sigma:_size_any_t=1.0, **kwargs):
         return self.randn(*args, sigma=sigma, **kwargs)
 
 
@@ -684,7 +684,7 @@ class RxSO3Type(LieType):
     def add_(cls, input, other):
         return input.copy_(LieTensor(other[..., :4], ltype=rxso3_type).Exp() * input)
 
-    def randn_like(self, *args, sigma:_size_2_t=1.0, **kwargs):
+    def randn_like(self, *args, sigma:_size_any_t=1.0, **kwargs):
         return self.randn(*args, sigma=sigma, **kwargs)
 
 
