@@ -79,14 +79,14 @@ class RobustModel(nn.Module):
 
 class _Optimizer(Optimizer):
     r'''
-    Base Class for all second order optimizers.
+    Base class for all second order optimizers.
     '''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     
     def update_parameter(self, params, step):
         r'''
-        params are goint to be changed by step calling this function
+        params will be updated by calling this function
         '''
         steps = step.split([p.numel() for p in params if p.requires_grad])
         [p.add_(d.view(p.shape)) for p, d in zip(params, steps) if p.requires_grad]
@@ -401,20 +401,20 @@ class LevenbergMarquardt(_Optimizer):
             Tensor: the minimized model loss.
 
         Note:
-            The (non-negative) damping factor :math:`\lambda` can be adjusted at each iteration. If
-            the residual reduces rapidly, a smaller value can be used, bringing the algorithm
-            closer to the Gauss-Newton algorithm, whereas if an iteration gives insufficient residual
-            reduction, :math:`\lambda` can be increased, giving a step closer to the gradient
-            descent direction.
+            The (non-negative) damping factor :math:`\lambda` can be adjusted at each iteration.
+            If the residual reduces rapidly, a smaller value can be used, bringing the algorithm
+            closer to the Gauss-Newton algorithm, whereas if an iteration gives insufficient
+            residual reduction, :math:`\lambda` can be increased, giving a step closer to the
+            gradient descent direction.
 
             See more details of `Levenberg-Marquardt (LM) algorithm
             <https://en.wikipedia.org/wiki/Levenberg-Marquardt_algorithm>`_ on Wikipedia.
 
         Note:
             Different from PyTorch optimizers like
-            `SGD <https://pytorch.org/docs/stable/generated/torch.optim.SGD.html>`_, where the model
-            error has to be a scalar, the output of model :math:`\bm{f}` can be a Tensor/LieTensor or a
-            tuple of Tensors/LieTensors.
+            `SGD <https://pytorch.org/docs/stable/generated/torch.optim.SGD.html>`_, where the
+            model error has to be a scalar, the output of model :math:`\bm{f}` can be a
+            Tensor/LieTensor or a tuple of Tensors/LieTensors.
 
         Example:
             Optimizing a simple module to **approximate pose inversion**.
@@ -445,6 +445,11 @@ class LevenbergMarquardt(_Optimizer):
             Pose Inversion error: 0.0008593 @ 2 it
             Pose Inversion error: 0.0000004 @ 3 it
             Early Stopping with error: 4.443569991963159e-07
+
+        Note:
+            More practical examples, e.g., pose graph optimization (PGO), can be found at
+            `examples/module/pgo
+            <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.    
         '''
         for pg in self.param_groups:
             R = self.model(input, target, weight)

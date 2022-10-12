@@ -1529,7 +1529,7 @@ def Inv(x):
             \mathrm{Inv}(^s\mathbf{q}_i) \right]
 
     * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`so3_type` or :obj:`se3_type` or
-      :obj:`sim3_type` or :obj:`rxso3_type`(input :math:`\mathbf{x}` is an instance of :meth:`so3`
+      :obj:`sim3_type` or :obj:`rxso3_type` (input :math:`\mathbf{x}` is an instance of :meth:`so3`
       or :meth:`se3` or :meth:`sim3` or :meth:`rxso3`):
 
         .. math::
@@ -1628,13 +1628,19 @@ def Inv(x):
             >>> x + x.Inv()
             tensor([0., 0., 0.])
 
+        One can also verify:
+
+            >>> x = pp.randn_SO3()
+            >>> x.Log() + x.Inv().Log()
+            so3Type LieTensor:
+            LieTensor([0., 0., 0.])
     """
     return x.Inv()
 
 
 @assert_ltype
 def Mul(x, y):
-    return x * y
+    return x @ y
 
 
 @assert_ltype

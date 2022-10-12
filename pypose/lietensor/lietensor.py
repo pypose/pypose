@@ -30,15 +30,10 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
 
 class LieType:
     '''LieTensor Type Base Class'''
-    def __init__(self, lid, dimension, embedding, manifold):
-        self._lid       = lid                     # LieType ID
+    def __init__(self, dimension, embedding, manifold):
         self._dimension = torch.Size([dimension]) # Data dimension
         self._embedding = torch.Size([embedding]) # Embedding dimension
         self._manifold  = torch.Size([manifold])  # Manifold dimension
-
-    @property
-    def lid(self):
-        return self._lid
 
     @property
     def dimension(self):
@@ -74,8 +69,8 @@ class LieType:
         raise NotImplementedError("Instance has no Exp attribute.")
 
     def Inv(self, x):
-        if not self.on_manifold:
-            raise AttributeError("Lie Group has no Inv attribute")
+        if self.on_manifold:
+            return - x
         raise NotImplementedError("Instance has no Inv attribute.")
 
     def Act(self, X, p):
@@ -173,7 +168,7 @@ class LieType:
 
 class SO3Type(LieType):
     def __init__(self):
-        super().__init__(1, 4, 4, 3)
+        super().__init__(4, 4, 3)
 
     def Log(self, X):
         X = X.tensor() if hasattr(X, 'ltype') else X
@@ -211,8 +206,6 @@ class SO3Type(LieType):
         raise NotImplementedError('Invalid __mul__ operation')
     
     def Inv(self, X):
-        if self.on_manifold:
-            return LieTensor(-X, ltype=SO3_type)
         X = X.tensor() if hasattr(X, 'ltype') else X
         out = SO3_Inv.apply(X)
         return LieTensor(out, ltype=SO3_type)
@@ -280,7 +273,7 @@ class SO3Type(LieType):
 
 class so3Type(LieType):
     def __init__(self):
-        super().__init__(1, 3, 4, 3)
+        super().__init__(3, 4, 3)
 
     def Exp(self, x):
         x = x.tensor() if hasattr(x, 'ltype') else x
@@ -325,7 +318,7 @@ class so3Type(LieType):
 
 class SE3Type(LieType):
     def __init__(self):
-        super().__init__(3, 7, 7, 6)
+        super().__init__(7, 7, 6)
 
     def Log(self, X):
         X = X.tensor() if hasattr(X, 'ltype') else X
@@ -363,8 +356,6 @@ class SE3Type(LieType):
         raise NotImplementedError('Invalid __mul__ operation')
 
     def Inv(self, X):
-        if self.on_manifold:
-            return LieTensor(-X, ltype=SE3_type)
         X = X.tensor() if hasattr(X, 'ltype') else X
         out = SE3_Inv.apply(X)
         return LieTensor(out, ltype=SE3_type)
@@ -418,7 +409,7 @@ class SE3Type(LieType):
 
 class se3Type(LieType):
     def __init__(self):
-        super().__init__(3, 6, 7, 6)
+        super().__init__(6, 7, 6)
 
     def Exp(self, x):
         x = x.tensor() if hasattr(x, 'ltype') else x
@@ -449,7 +440,7 @@ class se3Type(LieType):
 
 class Sim3Type(LieType):
     def __init__(self):
-        super().__init__(4, 8, 8, 7)
+        super().__init__(8, 8, 7)
 
     def Log(self, X):
         X = X.tensor() if hasattr(X, 'ltype') else X
@@ -487,8 +478,6 @@ class Sim3Type(LieType):
         raise NotImplementedError('Invalid __mul__ operation')
 
     def Inv(self, X):
-        if self.on_manifold:
-            return LieTensor(-X, ltype=Sim3_type)
         X = X.tensor() if hasattr(X, 'ltype') else X
         out = Sim3_Inv.apply(X)
         return LieTensor(out, ltype=Sim3_type)
@@ -545,7 +534,7 @@ class Sim3Type(LieType):
 
 class sim3Type(LieType):
     def __init__(self):
-        super().__init__(4, 7, 8, 7)
+        super().__init__(7, 8, 7)
 
     def Exp(self, x):
         x = x.tensor() if hasattr(x, 'ltype') else x
@@ -579,7 +568,7 @@ class sim3Type(LieType):
 
 class RxSO3Type(LieType):
     def __init__(self):
-        super().__init__(2, 5, 5, 4)
+        super().__init__(5, 5, 4)
 
     def Log(self, X):
         X = X.tensor() if hasattr(X, 'ltype') else X
@@ -617,8 +606,6 @@ class RxSO3Type(LieType):
         raise NotImplementedError('Invalid __mul__ operation')
 
     def Inv(self, X):
-        if self.on_manifold:
-            return LieTensor(-X, ltype=RxSO3_type)
         X = X.tensor() if hasattr(X, 'ltype') else X
         out = RxSO3_Inv.apply(X)
         return LieTensor(out, ltype=RxSO3_type)
@@ -672,7 +659,7 @@ class RxSO3Type(LieType):
 
 class rxso3Type(LieType):
     def __init__(self):
-        super().__init__(2, 4, 5, 4)
+        super().__init__(4, 5, 4)
 
     def Exp(self, x):
         x = x.tensor() if hasattr(x, 'ltype') else x
@@ -980,9 +967,15 @@ class LieTensor(torch.Tensor):
         return self.add(other=other)
 
     def __mul__(self, other):
+        r'''
+        See :meth:`pypose.mul`
+        '''
         return self.ltype.Mul(self, other)
 
     def __matmul__(self, other):
+        r'''
+        See :meth:`pypose.matmul`
+        '''
         if isinstance(other, LieTensor):
             return self.ltype.Mul(self, other)
         else: # Same with: self.ltype.matrix(self) @ other
