@@ -7,7 +7,7 @@ from .lietensor import SE3_type, se3_type
 from .lietensor import SO3_type, so3_type
 from .lietensor import Sim3_type, sim3_type
 from .lietensor import RxSO3_type, rxso3_type
-from .common_types import _size_any_t
+from .lietensor import _size_any_t
 
 
 def _LieTensor_wrapper_add_docstr(wrapper: functools.partial, embedding_doc):
