@@ -410,21 +410,20 @@ def randn_so3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
 def randn_SO3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     r'''
     Returns :obj:`SO3_type` LieTensor filled with the Exponential map of the random
-    :obj:`so3_type` LieTensor. The corresponding rotation has an evenly distributed rotation axis 
-    and the rotation angle follows normal distribution with 0 mean and :obj:`sigma` standard deviation.
+    :obj:`so3_type` LieTensor. The generated LieTensor satisfies that the corresponding rotation axis 
+    follows uniform distribution on the standard sphere and the rotation angle follows normal distribution 
+    with 0 mean and standard deviation :obj:`sigma`.
     
     .. math::
-        \mathrm{data}[*, :] = \mathrm{Exp}([\delta_x, \delta_y, \delta_z]) = \mathrm{Exp}([\delta_x', \delta_y', \delta_z'] \cdot \theta),
+        \begin{aligned}
+        \mathrm{data}[*, :] &= \mathrm{Exp}([\delta_x, \delta_y, \delta_z]) \\
+                            &= \mathrm{Exp}([\delta_x', \delta_y', \delta_z'] \cdot \theta),
+        \end{aligned}
 
-    .. math::
-        [\delta_x', \delta_y', \delta_z'] \sim \mathcal{U}_{\mathrm{s}},
-
-    .. math::
-        \theta \sim \mathcal{N}(0, \sigma),
-
-    where :math:`\mathcal{U}_{\mathrm{s}}` denotes uniform distribution on the standard sphere. 
-    :math:`\mathcal{N}(\cdot, \cdot)` denotes normal distribution and :math:`\mathrm{Exp}()` is the 
-    Exponential map.
+    where :math:`[\delta_x', \delta_y', \delta_z']` is randomly generated from uniform
+    distribution :math:`\mathcal{U}_{\mathrm{s}}` on a standard sphere and :math:`\theta`
+    is generated from a normal distribution :math:`\mathcal{N}(0, \sigma)`, where sigma
+    (:math:`\sigma`) is the standard deviation. :math:`\mathrm{Exp}()` is the Exponential map.
 
     For detailed explanation of generating :math:`[\delta_x', \delta_y', \delta_z']`, please see 
     :meth:`pypose.randn_so3()`.
@@ -468,18 +467,17 @@ def randn_SO3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
 def randn_se3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     r'''
     Returns :obj:`se3_type` LieTensor filled with random numbers. The transation part 
-    :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
-    with mean 0 and standard deviation :obj:`sigma_t`, the rotation part :math:`[\delta_x, \delta_y, \delta_z]` 
-    has an evenly distributed rotation axis and the rotation angle follows normal distribution with 
-    0 mean and :obj:`sigma_r` standard deviation. 
+    satisfies that each element follows normal distribution with 0 mean and :obj:`sigma_t` standard deviation.
+    The rotation part satisfies that the corresponding rotation axis follows uniform distribution on the
+    standard sphere and the rotation angle follows normal distribution with 0 mean and :obj:`sigma_r` standard deviation. 
     Note that the input argument :obj:`sigma` = (:obj:`sigma_t`, :obj:`sigma_r`).
 
     .. math::
         \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z],
 
-    where :math:`\tau_x, \tau_y, \tau_z \sim \mathcal{N}(0, \sigma_{\rm{t}})` and 
+    where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_t)`, 
+    where :obj:`sigma_t` (:math:`\sigma_t`) is the standard deviation. 
     :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`.
-    :math:`\mathcal{N}(\cdot, \cdot)` denotes normal distribution.
 
     Args:
         size (int...): a sequence of integers defining the shape of the output tensor.
@@ -541,10 +539,10 @@ def randn_SE3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     .. math::
         \mathrm{data}[*, :] = \mathrm{Exp}([\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z]),
 
-    where :math:`\tau_x, \tau_y, \tau_z \sim \mathcal{N}(0, \sigma_{\rm{t}})` and 
-    :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`.
-    :math:`\mathcal{N}(\cdot, \cdot)` denotes normal distribution and :math:`\mathrm{Exp}()` is the 
-    Exponential map.
+    where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
+    :math:`\mathcal{N}(0, \sigma_t)`, where :obj:`sigma_t` (:math:`\sigma_t`) is the standard deviation. 
+    :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`. 
+    :math:`\mathrm{Exp}()` is the Exponential map.
 
     Args:
         size (int...): a sequence of integers defining the shape of the output tensor.
@@ -601,11 +599,10 @@ def randn_SE3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
 def randn_sim3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     r'''
     Returns :obj:`sim3_type` LieTensor filled with random numbers. The transation part 
-    :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
-    with mean 0 and standard deviation :obj:`sigma_t`, the rotation part :math:`[\delta_x, \delta_y, \delta_z]` 
-    has an evenly distributed rotation axis and the rotation angle follows normal distribution with 
-    0 mean and :obj:`sigma_r` standard deviation, and the scale part :math:`\log s` is a 
-    random number from a normal distribution with mean 0 and standard deviation :obj:`sigma_s`.
+    satisfies that each element follows normal distribution with 0 mean and :obj:`sigma_t` standard deviation. 
+    The rotation part satisfies that the corresponding rotation axis follows uniform distribution on the
+    standard sphere and the rotation angle follows normal distribution with 0 mean and :obj:`sigma_r` standard deviation.
+    The scale part follows normal distribution with 0 mean and :obj:`sigma_s` standard deviation.
 
     Note that :obj:`sigma_t`, :obj:`sigma_r`, and :obj:`sigma_s` are all from input argument :obj:`sigma`, i.e.,
     :obj:`sigma` = (:obj:`sigma_t`, :obj:`sigma_r`, :obj:`sigma_s`).
@@ -613,10 +610,11 @@ def randn_sim3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     .. math::
         \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z, \log s],
 
-    where :math:`\tau_x, \tau_y, \tau_z \sim \mathcal{N}(0, \sigma_{\rm{t}})`, 
-    :math:`\log s \sim \mathcal{N}(0, \sigma_{\rm{s}})` and 
-    :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`.
-    :math:`\mathcal{N}(\cdot, \cdot)` denotes normal distribution.
+    where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
+    :math:`\mathcal{N}(0, \sigma_t)`, where :obj:`sigma_t` (:math:`\sigma_t`) is the standard deviation. 
+    :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`. 
+    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, where :obj:`sigma_s`
+    (:math:`\sigma_s`) is the standard deviation.
 
     Args:
         size (int...): a sequence of integers defining the shape of the output tensor.
@@ -678,11 +676,12 @@ def randn_Sim3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     .. math::
         \mathrm{data}[*, :] = \mathrm{Exp}([\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z, \log s]),
 
-    where :math:`\tau_x, \tau_y, \tau_z \sim \mathcal{N}(0, \sigma_{\rm{t}})`, 
-    :math:`\log s \sim \mathcal{N}(0, \sigma_{\rm{s}})` and 
-    :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`.
-    :math:`\mathcal{N}(\cdot, \cdot)` denotes normal distribution and :math:`\mathrm{Exp}()` is the 
-    Exponential map.
+    where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
+    :math:`\mathcal{N}(0, \sigma_t)`, where :obj:`sigma_t` (:math:`\sigma_t`) is the standard deviation. 
+    :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`. 
+    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, where :obj:`sigma_s`
+    (:math:`\sigma_s`) is the standard deviation. 
+    :math:`\mathrm{Exp}()` is the Exponential map.
 
     Args:
         size (int...): a sequence of integers defining the shape of the output tensor.
@@ -739,19 +738,18 @@ def randn_Sim3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
 def randn_rxso3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     r'''
     Returns :obj:`rxso3_type` LieTensor filled with random numbers. 
-    The rotation part :math:`[\delta_x, \delta_y, \delta_z]` has an evenly distributed rotation 
-    axis and the rotation angle follows normal distribution with 
-    0 mean and :obj:`sigma_r` standard deviation. The scale part :math:`\log s` is a 
-    random number from a normal distribution with mean 0 and standard deviation :obj:`sigma_s`.
+    The rotation part satisfies that the corresponding rotation axis follows uniform distribution on the
+    standard sphere and the rotation angle follows normal distribution with 0 mean and :obj:`sigma_r` standard deviation.
+    The scale part follows normal distribution with 0 mean and :obj:`sigma_s` standard deviation.
     Note that :obj:`sigma_r` and :obj:`sigma_s` are both from input argument :obj:`sigma`, i.e.,
     :obj:`sigma` = (:obj:`sigma_r`, :obj:`sigma_s`).
 
     .. math::
         \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z, \log s],
 
-    where :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()` and 
-    :math:`\log s \sim \mathcal{N}(0, \sigma_{\mathrm{s}})`. :math:`\mathcal{N}(\cdot, \cdot)` 
-    denotes normal distribution.
+    where :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`. 
+    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, where :obj:`sigma_s`
+    (:math:`\sigma_s`) is the standard deviation.
 
     Args:
         size (int...): a sequence of integers defining the shape of the output tensor.
@@ -805,9 +803,10 @@ def randn_RxSO3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     .. math::
         \mathrm{data}[*, :] = \mathrm{Exp}([\delta_x, \delta_y, \delta_z, \log s]),
 
-    where :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()` and 
-    :math:`\log s \sim \mathcal{N}(0, \sigma_{\mathrm{s}})`. :math:`\mathcal{N}(\cdot, \cdot)` denotes 
-    normal distribution and :math:`\mathrm{Exp}()` is the Exponential map.
+    where :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`. 
+    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, where :obj:`sigma_s`
+    (:math:`\sigma_s`) is the standard deviation. 
+    :math:`\mathrm{Exp}()` is the Exponential map.
 
     Args:
         size (int...): a sequence of integers defining the shape of the output tensor.

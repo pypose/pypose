@@ -38,7 +38,10 @@ _penta = _ntuple(5, "_penta")
 def to_tuple(x):
     out = tuple()
     for i in x:
-        out += tuple(i)
+        if not isinstance(i, collections.abc.Iterable):
+            out += (i,)
+        else:
+            out += tuple(i)
     return out
 
 class LieType:
