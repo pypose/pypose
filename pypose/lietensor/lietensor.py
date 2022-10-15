@@ -2,9 +2,7 @@ import collections
 import math, numbers
 import torch, warnings
 from torch import nn, linalg
-from torch.types import _size
 from .operation import broadcast_inputs
-from typing import Union, Tuple, Optional
 from .basics import cumops_, cummul_, cumprod_
 from .basics import vec2skew, cumops, cummul, cumprod
 from torch.utils._pytree import tree_map, tree_flatten
@@ -30,17 +28,6 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
                      'transpose', 'unbind', 'gather', 'repeat', 'expand', 'expand_as',
                      'index_select', 'masked_select', 'index_copy', 'index_copy_',
                      'select', 'select_scatter', 'index_put','index_put_', 'copy_']
-
-_penta = _ntuple(5, "_penta")
-
-def to_tuple(x):
-    out = tuple()
-    for i in x:
-        if not isinstance(i, collections.abc.Iterable):
-            out += (i,)
-        else:
-            out += tuple(i)
-    return out
 
 class LieType:
     '''LieTensor Type Base Class'''
@@ -139,6 +126,16 @@ class LieType:
         warnings.warn("Instance has no scale. Scalar one(s) is returned.")
         return torch.ones(input.lshape + (1,), dtype=input.dtype, device=input.device,
             requires_grad=input.requires_grad)
+
+    @classmethod
+    def to_tuple(cls, input):
+        out = tuple()
+        for i in input:
+            if not isinstance(i, collections.abc.Iterable):
+                out += (i,)
+            else:
+                out += tuple(i)
+        return out
 
     @classmethod
     def identity(cls, *args, **kwargs):
@@ -255,7 +252,7 @@ class SO3Type(LieType):
         data = torch.tensor([0., 0., 0., 1.], **kwargs)
         return LieTensor(data.repeat(size+(1,)), ltype=SO3_type)
 
-    def randn(self, *size:_size, sigma=1.0, requires_grad=False, **kwargs):
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         data = so3_type.Exp(so3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=SO3_type).requires_grad_(requires_grad)
 
@@ -307,11 +304,11 @@ class so3Type(LieType):
     def identity(cls, *size, **kwargs):
         return SO3_type.Log(SO3_type.identity(*size, **kwargs))
 
-    def randn(self, *size:_size, sigma=1.0, requires_grad=False, **kwargs):
-        size = to_tuple(size)
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
+        size = self.to_tuple(size)
         data_ = torch.randn(*(size + torch.Size([3])), **kwargs)
         dis_2 = data_.pow(2).sum(dim=-1, keepdim=True)
-        dis_ = torch.sqrt(dis_2.to(torch.double)).to(data_.dtype)
+        dis_ = torch.sqrt(dis_2).to(data_.dtype)
         data = data_ / dis_
         data_theta = sigma * torch.randn(*(size + torch.Size([1])), **kwargs)
         return LieTensor(data * data_theta, ltype=so3_type).requires_grad_(requires_grad)
@@ -419,7 +416,7 @@ class SE3Type(LieType):
         data = torch.tensor([0., 0., 0., 0., 0., 0., 1.], **kwargs)
         return LieTensor(data.repeat(size+(1,)), ltype=SE3_type)
 
-    def randn(self, *size:_size, sigma=1.0, requires_grad=False, **kwargs):
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         data = se3_type.Exp(se3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=SE3_type).requires_grad_(requires_grad)
 
@@ -457,7 +454,7 @@ class se3Type(LieType):
     def identity(cls, *size, **kwargs):
         return SE3_type.Log(SE3_type.identity(*size, **kwargs))
 
-    def randn(self, *size:_size, sigma=1.0, requires_grad=False, **kwargs):
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         #  convert different types of inputs to SE3 sigma
         if not isinstance(sigma, collections.abc.Iterable):
             sigma = _quadruple(sigma)
@@ -467,11 +464,11 @@ class se3Type(LieType):
             sigma = translation_sigma+rotation_sigma
         else:
             assert len(sigma)==4
-        size = to_tuple(size)
-        rotation_data = so3_type.randn(*size, sigma=sigma[-1], **kwargs).detach().tensor()
+        size = self.to_tuple(size)
+        rotation = so3_type.randn(*size, sigma=sigma[-1], **kwargs).detach().tensor()
         sigma = torch.tensor([sigma[0], sigma[1], sigma[2]], **kwargs)
-        translation_data = sigma * torch.randn(*(size + torch.Size([3])), **kwargs)
-        data = torch.cat([translation_data, rotation_data], dim=-1)
+        translation = sigma * torch.randn(*(size + torch.Size([3])), **kwargs)
+        data = torch.cat([translation, rotation], dim=-1)
         return LieTensor(data, ltype=se3_type).requires_grad_(requires_grad)
 
 
@@ -560,7 +557,7 @@ class Sim3Type(LieType):
         data = torch.tensor([0., 0., 0., 0., 0., 0., 1., 1.], **kwargs)
         return LieTensor(data.repeat(size+(1,)), ltype=Sim3_type)
 
-    def randn(self, *size:_size, sigma=1.0, requires_grad=False, **kwargs):
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         data = sim3_type.Exp(sim3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=Sim3_type).requires_grad_(requires_grad)
 
@@ -601,9 +598,9 @@ class sim3Type(LieType):
     def identity(cls, *size, **kwargs):
         return Sim3_type.Log(Sim3_type.identity(*size, **kwargs))
 
-    def randn(self, *size:_size, sigma=1.0, requires_grad=False, **kwargs):
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         if not isinstance(sigma, collections.abc.Iterable):
-            sigma = _penta(sigma)
+            sigma = _ntuple(5, "_penta")(sigma)
         elif len(sigma)==3:
             rotation_sigma = _single(sigma[-2])
             scale_sigma = _single(sigma[-1])
@@ -611,14 +608,14 @@ class sim3Type(LieType):
             sigma = translation_sigma+rotation_sigma+scale_sigma
         else:
             assert len(sigma)==5
-        size = to_tuple(size)
-        rotation_data = so3_type.randn(*size, sigma=sigma[-2], **kwargs).detach().tensor()
-        scale_data = sigma[-1] * torch.randn(*(size + torch.Size([1])), **kwargs)
+        size = self.to_tuple(size)
+        rotation = so3_type.randn(*size, sigma=sigma[-2], **kwargs).detach().tensor()
+        scale = sigma[-1] * torch.randn(*(size + torch.Size([1])), **kwargs)
         translation_x = sigma[0] * torch.randn(*(size + torch.Size([1])), **kwargs)
         translation_y = sigma[1] * torch.randn(*(size + torch.Size([1])), **kwargs)
         translation_z = sigma[2] * torch.randn(*(size + torch.Size([1])), **kwargs)
-        translation_data = torch.cat([translation_x, translation_y, translation_z], dim=-1)
-        data = torch.cat([translation_data, rotation_data, scale_data], dim=-1)
+        translation = torch.cat([translation_x, translation_y, translation_z], dim=-1)
+        data = torch.cat([translation, rotation, scale], dim=-1)
         return LieTensor(data, ltype=sim3_type).requires_grad_(requires_grad)
 
 
@@ -704,7 +701,7 @@ class RxSO3Type(LieType):
         data = torch.tensor([0., 0., 0., 1., 1.], **kwargs)
         return LieTensor(data.repeat(size+(1,)), ltype=RxSO3_type)
 
-    def randn(self, *size:_size, sigma=1.0, requires_grad=False, **kwargs):
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         data = rxso3_type.Exp(rxso3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=RxSO3_type).requires_grad_(requires_grad)
 
@@ -742,12 +739,12 @@ class rxso3Type(LieType):
     def identity(cls, *size, **kwargs):
         return RxSO3_type.Log(RxSO3_type.identity(*size, **kwargs))
 
-    def randn(self, *size:_size, sigma=1.0, requires_grad=False, **kwargs):
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         if not isinstance(sigma, collections.abc.Iterable):
             sigma = _pair(sigma)
         else:
             assert len(sigma)==2
-        size = to_tuple(size)
+        size = self.to_tuple(size)
         rotation_data = so3_type.randn(*size, sigma=sigma[0], **kwargs).detach().tensor()
         scale_data = sigma[1] * torch.randn(*(size+torch.Size([1])), **kwargs)
         data = torch.cat([rotation_data, scale_data], dim=-1)
