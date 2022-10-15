@@ -260,9 +260,6 @@ class SO3Type(LieType):
     def add_(cls, input, other):
         return input.copy_(LieTensor(other[..., :3], ltype=so3_type).Exp() * input)
 
-    def randn_like(self, *args, sigma=1.0, **kwargs):
-        return self.randn(*args, sigma=sigma, **kwargs)
-
     def matrix(self, input):
         """ To 3x3 matrix """
         I = torch.eye(3, dtype=input.dtype, device=input.device)
@@ -424,9 +421,6 @@ class SE3Type(LieType):
     def add_(cls, input, other):
         return input.copy_(LieTensor(other[..., :6], ltype=se3_type).Exp() * input)
 
-    def randn_like(self, *args, sigma=1.0, **kwargs):
-        return self.randn(*args, sigma=sigma, **kwargs)
-
 
 class se3Type(LieType):
     def __init__(self):
@@ -564,9 +558,6 @@ class Sim3Type(LieType):
     @classmethod
     def add_(cls, input, other):
         return input.copy_(LieTensor(other[..., :7], ltype=sim3_type).Exp() * input)
-
-    def randn_like(self, *args, sigma=1.0, **kwargs):
-        return self.randn(*args, sigma=sigma, **kwargs)
 
 
 class sim3Type(LieType):
@@ -708,9 +699,6 @@ class RxSO3Type(LieType):
     @classmethod
     def add_(cls, input, other):
         return input.copy_(LieTensor(other[..., :4], ltype=rxso3_type).Exp() * input)
-
-    def randn_like(self, *args, sigma=1.0, **kwargs):
-        return self.randn(*args, sigma=sigma, **kwargs)
 
 
 class rxso3Type(LieType):
