@@ -7,7 +7,6 @@ from .lietensor import SE3_type, se3_type
 from .lietensor import SO3_type, so3_type
 from .lietensor import Sim3_type, sim3_type
 from .lietensor import RxSO3_type, rxso3_type
-from .lietensor import _size_any_t
 
 
 def _LieTensor_wrapper_add_docstr(wrapper: functools.partial, embedding_doc):
@@ -227,7 +226,7 @@ sim3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=sim3_typ
         tensor([0., 0., 0., 0., 0., 0., 1.])
     ''')
 
-def randn_like(input, sigma:_size_any_t=1.0, **kwargs):
+def randn_like(input, sigma=1.0, **kwargs):
     r'''
     Returns a LieTensor with the same size as input that is filled with random
     LieTensor with the corresponding :obj:`input.ltype`.
@@ -319,7 +318,7 @@ def randn_like(input, sigma:_size_any_t=1.0, **kwargs):
     return input.ltype.randn_like(*input.lshape, sigma=sigma, **kwargs)
 
 
-def randn_so3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
+def randn_so3(*size:_size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`so3_type` LieTensor filled with random numbers. The generated LieTensor
     satisfies that the corresponding rotation axis follows uniform distribution on the
@@ -407,7 +406,7 @@ def randn_so3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     return so3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_SO3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
+def randn_SO3(*size:_size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`SO3_type` LieTensor filled with the Exponential map of the random
     :obj:`so3_type` LieTensor. The generated LieTensor satisfies that the corresponding rotation axis 
@@ -464,7 +463,7 @@ def randn_SO3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     return SO3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_se3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
+def randn_se3(*size:_size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`se3_type` LieTensor filled with random numbers. The transation part 
     satisfies that each element follows normal distribution with 0 mean and :obj:`sigma_t` standard deviation.
@@ -531,7 +530,7 @@ def randn_se3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     return se3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_SE3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
+def randn_SE3(*size:_size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`SE3_type` LieTensor filled with the Exponential map of the random
     :obj:`se3_type` LieTensor. The :obj:`se3_type` LieTensor is generated using :meth:`pypose.randn_se3()`.
@@ -596,7 +595,7 @@ def randn_SE3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     return SE3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_sim3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
+def randn_sim3(*size:_size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`sim3_type` LieTensor filled with random numbers. The transation part 
     satisfies that each element follows normal distribution with 0 mean and :obj:`sigma_t` standard deviation. 
@@ -668,7 +667,7 @@ def randn_sim3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     return sim3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_Sim3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
+def randn_Sim3(*size:_size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`Sim3_type` LieTensor filled with the Exponential map of the random
     :obj:`sim3_type` LieTensor. The :obj:`sim3_type` LieTensor is generated using :meth:`randn_sim3()`.
@@ -735,7 +734,7 @@ def randn_Sim3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     return Sim3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_rxso3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
+def randn_rxso3(*size:_size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`rxso3_type` LieTensor filled with random numbers. 
     The rotation part satisfies that the corresponding rotation axis follows uniform distribution on the
@@ -795,7 +794,7 @@ def randn_rxso3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
     return rxso3_type.randn(*size, sigma=sigma, **kwargs)
 
 
-def randn_RxSO3(*size:_size, sigma:_size_any_t=1.0, **kwargs):
+def randn_RxSO3(*size:_size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`RxSO3_type` LieTensor filled with the Exponential map of the random
     :obj:`rxso3_type` LieTensor. The :obj:`rxso3_type` LieTensor is generated using :meth:`randn_rxso3()`.
