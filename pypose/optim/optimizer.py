@@ -149,8 +149,7 @@ class GaussNewton(_Optimizer):
 
     Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`.
 
-    Available kernels: :meth:`pypose.module.Huber`; :meth:`module.PseudoHuber`;
-    :meth:`module.Cauchy`.
+    Available kernels: :meth:`kernel.Huber`; :meth:`kernel.PseudoHuber`; :meth:`kernel.Cauchy`.
 
     Available correctors: :meth:`corrector.FastTriggs`; :meth:`corrector.Triggs`.
 
@@ -337,8 +336,7 @@ class LevenbergMarquardt(_Optimizer):
 
     Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`, :meth:`solver.Cholesky`.
 
-    Available kernels: :meth:`pypose.module.Huber`; :meth:`module.PseudoHuber`;
-    :meth:`module.Cauchy`.
+    Available kernels: :meth:`kernel.Huber`; :meth:`kernel.PseudoHuber`; :meth:`kernel.Cauchy`.
 
     Available correctors: :meth:`corrector.FastTriggs`, :meth:`corrector.Triggs`.
 
