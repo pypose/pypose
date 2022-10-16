@@ -1,7 +1,5 @@
-import torch
-import functools
-from .lietensor import LieType
-from .lietensor import LieTensor
+import torch, functools
+from .lietensor import LieTensor, LieType
 from .lietensor import SE3_type, se3_type
 from .lietensor import SO3_type, so3_type
 from .lietensor import Sim3_type, sim3_type
@@ -22,19 +20,19 @@ def _LieTensor_wrapper_add_docstr(wrapper: functools.partial, embedding_doc):
             object from :obj:`list`, which defines tensor data (see below), or
             from ':obj:`int`...', which defines tensor shape.
 
-            The shape of :obj:`Tensor` object must be `(*, {type_dim})`,
-            where `*` is empty, one, or more batched dimensions (the
+            The shape of :obj:`Tensor` object must be ``(*, {type_dim})``,
+            where ``*`` is empty, one, or more batched dimensions (the
             :obj:`~LieTensor.lshape` of this LieTensor), otherwise error will
             be raised.
 
     {embedding_doc}
 
-    If `data` is tensor-like, the last dimension should correspond to the
+    If ``data`` is tensor-like, the last dimension should correspond to the
     {type_dim} elements of the above embedding.
 
     Note:
         It is not advised to construct {type_name} Tensors by specifying storage
-        sizes with `int...`, which does not initialize data.
+        sizes with ':obj:`int`...', which does not initialize data.
 
         Consider using :obj:`pypose.randn_{type_name}` or
         :obj:`pypose.identity_{type_name}` instead.

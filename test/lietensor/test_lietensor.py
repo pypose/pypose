@@ -196,7 +196,7 @@ def test_lietensor():
     from torch.autograd.functional import jacobian
 
     def func(x):
-        return x.Exp()
+        return x.Exp().tensor()
 
     J = jacobian(func, p)
 
@@ -210,7 +210,7 @@ def test_lietensor():
             self.p = pp.Parameter(pp.randn_so3(2))
 
         def forward(self, x):
-            return self.p.Exp() * x
+            return (self.p.Exp() * x).tensor()
 
     model, input = PoseTransform(), pp.randn_SO3()
     J = pp.optim.functional.modjac(model, input=input, flatten=True)
@@ -218,6 +218,8 @@ def test_lietensor():
     LT = [pp.randn_SO3, pp.randn_so3, pp.randn_SE3, pp.randn_se3, \
         pp.randn_Sim3, pp.randn_sim3, pp.randn_RxSO3, pp.randn_rxso3]
 
+    warnings.filterwarnings("ignore", message="Instance has no translation.")
+    warnings.filterwarnings("ignore", message="Instance has no scale.")
     for lt in LT:
         x = lt(random.randint(1, 10), dtype=torch.float64, device=device, requires_grad=True)
         t = x.translation()
