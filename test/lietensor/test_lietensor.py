@@ -183,7 +183,7 @@ def test_lietensor():
     assert not torch.allclose(x, y)
 
     generator = torch.Generator()
-    x = pp.randn_so3(1, 2, sigma= 0.1, generator=generator, dtype=torch.float32) # not half
+    x = pp.randn_so3(1, 2, sigma= 0.1, generator=generator, dtype=torch.float16) # not half
 
     x = pp.randn_so3(2,2)
     x.Jr()

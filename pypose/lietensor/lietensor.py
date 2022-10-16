@@ -303,12 +303,10 @@ class so3Type(LieType):
 
     def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         size = self.to_tuple(size)
-        data_ = torch.randn(*(size + torch.Size([3])), **kwargs)
-        dis_2 = data_.pow(2).sum(dim=-1, keepdim=True)
-        dis_ = torch.sqrt(dis_2).to(data_.dtype)
-        data = data_ / dis_
-        data_theta = sigma * torch.randn(*(size + torch.Size([1])), **kwargs)
-        return LieTensor(data * data_theta, ltype=so3_type).requires_grad_(requires_grad)
+        data = torch.randn(*(size + torch.Size([3])), **kwargs)
+        dist = data.norm(dim=-1, keepdim=True)
+        theta = sigma * torch.randn(*(size + torch.Size([1])), **kwargs)
+        return LieTensor(data / dist * theta, ltype=so3_type).requires_grad_(requires_grad)
 
     def matrix(self, input):
         """ To 3x3 matrix """
@@ -455,7 +453,7 @@ class se3Type(LieType):
         elif len(sigma)==2:
             rotation_sigma = _single(sigma[-1])
             translation_sigma = _triple(sigma[0])
-            sigma = translation_sigma+rotation_sigma
+            sigma = translation_sigma + rotation_sigma
         else:
             assert len(sigma)==4
         size = self.to_tuple(size)
@@ -602,10 +600,8 @@ class sim3Type(LieType):
         size = self.to_tuple(size)
         rotation = so3_type.randn(*size, sigma=sigma[-2], **kwargs).detach().tensor()
         scale = sigma[-1] * torch.randn(*(size + torch.Size([1])), **kwargs)
-        translation_x = sigma[0] * torch.randn(*(size + torch.Size([1])), **kwargs)
-        translation_y = sigma[1] * torch.randn(*(size + torch.Size([1])), **kwargs)
-        translation_z = sigma[2] * torch.randn(*(size + torch.Size([1])), **kwargs)
-        translation = torch.cat([translation_x, translation_y, translation_z], dim=-1)
+        sigma = torch.tensor([sigma[0], sigma[1], sigma[2]], **kwargs)
+        translation = sigma * torch.randn(*(size + torch.Size([3])), **kwargs)
         data = torch.cat([translation, rotation, scale], dim=-1)
         return LieTensor(data, ltype=sim3_type).requires_grad_(requires_grad)
 
@@ -733,9 +729,9 @@ class rxso3Type(LieType):
         else:
             assert len(sigma)==2
         size = self.to_tuple(size)
-        rotation_data = so3_type.randn(*size, sigma=sigma[0], **kwargs).detach().tensor()
-        scale_data = sigma[1] * torch.randn(*(size+torch.Size([1])), **kwargs)
-        data = torch.cat([rotation_data, scale_data], dim=-1)
+        rotation = so3_type.randn(*size, sigma=sigma[0], **kwargs).tensor()
+        scale = sigma[1] * torch.randn(*(size + torch.Size([1])), **kwargs)
+        data = torch.cat([rotation, scale], dim=-1)
         return LieTensor(data, ltype=rxso3_type).requires_grad_(requires_grad)
 
 

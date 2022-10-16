@@ -268,7 +268,7 @@ def randn_like(input, sigma=1.0, **kwargs):
         input (LieTensor): the size of input will determine size of the output tensor.
 
         sigma (float or (float...), optional): standard deviation for generating random
-            LieTensors. Default: `1.0`.
+            LieTensors. Default: ``1.0``.
 
         dtype (torch.dtype, optional): the desired data type of returned Tensor.
             Default: if ``None``, defaults to the dtype of input.
@@ -283,7 +283,7 @@ def randn_like(input, sigma=1.0, **kwargs):
             tensor. Default: ``False``.
 
         memory_format (torch.memory_format, optional): the desired memory format of returned
-            Tensor. Default: torch.preserve_format.
+            Tensor. Default: ``torch.preserve_format``.
     
     Note:
         The parameter sigma (:math:`\sigma`) can either be:
@@ -341,7 +341,7 @@ def randn_so3(*size:_size, sigma=1.0, **kwargs):
             Can be a variable number of arguments or a collection like a list or tuple.
 
         sigma (float, optional): standard deviation for the angle of the generated rotation.
-            Default: 1.0.
+            Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: ``False``.
@@ -349,14 +349,14 @@ def randn_so3(*size:_size, sigma=1.0, **kwargs):
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: ``None``. If None, uses a global default
+            Default: ``None``. If ``None``, uses a global default
             (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
-            Default: torch.strided.
+            Default: ``torch.strided``.
 
         device (torch.device, optional): the desired device of returned tensor.
-            Default: ``None``. If None, uses the current device for the default tensor
+            Default: ``None``. If ``None``, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). Device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
@@ -379,18 +379,24 @@ def randn_so3(*size:_size, sigma=1.0, **kwargs):
             d = \sqrt{(x^2_0+y^2_0+z^2_0)}.
 
         Note that the point :math:`[x_0, y_0, z_0]` follows 3-D Gaussian distribution, 
-        which is centrosymmetry about :math:`(0, 0, 0)`. Thus the normalized point 
-        :math:`[\delta_x', \delta_y', \delta_z']` is both centrosymmetry and satisfies 
-        :math:`\delta_x'^2+\delta_y'^2+\delta_z'^2=1`. Therefore we have 
+        which is centrosymmetry with respect to :math:`(0, 0, 0)`. Therefore, we have
+        :math:`\delta_x'^2+\delta_y'^2+\delta_z'^2=1` and the normalized points follow
+        uniform distribution on a standard sphere, i.e.,
         :math:`[\delta_x', \delta_y', \delta_z'] \sim \mathcal{U}_{\mathrm{s}}`.
-        The point :math:`[\delta_x', \delta_y', \delta_z']` can also represent a rotation axis, 
-        which is evenly distributed.
+        The point :math:`[\delta_x', \delta_y', \delta_z']` can also represent an evenly
+        sampled rotation axis.
 
     Example:
         >>> pp.randn_so3(2, sigma=0.1, requires_grad=True, dtype=torch.float64)
         so3Type LieTensor:
         tensor([[-0.0344,  0.0177,  0.0252],
                 [-0.0040,  0.0032,  0.0149]], dtype=torch.float64, requires_grad=True)
+        >>> pp.randn_so3()
+        so3Type LieTensor:
+        LieTensor([ 0.4811, -0.1487, -0.5949])  # Shape (3)
+        >>> pp.randn_so3(1)
+        so3Type LieTensor:
+        LieTensor([[0.0235, 0.0334, 1.2601]])   # Shape (1, 3)
 
     .. figure:: /_static/img/lietensor/randn/randn_so3.svg
         :height: 1000px
@@ -409,9 +415,9 @@ def randn_so3(*size:_size, sigma=1.0, **kwargs):
 def randn_SO3(*size:_size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`SO3_type` LieTensor filled with the Exponential map of the random
-    :obj:`so3_type` LieTensor. The generated LieTensor satisfies that the corresponding rotation axis 
-    follows uniform distribution on the standard sphere and the rotation angle follows normal distribution 
-    with 0 mean and standard deviation :obj:`sigma`.
+    :obj:`so3_type` LieTensor. The generated LieTensor satisfies that the corresponding 
+    rotation axis follows uniform distribution on the standard sphere and the rotation 
+    angle follows normal distribution with 0 mean and standard deviation :obj:`sigma`.
     
     .. math::
         \begin{aligned}
@@ -431,21 +437,23 @@ def randn_SO3(*size:_size, sigma=1.0, **kwargs):
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float, optional): standard deviation for the angle of the generated rotation. Default: 1.0.
+        sigma (float, optional): standard deviation for the angle of the generated rotation. 
+            Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
-            the returned tensor. Default: "False".
+            the returned tensor. Default: ``False``.
 
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: "None". If None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+            Default: ``None``. 
+            If ``None``, uses a global default (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
-            Default: torch.strided.
+            Default: ``torch.strided``.
 
         device (torch.device, optional): the desired device of returned tensor.
-            Default: "None". If None, uses the current device for the default tensor
+            Default: ``None``. If ``None``, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). Device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
@@ -465,16 +473,19 @@ def randn_SO3(*size:_size, sigma=1.0, **kwargs):
 
 def randn_se3(*size:_size, sigma=1.0, **kwargs):
     r'''
-    Returns :obj:`se3_type` LieTensor filled with random numbers. The transation part 
-    satisfies that each element follows normal distribution with 0 mean and :obj:`sigma_t` standard deviation.
-    The rotation part satisfies that the corresponding rotation axis follows uniform distribution on the
-    standard sphere and the rotation angle follows normal distribution with 0 mean and :obj:`sigma_r` standard deviation. 
+    Returns :obj:`se3_type` LieTensor filled with random numbers. The translation part 
+    satisfies that each element follows normal distribution with 0 mean and :obj:`sigma_t` 
+    standard deviation.
+    The rotation part satisfies that the corresponding rotation axis follows uniform 
+    distribution on the standard sphere and the rotation angle follows normal distribution 
+    with 0 mean and :obj:`sigma_r` standard deviation. 
     Note that the input argument :obj:`sigma` = (:obj:`sigma_t`, :obj:`sigma_r`).
 
     .. math::
         \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z],
 
-    where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_t)`, 
+    where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
+    :math:`\mathcal{N}(0, \sigma_t)`, 
     where :obj:`sigma_t` (:math:`\sigma_t`) is the standard deviation. 
     :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`.
 
@@ -482,22 +493,24 @@ def randn_se3(*size:_size, sigma=1.0, **kwargs):
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float or (float...), optional): standard deviation (:obj:`sigma_t` and :obj:`sigma_r`) for 
-            the two normal distribution. Default: 1.0.
+        sigma (float or (float...), optional): standard deviation 
+            (:obj:`sigma_t` and :obj:`sigma_r`) 
+            for the two normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
-            the returned tensor. Default: "False".
+            the returned tensor. Default: ``False``.
 
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: "None". If None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+            Default: ``None``. If ``None``, uses a global default 
+            (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
-            Default: torch.strided.
+            Default: ``torch.strided``.
 
         device (torch.device, optional): the desired device of returned tensor.
-            Default: "None". If None, uses the current device for the default tensor
+            Default: ``None``. If ``None``, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). Device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
@@ -507,15 +520,18 @@ def randn_se3(*size:_size, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-            - a single ``float`` -- in which all the elements in the :obj:`se3_type` share the same sigma, i.e., 
+            - a single ``float`` -- in which all the elements in the :obj:`se3_type` 
+              share the same sigma, i.e., 
               :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` = :math:`\sigma`.
 
-            - a ``tuple`` of two floats -- in which case, the specific sigmas are assigned independently, i.e.,
+            - a ``tuple`` of two floats -- in which case, the specific sigmas are 
+              assigned independently, i.e., 
               :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`).
 
-            - a ``tuple`` of four floats -- in which case, the specific sigmas for each transation data 
-              are assigned independently, i.e., 
-              :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`).
+            - a ``tuple`` of four floats -- in which case, the specific sigmas for 
+              each translation data are assigned independently, i.e., 
+              :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, 
+              :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`).
 
     Example:
         >>> pp.randn_se3(2, sigma=(1.0, 0.5))           # sigma = (sigma_t, sigma_r)
@@ -533,13 +549,15 @@ def randn_se3(*size:_size, sigma=1.0, **kwargs):
 def randn_SE3(*size:_size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`SE3_type` LieTensor filled with the Exponential map of the random
-    :obj:`se3_type` LieTensor. The :obj:`se3_type` LieTensor is generated using :meth:`pypose.randn_se3()`.
+    :obj:`se3_type` LieTensor. The :obj:`se3_type` LieTensor is generated using 
+    :meth:`pypose.randn_se3()`.
 
     .. math::
         \mathrm{data}[*, :] = \mathrm{Exp}([\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z]),
 
     where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
-    :math:`\mathcal{N}(0, \sigma_t)`, where :obj:`sigma_t` (:math:`\sigma_t`) is the standard deviation. 
+    :math:`\mathcal{N}(0, \sigma_t)`, where :obj:`sigma_t` (:math:`\sigma_t`) is the 
+    standard deviation. 
     :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`. 
     :math:`\mathrm{Exp}()` is the Exponential map.
 
@@ -547,22 +565,23 @@ def randn_SE3(*size:_size, sigma=1.0, **kwargs):
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float or (float...), optional): standard deviation (:obj:`sigma_t` and :obj:`sigma_r`) for 
-            the two normal distribution. Default: 1.0.
+        sigma (float or (float...), optional): standard deviation 
+            (:obj:`sigma_t` and :obj:`sigma_r`) for the two normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
-            the returned tensor. Default: "False".
+            the returned tensor. Default: ``False``.
 
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: "None". If None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+            Default: ``None``. If None, uses a global default 
+            (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
-            Default: torch.strided.
+            Default: ``torch.strided``.
 
         device (torch.device, optional): the desired device of returned tensor.
-            Default: "None". If None, uses the current device for the default tensor
+            Default: ``None``. If ``None``, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). Device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
@@ -572,15 +591,18 @@ def randn_SE3(*size:_size, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-            - a single ``float`` -- in which all the elements in the :obj:`SE3_type` share the same sigma, i.e., 
+            - a single ``float`` -- in which all the elements in the :obj:`SE3_type` 
+              share the same sigma, i.e., 
               :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` = :math:`\sigma`.
 
-            - a ``tuple`` of two floats -- in which case, the specific sigmas are assigned independently, i.e.,
+            - a ``tuple`` of two floats -- in which case, the specific sigmas are 
+              assigned independently, i.e.,
               :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`).
 
-            - a ``tuple`` of four floats -- in which case, the specific sigmas for each transation data 
-              are assigned independently, i.e., 
-              :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`).
+            - a ``tuple`` of four floats -- in which case, the specific sigmas for
+              each translation data are assigned independently, i.e., 
+              :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, 
+              :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`).
 
     Example:
         >>> pp.randn_SE3(2, sigma=(1.0, 2.0))           # sigma = (sigma_t, sigma_r)
@@ -597,14 +619,15 @@ def randn_SE3(*size:_size, sigma=1.0, **kwargs):
 
 def randn_sim3(*size:_size, sigma=1.0, **kwargs):
     r'''
-    Returns :obj:`sim3_type` LieTensor filled with random numbers. The transation part 
+    Returns :obj:`sim3_type` LieTensor filled with random numbers. The translation part 
     satisfies that each element follows normal distribution with 0 mean and :obj:`sigma_t` standard deviation. 
     The rotation part satisfies that the corresponding rotation axis follows uniform distribution on the
-    standard sphere and the rotation angle follows normal distribution with 0 mean and :obj:`sigma_r` standard deviation.
-    The scale part follows normal distribution with 0 mean and :obj:`sigma_s` standard deviation.
+    standard sphere and the rotation angle follows normal distribution with 0 mean and :obj:`sigma_r` 
+    standard deviation. The scale part follows normal distribution with 0 mean and :obj:`sigma_s` 
+    standard deviation.
 
-    Note that :obj:`sigma_t`, :obj:`sigma_r`, and :obj:`sigma_s` are all from input argument :obj:`sigma`, i.e.,
-    :obj:`sigma` = (:obj:`sigma_t`, :obj:`sigma_r`, :obj:`sigma_s`).
+    Note that :obj:`sigma_t`, :obj:`sigma_r`, and :obj:`sigma_s` are all from input argument :obj:`sigma`, 
+    i.e., :obj:`sigma` = (:obj:`sigma_t`, :obj:`sigma_r`, :obj:`sigma_s`).
 
     .. math::
         \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z, \log s],
@@ -612,29 +635,31 @@ def randn_sim3(*size:_size, sigma=1.0, **kwargs):
     where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
     :math:`\mathcal{N}(0, \sigma_t)`, where :obj:`sigma_t` (:math:`\sigma_t`) is the standard deviation. 
     :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`. 
-    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, where :obj:`sigma_s`
-    (:math:`\sigma_s`) is the standard deviation.
+    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`,
+    where :obj:`sigma_s` (:math:`\sigma_s`) is the standard deviation.
 
     Args:
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float or (float...), optional): standard deviation (:obj:`sigma_t`, :obj:`sigma_r`, and :obj:`sigma_s`) 
-            for the three normal distribution. Default: 1.0.
+        sigma (float or (float...), optional): standard deviation (:obj:`sigma_t`, 
+            :obj:`sigma_r`, and :obj:`sigma_s`) 
+            for the three normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
-            the returned tensor. Default: "False".
+            the returned tensor. Default: ``False``.
 
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: "None". If None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+            Default: ``None``. If ``None``, uses a global default 
+            (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
-            Default: torch.strided.
+            Default: ``torch.strided``.
 
         device (torch.device, optional): the desired device of returned tensor.
-            Default: "None". If None, uses the current device for the default tensor
+            Default: ``None``. If ``None``, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). Device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
@@ -644,15 +669,20 @@ def randn_sim3(*size:_size, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-            - a single ``float`` -- in which all the elements in the :obj:`sim3_type` share the same sigma, i.e., 
-              :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` = :math:`\sigma`.
+            - a single ``float`` -- in which all the elements in the :obj:`sim3_type` 
+              share the same sigma, i.e., 
+              :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` 
+              = :math:`\sigma`.
 
-            - a ``tuple`` of three floats -- in which case, the specific sigmas for the three parts are 
-              assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`, :math:`\sigma_{\rm{s}}`).
+            - a ``tuple`` of three floats -- in which case, the specific sigmas for 
+              the three parts are assigned independently, i.e., 
+              :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`, 
+              :math:`\sigma_{\rm{s}}`).
 
-            - a ``tuple`` of five floats -- in which case, the specific sigmas for each transation 
-              data are also assigned independently, i.e.,
-              :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`, :math:`\sigma_{\rm{s}}`).
+            - a ``tuple`` of five floats -- in which case, the specific sigmas for 
+              each translation data are also assigned independently, i.e.,
+              :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, 
+              :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`, :math:`\sigma_{\rm{s}}`).
 
     Example:
         >>> pp.randn_sim3(2, sigma=(1.0, 1.0, 2.0))             # sigma = (sigma_t, sigma_r, sigma_s)
@@ -678,30 +708,32 @@ def randn_Sim3(*size:_size, sigma=1.0, **kwargs):
     where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
     :math:`\mathcal{N}(0, \sigma_t)`, where :obj:`sigma_t` (:math:`\sigma_t`) is the standard deviation. 
     :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`. 
-    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, where :obj:`sigma_s`
-    (:math:`\sigma_s`) is the standard deviation. 
+    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, 
+    where :obj:`sigma_s` (:math:`\sigma_s`) is the standard deviation. 
     :math:`\mathrm{Exp}()` is the Exponential map.
 
     Args:
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float or (float...), optional): standard deviation (:obj:`sigma_t`, :obj:`sigma_r`, and :obj:`sigma_s`) 
-            for the three normal distribution. Default: 1.0.
+        sigma (float or (float...), optional): standard deviation
+            (:obj:`sigma_t`, :obj:`sigma_r`, and :obj:`sigma_s`) 
+            for the three normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
-            the returned tensor. Default: "False".
+            the returned tensor. Default: ``False``.
 
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: "None". If None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+            Default: ``None``. If ``None``, uses a global default 
+            (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
-            Default: torch.strided.
+            Default: ``torch.strided``.
 
         device (torch.device, optional): the desired device of returned tensor.
-            Default: "None". If None, uses the current device for the default tensor
+            Default: ``None``. If ``None``, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). Device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
@@ -711,15 +743,20 @@ def randn_Sim3(*size:_size, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-            - a single ``float`` -- in which all the elements in the :obj:`Sim3_type` share the same sigma, i.e., 
-              :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` = :math:`\sigma`.
+            - a single ``float`` -- in which all the elements in the :obj:`Sim3_type` 
+              share the same sigma, i.e., 
+              :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` 
+              = :math:`\sigma_{\rm{s}}` = :math:`\sigma`.
 
-            - a ``tuple`` of three floats -- in which case, the specific sigmas for the three parts are 
-              assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`, :math:`\sigma_{\rm{s}}`).
+            - a ``tuple`` of three floats -- in which case, the specific sigmas 
+              for the three parts are assigned independently, i.e., 
+              :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`, 
+              :math:`\sigma_{\rm{s}}`).
 
-            - a ``tuple`` of five floats -- in which case, the specific sigmas for each transation 
-              data are also assigned independently, i.e.,
-              :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`, :math:`\sigma_{\rm{s}}`).
+            - a ``tuple`` of five floats -- in which case, the specific sigmas 
+              for each translation data are also assigned independently, i.e.,
+              :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, 
+              :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`, :math:`\sigma_{\rm{s}}`).
 
     Example:
         >>> pp.randn_Sim3(2, sigma=(1.0, 1.0, 2.0)) # sigma = (sigma_t, sigma_r, sigma_s)
@@ -737,8 +774,9 @@ def randn_Sim3(*size:_size, sigma=1.0, **kwargs):
 def randn_rxso3(*size:_size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`rxso3_type` LieTensor filled with random numbers. 
-    The rotation part satisfies that the corresponding rotation axis follows uniform distribution on the
-    standard sphere and the rotation angle follows normal distribution with 0 mean and :obj:`sigma_r` standard deviation.
+    The rotation part satisfies that the corresponding rotation axis follows uniform 
+    distribution on the standard sphere and the rotation angle follows normal distribution 
+    with 0 mean and :obj:`sigma_r` standard deviation.
     The scale part follows normal distribution with 0 mean and :obj:`sigma_s` standard deviation.
     Note that :obj:`sigma_r` and :obj:`sigma_s` are both from input argument :obj:`sigma`, i.e.,
     :obj:`sigma` = (:obj:`sigma_r`, :obj:`sigma_s`).
@@ -747,29 +785,30 @@ def randn_rxso3(*size:_size, sigma=1.0, **kwargs):
         \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z, \log s],
 
     where :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`. 
-    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, where :obj:`sigma_s`
-    (:math:`\sigma_s`) is the standard deviation.
+    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, 
+    where :obj:`sigma_s` (:math:`\sigma_s`) is the standard deviation.
 
     Args:
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float or (float...), optional): standard deviation (:obj:`sigma_r`, and :obj:`sigma_s`) for the 
-            two normal distribution. Default: 1.0.
+        sigma (float or (float...), optional): standard deviation (:obj:`sigma_r`, 
+            and :obj:`sigma_s`) for the two normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
-            the returned tensor. Default: "False".
+            the returned tensor. Default: ``False``.
 
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: "None". If None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+            Default: ``None``. If ``None``, uses a global default 
+            (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
-            Default: torch.strided.
+            Default: ``torch.strided``.
 
         device (torch.device, optional): the desired device of returned tensor.
-            Default: "None". If None, uses the current device for the default tensor
+            Default: ``None``. If ``None``, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). Device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
@@ -780,10 +819,12 @@ def randn_rxso3(*size:_size, sigma=1.0, **kwargs):
         The parameter :math:`\sigma` can either be:
 
             - a single ``float`` -- in which all the elements in the :obj:`rxso3_type` share 
-              the same sigma, i.e., :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` = :math:`\sigma`.
+              the same sigma, i.e., :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` 
+              = :math:`\sigma`.
 
             - a ``tuple`` of two floats -- in which case, the specific sigmas for the two parts 
-              are assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{r}}`, :math:`\sigma_{\rm{s}}`).
+              are assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{r}}`, 
+              :math:`\sigma_{\rm{s}}`).
 
     Example:
         >>> pp.randn_rxso3(2, sigma=(1.0, 2.0)) # (sigma_r, sigma_s)
@@ -797,33 +838,35 @@ def randn_rxso3(*size:_size, sigma=1.0, **kwargs):
 def randn_RxSO3(*size:_size, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`RxSO3_type` LieTensor filled with the Exponential map of the random
-    :obj:`rxso3_type` LieTensor. The :obj:`rxso3_type` LieTensor is generated using :meth:`randn_rxso3()`.
+    :obj:`rxso3_type` LieTensor. The :obj:`rxso3_type` LieTensor is generated using 
+    :meth:`randn_rxso3()`.
 
     .. math::
         \mathrm{data}[*, :] = \mathrm{Exp}([\delta_x, \delta_y, \delta_z, \log s]),
 
     where :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`. 
-    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, where :obj:`sigma_s`
-    (:math:`\sigma_s`) is the standard deviation. 
+    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, 
+    where :obj:`sigma_s` (:math:`\sigma_s`) is the standard deviation. 
     :math:`\mathrm{Exp}()` is the Exponential map.
 
     Args:
         size (int...): a sequence of integers defining the shape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float or (float...), optional): standard deviation (:obj:`sigma_r`, and :obj:`sigma_s`) for the 
-            two normal distribution. Default: 1.0.
+        sigma (float or (float...), optional): standard deviation (:obj:`sigma_r`, 
+            and :obj:`sigma_s`) for the two normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
-            the returned tensor. Default: "False".
+            the returned tensor. Default: ``False``.
 
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: "None". If None, uses a global default (see :meth:`torch.set_default_tensor_type()`).
+            Default: ``None``. If ``None``, uses a global default 
+            (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
-            Default: torch.strided.
+            Default: ``torch.strided``.
 
         device (torch.device, optional): the desired device of returned tensor.
             Default: "None". If None, uses the current device for the default tensor
@@ -837,10 +880,12 @@ def randn_RxSO3(*size:_size, sigma=1.0, **kwargs):
         The parameter :math:`\sigma` can either be:
 
             - a single ``float`` -- in which all the elements in the :obj:`RxSO3_type` share 
-              the same sigma, i.e., :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` = :math:`\sigma`.
+              the same sigma, i.e., :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` = 
+              :math:`\sigma`.
 
             - a ``tuple`` of two floats -- in which case, the specific sigmas for the two parts 
-              are assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{r}}`, :math:`\sigma_{\rm{s}}`).
+              are assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{r}}`, 
+              :math:`\sigma_{\rm{s}}`).
 
     Example:
         >>> pp.randn_RxSO3(2, sigma=(1.0, 2.0)) # (sigma_r, sigma_s)
