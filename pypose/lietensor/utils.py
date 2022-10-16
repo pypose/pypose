@@ -268,7 +268,7 @@ def randn_like(input, sigma=1.0, **kwargs):
         input (LieTensor): the size of input will determine size of the output tensor.
 
         sigma (float or (float...), optional): standard deviation for generating random
-            LieTensors. Default: 1.0.
+            LieTensors. Default: `1.0`.
 
         dtype (torch.dtype, optional): the desired data type of returned Tensor.
             Default: if ``None``, defaults to the dtype of input.
