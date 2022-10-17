@@ -302,7 +302,7 @@ class so3Type(LieType):
         return SO3_type.Log(SO3_type.identity(*size, **kwargs))
 
     def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
-        assert isinstance(sigma, float), 'so3 and SO3 type only accepts single float sigma input'
+        assert isinstance(sigma, float), 'Only accepts sigma as a single number'
         size = self.to_tuple(size)
         data = torch.randn(*(size + torch.Size([3])), **kwargs)
         dist = data.norm(dim=-1, keepdim=True)
@@ -456,7 +456,7 @@ class se3Type(LieType):
             translation_sigma = _triple(sigma[0])
             sigma = translation_sigma + rotation_sigma
         else:
-            assert len(sigma)==4, 'se3 and SE3 type only accept a tuple of sigma in size 1, 2, or 4.'
+            assert len(sigma)==4, 'Only accepts a tuple of sigma in size 1, 2, or 4.'
         size = self.to_tuple(size)
         rotation = so3_type.randn(*size, sigma=sigma[-1], **kwargs).detach().tensor()
         sigma = torch.tensor([sigma[0], sigma[1], sigma[2]], **kwargs)
@@ -597,7 +597,7 @@ class sim3Type(LieType):
             translation_sigma = _triple(sigma[0])
             sigma = translation_sigma+rotation_sigma+scale_sigma
         else:
-            assert len(sigma)==5, 'sim3 and Sim3 type only accept a tuple of sigma in size 1, 3, or 5.'
+            assert len(sigma)==5, 'Only accepts a tuple of sigma in size 1, 3, or 5.'
         size = self.to_tuple(size)
         rotation = so3_type.randn(*size, sigma=sigma[-2], **kwargs).detach().tensor()
         scale = sigma[-1] * torch.randn(*(size + torch.Size([1])), **kwargs)
@@ -728,7 +728,7 @@ class rxso3Type(LieType):
         if not isinstance(sigma, collections.abc.Iterable):
             sigma = _pair(sigma)
         else:
-            assert len(sigma)==2, 'rxso3 and RxSO3 type only accept a tuple of sigma in size 1 or 2.'
+            assert len(sigma)==2, 'Only accepts a tuple of sigma in size 1 or 2.'
         size = self.to_tuple(size)
         rotation = so3_type.randn(*size, sigma=sigma[0], **kwargs).tensor()
         scale = sigma[1] * torch.randn(*(size + torch.Size([1])), **kwargs)
