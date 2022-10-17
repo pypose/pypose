@@ -183,7 +183,7 @@ def test_lietensor():
     assert not torch.allclose(x, y)
 
     generator = torch.Generator()
-    x = pp.randn_so3(1, 2, sigma= 0.1, generator=generator, dtype=torch.float16)
+    x = pp.randn_so3(1, 2, sigma= 0.1, generator=generator, dtype=torch.float16) # not half
 
     x = pp.randn_so3(2,2)
     x.Jr()
@@ -226,6 +226,7 @@ def test_lietensor():
         r = x.rotation()
         s = x.scale()
         m = x.matrix()
+        xx = pp.randn_like(x)
         assert(r.device == t.device == s.device == x.device == m.device)
         assert(r.dtype == t.dtype == s.dtype == x.dtype == m.dtype)
         assert(r.lshape == t.shape[:-1] == s.shape[:-1] == x.lshape == m.shape[:-2])
