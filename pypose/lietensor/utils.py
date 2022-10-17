@@ -471,28 +471,24 @@ def randn_SO3(*lsize, sigma=1.0, **kwargs):
 
 def randn_se3(*lsize, sigma=1.0, **kwargs):
     r'''
-    Returns :obj:`se3_type` LieTensor filled with random numbers. The translation part 
-    satisfies that each element follows normal distribution with 0 mean and :obj:`sigma_t` 
-    standard deviation.
-    The rotation part satisfies that the corresponding rotation axis follows uniform 
-    distribution on the standard sphere and the rotation angle follows normal distribution 
-    with 0 mean and :obj:`sigma_r` standard deviation. 
-    Note that the input argument :obj:`sigma` = (:obj:`sigma_t`, :obj:`sigma_r`).
+    Returns :obj:`se3_type` LieTensor filled with random numbers. 
 
     .. math::
         \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z],
-
-    where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
-    :math:`\mathcal{N}(0, \sigma_t)`, 
-    where :obj:`sigma_t` (:math:`\sigma_t`) is the standard deviation. 
-    :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`.
+    
+    where translation :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
+    :math:`\mathcal{N}(0, \sigma_t)`, rotation :math:`[\delta_x, \delta_y, \delta_z]` is
+    generated using :meth:`pypose.randn_so3()` with standard deviation :math:`\sigma_r`
+    Note that standard deviations :math:`\sigma_t` and :math:`\sigma_r` are
+    specified by ``sigma`` (:math:`\sigma`), where we have
+    :math:`\sigma = (\sigma_t, \sigma_r)`.
 
     Args:
         lsize (int...): a sequence of integers defining the lshape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
         sigma (float or (float...), optional): standard deviation 
-            (:obj:`sigma_t` and :obj:`sigma_r`) 
+            (:math:`\sigma_t` and :math:`\sigma_r`) 
             for the two normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
@@ -518,18 +514,16 @@ def randn_se3(*lsize, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-            - a single ``float`` -- in which all the elements in the :obj:`se3_type` 
-              share the same sigma, i.e., 
-              :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` = :math:`\sigma`.
-
-            - a ``tuple`` of two floats -- in which case, the specific sigmas are 
-              assigned independently, i.e., 
-              :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`).
-
-            - a ``tuple`` of four floats -- in which case, the specific sigmas for 
-              each translation data are assigned independently, i.e., 
-              :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, 
-              :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`).
+        - a single ``float`` -- in which all the elements in the :obj:`se3_type` 
+          share the same sigma, i.e., 
+          :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` = :math:`\sigma`.
+        - a ``tuple`` of two floats -- in which case, the specific sigmas are 
+          assigned independently, i.e., 
+          :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`).
+        - a ``tuple`` of four floats -- in which case, the specific sigmas for 
+          each translation data are assigned independently, i.e., 
+          :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, 
+          :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`).
 
     Example:
         >>> pp.randn_se3(2, sigma=(1.0, 0.5))           # sigma = (sigma_t, sigma_r)
@@ -553,17 +547,20 @@ def randn_SE3(*lsize, sigma=1.0, **kwargs):
         \mathrm{data}[*, :] = \mathrm{Exp}([\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z]),
 
     where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
-    :math:`\mathcal{N}(0, \sigma_t)`, where :obj:`sigma_t` (:math:`\sigma_t`) is the 
-    standard deviation. 
-    :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`. 
-    :math:`\mathrm{Exp}()` is the Exponential map.
+    :math:`\mathcal{N}(0, \sigma_t)`, :math:`[\delta_x, \delta_y, \delta_z]` is
+    generated using :meth:`pypose.randn_so3()` with with standard deviation
+    :math:`\sigma_r`. :math:`\mathrm{Exp}()` is the Exponential map. Note that standard deviations 
+    :math:`\sigma_t`, :math:`\sigma_r`, and :math:`\sigma_s` are specified by 
+    ``sigma`` (:math:`\sigma`), where we have :math:`\sigma = (\sigma_t, \sigma_r)`.
+
+    For detailed explanation, please see :meth:`pypose.randn_se3()` and :meth:`pypose.Exp()`.
 
     Args:
         lsize (int...): a sequence of integers defining the lshape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
         sigma (float or (float...), optional): standard deviation 
-            (:obj:`sigma_t` and :obj:`sigma_r`) for the two normal distribution. Default: ``1.0``.
+            (:math:`\sigma_t` and :math:`\sigma_r`) for the two normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: ``False``.
@@ -588,18 +585,16 @@ def randn_SE3(*lsize, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-            - a single ``float`` -- in which all the elements in the :obj:`SE3_type` 
-              share the same sigma, i.e., 
-              :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` = :math:`\sigma`.
-
-            - a ``tuple`` of two floats -- in which case, the specific sigmas are 
-              assigned independently, i.e.,
-              :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`).
-
-            - a ``tuple`` of four floats -- in which case, the specific sigmas for
-              each translation data are assigned independently, i.e., 
-              :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, 
-              :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`).
+        - a single ``float`` -- in which all the elements in the :obj:`SE3_type` 
+          share the same sigma, i.e., 
+          :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` = :math:`\sigma`.
+        - a ``tuple`` of two floats -- in which case, the specific sigmas are 
+          assigned independently, i.e.,
+          :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`).
+        - a ``tuple`` of four floats -- in which case, the specific sigmas for
+          each translation data are assigned independently, i.e., 
+          :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, 
+          :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`).
 
     Example:
         >>> pp.randn_SE3(2, sigma=(1.0, 2.0))           # sigma = (sigma_t, sigma_r)
@@ -700,10 +695,10 @@ def randn_Sim3(*lsize, sigma=1.0, **kwargs):
         \mathrm{data}[*, :] = \mathrm{Exp}([\tau_x, \tau_y, \tau_z, \delta_x,
         \delta_y, \delta_z, \log s]),
 
-    where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
-    :math:`\mathcal{N}(0, \sigma_t)`, :math:`[\delta_x, \delta_y, \delta_z]` is
+    where translation :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
+    :math:`\mathcal{N}(0, \sigma_t)`, rotation :math:`[\delta_x, \delta_y, \delta_z]` is
     generated using :meth:`pypose.randn_so3()` with with standard deviation
-    :math:`\sigma_r`, :math:`\log s` is generated from a normal distribution
+    :math:`\sigma_r`, scale :math:`\log s` is generated from a normal distribution
     :math:`\mathcal{N}(0, \sigma_s)`, and :math:`\mathrm{Exp}()` is the Exponential
     map. Note that standard deviations :math:`\sigma_t`, :math:`\sigma_r`, and
     :math:`\sigma_s` are specified by ``sigma`` (:math:`\sigma`), where we have
@@ -716,7 +711,7 @@ def randn_Sim3(*lsize, sigma=1.0, **kwargs):
             Can be a variable number of arguments or a collection like a list or tuple.
 
         sigma (float or (float...), optional): standard deviation
-            (:obj:`sigma_t`, :obj:`sigma_r`, and :obj:`sigma_s`) 
+            (:math:`\sigma_t`, :math:`\sigma_r`, and :math:`\sigma_s`) 
             for the three normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
@@ -746,12 +741,10 @@ def randn_Sim3(*lsize, sigma=1.0, **kwargs):
           share the same sigma, i.e., 
           :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` 
           = :math:`\sigma_{\rm{s}}` = :math:`\sigma`.
-
         - a ``tuple`` of three floats -- in which case, the specific sigmas 
           for the three parts are assigned independently, i.e., 
           :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`, 
           :math:`\sigma_{\rm{s}}`).
-
         - a ``tuple`` of five floats -- in which case, the specific sigmas 
           for each translation data are also assigned independently, i.e.,
           :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, 
@@ -778,26 +771,23 @@ def randn_Sim3(*lsize, sigma=1.0, **kwargs):
 def randn_rxso3(*lsize, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`rxso3_type` LieTensor filled with random numbers. 
-    The rotation part satisfies that the corresponding rotation axis follows uniform 
-    distribution on the standard sphere and the rotation angle follows normal distribution 
-    with 0 mean and :obj:`sigma_r` standard deviation.
-    The scale part follows normal distribution with 0 mean and :obj:`sigma_s` standard deviation.
-    Note that :obj:`sigma_r` and :obj:`sigma_s` are both from input argument :obj:`sigma`, i.e.,
-    :obj:`sigma` = (:obj:`sigma_r`, :obj:`sigma_s`).
 
     .. math::
         \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z, \log s],
 
-    where :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`. 
-    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, 
-    where :obj:`sigma_s` (:math:`\sigma_s`) is the standard deviation.
+    where rotation :math:`[\delta_x, \delta_y, \delta_z]` is
+    generated using :meth:`pypose.randn_so3()` with standard deviation :math:`\sigma_r`,
+    scale :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`.
+    Note that standard deviations :math:`\sigma_r` and :math:`\sigma_s` are
+    specified by ``sigma`` (:math:`\sigma`), where we have
+    :math:`\sigma = (\sigma_r, \sigma_s)`.
 
     Args:
         lsize (int...): a sequence of integers defining the lshape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float or (float...), optional): standard deviation (:obj:`sigma_r`, 
-            and :obj:`sigma_s`) for the two normal distribution. Default: ``1.0``.
+        sigma (float or (float...), optional): standard deviation (:math:`\sigma_r`, 
+            and :math:`\sigma_s`) for the two normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: ``False``.
@@ -822,13 +812,12 @@ def randn_rxso3(*lsize, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-            - a single ``float`` -- in which all the elements in the :obj:`rxso3_type` share 
-              the same sigma, i.e., :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` 
-              = :math:`\sigma`.
-
-            - a ``tuple`` of two floats -- in which case, the specific sigmas for the two parts 
-              are assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{r}}`, 
-              :math:`\sigma_{\rm{s}}`).
+        - a single ``float`` -- in which all the elements in the :obj:`rxso3_type` share 
+          the same sigma, i.e., :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` 
+          = :math:`\sigma`.
+        - a ``tuple`` of two floats -- in which case, the specific sigmas for the two parts 
+          are assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{r}}`, 
+          :math:`\sigma_{\rm{s}}`).
 
     Example:
         >>> pp.randn_rxso3(2, sigma=(1.0, 2.0)) # (sigma_r, sigma_s)
@@ -848,17 +837,20 @@ def randn_RxSO3(*lsize, sigma=1.0, **kwargs):
     .. math::
         \mathrm{data}[*, :] = \mathrm{Exp}([\delta_x, \delta_y, \delta_z, \log s]),
 
-    where :math:`[\delta_x, \delta_y, \delta_z]` is generated using :meth:`pypose.randn_so3()`. 
-    :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, 
-    where :obj:`sigma_s` (:math:`\sigma_s`) is the standard deviation. 
+    where rotation :math:`[\delta_x, \delta_y, \delta_z]` is
+    generated using :meth:`pypose.randn_so3()` with standard deviation :math:`\sigma_r`,
+    scale :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`.
     :math:`\mathrm{Exp}()` is the Exponential map.
+    Note that standard deviations :math:`\sigma_r` and :math:`\sigma_s` are
+    specified by ``sigma`` (:math:`\sigma`), where we have
+    :math:`\sigma = (\sigma_r, \sigma_s)`.
 
     Args:
         lsize (int...): a sequence of integers defining the lshape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float or (float...), optional): standard deviation (:obj:`sigma_r`, 
-            and :obj:`sigma_s`) for the two normal distribution. Default: ``1.0``.
+        sigma (float or (float...), optional): standard deviation (:math:`\sigma_r`, 
+            and :math:`\sigma_s`) for the two normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: ``False``.
@@ -883,13 +875,12 @@ def randn_RxSO3(*lsize, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-            - a single ``float`` -- in which all the elements in the :obj:`RxSO3_type` share 
-              the same sigma, i.e., :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` = 
-              :math:`\sigma`.
-
-            - a ``tuple`` of two floats -- in which case, the specific sigmas for the two parts 
-              are assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{r}}`, 
-              :math:`\sigma_{\rm{s}}`).
+        - a single ``float`` -- in which all the elements in the :obj:`RxSO3_type` share 
+          the same sigma, i.e., :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` = 
+          :math:`\sigma`.
+        - a ``tuple`` of two floats -- in which case, the specific sigmas for the two parts 
+          are assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{r}}`, 
+          :math:`\sigma_{\rm{s}}`).
 
     Example:
         >>> pp.randn_RxSO3(2, sigma=(1.0, 2.0)) # (sigma_r, sigma_s)
