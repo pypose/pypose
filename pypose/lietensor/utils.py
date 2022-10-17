@@ -420,11 +420,10 @@ def randn_SO3(*lsize, sigma=1.0, **kwargs):
                             &= \mathrm{Exp}([\delta_x', \delta_y', \delta_z'] \cdot \theta),
         \end{aligned}
 
-    where :math:`[\delta_x', \delta_y', \delta_z']` is randomly generated from uniform
-    distribution :math:`\mathcal{U}_{\mathrm{s}}` on a standard sphere,
-    :math:`\mathrm{Exp}()` is the Exponential map, :math:`\theta` is generated from a normal
-    distribution :math:`\mathcal{N}(0, \sigma)` where :math:`\sigma` (``sigma``) is the
-    standard deviation.
+    where :math:`[\delta_x', \delta_y', \delta_z']` is generated from uniform distribution
+    :math:`\mathcal{U}_{\mathrm{s}}` on a standard sphere, :math:`\mathrm{Exp}()` is the
+    Exponential map, :math:`\theta` is generated from a normal distribution
+    :math:`\mathcal{N}(0, \sigma)` where :math:`\sigma` (``sigma``) is the standard deviation.
 
     For detailed explanation, please see :meth:`pypose.randn_so3()` and :meth:`pypose.Exp()`.
 
@@ -465,6 +464,16 @@ def randn_SO3(*lsize, sigma=1.0, **kwargs):
                 [ 3.8711e-02, -6.3148e-02, -1.9388e-02,  9.9706e-01]],
                 dtype=torch.float64, requires_grad=True)
 
+    .. figure:: /_static/img/lietensor/randn/randn_so3.svg
+        :height: 1000px
+        :width: 1000px
+        :scale: 30 %
+        :alt: map to buried treasure
+        :align: center
+
+        Visualization of :meth:`pypose.randn_SO3()`. A total of 5000 random rotations
+        are sampled using :meth:`pypose.randn_SO3()` and applied to the basepoint
+        [0, 0, 1] (shown in blue).
     '''
     return SO3_type.randn(*lsize, sigma=sigma, **kwargs)
 
@@ -478,10 +487,9 @@ def randn_se3(*lsize, sigma=1.0, **kwargs):
     
     where translation :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
     :math:`\mathcal{N}(0, \sigma_t)`, rotation :math:`[\delta_x, \delta_y, \delta_z]` is
-    generated using :meth:`pypose.randn_so3()` with standard deviation :math:`\sigma_r`
+    generated using :meth:`pypose.randn_so3()` with standard deviation :math:`\sigma_r`.
     Note that standard deviations :math:`\sigma_t` and :math:`\sigma_r` are
-    specified by ``sigma`` (:math:`\sigma`), where we have
-    :math:`\sigma = (\sigma_t, \sigma_r)`.
+    specified by ``sigma`` (:math:`\sigma`), where :math:`\sigma = (\sigma_t, \sigma_r)`.
 
     Args:
         lsize (int...): a sequence of integers defining the lshape of the output tensor.
@@ -509,7 +517,7 @@ def randn_se3(*lsize, sigma=1.0, **kwargs):
             for CPU tensor types and the current CUDA device for CUDA tensor types.
 
     Returns:
-        LieTensor: a :obj:`se3_type` LieTensor
+        LieTensor: a :obj:`se3_type` LieTensor.
 
     Note:
         The parameter :math:`\sigma` can either be:
@@ -526,11 +534,17 @@ def randn_se3(*lsize, sigma=1.0, **kwargs):
           :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`).
 
     Example:
-        >>> pp.randn_se3(2, sigma=(1.0, 0.5))           # sigma = (sigma_t, sigma_r)
+
+        For :math:`\sigma = (\sigma_t, \sigma_r)`
+
+        >>> pp.randn_se3(2, sigma=(1.0, 0.5))
         se3Type LieTensor:
         tensor([[-0.4226,  0.4028, -1.3824,  0.4433, -0.2029, -0.1193],
                 [-0.8423, -1.0435,  0.8311, -0.4733,  0.0175,  0.1400]])
-        >>> pp.randn_se3(2, sigma=(1.0, 2.0, 3.0, 0.5)) # sigma = (sigma_tx, sigma_ty, sigma_tz, sigma_r)
+
+        For :math:`\sigma = (\sigma_{tx}, \sigma_{ty}, \sigma_{tz}, \sigma_{r})`
+
+        >>> pp.randn_se3(2, sigma=(1.0, 2.0, 3.0, 0.5))
         se3Type LieTensor:
         tensor([[ 1.1209,  1.4211, -0.7237, -0.1168,  0.0128,  0.1479],
                 [ 0.1765,  0.3891,  3.4799, -0.0411, -0.2616, -0.1028]])
@@ -549,9 +563,9 @@ def randn_SE3(*lsize, sigma=1.0, **kwargs):
     where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
     :math:`\mathcal{N}(0, \sigma_t)`, :math:`[\delta_x, \delta_y, \delta_z]` is
     generated using :meth:`pypose.randn_so3()` with with standard deviation
-    :math:`\sigma_r`. :math:`\mathrm{Exp}()` is the Exponential map. Note that standard deviations 
-    :math:`\sigma_t`, :math:`\sigma_r`, and :math:`\sigma_s` are specified by 
-    ``sigma`` (:math:`\sigma`), where we have :math:`\sigma = (\sigma_t, \sigma_r)`.
+    :math:`\sigma_r`, and :math:`\mathrm{Exp}()` is the Exponential map. Note that standard
+    deviations :math:`\sigma_t` and :math:`\sigma_r` are specified by ``sigma`` (:math:`\sigma`),
+    where :math:`\sigma = (\sigma_t, \sigma_r)`.
 
     For detailed explanation, please see :meth:`pypose.randn_se3()` and :meth:`pypose.Exp()`.
 
@@ -560,7 +574,8 @@ def randn_SE3(*lsize, sigma=1.0, **kwargs):
             Can be a variable number of arguments or a collection like a list or tuple.
 
         sigma (float or (float...), optional): standard deviation 
-            (:math:`\sigma_t` and :math:`\sigma_r`) for the two normal distribution. Default: ``1.0``.
+            (:math:`\sigma_t` and :math:`\sigma_r`) for the two normal distribution.
+            Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
             the returned tensor. Default: ``False``.
@@ -597,11 +612,17 @@ def randn_SE3(*lsize, sigma=1.0, **kwargs):
           :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`).
 
     Example:
-        >>> pp.randn_SE3(2, sigma=(1.0, 2.0))           # sigma = (sigma_t, sigma_r)
+
+        For :math:`\sigma = (\sigma_t, \sigma_r)`
+
+        >>> pp.randn_SE3(2, sigma=(1.0, 2.0))
         SE3Type LieTensor:
         tensor([[ 0.2947, -1.6990, -0.5535,  0.4439,  0.2777,  0.0518,  0.8504],
                 [ 0.6825,  0.2963,  0.3410,  0.3375, -0.2355,  0.7389, -0.5335]])
-        >>> pp.randn_SE3(2, sigma=(1.0, 1.5, 2.0, 2.0)) # sigma = (sigma_tx, sigma_ty, sigma_tz, sigma_r)
+
+        For :math:`\sigma = (\sigma_{tx}, \sigma_{ty}, \sigma_{tz}, \sigma_{r})`
+
+        >>> pp.randn_SE3(2, sigma=(1.0, 1.5, 2.0, 2.0))
         SE3Type LieTensor:
         tensor([[-1.5689, -0.6772,  0.3580, -0.2509,  0.8257, -0.4950,  0.1018],
                 [ 0.2613, -2.7613,  0.2151, -0.8802,  0.2619,  0.3044,  0.2531]])
@@ -621,8 +642,7 @@ def randn_sim3(*lsize, sigma=1.0, **kwargs):
     generated using :meth:`pypose.randn_so3()` with standard deviation :math:`\sigma_r`,
     scale :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`.
     Note that standard deviations :math:`\sigma_t`, :math:`\sigma_r`, and :math:`\sigma_s` are
-    specified by ``sigma`` (:math:`\sigma`), where we have
-    :math:`\sigma = (\sigma_t, \sigma_r, \sigma_s)`.
+    specified by ``sigma`` (:math:`\sigma`), where :math:`\sigma=(\sigma_t,\sigma_r,\sigma_s)`.
 
     Args:
         lsize (int...): a sequence of integers defining the lshape of the output tensor.
@@ -701,7 +721,7 @@ def randn_Sim3(*lsize, sigma=1.0, **kwargs):
     :math:`\sigma_r`, scale :math:`\log s` is generated from a normal distribution
     :math:`\mathcal{N}(0, \sigma_s)`, and :math:`\mathrm{Exp}()` is the Exponential
     map. Note that standard deviations :math:`\sigma_t`, :math:`\sigma_r`, and
-    :math:`\sigma_s` are specified by ``sigma`` (:math:`\sigma`), where we have
+    :math:`\sigma_s` are specified by ``sigma`` (:math:`\sigma`), where
     :math:`\sigma = (\sigma_t, \sigma_r, \sigma_s)`.
 
     For detailed explanation, please see :meth:`pypose.randn_sim3()` and :meth:`pypose.Exp()`.
@@ -779,8 +799,7 @@ def randn_rxso3(*lsize, sigma=1.0, **kwargs):
     generated using :meth:`pypose.randn_so3()` with standard deviation :math:`\sigma_r`,
     scale :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`.
     Note that standard deviations :math:`\sigma_r` and :math:`\sigma_s` are
-    specified by ``sigma`` (:math:`\sigma`), where we have
-    :math:`\sigma = (\sigma_r, \sigma_s)`.
+    specified by ``sigma`` (:math:`\sigma`), where :math:`\sigma = (\sigma_r, \sigma_s)`.
 
     Args:
         lsize (int...): a sequence of integers defining the lshape of the output tensor.
@@ -820,7 +839,10 @@ def randn_rxso3(*lsize, sigma=1.0, **kwargs):
           :math:`\sigma_{\rm{s}}`).
 
     Example:
-        >>> pp.randn_rxso3(2, sigma=(1.0, 2.0)) # (sigma_r, sigma_s)
+
+        For :math:`\sigma = (\sigma_r, \sigma_s)`
+
+        >>> pp.randn_rxso3(2, sigma=(1.0, 2.0))
         rxso3Type LieTensor:
         tensor([[-0.5033, -0.4102, -0.6213, -3.5049],
                 [-0.3185,  0.1053, -0.0816, -1.1907]])
@@ -837,12 +859,11 @@ def randn_RxSO3(*lsize, sigma=1.0, **kwargs):
     .. math::
         \mathrm{data}[*, :] = \mathrm{Exp}([\delta_x, \delta_y, \delta_z, \log s]),
 
-    where rotation :math:`[\delta_x, \delta_y, \delta_z]` is
-    generated using :meth:`pypose.randn_so3()` with standard deviation :math:`\sigma_r`,
-    scale :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`.
-    :math:`\mathrm{Exp}()` is the Exponential map.
-    Note that standard deviations :math:`\sigma_r` and :math:`\sigma_s` are
-    specified by ``sigma`` (:math:`\sigma`), where we have
+    where rotation :math:`[\delta_x, \delta_y, \delta_z]` is generated using
+    :meth:`pypose.randn_so3()` with standard deviation :math:`\sigma_r`, scale :math:`\log s`
+    is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`, and
+    :math:`\mathrm{Exp}()` is the Exponential map. Note that standard deviations
+    :math:`\sigma_r` and :math:`\sigma_s` are specified by ``sigma`` (:math:`\sigma`), where
     :math:`\sigma = (\sigma_r, \sigma_s)`.
 
     Args:
@@ -883,7 +904,10 @@ def randn_RxSO3(*lsize, sigma=1.0, **kwargs):
           :math:`\sigma_{\rm{s}}`).
 
     Example:
-        >>> pp.randn_RxSO3(2, sigma=(1.0, 2.0)) # (sigma_r, sigma_s)
+
+        For :math:`\sigma = (\sigma_r, \sigma_s)`
+
+        >>> pp.randn_RxSO3(2, sigma=(1.0, 2.0))
         RxSO3Type LieTensor:
         tensor([[-0.1929, -0.0141,  0.2859,  0.9385,  4.5562],
                 [-0.2871,  0.0134, -0.2903,  0.9128,  3.1044]])
