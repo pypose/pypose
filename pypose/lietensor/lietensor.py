@@ -302,7 +302,7 @@ class so3Type(LieType):
         return SO3_type.Log(SO3_type.identity(*size, **kwargs))
 
     def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
-        assert isinstance(sigma, float), 'so3 and SO3 type only accepts single float sigma input'
+        assert isinstance(sigma, float) or isinstance(sigma, int), 'so3 and SO3 type only accepts single float sigma input'
         size = self.to_tuple(size)
         data = torch.randn(*(size + torch.Size([3])), **kwargs)
         dist = data.norm(dim=-1, keepdim=True)
