@@ -7,8 +7,7 @@ Modules
    :nosignatures:
 
    :template: autosummary/class-no-inherit.rst
-   module.IMUPreintegrator
    module.System
    module.LTI
-   module.LTINoise
    module.EKF
+   module.IMUPreintegrator
