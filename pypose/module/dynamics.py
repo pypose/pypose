@@ -4,6 +4,7 @@ import pypose as pp
 from torch.autograd.functional import jacobian
 
 
+
 class System(nn.Module):
     r'''
     The base class of a general discrete-time system dynamics model.
@@ -312,16 +313,16 @@ class LTI(System):
         >>> B = torch.randn(2, 3, 2)
         >>> C = torch.randn(2, 3, 3)
         >>> D = torch.randn(2, 3, 2)
-        >>> c1 = torch.randn(2, 1, 3)
-        >>> c2 = torch.randn(2, 1, 3)
-        >>> state = torch.randn(2, 1, 3)
-        >>> input = torch.randn(2, 1, 2)
-        >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
+        >>> c1 = torch.randn(2, 3)
+        >>> c2 = torch.randn(2, 3)
+        >>> state = torch.randn(2, 3)
+        >>> input = torch.randn(2, 2)
+        >>> lti = pp.module.LTI3(A, B, C, D, c1, c2)
         >>> lti(state, input)
-        tensor([[[-8.5639,  0.0523, -0.2576]],
-                [[ 4.1013, -1.5452, -0.0233]]]), 
-        tensor([[[-3.5780, -2.2970, -2.9314]], 
-                [[-0.4358,  1.7306,  2.7514]]]))
+        tensor([[ 1.4768, -1.0108, -1.2558],
+                [-0.6257, -1.7898, -1.9296]]), 
+        tensor([[-0.0333,  0.1495,  0.3392],
+                [-0.7129,  0.5230,  1.3020]]))
 
     Note:
         In this general example, all variables are in a batch. User definable as appropriate.
@@ -343,8 +344,8 @@ class LTI(System):
         Perform one step advance for the LTI system.
 
         '''
-        if self.A.ndim >= 3:
-            assert self.A.ndim == state.ndim == input.ndim,  "Invalid System Matrices dimensions"
+        assert state.ndim in (1, 2),  "Invalid System Matrices dimensions"
+        assert state.ndim == input.ndim,  "Invalid System Matrices dimensions"
 
         return super(LTI, self).forward(state, input)
 
@@ -356,7 +357,8 @@ class LTI(System):
             \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1 \\
 
         '''
-        return state.matmul(self.A.mT) + input.matmul(self.B.mT) + self.c1
+
+        return torch.einsum('...ik,...k->...i', [self.A, state]) + torch.einsum('...ik,...k->...i', [self.B, input]) + self.c1
 
     def observation(self, state, input, t=None):
         r'''
@@ -365,7 +367,9 @@ class LTI(System):
         .. math::
             \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2 \\
         '''
-        return state.matmul(self.C.mT) + input.matmul(self.D.mT) + self.c2
+        
+        return torch.einsum('...ik,...k->...i', [self.C, state]) + torch.einsum('...ik,...k->...i', [self.D, input]) + self.c2
+
 
     @property
     def A(self):
@@ -432,3 +436,4 @@ class LTI(System):
     @c2.setter
     def c2(self, c2):
         self._c2 = c2
+        
