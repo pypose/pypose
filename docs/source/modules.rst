@@ -7,7 +7,10 @@ Modules
    :nosignatures:
 
    :template: autosummary/class-no-inherit.rst
-   module.IMUPreintegrator
    module.System
    module.LTI
+<<<<<<< HEAD
    module.DP_LQR
+=======
+   module.IMUPreintegrator
+>>>>>>> main

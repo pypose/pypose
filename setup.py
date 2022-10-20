@@ -76,12 +76,10 @@ if __name__ == '__main__':
             'Intended Audience :: Developers',
             'Intended Audience :: Education',
             'Intended Audience :: Science/Research',
-            'Intended Audience :: Robotics',
             'Topic :: Software Development :: Libraries',
             'Topic :: Scientific/Engineering :: Artificial Intelligence',
-            'Topic :: Scientific/Engineering :: Robotics',
             # Pick your license as you wish
-            'License :: OSI Approved :: BSD 3-Clause "New" or "Revised" license',
+            'License :: OSI Approved :: BSD License',
             'Operating System :: OS Independent',
             # Specify the Python versions you support here. In particular, ensure
             # that you indicate whether you support Python 2, Python 3 or both.
