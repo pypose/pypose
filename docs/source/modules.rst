@@ -10,3 +10,4 @@ Modules
    module.IMUPreintegrator
    module.System
    module.LTI
+   module.DP_LQR
