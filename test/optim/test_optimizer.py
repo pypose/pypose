@@ -91,7 +91,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
         print('Done')
-        assert idx < 10, "Optimization requires too many steps."
+        assert idx < 9, "Optimization requires too many steps."
 
 
     def test_optim_liegroup(self):
@@ -118,7 +118,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
         
-        assert idx < 10, "Optimization requires too many steps."
+        assert idx < 9, "Optimization requires too many steps."
 
 
     def test_optim_with_kernel(self):
@@ -148,7 +148,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
 
-        assert idx < 10, "Optimization requires too many steps."
+        assert idx < 9, "Optimization requires too many steps."
 
     def test_optim_strategy_constant(self):
 
@@ -221,7 +221,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.item())
                 break
 
-        assert idx < 10, "Optimization requires too many steps."
+        assert idx < 9, "Optimization requires too many steps."
 
 
     def test_optim_multiparameter(self):
@@ -248,7 +248,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.item())
                 break
 
-        assert idx < 10, "Optimization requires too many steps."
+        assert idx < 9, "Optimization requires too many steps."
 
 
 if __name__ == '__main__':
