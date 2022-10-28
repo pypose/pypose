@@ -35,7 +35,7 @@ class RobustModel(nn.Module):
             self.register_forward_hook(self.kernel_forward)
 
         if weight is not None:
-            weight = self.validate_weight(weight)
+            # weight = self.validate_weight(weight)
             self.register_buffer('weight', weight)
 
     @torch.no_grad()
@@ -56,14 +56,15 @@ class RobustModel(nn.Module):
             return self.model(input)
 
     def residual(self, output, target, weight=None):
-        error = (output if target is None else output - target).unsqueeze(-1)
-        if weight is not None:
-            residual = self.validate(weight) @ error
-        elif hasattr(self, 'weight'):
-            residual = self.weight @ error
-        else:
-            residual = error
-        return residual.squeeze(-1)
+        # error = (output if target is None else output - target).unsqueeze(-1)
+        # if weight is not None:
+        #     residual = self.validate(weight) @ error
+        # elif hasattr(self, 'weight'):
+        #     residual = self.weight @ error
+        # else:
+        #     residual = error
+        # return residual.squeeze(-1)
+        return (output if target is None else output - target)
 
     def kernel_forward(self, module, input, output):
         # eps is to prevent grad of sqrt() from being inf
@@ -184,7 +185,8 @@ class GaussNewton(_Optimizer):
     def __init__(self, model, solver=None, kernel=None, corrector=None, weight=None, vectorize=True):
         super().__init__(model.parameters(), defaults={})
         self.solver = PINV() if solver is None else solver
-        self.jackwargs = {'vectorize': vectorize, 'flatten': True}
+        # self.jackwargs = {'vectorize': vectorize, 'flatten': True}
+        self.jackwargs = {'vectorize': vectorize, 'flatten': False}
         if kernel is not None and corrector is None:
             # auto diff of robust model will be computed
             self.model = RobustModel(model, kernel, weight=weight, auto=True)
@@ -252,8 +254,13 @@ class GaussNewton(_Optimizer):
         for pg in self.param_groups:
             R = self.model(input, target, weight)
             J = modjac(self.model, input=(input, target, weight), **self.jackwargs)
+            J = J[0].reshape(tuple(R.shape)+(-1,))
             R, J = self.corrector(R = R, J = J)
-            D = self.solver(A = J, b = -R.view(-1, 1))
+            A, b = J.permute([len(J.shape)-1,]+[i for i in range(len(J.shape)-1)]), R
+            if weight is not None:
+                A, b = (weight @ A.unsqueeze(-1)).squeeze(-1), (weight @ b.unsqueeze(-1)).squeeze(-1)
+            D = self.solver(A = A.reshape(A.shape[0], -1).T, b = -b.view(-1, 1))
+            # D = self.solver(A = J, b = -R.view(-1, 1))
             self.last = self.loss if hasattr(self, 'loss') \
                         else self.model.loss(input, target, weight)
             self.update_parameter(params = pg['params'], step = D)
@@ -371,7 +378,8 @@ class LevenbergMarquardt(_Optimizer):
         self.strategy = TrustRegion() if strategy is None else strategy
         defaults = {**{'min':min, 'max':max}, **self.strategy.defaults}
         super().__init__(model.parameters(), defaults=defaults)
-        self.jackwargs = {'vectorize': vectorize, 'flatten': True}
+        # self.jackwargs = {'vectorize': vectorize, 'flatten': True}
+        self.jackwargs = {'vectorize': vectorize, 'flatten': False}
         self.solver = Cholesky() if solver is None else solver
         self.reject, self.reject_count = reject, 0
         if kernel is not None and corrector is None:
@@ -452,15 +460,22 @@ class LevenbergMarquardt(_Optimizer):
         for pg in self.param_groups:
             R = self.model(input, target, weight)
             J = modjac(self.model, input=(input, target, weight), **self.jackwargs)
+            J = J[0].reshape(tuple(R.shape)+(-1,))
             R, J = self.corrector(R = R, J = J)
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target, weight)
-            A, self.reject_count = J.T @ J, 0
+            J_T = J.permute([len(J.shape)-1,]+[i for i in range(len(J.shape)-1)])
+            if weight is not None:
+                J_T = (J_T.unsqueeze(-2) @ weight).squeeze(-2)
+            J, J_T = J.reshape(-1, J.shape[-1]), J_T.reshape(J_T.shape[0], -1)
+            A, self.reject_count = J_T @ J, 0
+            # A, self.reject_count = J.T @ J, 0
             A.diagonal().clamp_(pg['min'], pg['max'])
             while self.last <= self.loss:
                 A.diagonal().add_(A.diagonal() * pg['damping'])
                 try:
-                    D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
+                    D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
+                    # D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
                 except Exception as e:
                     print(e, "\nLinear solver failed. Breaking optimization step...")
                     break
