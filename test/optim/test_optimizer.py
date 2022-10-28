@@ -8,6 +8,7 @@ import pypose.optim.kernel as ppok
 import pypose.optim.corrector as ppoc
 import pypose.optim.strategy as ppst
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if 0 else "cpu")
 
 
 class Timer:
@@ -226,9 +227,9 @@ class TestOptim:
 
 if __name__ == '__main__':
     test = TestOptim()
-    test.test_optim_liealgebra()
-    test.test_optim_liegroup()
-    test.test_optim_with_kernel()
+    # test.test_optim_liealgebra()
+    # test.test_optim_liegroup()
+    # test.test_optim_with_kernel()
     test.test_optim_strategy_constant()
-    test.test_optim_strategy_adaptive()
-    test.test_optim_trustregion()
+    # test.test_optim_strategy_adaptive()
+    # test.test_optim_trustregion()

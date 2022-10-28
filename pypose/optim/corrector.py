@@ -86,7 +86,8 @@ class FastTriggs(nn.Module):
         '''
         x = R.square().sum(-1, keepdim=True)
         s = jacobian(self.func, x).sqrt()
-        sj = s.expand_as(R).reshape(-1, 1)
+        # sj = s.expand_as(R).reshape(-1, 1)
+        sj = s.expand_as(R).unsqueeze(-1)
         return s * R, sj * J
 
 
