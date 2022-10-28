@@ -8,7 +8,6 @@ import pypose.optim.kernel as ppok
 import pypose.optim.corrector as ppoc
 import pypose.optim.strategy as ppst
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# device = torch.device("cuda" if 0 else "cpu")
 
 
 class Timer:
