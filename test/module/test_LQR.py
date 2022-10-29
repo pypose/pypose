@@ -66,6 +66,107 @@ def test_LQR_linear():
     print("Done")
 
 
+def test_LQR_ltv_random():
+
+    torch.manual_seed(1)
+    n_batch, n_state, n_ctrl, T = 2, 4, 3, 5
+    n_sc = n_state + n_ctrl
+
+    Q = torch.randn(T, n_batch, n_sc, n_sc)
+    Q = torch.matmul(Q.mT, Q)
+    p = torch.randn(T, n_batch, n_sc)
+    A = torch.randn(T, n_batch, n_state, n_state)
+    B = torch.randn(T, n_batch, n_state, n_ctrl)
+    C = torch.tile(torch.eye(n_state), (T, n_batch, 1, 1))
+    D = torch.tile(torch.zeros(n_state, n_ctrl), (T, n_batch, 1, 1))
+    c1 = torch.randn(T, n_batch, n_state)
+    c2 = torch.tile(torch.zeros(n_state), (T, n_batch, 1))
+    x_init = torch.randn(n_batch, n_state)
+    
+    class LTV(pp.module.System):
+    
+        def __init__(self, T, A, B, C, D, c1=None, c2=None):
+            super(LTV, self).__init__()
+            self.T = T
+            self.A, self.B, self.C, self.D = A, B, C, D
+            self.c1, self.c2 = c1, c2
+
+        def forward(self, state, input):
+            
+            return super(LTV, self).forward(state, input)
+
+        def state_transition(self, state, input, t=None):
+            for t in range(self.T):
+                A = self.A[t]
+                B = self.B[t]
+                c1 = self.c1[t]
+
+            return torch.einsum('...ik,...k->...i', [A, state]) + torch.einsum('...ik,...k->...i', [B, input]) + c1
+
+        def observation(self, state, input, t=None):
+            for t in range(self.T):
+                C = self.C[t]
+                D = self.D[t]
+                c2 = self.c2[t]
+
+            return torch.einsum('...ik,...k->...i', [C, state]) + torch.einsum('...ik,...k->...i', [D, input]) + c2
+
+        @property
+        def A(self):
+            return self._A
+
+        @A.setter
+        def A(self, A):
+            self._A = A
+
+        @property
+        def B(self):
+            return self._B
+
+        @B.setter
+        def B(self, B):
+            self._B = B
+
+        @property
+        def C(self):
+            return self._C
+
+        @C.setter
+        def C(self, C):
+            self._C = C
+
+        @property
+        def D(self):
+            return self._D
+
+        @D.setter
+        def D(self, D):
+            self._D = D
+
+        @property
+        def c1(self):
+            return self._c1
+
+        @c1.setter
+        def c1(self, c1):
+            self._c1 = c1
+
+        @property
+        def c2(self):
+            return self._c2
+
+        @c2.setter
+        def c2(self, c2):
+            self._c2 = c2
+
+    ltv = LTV(T, A, B, C, D, c1, c2)
+    LQR_DP  = pp.module.DP_LQR(n_state, n_ctrl, T, ltv)
+    x_lqr, u_lqr, objs_lqr, tau = LQR_DP(x_init, Q, p)
+
+    print("Done")
+
+
 if __name__ == '__main__':
     test_LQR_linear()
+    test_LQR_ltv_random()
 
