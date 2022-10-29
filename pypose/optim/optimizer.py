@@ -185,8 +185,7 @@ class GaussNewton(_Optimizer):
     def __init__(self, model, solver=None, kernel=None, corrector=None, weight=None, vectorize=True):
         super().__init__(model.parameters(), defaults={})
         self.solver = PINV() if solver is None else solver
-        # self.jackwargs = {'vectorize': vectorize, 'flatten': True}
-        self.jackwargs = {'vectorize': vectorize, 'flatten': False}
+        self.jackwargs = {'vectorize': vectorize, 'flatten': True}
         if kernel is not None and corrector is None:
             # auto diff of robust model will be computed
             self.model = RobustModel(model, kernel, weight=weight, auto=True)
@@ -254,8 +253,8 @@ class GaussNewton(_Optimizer):
         for pg in self.param_groups:
             R = self.model(input, target, weight)
             J = modjac(self.model, input=(input, target, weight), **self.jackwargs)
-            J = J[0].reshape(tuple(R.shape)+(-1,))
             R, J = self.corrector(R = R, J = J)
+            J = J.reshape(tuple(R.shape)+(-1,))
             A, b = J.permute([len(J.shape)-1,]+[i for i in range(len(J.shape)-1)]), R
             if weight is not None:
                 A, b = (weight @ A.unsqueeze(-1)).squeeze(-1), (weight @ b.unsqueeze(-1)).squeeze(-1)
@@ -378,8 +377,7 @@ class LevenbergMarquardt(_Optimizer):
         self.strategy = TrustRegion() if strategy is None else strategy
         defaults = {**{'min':min, 'max':max}, **self.strategy.defaults}
         super().__init__(model.parameters(), defaults=defaults)
-        # self.jackwargs = {'vectorize': vectorize, 'flatten': True}
-        self.jackwargs = {'vectorize': vectorize, 'flatten': False}
+        self.jackwargs = {'vectorize': vectorize, 'flatten': True}
         self.solver = Cholesky() if solver is None else solver
         self.reject, self.reject_count = reject, 0
         if kernel is not None and corrector is None:
@@ -460,14 +458,14 @@ class LevenbergMarquardt(_Optimizer):
         for pg in self.param_groups:
             R = self.model(input, target, weight)
             J = modjac(self.model, input=(input, target, weight), **self.jackwargs)
-            J = J[0].reshape(tuple(R.shape)+(-1,))
             R, J = self.corrector(R = R, J = J)
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target, weight)
-            J_T = J.permute([len(J.shape)-1,]+[i for i in range(len(J.shape)-1)])
+            J_T = J.reshape(tuple(R.shape)+(-1,))
+            J_T = J_T.permute([len(J_T.shape)-1,]+[i for i in range(len(J_T.shape)-1)])
             if weight is not None:
                 J_T = (J_T.unsqueeze(-2) @ weight).squeeze(-2)
-            J, J_T = J.reshape(-1, J.shape[-1]), J_T.reshape(J_T.shape[0], -1)
+            J_T = J_T.reshape(J_T.shape[0], -1)
             A, self.reject_count = J_T @ J, 0
             # A, self.reject_count = J.T @ J, 0
             A.diagonal().clamp_(pg['min'], pg['max'])
