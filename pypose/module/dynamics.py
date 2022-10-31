@@ -317,7 +317,7 @@ class LTI(System):
         >>> c2 = torch.randn(2, 3)
         >>> state = torch.randn(2, 3)
         >>> input = torch.randn(2, 2)
-        >>> lti = pp.module.LTI3(A, B, C, D, c1, c2)
+        >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
         >>> lti(state, input)
         tensor([[ 1.4768, -1.0108, -1.2558],
                 [-0.6257, -1.7898, -1.9296]]), 
