@@ -259,7 +259,7 @@ class GaussNewton(_Optimizer):
             if weight is not None:
                 A, b = (weight @ A.unsqueeze(-1)).squeeze(-1), (weight @ b.unsqueeze(-1)).squeeze(-1)
             D = self.solver(A = A.reshape(A.shape[0], -1).T, b = -b.view(-1, 1))
-            # D = self.solver(A = J, b = -R.view(-1, 1))
+            # D = self.solver(A = J, b = -R.view(-1, 1)) 
             self.last = self.loss if hasattr(self, 'loss') \
                         else self.model.loss(input, target, weight)
             self.update_parameter(params = pg['params'], step = D)
