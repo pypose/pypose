@@ -228,11 +228,11 @@ class TestOptim:
         class PoseInv(nn.Module):
             def __init__(self, *dim):
                 super().__init__()
-                self.pose = pp.Parameter(pp.randn_SE3(*dim))
-                self.trans = pp.Parameter(pp.randn_SE3(*dim))
+                self.pose1 = pp.Parameter(pp.randn_SE3(*dim))
+                self.pose2 = pp.Parameter(pp.randn_SE3(*dim))
 
             def forward(self, inputs):
-                return (self.pose @ inputs @ self.trans).Log().tensor()
+                return ((self.pose1 @ inputs).Log().tensor() + (self.pose2 @ inputs).Log().tensor())
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         inputs = pp.randn_SE3(2, 2).to(device)
