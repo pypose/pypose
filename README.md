@@ -1,4 +1,4 @@
-# PyPose: A Library for Robot Learning with Physics-based Optimization
+## PyPose: A Library for Robot Learning with Physics-based Optimization
 
 ![robot](https://user-images.githubusercontent.com/8695500/193484553-2da66824-4461-4aca-ad8c-b17c05bef067.png)
 
@@ -46,13 +46,7 @@ More information about efficiency comparison goes to [our paper for PyPose](http
 pip install pypose
 ```
 
-#### **From source**
-```bash
-git clone https://github.com/pypose/pypose.git && cd pypose
-python setup.py develop
-```
-
-#### For early users
+#### Install from source
 
 1. Requirement:
 
@@ -62,7 +56,7 @@ On Ubuntu, MasOS, or Windows, install [PyTorch](https://pytorch.org/), then run:
 pip install -r requirements/main.txt
 ```
 
-2.  Install locally:
+2. Install locally:
 
 ```bash
 git clone  https://github.com/pypose/pypose.git
