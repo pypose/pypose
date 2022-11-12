@@ -10,111 +10,59 @@ class Cost(nn.Module):
     The base class of a cost function.
     
     todo: change description
-    The state transision function :math:`\mathbf{f}` and observation function
-    :math:`\mathbf{g}` are given by:
+    The cost function :math:`\mathrm{cost}` is given by:
 
     .. math::
         \begin{aligned}
-            \mathbf{x}_{k+1} &= \mathbf{f}(\mathbf{x}_k, \mathbf{u}_k, t_k), \\
-            \mathbf{y}_{k}   &= \mathbf{g}(\mathbf{x}_k, \mathbf{u}_k, t_k), 
+            \mathrm{cost} = \mathrm{func}(\mathbf{x}_k, \mathbf{u}_k)
         \end{aligned}
 
-    where :math:`k`, :math:`\mathbf{x}`, :math:`\mathbf{u}`, :math:`\mathbf{y}` are the time
-    step, state(s), input(s), and observation(s), respectively.
+    where :math:`k`, :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state(s), input(s), respectively.
 
     Note:
         To use the class, users need to inherit this class and define methods
-        :obj:`state_transition` and :obj:`observation`, which are automatically called by
+        :obj:`cost`, which is automatically called by
         internal :obj:`forward` method.
-        The system timestamp (starting from **0**) is also self-added automatically once
-        the :obj:`forward` method is called.
 
     Note:
 
-        This class provides automatic **linearlization** at a reference point
-        :math:`\chi^*=(\mathbf{x}^*, \mathbf{u}^*, t^*)` along a trajectory.
-        One can directly call those linearized system matrices as properties including
-        :obj:`A`, :obj:`B`, :obj:`C`, :obj:`D`, :obj:`c1`, and :obj:`c2`, after calling
+        This class provides automatic **linearlization and quadraticization** at a reference point
+        :math:`\chi^*=(\mathbf{x}^*, \mathbf{u}^*)`.
+        One can directly call those linearized and quadraticized cost as properties including
+        :obj:`cx`, :obj:`cu`, :obj:`cxx`, :obj:`cxu`, :obj:`cux`, :obj:`cuu`, and :obj:`c`, after calling
         a method :obj:`set_refpoint`.
-
-        Consider a point
-        :math:`\chi=(\mathbf{x}^*+\delta\mathbf{x}, \mathbf{u}^*+\delta\mathbf{u}, t^*)` near
-        :math:`\chi^*`. We have
-
-        .. math::
-            \begin{aligned}
-            \mathbf{f}(\mathbf{x}, \mathbf{u}, t^*) &\approx \mathbf{f}(\mathbf{x}^*, 
-                \mathbf{u}^*, t^*) +  \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}}
-                \right|_{\chi^*} \delta \mathbf{x} + \left. \frac{\partial \mathbf{f}} 
-                {\partial \mathbf{u}} \right|_{\chi^*} \delta \mathbf{u} \\
-            &= \mathbf{f}(\mathbf{x}^*, \mathbf{u}^*, t^*) + \mathbf{A}(\mathbf{x} 
-                - \mathbf{x}^*) + \mathbf{B}(\mathbf{u}-\mathbf{u}^*) \\
-            &= \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1
-            \end{aligned}
-
-        and
-
-        .. math::
-            \mathbf{g}(\mathbf{x}, \mathbf{u}, t^*) \approx \mathbf{C}\mathbf{x} \
-                        + \mathbf{D}\mathbf{u} + \mathbf{c}_2
-
-        The notion of linearization is slightly different from that in dynamical system
-        theory. First, the linearization can be done for arbitrary point(s), not limit to
-        the equilibrium point(s), and therefore the extra constant terms :math:`\mathbf{c}_1`
-        and :math:`\mathbf{c}_2` are produced. Second, the linearized equations are represented
-        by the full states and inputs: :math:`\mathbf{x}` and :math:`\mathbf{u}`, rather than 
-        the perturbation format: :math:`\delta \mathbf{x}` and :math:`\delta \mathbf{u}`
-        so that the model is consistent with, e.g., the LTI model and the iterative LQR
-        solver. More details go to :meth:`LTI`.
 
     Example:
 
-        A simple linear time-varying system.  Here we just show an example for advancing one
-        time step of the system at a given time step and computing the linearization.
-        For generating one trajecotry given a series of inputs and advanced use of linearization,
-        see the `examples` folder.
+        A simple non-quadratic cost example. For advanced usage, see the `examples` folder.
 
-        >>> import math
-        >>> import pypose as pp
-        >>> import torch
-        >>> class Floquet(pp.module.System):
-        ...     def __init__(self):
-        ...         super(Floquet, self).__init__()
-        ...
-        ...     def state_transition(self, state, input, t):
-        ...         cc = torch.cos(2 * math.pi * t / 100)
-        ...         ss = torch.sin(2 * math.pi * t / 100)
-        ...         A = torch.tensor([[   1., cc/10],
-        ...                           [cc/10,    1.]])
-        ...         B = torch.tensor([[ss],
-        ...                           [1.]])
-        ...         return state.matmul(A) + B.matmul(input)
-        ...
-        ...     def observation(self, state, input, t):
-        ...         return state + t
-        ...
-        >>> solver = Floquet()
-        >>> time_curr = 8 # We start from t = 8, and advance one step to t = 9
-        >>> input = torch.sin(2 * math.pi * torch.tensor(time_curr) / 50)
-        >>> state_curr = torch.tensor([1., 1.])
-        >>> solver.reset(t = time_curr)
-        >>> state_next, obser_curr = solver(state_curr, input)
-        ... 
-        >>> solver.set_refpoint()
-        >>> print(state_next)
-        >>> print(obser_curr)
-        >>> print(solver.A)
-        >>> print(solver.B)
-        tensor([1.4944, 1.9320])
-        tensor([9., 9.])
-        tensor([[1.0000, 0.0844],
-                [0.0844, 1.0000]])
-        tensor([[0.5358],
-                [1.0000]])
+        >>> import torch as torch
+        >>> class NonQuadCost(Cost):
+        ... def __init__(self):
+        ...    super(NonQuadCost, self).__init__()
+        ... def cost(self, state, input):
+        ...    return torch.sum(state**3) + torch.sum(input**4) \
+        ...            + torch.sum(state * input) # did not consider batch here
+        >>> state = torch.randn(1, 3)
+        >>> input = torch.randn(1, 3)
+        >>> nonQuadCost = NonQuadCost()
+        >>> cost_value = nonQuadCost(state, input)
+        >>> print('cost_value', cost_value)
+        >>> # 1st, 2nd order partial derivatives at current state and input
+        >>> jacob_state, jacob_input = state, input
+        >>> nonQuadCost.set_refpoint(state=jacob_state, input=jacob_input)
+        >>> print('cx', nonQuadCost.cx.size(), nonQuadCost.cx, '?==?', 3*state**2 + input)
+        >>> print('cu', nonQuadCost.cu.size(), nonQuadCost.cu, '?==?', 4*input**3 + state)
+        >>> print('cxx', nonQuadCost.cxx.size(), nonQuadCost.cxx, '?==?', 6*torch.diag(state.squeeze(0)))
+        >>> print('cxu', nonQuadCost.cxu.size(), nonQuadCost.cxu, '?==?', torch.eye(state.size(-1)) )
+        >>> print('cux', nonQuadCost.cux.size(), nonQuadCost.cux, '?==?', torch.eye(state.size(-1)))
+        >>> print('cuu', nonQuadCost.cuu.size(), nonQuadCost.cuu, '?==?', 12*torch.diag((input**2).squeeze(0)))
+        >>> print('c', nonQuadCost.c.size())
+        >>> cx, cu, cxx, cxu, cux, cuu, c = nonQuadCost.cx, nonQuadCost.cu, nonQuadCost.cxx, nonQuadCost.cxu, nonQuadCost.cux, nonQuadCost.cuu, nonQuadCost.c
 
     Note:
-        More practical examples can be found at `examples/module/dynamics
-        <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
+        More practical examples can be found at `examples/module/cost
+        <https://github.com/pypose/pypose/tree/main/examples/module/cost>`_.
     '''
 
     def __init__(self):
@@ -286,10 +234,10 @@ class Cost(nn.Module):
         '''
         # Potential performance loss here - self.A and self.B involves jacobian eval
         return self._ref_c - self._ref_state.matmul(self.cx.mT) - self._ref_input.matmul(self.cu.mT) \
-                           - self._ref_state.matmul(self.cxx.mT).matmul(self._ref_state) \
-                           - 0.5 * self._ref_state.matmul(self.cux.mT).matmul(self._ref_input) \
-                           - 0.5 * self._ref_input.matmul(self.cxu.mT).matmul(self._ref_state) \
-                           - self._ref_input.matmul(self.cuu.mT).matmul(self._ref_input)
+                           - self._ref_state.matmul(self.cxx).matmul(self._ref_state.mT) \
+                           - 0.5 * self._ref_state.matmul(self.cxu).matmul(self._ref_input.mT) \
+                           - 0.5 * self._ref_input.matmul(self.cux).matmul(self._ref_state.mT) \
+                           - self._ref_input.matmul(self.cuu).matmul(self._ref_input.mT)
 
 
 class QuadCost(Cost):

@@ -10,3 +10,5 @@ Modules
    module.System
    module.LTI
    module.IMUPreintegrator
+   module.Cost
+   module.QuadCost
