@@ -2,6 +2,7 @@ import torch as torch
 import torch.nn as nn
 import pypose as pp
 from torch.autograd.functional import jacobian
+from torch.autograd import grad
 
 
 class Cost(nn.Module):
@@ -119,14 +120,14 @@ class Cost(nn.Module):
     def __init__(self):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
-        self.register_buffer('_t',torch.zeros(1))
-        self.register_forward_hook(self.forward_hook)
+        # self.register_buffer('_t',torch.zeros(1))
+        # self.register_forward_hook(self.forward_hook)
 
-    def forward_hook(self, module, inputs, outputs):
-        r'''
-        Automatically advances the time step.
-        '''
-        self._t.add_(1) #todo: change this, no need advance
+    # def forward_hook(self, module, inputs, outputs):
+    #     r'''
+    #     Automatically advances the time step.
+    #     '''
+    #     self._t.add_(1)
 
     def forward(self, state, input):
         r'''
@@ -224,19 +225,41 @@ class Cost(nn.Module):
         .. math::
             \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
+        # https://discuss.pytorch.org/t/second-order-derivatives-of-loss-function/71797/4 need _ref to be requires_grad = True?
+        # first_derivative = grad(self.cost(self._ref_state, self._ref_input), self._ref_state, create_graph=True)[0]
+        # print('first derivative', first_derivative.size())
+        # second_derivative = grad(first_derivative, self._ref_state)[0]
+        # print('second derivative', second_derivative)
+
+        # https://pytorch.org/docs/stable/_modules/torch/autograd/functional.html#hessian
+
+        # def jac_func(x): # create a functional here
+        #     func = lambda x: self.cost(x, self._ref_input)
+        #     jac = jacobian(func, x, create_graph=True)
+        #     # print('jac', jac.size())
+        #     return jac
+
+        # equivalent simpler form
         func = lambda x: self.cost(x, self._ref_input)
-        func_dx  = lambda x: jacobian(func, x, **self.jacargs)
-        return jacobian(func_dx, self._ref_state, **self.jacargs)
+        jac_func = lambda x: jacobian(func, x, create_graph=True) 
+        return jacobian(jac_func, self._ref_state, **self.jacargs).squeeze()
 
     @property
     def cxu(self):
-        return NotImplementedError
+        def jac_func(u):
+            func = lambda x: self.cost(x, u)
+            jac = jacobian(func, self._ref_state, create_graph=True) # substitute x here
+            return jac
+        return jacobian(jac_func, self._ref_input,  **self.jacargs).squeeze()
     
     @property
     def cux(self):
-        return NotImplementedError
-
-    # todo: copy from cxx, debug
+        def jac_func(x):
+            func = lambda u: self.cost(x, u)
+            jac = jacobian(func, self._ref_input, create_graph=True)
+            return jac
+        return jacobian(jac_func, self._ref_state,  **self.jacargs).squeeze()
+ 
     @property
     def cuu(self):
         r'''
@@ -246,10 +269,11 @@ class Cost(nn.Module):
         .. math::
             \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
-        func = lambda x: self.cost(self._ref_state, x)
-        return jacobian(func, self._ref_input, **self.jacargs) 
-
-
+        def jac_func(u):
+            func = lambda u: self.cost(self._ref_state, u)
+            jac = jacobian(func, u, create_graph=True)
+            return jac
+        return jacobian(jac_func, self._ref_input, **self.jacargs).squeeze()
 
     @property
     def c(self):
