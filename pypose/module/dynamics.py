@@ -277,6 +277,38 @@ class System(nn.Module):
         # Potential performance loss here - self.C and self.D involves jacobian eval
         return self._ref_g - self._ref_state.matmul(self.C.mT) - self._ref_input.matmul(self.D.mT)
 
+    # second order derivative
+    @property
+    def fxx(self):
+        def jac_func(x): # create a functional here
+            func = lambda x: self.state_transition(x, self._ref_input)
+            jac = jacobian(func, x, create_graph=True)
+            return jac
+        return jacobian(jac_func, self._ref_state, **self.jacargs).squeeze()
+        
+    @property
+    def fxu(self):
+        def jac_func(u):
+            func = lambda x: self.state_transition(x, u)
+            jac = jacobian(func, self._ref_state, create_graph=True) # substitute x here
+            return jac
+        return jacobian(jac_func, self._ref_input,  **self.jacargs).squeeze()
+    
+    @property
+    def fux(self):
+        def jac_func(x):
+            func = lambda u: self.state_transition(x, u)
+            jac = jacobian(func, self._ref_input, create_graph=True)
+            return jac
+        return jacobian(jac_func, self._ref_state,  **self.jacargs).squeeze()
+ 
+    @property
+    def fuu(self):
+        def jac_func(u):
+            func = lambda u: self.state_transition(self._ref_state, u)
+            jac = jacobian(func, u, create_graph=True)
+            return jac
+        return jacobian(jac_func, self._ref_input, **self.jacargs).squeeze()
 
 class LTI(System):
     r'''

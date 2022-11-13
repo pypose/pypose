@@ -324,10 +324,10 @@ class QuadCost(Cost):
         # print(state.matmul(self.cx.mT).size())
         # exit()
         return state.matmul(self.cx.mT) + input.matmul(self.cu.mT) \
-                        + state.matmul(self.cxx.mT).matmul(state.mT) \
-                        + 0.5 * state.matmul(self.cxu.mT).matmul(input.mT) \
-                        + 0.5 * input.matmul(self.cux.mT).matmul(state.mT) \
-                        + input.matmul(self.cuu.mT).matmul(input.mT) \
+                        + state.matmul(self.cxx).matmul(state.mT) \
+                        + 0.5 * state.matmul(self.cxu).matmul(input.mT) \
+                        + 0.5 * input.matmul(self.cux).matmul(state.mT) \
+                        + input.matmul(self.cuu).matmul(input.mT) \
                         + self.c
 
     @property
@@ -411,7 +411,7 @@ if __name__ == "__main__":
         cx = torch.randn(2, 1, 3)
         cu = torch.randn(2, 1, 2)
         cxx = torch.randn(2, 3, 3)
-        cxu = torch.randn(2, 2, 3)
+        cxu = torch.randn(2, 3, 2)
         cux = torch.transpose(cxu, 1,2)
         cuu = torch.randn(2, 2, 2)
         c = torch.randn(2, 1, 1)

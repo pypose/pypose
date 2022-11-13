@@ -16,26 +16,69 @@ class algParam:
         self.infeas = infeas
 
 class fwdPass:
-    def __init__(self,sys=None, cost=None, cons=None):
-        self.f = sys
-        self.p = cost['stagecost']
-        self.q = cost['terminalcost']
-        self.c = cons
+    def __init__(self,sys=None, cost=None, cons=None, horizon=1):
+        self.f_fn = sys
+        self.p_fn = cost
+        self.q_fn = cost
+        self.c_fn = cons
+        self.N = horizon
+        self.n_state = self.f_fn.A.size(-1) # todo
+        self.n_input = self.f_fn.B.size(-1)
+        self.n_cons = self.c_fn.gx.size(0)
+        # defined in dynamics function
+        self.x = torch.zeros(self.N+1, self.n_state, 1)
+        self.u = torch.zeros(self.N, self.n_input,1)
+        self.c = torch.zeros(self.N, self.n_cons, 1)
+        self.y = torch.zeros(self.N, self.n_cons, 1) 
+        self.s = torch.zeros(self.N, self.n_cons, 1) 
+        self.mu = torch.zeros(self.N, self.n_cons, 1) 
 
-    def setPmat(self):
-        return True
-    
+        self.p = torch.Tensor([0.0])
+        self.px = torch.zeros(1, self.n_state)
+        self.pxx = torch.eye(self.n_state, self.n_state)
+
+        # VecOfMatXd f;     // f
+        self.fx = torch.zeros(self.N, self.n_state, self.n_state)
+        self.fu = torch.zeros(self.N, self.n_state, self.n_input)
+
+        self.fxx = torch.zeros(self.N, self.n_state, self.n_state, self.n_state)
+        self.fxu = torch.zeros(self.N, self.n_state, self.n_state, self.n_input)
+        self.fuu = torch.zeros(self.N, self.n_state, self.n_input, self.n_input)
+
+        self.q = torch.zeros(self.N, 1)
+        self.qx = torch.zeros(self.N, self.n_state)
+        self.qu = torch.zeros(self.N, self.n_input)
+        self.qxx = torch.zeros(self.N, self.n_state, self.n_state)
+        self.qxu = torch.zeros(self.N, self.n_state, self.n_input)
+        self.quu = torch.zeros(self.N, self.n_input, self.n_input)
+
+        self.cx = torch.zeros(self.N, self.n_cons, self.n_state)
+        self.cu = torch.zeros(self.N, self.n_cons, self.n_input)
+
+        self.filter = []
+        # self.cost = 0.
+        # self.costq = 0. # defined in resetfilter function
+        self.err = 0.
+        self.logcost = 0.
+        self.step = 0
+        self.failed = False
+        self.stepsize = 1.0
+
+        # Eigen::VectorXd jerkCost;
+
+        self.reg_exp_base = 1.0
+
     def computenextx(self, x, u): # seems to be embedded in system
-        return self.f(x, u)
+        return self.f_fn(x, u)
 
-    def computec(self):
-        return 
+    def computec(self, x, u):
+        return self.c_fn(x, u)
 
-    def computep(self):
-        return True
+    def computep(self, x):
+        return self.p_fn(x, torch.zeros(1, self.n_input)) # dummy input
 
-    def computeq(self):
-        return True
+    def computeq(self, x, u):
+        return self.q_fn(x, u)
     
     def computeall(self):
         self.computeprelated()
@@ -44,27 +87,47 @@ class fwdPass:
         self.computecrelated()
 
     def computeprelated(self):
-        return True
+        self.p = self.computep(self.x[-1])
+        self.px = self.p_fn.cx
+        self.pxx = self.p_fn.cxx
+        return 
 
     def computefrelated(self):
-        return True
+        for i in range(self.N):
+            self.f_fn.set_refpoint(state=self.x[i], input=self.u[i])
+            # print('checkpoint', self.fx.size())
+            self.fx[i] = self.f_fn.A
+            self.fu[i] = self.f_fn.B   
+            self.fxx[i] = self.f_fn.fxx
+            self.fxu[i] = self.f_fn.fxu  
+            self.fuu[i] = self.f_fn.fuu  
 
     def computeqrelated(self):
-        return True
+        for i in range(self.N):
+            self.q[i] = self.q_fn(self.x[i], self.u[i])
+            self.q_fn.set_refpoint(state=self.x[i], input=self.u[i])
+            self.qx[i] = self.q_fn.cx
+            self.qu[i] = self.q_fn.cu
+            self.qxx[i] = self.q_fn.cxx
+            self.qxu[i] = self.q_fn.cxu
+            self.quu[i] = self.q_fn.cuu
 
     def computecrelated(self):
-        return True
+        for i in range(self.N):
+            self.c[i] = self.c_fn(self.x[i], self.u[i])
+            self.c_fn.set_refpoint(state=self.x[i], input=self.u[i])
+            self.cx[i] = self.c_fn.gx
+            self.cu[i] = self.c_fn.gu        
 
     def initialroll(self):
-        q = VectorXd::Zero(N)
-        for i in range(N):
-            x_temp = x[i]
-            u_temp = u[i]
-            c[i] = computecminvo(x_temp, u_temp, i, corridor)
-            q(i) = computeq(x_temp, u_temp)  #  compute cost then used in resetfilter
-            x[i+1] = computenextx(x_temp, u_temp)
-        }
-        self.cost = q.sum() + self.computep(x[N], x_d)
+        q = torch.zeros(1,self.N)
+        for i in range(self.N):
+            x_temp = self.x[i]
+            u_temp = self.u[i]
+            self.c[i] = self.computec(x_temp, u_temp)
+            self.q[i] = self.computeq(x_temp, u_temp)  #  compute cost then used in resetfilter
+            self.x[i+1] = self.computenextx(x_temp, u_temp)
+        self.cost = q.sum() + self.computep(self.x[N])
         self.costq = q.sum()
 
     def resetfilter(self, alg):
@@ -72,42 +135,44 @@ class fwdPass:
         self.err = 0.0
         if (alg.infeas):
             for i in range(N): 
-                self.logcost -= alg.mu * self.y[i].array().log().sum()
-                self.err += (self.c[i]+self.y[i]).lpNorm<1>()
+                self.logcost -= alg.mu * self.y[i].log().sum()
+                self.err += torch.linalg.vector_norm(self.c[i]+self.y[i], 1)
             if (self.err < alg.tol):
                 self.err = 0.0
 
         else:
             for i in range(N):
-                self.logcost -= alg.mu * (-self.c[i]).array().log().sum()
+                self.logcost -= alg.mu * (-self.c[i]).log().sum()
                 self.err = 0.0
 
         self.filter = [self.logcost, self.err]
         self.step = 0
         self.failed = False
 
-    def finalroll(self):
-        kerkCost = VectorXd::Zero(N);
-        for i in range(self.N):
-            x_temp = x[i]
-            u_temp = u[i]
-            # time2barR((u_temp.tail(1))(0))
-            # jerkCost(i) = (u_temp.head(sys_order*dim).transpose() * barR * u_temp.head(sys_order*dim))(0); 
+    # def finalroll(self):
+    #     jerkCost = torch.zeros(1,N)
+    #     for i in range(self.N):
+    #         x_temp = self.x[i]
+    #         u_temp = self.u[i]
+    #         # time2barR((u_temp.tail(1))(0))
+    #         # jerkCost(i) = (u_temp.head(sys_order*dim).transpose() * barR * u_temp.head(sys_order*dim))(0); 
 
     # get function should be implemented by @property, should take care of deepcopy thing      
 
-    def removeColumn(self, matrix, colToRemove):
-        numRows = matrix.rows()
-        numCols = matrix.cols()-1
-        if( colToRemove < numCols ):
-            matrix.block(0,colToRemove,numRows,numCols-colToRemove) = matrix.block(0,colToRemove+1,numRows,numCols-colToRemove)
-        matrix.conservativeResize(numRows,numCols); 
-        return matrix    
+    # def removeColumn(self, matrix, colToRemove):
+    #     numRows = matrix.rows()
+    #     numCols = matrix.cols()-1
+    #     if( colToRemove < numCols ):
+    #         matrix.block(0,colToRemove,numRows,numCols-colToRemove) = matrix.block(0,colToRemove+1,numRows,numCols-colToRemove)
+    #     matrix.conservativeResize(numRows,numCols); 
+    #     return matrix    
 
 
 class bwdPass:
     def __init__(self):
-        return True
+        self.reg = 0.0
+        self.failed = False
+        self.recovery = 0
 
     def resetreg(self):
         self.reg = 0.0
@@ -122,18 +187,18 @@ class bwdPass:
 
 
 class ddpOptimizer:
-    def __init__(self, sys=None, cost=None, cons=None):
+    def __init__(self, sys=None, cost=None, cons=None, horizon=None):
         self.alg = algParam()
-        self.fp = fwdPass(sys=sys, cost=cost, cons=cons)
+        self.fp = fwdPass(sys=sys, cost=cost, cons=cons, horizon=horizon)
         self.bp = bwdPass()
-
+        self.N = horizon
     def backwardpass(self):
         fp = self.fp
         bp = self.bp
         alg = self.alg
 
         n_state = fp.n_state
-        n_ctrl = fp.n_ctrl
+        n_input = fp.n_input
         N = fp.N
         dV = [0.0,0.0]
         c_err = 0.0
@@ -168,8 +233,10 @@ class ddpOptimizer:
         cx, cu = fp.cx, fp.cu
 
         # todo: * to @ ?
-        for i in range(N-1, -1, -1):
-                Qx = qx[i] + cx[i].transpose() * s[i] + fx[i].transpose() * Vx
+        for i in range(self.N-1, -1, -1):
+                print('checkpoint optimizer')
+                print(qx[i].size(), cx[i].size(), s[i].size(), fx[i].size(), Vx.size())
+                Qx = qx[i] + cx[i].mT.matmul(s[i]) + fx[i].mT.matmul(Vx)
                 Qu = qu[i] + cu[i].transpose() * s[i] + fu[i].transpose() * Vx # (5b)
 
                 fxiVxx = fx[i].transpose() * Vxx
@@ -300,7 +367,7 @@ class ddpOptimizer:
         stepsize = 0.
         err = 0.
         tau = max(0.99, 1-alg.mu)
-        steplist = pow(2.0, ArrayXd::LinSpaced(11, -10, 0).reverse() )
+        steplist = pow(2.0, torch.linspace(11, -10, 0).reverse() )
         failed = False
 
         for step in range(steplist.size()):
@@ -369,9 +436,9 @@ class ddpOptimizer:
                 
                 if (failed): continue
 
-                tempm = zeros(2,columnidtokeep.size())
+                tempm = torch.zeros(2,columnidtokeep.size())
                 for i in range(columnidtokeep.size() ): 
-                    tempm.col(i) = fp.filter.col(columnidtokeep[i])
+                    tempm[:, i]= fp.filter[:,i]
                 fp.filter.resize(2, tempm.cols() + 1)
                 fp.filter << tempm, candidate;            
                 break
@@ -400,7 +467,7 @@ class ddpOptimizer:
 
         for iter in range(self.alg.maxiter):
             while True: 
-                self.backwardpass();
+                self.backwardpass()
                 if ~self.bp.failed: 
                     break
                 # in case dead loop in bp
@@ -435,25 +502,50 @@ class ddpOptimizer:
 if __name__ == "__main__":
     N = 100    # Number of time steps
 
-    # Time, Input, Initial state
-    time  = torch.arange(0, N+1)
-    input = torch.sin(2*math.pi*time/50)
-    state = torch.tensor([1., 1.])
-
     # Create dynamics sys object
-    sys = Floquet()
-    # todo: cost class
-    cost = 1.0
-    solver = ddpOptimizer(sys, cost) 
+    A = torch.eye(3, 3)
+    B = torch.randn(3, 2)
+    C = torch.randn(3, 3)
+    D = torch.randn(3, 2)
+    c1 = torch.zeros(1, 3)
+    c2 = torch.randn(1, 3)
+    state = torch.randn(1, 3)
+    input = torch.randn(1, 2)
+    lti = pp.module.LTI(A, B, C, D, c1, c2)    # Calculate trajectory
+ 
+    n_state = state.size(1)
+    n_input = input.size(1) 
+
+    state_all = torch.zeros(N+1, n_state)
+    input_all = torch.zeros(N, n_input)
+    state_all[0] = state
+    for i in range(N):
+        # print('i', i, state_all[i])
+        state_all[i+1], _ = lti(state_all[i], input_all[i])
+
+    # Create cost object
+    cx = torch.randn(1, 3)
+    cu = torch.randn(1, 2)
+    cxx = torch.randn(3, 3)
+    cxx = cxx + cxx.mT
+    cxu = torch.randn(3, 2)
+    cux = cxu.mT
+    cuu = torch.randn(2, 2)
+    cuu = cuu + cuu.mT
+    c = torch.randn(1, 1)
+    quadcost = pp.module.QuadCost(cx,cu,cxx,cxu,cux,cuu,c)
+
+    # Create constraint object
+    gx = torch.zeros( 2*n_input, n_state)
+    gu = torch.vstack( (torch.eye(n_input, n_input), - torch.eye(n_input, n_input)) )
+    g = torch.hstack( (1. * torch.ones(1, n_input), -1. * torch.ones(1, n_input)) )
+    print('checkpoint', gx.size(), gu.size(), g.size())
+    lincon = pp.module.LinCon(gx, gu, g)
+    solver = ddpOptimizer(lti, quadcost, lincon, N) 
+
     traj_opt = solver.optimizer()
 
-    # Calculate trajectory
-    state_all = torch.zeros(N+1, 2)
-    state_all[0] = state
-    obser_all = torch.zeros(N, 2)
 
-    for i in range(N):
-        state_all[i+1], obser_all[i] = sys(state_all[i], input[i])
 
     # Create time plots to show dynamics
     f, ax = plt.subplots(nrows=4, sharex=True)
