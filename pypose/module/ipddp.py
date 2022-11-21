@@ -7,6 +7,7 @@ from pypose.module.dynamics import System
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 class algParam:
     def __init__(self, mu=1.0, maxiter=100, tol=1.0e-7, infeas=True):
@@ -16,7 +17,7 @@ class algParam:
         self.infeas = infeas
 
 class fwdPass:
-    def __init__(self,sys=None, cost=None, cons=None, horizon=1):
+    def __init__(self,sys=None, cost=None, cons=None, horizon=1, init_traj=None):
         self.f_fn = sys
         self.p_fn = cost
         self.q_fn = cost
@@ -26,8 +27,10 @@ class fwdPass:
         self.n_input = self.f_fn.B.size(-1)
         self.n_cons = self.c_fn.gx.size(0)
         # defined in dynamics function
-        self.x = torch.zeros(self.N+1, 1, self.n_state)
-        self.u = torch.zeros(self.N,   1, self.n_input)
+        # self.x = torch.zeros(self.N+1, 1, self.n_state)
+        # self.u = torch.zeros(self.N,   1, self.n_input)
+        self.x = init_traj['state']
+        self.u = init_traj['input']
         self.c = torch.zeros(self.N, self.n_cons, 1)
         self.y = 0.01*torch.ones(self.N, self.n_cons, 1) 
         self.s = 0.1*torch.zeros(self.N, self.n_cons, 1) 
@@ -66,7 +69,7 @@ class fwdPass:
 
         # Eigen::VectorXd jerkCost;
 
-        self.reg_exp_base = 1.0
+        self.reg_exp_base = 1.6
 
     def computenextx(self, x, u): # seems to be embedded in system
         return self.f_fn(x, u)[0]
@@ -120,7 +123,6 @@ class fwdPass:
             self.cu[i] = self.c_fn.gu        
 
     def initialroll(self):
-        q = torch.zeros(1,self.N)
         for i in range(self.N):
             x_temp = self.x[i]
             u_temp = self.u[i]
@@ -129,23 +131,23 @@ class fwdPass:
             print('x, u temp', x_temp, u_temp)
             print(self.computenextx(x_temp, u_temp), self.x[i+1] )
             self.x[i+1] = self.computenextx(x_temp, u_temp)
-        self.cost = q.sum() + self.computep(self.x[N])
-        self.costq = q.sum()
+        self.cost = self.q.sum() + self.computep(self.x[N])
+        self.costq = self.q.sum()
 
     def resetfilter(self, alg):
         self.logcost = self.cost
-        self.err = 0.0
+        self.err = torch.Tensor([0.0])
         if (alg.infeas):
             for i in range(N): 
                 self.logcost -= alg.mu * self.y[i].log().sum()
                 self.err += torch.linalg.vector_norm(self.c[i]+self.y[i], 1)
             if (self.err < alg.tol):
-                self.err = 0.0
+                self.err = torch.Tensor([0.0])
 
         else:
             for i in range(N):
                 self.logcost -= alg.mu * (-self.c[i]).log().sum()
-                self.err = 0.0
+                self.err = torch.Tensor([0.0])
 
         self.filter = torch.vstack((self.logcost, self.err))
         self.step = 0
@@ -203,9 +205,9 @@ class bwdPass:
         self.recovery = 0
 
 class ddpOptimizer:
-    def __init__(self, sys=None, cost=None, cons=None, horizon=None):
+    def __init__(self, sys=None, cost=None, cons=None, horizon=None, init_traj=None):
         self.alg = algParam()
-        self.fp = fwdPass(sys=sys, cost=cost, cons=cons, horizon=horizon)
+        self.fp = fwdPass(sys=sys, cost=cost, cons=cons, horizon=horizon, init_traj=init_traj)
         self.bp = bwdPass(sys=sys,            cons=cons, horizon=horizon)
         self.N = horizon
 
@@ -224,20 +226,17 @@ class ddpOptimizer:
 
         if (fp.failed or bp.failed):
             bp.reg += 1.0
+        elif (fp.step == 1):
+            bp.reg -= 1.0
+        elif (fp.step <= 4):
+            bp.reg = bp.reg
         else:
-            if (fp.step == 0):
-                bp.reg -= 1.0
-            else:
-                if (fp.step <= 3):
-                    bp.reg = bp.reg
-                else:
-                    bp.reg += 1.0
+            bp.reg += 1.0
 
         if (bp.reg < 0.0):
             bp.reg = 0.0
-        else:
-            if (bp.reg > 24.0):
-                bp.reg = 24.0
+        elif (bp.reg > 24.0):
+            bp.reg = 24.0
 
         if ~fp.failed:
             fp.computeall()
@@ -251,7 +250,7 @@ class ddpOptimizer:
 
         # todo: * to @ ?
         for i in range(self.N-1, -1, -1):
-            print('checkpoint optimizer', i)
+            # print('checkpoint optimizer', i)
             Qx = qx[i] + cx[i].mT.matmul(s[i]) + fx[i].mT.matmul(Vx)
             Qu = qu[i] + cu[i].mT.matmul(s[i]) + fu[i].mT.matmul(Vx) # (5b)
 
@@ -262,7 +261,9 @@ class ddpOptimizer:
             Quu = 0.5 * (Quu + Quu.mT)
 
             # todo S = s[i].asDiagonal();
-            Quu_reg = Quu + (pow(fp.reg_exp_base, bp.reg) - 1) * torch.eye(self.n_input, self.n_input)
+            Quu_reg = Quu + quu[i] * (pow(fp.reg_exp_base, bp.reg) - 1.)
+
+            # Quu_reg = Quu + (pow(fp.reg_exp_base, bp.reg) - 1) * torch.eye(self.n_input, self.n_input)
 
             if (alg.infeas):
                 r = s[i] * y[i] - alg.mu
@@ -365,7 +366,7 @@ class ddpOptimizer:
                 c_err=torch.maximum(c_err, torch.linalg.vector_norm(c[i]+y[i], float('inf')) )
 
         bp.failed = False
-        print('backward success')
+        # print('backward success')
         bp.opterr = torch.maximum( torch.maximum( Qu_err, c_err), mu_err)
         bp.dV = dV
 
@@ -384,7 +385,7 @@ class ddpOptimizer:
         cost, costq, logcost = 0., 0., 0.
         qnew = torch.zeros(self.N, 1)
         stepsize = 0.
-        err = 0.
+        err = torch.Tensor([0.])
         tau = max(0.99, 1-alg.mu)
         steplist = pow(2.0, torch.linspace(-10, 0, 11).flip(0) )
         failed = False
@@ -426,7 +427,7 @@ class ddpOptimizer:
                 cost = qnew.sum() + fp.computep(xnew[-1])
                 costq = qnew.sum()
                 logcost = cost  
-                err = 0.0;            
+                err = torch.Tensor([0.])          
                 if (alg.infeas):
                     for i in range(self.N): 
                         logcost -= alg.mu * ynew[i].log().sum()
@@ -441,33 +442,23 @@ class ddpOptimizer:
                 
 
                 candidate = torch.vstack((logcost, err))
-                columnidtokeep = 0
-                for i in range(len(fp.filter)):
-                    if (candidate[0]>=fp.filter[0, i] and candidate[1]>=fp.filter[1,i]):
-                        failed=True
-                        break                    
-                    else:
-                        idx=torch.all(candidate<=fp.filter,0) #todo: check
-                        fp.filter = fp.filter[:,~idx] #todo: check
-                        fp.filter=torch.hstack((fp.filter,candidate))
+                # for i in range(len(fp.filter)):
+                if torch.any( torch.all(candidate>=fp.filter, 0) ):
+                # if (candidate[0]>=fp.filter[0, i] and candidate[1]>=fp.filter[1,i]):
+                    failed=True
+                    break                    
+                else:
+                    idx=torch.all(candidate<=fp.filter,0) #todo: check
+                    fp.filter = fp.filter[:,~idx] #todo: check
+                    fp.filter=torch.hstack((fp.filter,candidate))
                         # if (candidate[0]>fp.filter[0, i] or candidate[1]>fp.filter[1, i]):
                         #     columnidtokeep.push_back(i)
-                    
-                
-                if (failed): continue
-
-                tempm = torch.zeros(2,columnidtokeep.size())
-                for i in range(columnidtokeep.size() ): 
-                    tempm[:, i]= fp.filter[:,i]
-                fp.filter.resize(2, tempm.shape + 1)
-                fp.filter = torch.hstack((tempm, candidate))            
-                break
-            
-        
+                    break
+                  
         if (failed):
-            fp.failed=True
+            fp.failed=failed
             fp.stepsize=0.0
-            print('forward failed')
+            # print('forward failed')
         else:
             fp.cost, fp.costq, fp.logcost = cost, costq, logcost
             fp.x, fp.u, fp.y, fp.s, fp.c, fp.q = xnew, unew, ynew, snew, cnew, qnew 
@@ -475,41 +466,41 @@ class ddpOptimizer:
             fp.stepsize=stepsize
             # fp.step=step
             fp.failed=False
-            print('forward success')
+            # print('forward success')
 
         self.fp = fp
         self.bp = bp
         self.alg = alg
 
     def optimizer(self):
+        time_start = time.time()
         self.fp.initialroll()
         self.alg.mu = self.fp.cost/self.fp.N/self.fp.s[0].shape[0]
         self.fp.resetfilter(self.alg)
         self.bp.resetreg()
-        iter = 0
-        bp_no_upd_count = 0
-        no_upd_count = 0
-        bp_no_upd_count_max = 20
-        opt_no_upd_count = 0
-        opt_no_upd_count_max = 5
 
         for iter in range(self.alg.maxiter):
             while True: 
                 self.backwardpass()
-                print('checkpoint bpreg', self.bp.reg)
+                # print('checkpoint bpreg', self.bp.reg)
                 if ~self.bp.failed: 
-                    break
-                # in case dead loop in bp
-                if (self.bp.reg == 24 and self.bp.failed):
-                    bp_no_upd_count += 1
-                else:
-                    bp_no_upd_count = 0
-                if (bp_no_upd_count > bp_no_upd_count_max):
-                    break      
-
+                    break    
+                
             self.forwardpass()
+            time_used = time.time() - time_start
+            if (iter % 10 == 1):
+                print('\n')
+                print('%-12s','Iteration','Time','mu','Cost','Opt. error','Reg. power','Stepsize')
+                print('\n')
+            # print(f'{iter:12d}{time_used:12.4f}{self.alg.mu:12.4g}
+            #        {self.fp.cost:12.4g}{self.bp.opterr:12.4g}{self.bp.reg:12.4g}{fp.stepsize:12.3f} \n')
+            #             iter, time, alg.mu, fp.cost, bp.opterr, bp.reg, fp.stepsize)
+            # print('{0:12.4f}{1:12.4f}{2:12.4f}{3:12.4f}{4:12.4f}{5:12.4f}{6:12.4f}'.format(
+            #             iter, time_used, self.alg.mu, self.fp.cost, self.bp.opterr, self.bp.reg, self.fp.stepsize))
+            print('%-12d%-12.4g%-12.4g%-12.4g%-12.4g%-12d%-12.3f\n'%(
+                        iter, time_used, self.alg.mu, self.fp.cost, self.bp.opterr, self.bp.reg, self.fp.stepsize))
 
-            #-----------termination conditions---------------
+                    #-----------termination conditions---------------
             if (max(self.bp.opterr, self.alg.mu)<=self.alg.tol):
                 print("~~~Optimality reached~~~")
                 break
@@ -519,16 +510,12 @@ class ddpOptimizer:
                 self.fp.resetfilter(self.alg)
                 self.bp.resetreg()
 
-            if (bp_no_upd_count > bp_no_upd_count_max):
-                rtn = -4.0
-                print("~~~ bp no update, terminate prematurely ~~~")
-                break     
-
         return self.fp.x      # todo: traj to be returned  
 
 
 
 if __name__ == "__main__":
+    torch.manual_seed(0)
     N = 5    # Number of time steps
 
     # Create dynamics sys object
@@ -545,32 +532,34 @@ if __name__ == "__main__":
     n_state = state.size(1)
     n_input = input.size(1) 
 
-    state_all = torch.zeros(N+1, n_state)
-    input_all = torch.zeros(N, n_input)
+    state_all = torch.randn(N+1, 1, n_state)
+    input_all = torch.randn(N,   1, n_input) * 0.1
+    init_traj = {'state': state_all, 
+                 'input': input_all}
     state_all[0] = state
     for i in range(N):
         # print('i', i, state_all[i])
         state_all[i+1], _ = lti(state_all[i], input_all[i])
 
     # Create cost object
-    cx = torch.randn(1, 3)
-    cu = torch.randn(1, 2)
+    cx = torch.zeros(1, 3)
+    cu = torch.zeros(1, 2)
     cxx = torch.eye(3, 3)
     cxx = cxx + cxx.mT
     cxu = torch.zeros(3, 2)
     cux = cxu.mT
     cuu = torch.eye(2, 2)
     cuu = cuu + cuu.mT
-    c = torch.randn(1, 1)
+    c = torch.zeros(1, 1)
     quadcost = pp.module.QuadCost(cx,cu,cxx,cxu,cux,cuu,c)
 
     # Create constraint object
     gx = torch.zeros( 2*n_input, n_state)
     gu = torch.vstack( (torch.eye(n_input, n_input), - torch.eye(n_input, n_input)) )
-    g = torch.hstack( (1. * torch.ones(1, n_input), -1. * torch.ones(1, n_input)) )
-    print('checkpoint', gx.size(), gu.size(), g.size())
+    g = torch.hstack( (-1. * torch.ones(1, n_input), -1. * torch.ones(1, n_input)) )
+    # print('checkpoint', gx.size(), gu.size(), g.size())
     lincon = pp.module.LinCon(gx, gu, g)
-    solver = ddpOptimizer(lti, quadcost, lincon, N) 
+    solver = ddpOptimizer(lti, quadcost, lincon, N, init_traj) 
 
     traj_opt = solver.optimizer()
 
