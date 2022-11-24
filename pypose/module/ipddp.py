@@ -17,15 +17,15 @@ class algParam:
         self.infeas = infeas
 
 class fwdPass:
-    def __init__(self,sys=None, cost=None, cons=None, horizon=1, init_traj=None):
+    def __init__(self,sys=None, stage_cost=None, terminal_cost=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=1, init_traj=None):
         self.f_fn = sys
-        self.p_fn = cost
-        self.q_fn = cost
+        self.p_fn = terminal_cost
+        self.q_fn = stage_cost
         self.c_fn = cons
         self.N = horizon
-        self.n_state = self.f_fn.A.size(-1) # todo
-        self.n_input = self.f_fn.B.size(-1)
-        self.n_cons = self.c_fn.gx.size(0)
+        self.n_state = n_state
+        self.n_input = n_input
+        self.n_cons = n_cons
         # defined in dynamics function
         # self.x = torch.zeros(self.N+1, 1, self.n_state)
         # self.u = torch.zeros(self.N,   1, self.n_input)
@@ -99,8 +99,10 @@ class fwdPass:
         for i in range(self.N):
             self.f_fn.set_refpoint(state=self.x[i], input=self.u[i])
             # print('checkpoint', self.fx.size())
-            self.fx[i] = self.f_fn.A
-            self.fu[i] = self.f_fn.B   
+            print('checkpoint',self.f_fn.B.size())
+            # print('checkpoint',self.f_fn.fxx.size())
+            self.fx[i] = self.f_fn.A.squeeze(0).squeeze(1)
+            self.fu[i] = self.f_fn.B.squeeze(0).squeeze(1)   
             self.fxx[i] = self.f_fn.fxx
             self.fxu[i] = self.f_fn.fxu  
             self.fuu[i] = self.f_fn.fuu  
@@ -131,21 +133,21 @@ class fwdPass:
             print('x, u temp', x_temp, u_temp)
             print(self.computenextx(x_temp, u_temp), self.x[i+1] )
             self.x[i+1] = self.computenextx(x_temp, u_temp)
-        self.cost = self.q.sum() + self.computep(self.x[N])
+        self.cost = self.q.sum() + self.computep(self.x[-1])
         self.costq = self.q.sum()
 
     def resetfilter(self, alg):
         self.logcost = self.cost
         self.err = torch.Tensor([0.0])
         if (alg.infeas):
-            for i in range(N): 
+            for i in range(self.N): 
                 self.logcost -= alg.mu * self.y[i].log().sum()
                 self.err += torch.linalg.vector_norm(self.c[i]+self.y[i], 1)
             if (self.err < alg.tol):
                 self.err = torch.Tensor([0.0])
 
         else:
-            for i in range(N):
+            for i in range(self.N):
                 self.logcost -= alg.mu * (-self.c[i]).log().sum()
                 self.err = torch.Tensor([0.0])
 
@@ -173,13 +175,13 @@ class fwdPass:
 
 
 class bwdPass:
-    def __init__(self, sys=None, cons=None, horizon=1):
+    def __init__(self, sys=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=1):
         self.f_fn = sys
         self.c_fn = cons
         self.N = horizon
-        self.n_state = self.f_fn.A.size(-1) # todo
-        self.n_input = self.f_fn.B.size(-1)
-        self.n_cons = self.c_fn.gx.size(0)
+        self.n_state = n_state
+        self.n_input = n_input
+        self.n_cons = n_cons
 
         self.reg = 0.0
         self.failed = False
@@ -205,10 +207,10 @@ class bwdPass:
         self.recovery = 0
 
 class ddpOptimizer:
-    def __init__(self, sys=None, cost=None, cons=None, horizon=None, init_traj=None):
+    def __init__(self, sys=None, stage_cost=None, terminal_cost=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=None, init_traj=None):
         self.alg = algParam()
-        self.fp = fwdPass(sys=sys, cost=cost, cons=cons, horizon=horizon, init_traj=init_traj)
-        self.bp = bwdPass(sys=sys,            cons=cons, horizon=horizon)
+        self.fp = fwdPass(sys=sys, stage_cost=stage_cost, terminal_cost=terminal_cost, cons=cons, n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon, init_traj=init_traj)
+        self.bp = bwdPass(sys=sys,            cons=cons,n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon)
         self.N = horizon
 
     def backwardpass(self):
@@ -528,7 +530,7 @@ if __name__ == "__main__":
     state = torch.randn(1, 3)
     input = torch.randn(1, 2)
     lti = pp.module.LTI(A, B, C, D, c1, c2)    # Calculate trajectory
- 
+
     n_state = state.size(1)
     n_input = input.size(1) 
 
@@ -551,7 +553,8 @@ if __name__ == "__main__":
     cuu = torch.eye(2, 2)
     cuu = cuu + cuu.mT
     c = torch.zeros(1, 1)
-    quadcost = pp.module.QuadCost(cx,cu,cxx,cxu,cux,cuu,c)
+    stage_cost = pp.module.QuadCost(cx,cu,cxx,cxu,cux,cuu,c)
+    terminal_cost = pp.module.QuadCost(cx,cu,10.*cxx,cxu,cux,cuu,c)
 
     # Create constraint object
     gx = torch.zeros( 2*n_input, n_state)
@@ -559,7 +562,7 @@ if __name__ == "__main__":
     g = torch.hstack( (-1. * torch.ones(1, n_input), -1. * torch.ones(1, n_input)) )
     # print('checkpoint', gx.size(), gu.size(), g.size())
     lincon = pp.module.LinCon(gx, gu, g)
-    solver = ddpOptimizer(lti, quadcost, lincon, N, init_traj) 
+    solver = ddpOptimizer(lti, stage_cost, terminal_cost, lincon,n_state,n_input,2*n_input, N, init_traj) 
 
     traj_opt = solver.optimizer()
 
