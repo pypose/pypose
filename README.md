@@ -32,9 +32,9 @@ Want more features? [Create an issue here](https://github.com/pypose/pypose/issu
 
 ##### PyPose is highly efficient and supports parallel computing for Jacobian of Lie group and Lie algebra. See following comparison.
 
-<img width="700" alt="image" src="https://user-images.githubusercontent.com/8695500/193468407-acbadb86-15d9-45d3-b7ef-864db744df38.png">
+<img width="1167" alt="image" src="https://user-images.githubusercontent.com/8695500/203210668-1a90224a-ae08-4d31-b9d1-e293be75ef3e.png">
 
-Efficiency comparisons of Lie group operations on CPU and GPU (we take Theseus performance as 1×).
+Efficiency and memory comparison of batched Lie group operations (we take Theseus performance as 1×).
 
 More information about efficiency comparison goes to [our paper for PyPose](https://arxiv.org/abs/2209.15428).
 
@@ -150,8 +150,8 @@ If you use PyPose, please cite the paper below. You may also [download it here](
 
 ```bibtex
 @article{wang2022pypose,
-  title   = {{PyPose: A Library for Robot Learning with Physics-based Optimization}},
-  author  = {Chen Wang, Dasong Gao, Kuan Xu, Junyi Geng, Yaoyu Hu, Yuheng Qiu, Bowen Li, Fan Yang, Brady Moon, Abhinav Pandey, Aryan, Jiahe Xu, Tianhao Wu, Haonan He, Daning Huang, Zhongqiang Ren, Shibo Zhao, Taimeng Fu, Pranay Reddy, Xiao Lin, Wenshan Wang, Jingnan Shi, Rajat Talak, Han Wang, Huai Yu, Shanzhao Wang, Ananth Kashyap, Rohan Bandaru, Karthik Dantu, Jiajun Wu, Luca Carlone, Marco Hutter, Sebastian Scherer},
+  title   = {{PyPose}: A Library for Robot Learning with Physics-based Optimization},
+  author  = {Wang, Chen and Gao, Dasong and Xu, Kuan and Geng, Junyi and Hu, Yaoyu and Qiu, Yuheng and Li, Bowen and Yang, Fan and Moon, Brady and Pandey, Abhinav and Aryan and Xu, Jiahe and Wu, Tianhao and He, Haonan and Huang, Daning and Ren, Zhongqiang and Zhao, Shibo and Fu, Taimeng and Reddy, Pranay and Lin, Xiao and Wang, Wenshan and Shi, Jingnan and Talak, Rajat and Cao, Kun and Du, Yi and Wang, Han and Yu, Huai and Wang, Shanzhao and Chen, Siyu and Kashyap, Ananth  and Bandaru, Rohan and Dantu, Karthik and Wu, Jiajun and Xie, Lihua and Carlone, Luca and Hutter, Marco and Scherer, Sebastian},
   journal = {arXiv preprint arXiv:2209.15428},
   year    = {2022}
 }
