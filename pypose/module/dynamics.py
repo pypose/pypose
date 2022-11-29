@@ -284,7 +284,7 @@ class System(nn.Module):
             func = lambda x: self.state_transition(x, self._ref_input)
             jac = jacobian(func, x, create_graph=True)
             return jac
-        return jacobian(jac_func, self._ref_state, **self.jacargs).squeeze()
+        return jacobian(jac_func, self._ref_state, **self.jacargs)
         
     @property
     def fxu(self):
@@ -292,7 +292,7 @@ class System(nn.Module):
             func = lambda x: self.state_transition(x, u)
             jac = jacobian(func, self._ref_state, create_graph=True) # substitute x here
             return jac
-        return jacobian(jac_func, self._ref_input,  **self.jacargs).squeeze()
+        return jacobian(jac_func, self._ref_input,  **self.jacargs)
     
     @property
     def fux(self):
@@ -300,7 +300,7 @@ class System(nn.Module):
             func = lambda u: self.state_transition(x, u)
             jac = jacobian(func, self._ref_input, create_graph=True)
             return jac
-        return jacobian(jac_func, self._ref_state,  **self.jacargs).squeeze()
+        return jacobian(jac_func, self._ref_state,  **self.jacargs)
  
     @property
     def fuu(self):
@@ -308,7 +308,7 @@ class System(nn.Module):
             func = lambda u: self.state_transition(self._ref_state, u)
             jac = jacobian(func, u, create_graph=True)
             return jac
-        return jacobian(jac_func, self._ref_input, **self.jacargs).squeeze()
+        return jacobian(jac_func, self._ref_input, **self.jacargs)
 
 class LTI(System):
     r'''

@@ -15,7 +15,7 @@ class InvPend(System):
     def state_transition(self, state, input, t=None):
         # x, xDot = state
         force = input.squeeze()
-        _dstate = torch.stack((state[0,1], force+torch.sin(state[0,1])))
+        _dstate = torch.stack((state[0,1], force+torch.sin(state[0,0])))
 
         return state + torch.mul(_dstate, self.tau)
 
@@ -28,15 +28,15 @@ if __name__ == "__main__":
     N = 10    # Number of time steps
 
     # Initial state
-    state = torch.tensor([[0.1, 0.1]], dtype=float)
+    state = torch.tensor([[-torch.pi, 0.]], dtype=float)
 
     # Create dynamics solver object
     sys = InvPend(dt)    # Calculate trajectory
     n_state = 2
     n_input = 1 
     # Calculate trajectory
-    state_all = torch.zeros(N+1, 1, n_state)
-    input_all = torch.zeros(N,   1, n_input)
+    state_all =      torch.zeros(N+1, 1, n_state)
+    input_all = 0.02*torch.ones(N,    1, n_input)
     init_traj = {'state': state_all, 
                  'input': input_all}
     state_all[0] = state
@@ -46,19 +46,19 @@ if __name__ == "__main__":
     cx = torch.zeros(1, n_state)
     cu = torch.zeros(1, n_input)
     cxx = torch.eye(n_state, n_state)
-    cxx = 0.5*(cxx + cxx.mT)
+    cxx = 0.5*dt*cxx
     cxu = torch.zeros(n_state, n_input)
     cux = cxu.mT
     cuu = torch.eye(n_input, n_input)
-    cuu = 0.5*(cuu + cuu.mT)
+    cuu = 0.5*dt*cuu
     c = torch.zeros(1, 1)
     stage_cost = pp.module.QuadCost(cx,cu,cxx,cxu,cux,cuu,c)
-    terminal_cost = pp.module.QuadCost(cx,cu,10.*cxx,cxu,cux,cuu,c)
+    terminal_cost = pp.module.QuadCost(cx,cu,10./dt*cxx,cxu,cux,cuu,c)
 
     # Create constraint object
     gx = torch.zeros( 2*n_input, n_state)
     gu = torch.vstack( (torch.eye(n_input, n_input), - torch.eye(n_input, n_input)) )
-    g = torch.hstack( (-1. * torch.ones(1, n_input), -1. * torch.ones(1, n_input)) )
+    g = torch.hstack( (-0.25 * torch.ones(1, n_input), -0.25 * torch.ones(1, n_input)) )
     # print('checkpoint', gx.size(), gu.size(), g.size())
     lincon = pp.module.LinCon(gx, gu, g)
     solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, n_state, n_input, gx.shape[0], N, init_traj) 

@@ -5,3 +5,7 @@ from .cost import Cost
 from .cost import QuadCost
 from .constraint import Constraint
 from .constraint import LinCon
+from .ipddp import algParam
+from .ipddp import fwdPass
+from .ipddp import bwdPass
+from .ipddp import ddpOptimizer

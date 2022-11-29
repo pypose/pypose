@@ -8,9 +8,13 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+import copy
 
 class algParam:
-    def __init__(self, mu=1.0, maxiter=100, tol=1.0e-7, infeas=True):
+    r'''
+    The class of algorithm parameter.
+    '''
+    def __init__(self, mu=1.0, maxiter=10, tol=1.0e-7, infeas=False):
         self.mu = mu  
         self.maxiter = maxiter
         self.tol = torch.tensor(tol)
@@ -98,14 +102,14 @@ class fwdPass:
     def computefrelated(self):
         for i in range(self.N):
             self.f_fn.set_refpoint(state=self.x[i], input=self.u[i])
-            # print('checkpoint', self.fx.size())
-            print('checkpoint',self.f_fn.B.size())
+            # print('checkpoint',self.f_fn.A.size())
+            # print('checkpoint',self.f_fn.B.size())
             # print('checkpoint',self.f_fn.fxx.size())
             self.fx[i] = self.f_fn.A.squeeze(0).squeeze(1)
             self.fu[i] = self.f_fn.B.squeeze(0).squeeze(1)   
-            self.fxx[i] = self.f_fn.fxx
-            self.fxu[i] = self.f_fn.fxu  
-            self.fuu[i] = self.f_fn.fuu  
+            self.fxx[i] = self.f_fn.fxx.squeeze(0).squeeze(1).squeeze(2)
+            self.fxu[i] = self.f_fn.fxu.squeeze(0).squeeze(1).squeeze(2)
+            self.fuu[i] = self.f_fn.fuu.squeeze(0).squeeze(1).squeeze(2)
 
     def computeqrelated(self):
         for i in range(self.N):
@@ -130,8 +134,8 @@ class fwdPass:
             u_temp = self.u[i]
             self.c[i] = self.computec(x_temp, u_temp)
             self.q[i] = self.computeq(x_temp, u_temp)  #  compute cost then used in resetfilter
-            print('x, u temp', x_temp, u_temp)
-            print(self.computenextx(x_temp, u_temp), self.x[i+1] )
+            # print('x, u temp', x_temp, u_temp)
+            # print(self.computenextx(x_temp, u_temp), self.x[i+1] )
             self.x[i+1] = self.computenextx(x_temp, u_temp)
         self.cost = self.q.sum() + self.computep(self.x[-1])
         self.costq = self.q.sum()
@@ -341,8 +345,8 @@ class ddpOptimizer:
                 cuiku = cu[i].matmul(ku)
                 bp.ks[i] = - cinv * (r + s[i] * cuiku)
                 bp.Ks[i] = - SCinv.matmul(cx[i] + cu[i].matmul(Ku)) # (11) checked
-                bp.ky[i] = torch.zeros(c[i].size(), 1)
-                bp.Ky[i] = torch.zeros(c[i].size(), n_state)       
+                bp.ky[i] = torch.zeros(c[i].shape[0], 1)
+                bp.Ky[i] = torch.zeros(c[i].shape[0], self.n_state)       
                 Quu = Quu - cuitSCinvcui # (12e)
                 Qxu = tempQux.mT # Qxu - cx[i].transpose() * SCinvcui; // (12d)
                 Qxx -= cx[i].mT.matmul(SCinvcxi) # (12c)
@@ -382,9 +386,9 @@ class ddpOptimizer:
         alg = self.alg
 
         xold, uold, yold, sold, cold=fp.x, fp.u, fp.y, fp.s, fp.c
-        xnew, unew, ynew, snew, cnew=fp.x, fp.u, fp.y, fp.s, fp.c #todo: copy issue?
-
-        cost, costq, logcost = 0., 0., 0.
+        xnew, unew, ynew, snew, cnew=torch.zeros_like(fp.x), torch.zeros_like(fp.u), torch.zeros_like(fp.y), torch.zeros_like(fp.s), torch.zeros_like(fp.c)
+        # xnew, unew, ynew, snew, cnew=fp.x, fp.u, fp.y, fp.s, fp.c #todo: copy issue?
+        cost, costq, logcost = torch.Tensor([0.]), torch.Tensor([0.]), torch.Tensor([0.])
         qnew = torch.zeros(self.N, 1)
         stepsize = 0.
         err = torch.Tensor([0.])
@@ -428,7 +432,7 @@ class ddpOptimizer:
                     qnew[i] = fp.computeq(xnew[i], unew[i])
                 cost = qnew.sum() + fp.computep(xnew[-1])
                 costq = qnew.sum()
-                logcost = cost  
+                logcost = copy.deepcopy(cost)  
                 err = torch.Tensor([0.])          
                 if (alg.infeas):
                     for i in range(self.N): 
@@ -440,7 +444,7 @@ class ddpOptimizer:
                     for i in range(self.N):
                         cnew[i] = fp.computec(xnew[i], unew[i])
                         logcost -= alg.mu * (-cnew[i]).log().sum()
-                    err=0.0
+                    err=torch.Tensor([0.])
                 
 
                 candidate = torch.vstack((logcost, err))
@@ -448,7 +452,7 @@ class ddpOptimizer:
                 if torch.any( torch.all(candidate>=fp.filter, 0) ):
                 # if (candidate[0]>=fp.filter[0, i] and candidate[1]>=fp.filter[1,i]):
                     failed=True
-                    break                    
+                    continue                    
                 else:
                     idx=torch.all(candidate<=fp.filter,0) #todo: check
                     fp.filter = fp.filter[:,~idx] #todo: check
@@ -477,6 +481,8 @@ class ddpOptimizer:
     def optimizer(self):
         time_start = time.time()
         self.fp.initialroll()
+        # print('checkpoint', self.fp.cost)
+        # print(self.fp.x, self.fp.u)
         self.alg.mu = self.fp.cost/self.fp.N/self.fp.s[0].shape[0]
         self.fp.resetfilter(self.alg)
         self.bp.resetreg()
@@ -492,7 +498,7 @@ class ddpOptimizer:
             time_used = time.time() - time_start
             if (iter % 10 == 1):
                 print('\n')
-                print('%-12s','Iteration','Time','mu','Cost','Opt. error','Reg. power','Stepsize')
+                print('Iteration','Time','mu','Cost','Opt. error','Reg. power','Stepsize')
                 print('\n')
             # print(f'{iter:12d}{time_used:12.4f}{self.alg.mu:12.4g}
             #        {self.fp.cost:12.4g}{self.bp.opterr:12.4g}{self.bp.reg:12.4g}{fp.stepsize:12.3f} \n')
