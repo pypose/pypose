@@ -43,17 +43,12 @@ if __name__ == "__main__":
  
 
     # Create cost object
-    cx = torch.zeros(1, n_state)
-    cu = torch.zeros(1, n_input)
-    cxx = torch.eye(n_state, n_state)
-    cxx = 0.5*dt*cxx
-    cxu = torch.zeros(n_state, n_input)
-    cux = cxu.mT
-    cuu = torch.eye(n_input, n_input)
-    cuu = 0.5*dt*cuu
+    Q = dt*torch.eye(n_state, n_state)
+    R = dt*torch.eye(n_input, n_input)
+    S = torch.zeros(n_state, n_input)
     c = torch.zeros(1, 1)
-    stage_cost = pp.module.QuadCost(cx,cu,cxx,cxu,cux,cuu,c)
-    terminal_cost = pp.module.QuadCost(cx,cu,10./dt*cxx,cxu,cux,cuu,c)
+    stage_cost = pp.module.QuadCost(Q, R, S, c)
+    terminal_cost = pp.module.QuadCost(10./dt*Q, R, S, c)
 
     # Create constraint object
     gx = torch.zeros( 2*n_input, n_state)

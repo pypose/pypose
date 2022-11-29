@@ -14,7 +14,7 @@ class algParam:
     r'''
     The class of algorithm parameter.
     '''
-    def __init__(self, mu=1.0, maxiter=10, tol=1.0e-7, infeas=False):
+    def __init__(self, mu=1.0, maxiter=20, tol=1.0e-7, infeas=False):
         self.mu = mu  
         self.maxiter = maxiter
         self.tol = torch.tensor(tol)
@@ -37,7 +37,7 @@ class fwdPass:
         self.u = init_traj['input']
         self.c = torch.zeros(self.N, self.n_cons, 1)
         self.y = 0.01*torch.ones(self.N, self.n_cons, 1) 
-        self.s = 0.1*torch.zeros(self.N, self.n_cons, 1) 
+        self.s = 0.1*torch.ones(self.N, self.n_cons, 1) 
         self.mu = self.y*self.s
 
         self.p = torch.Tensor([0.0])
@@ -95,8 +95,10 @@ class fwdPass:
 
     def computeprelated(self):
         self.p = self.computep(self.x[-1])
+        self.p_fn.set_refpoint(state=self.x[-1], input=self.u[-1])
         self.px = self.p_fn.cx.mT # use mT here s.t. cx property is consistent with dynamics implementation
-        self.pxx = self.p_fn.cxx
+        # print('checkpoint',self.p_fn.cxx.size())
+        self.pxx = self.p_fn.cxx.squeeze(0).squeeze(1)
         return 
 
     def computefrelated(self):
@@ -115,11 +117,16 @@ class fwdPass:
         for i in range(self.N):
             self.q[i] = self.q_fn(self.x[i], self.u[i])
             self.q_fn.set_refpoint(state=self.x[i], input=self.u[i])
+            # print('checkpoint',self.q_fn.cx.size())
+            # print('checkpoint',self.q_fn.cu.size())
+            # print('checkpoint',self.q_fn.cxx.size())
+            # print('checkpoint',self.q_fn.cxu.size())
+            # print('checkpoint',self.q_fn.cuu.size())
             self.qx[i] = self.q_fn.cx.mT
             self.qu[i] = self.q_fn.cu.mT
-            self.qxx[i] = self.q_fn.cxx
-            self.qxu[i] = self.q_fn.cxu
-            self.quu[i] = self.q_fn.cuu
+            self.qxx[i] = self.q_fn.cxx.squeeze(0).squeeze(1)
+            self.qxu[i] = self.q_fn.cxu.squeeze(0).squeeze(1)
+            self.quu[i] = self.q_fn.cuu.squeeze(0).squeeze(1)
 
     def computecrelated(self):
         for i in range(self.N):
@@ -231,10 +238,11 @@ class ddpOptimizer:
         Qu_err = torch.tensor(0.0)
 
         if (fp.failed or bp.failed):
+            print('fpbp checkpoint', fp.failed, bp.failed)
             bp.reg += 1.0
-        elif (fp.step == 1):
+        elif (fp.step == 0):
             bp.reg -= 1.0
-        elif (fp.step <= 4):
+        elif (fp.step <= 3):
             bp.reg = bp.reg
         else:
             bp.reg += 1.0
@@ -338,7 +346,7 @@ class ddpOptimizer:
                 temp = torch.hstack(( Qu, tempQux))
 
                 # kK = - lltofQuuReg.solve(temp)
-                kK = - torch.linalg.solve(lltofQuuReg, temp)
+                kK = - torch.linalg.solve(Quu_reg - cuitSCinvcui, temp)
 
                 ku = torch.unsqueeze(kK[:,0],-1)
                 Ku = kK[:,1:]
@@ -395,8 +403,9 @@ class ddpOptimizer:
         tau = max(0.99, 1-alg.mu)
         steplist = pow(2.0, torch.linspace(-10, 0, 11).flip(0) )
         failed = False
-
+        step_saved = 0
         for step in range(steplist.shape[0]):
+            step_saved = step
             failed = False
             stepsize = steplist[step]
             xnew[0] = xold[0]
@@ -470,7 +479,7 @@ class ddpOptimizer:
             fp.x, fp.u, fp.y, fp.s, fp.c, fp.q = xnew, unew, ynew, snew, cnew, qnew 
             fp.err=err
             fp.stepsize=stepsize
-            # fp.step=step
+            fp.step=step_saved
             fp.failed=False
             # print('forward success')
 

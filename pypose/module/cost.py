@@ -445,11 +445,12 @@ class QuadCost(Cost):
         # print('checkpoint', state.matmul(self.cxx.mT).size() )
         # print(state.matmul(self.cx.mT).size())
         # exit()
-        return 0.5 *  state.matmul(self.Q).matmul(state.mT) \
-                        + 0.5 * state.matmul(self.S).matmul(input.mT) \
-                        + 0.5 * input.matmul(self.S.mT).matmul(state.mT) \
-                        + input.matmul(self.R).matmul(input.mT) \
-                        + self.c
+        # print(state.size(), self.S.size(), input.size())
+        return (0.5 *  state.matmul(self.Q).matmul(state.mT) \
+                + 0.5 * state.matmul(self.S).matmul(input.mT) \
+                + 0.5 * input.matmul(self.S.mT).matmul(state.mT) \
+                + 0.5 * input.matmul(self.R).matmul(input.mT) \
+                + self.c).squeeze()
 
     @property
     def c(self):
