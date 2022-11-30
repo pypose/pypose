@@ -35,7 +35,6 @@ class fwdPass:
         # self.u = torch.zeros(self.N,   1, self.n_input)
         self.x = init_traj['state']
         self.u = init_traj['input']
-        # print("ckpt%.12f" % self.u[-1,0,0])
         self.c = torch.zeros(self.N, self.n_cons, 1)
         self.y = 0.01*torch.ones(self.N, self.n_cons, 1) 
         self.s = 0.1*torch.ones(self.N, self.n_cons, 1) 
@@ -45,7 +44,6 @@ class fwdPass:
         self.px = torch.zeros(1, self.n_state)
         self.pxx = torch.eye(self.n_state, self.n_state)
 
-        # VecOfMatXd f;     // f
         self.fx = torch.zeros(self.N, self.n_state, self.n_state)
         self.fu = torch.zeros(self.N, self.n_state, self.n_input)
 
@@ -64,15 +62,12 @@ class fwdPass:
         self.cu = torch.zeros(self.N, self.n_cons, self.n_input)
 
         self.filter = torch.Tensor([[torch.inf], [0.]])
-        # self.cost = 0.
-        # self.costq = 0. # defined in resetfilter function
+
         self.err = 0.
         self.logcost = 0.
         self.step = 0
         self.failed = False
         self.stepsize = 1.0
-
-        # Eigen::VectorXd jerkCost;
 
         self.reg_exp_base = 1.6
 
@@ -98,16 +93,12 @@ class fwdPass:
         self.p = self.computep(self.x[-1])
         self.p_fn.set_refpoint(state=self.x[-1], input=self.u[-1])
         self.px = self.p_fn.cx.mT # use mT here s.t. cx property is consistent with dynamics implementation
-        # print('checkpoint',self.p_fn.cxx.size())
         self.pxx = self.p_fn.cxx.squeeze(0).squeeze(1)
         return 
 
     def computefrelated(self):
         for i in range(self.N):
             self.f_fn.set_refpoint(state=self.x[i], input=self.u[i])
-            # print('checkpoint',self.f_fn.A.size())
-            # print('checkpoint',self.f_fn.B.size())
-            # print('checkpoint',self.f_fn.fxx.size())
             self.fx[i] = self.f_fn.A.squeeze(0).squeeze(1)
             self.fu[i] = self.f_fn.B.squeeze(0).squeeze(1)   
             self.fxx[i] = self.f_fn.fxx.squeeze(0).squeeze(1).squeeze(2)
@@ -118,11 +109,6 @@ class fwdPass:
         for i in range(self.N):
             self.q[i] = self.q_fn(self.x[i], self.u[i])
             self.q_fn.set_refpoint(state=self.x[i], input=self.u[i])
-            # print('checkpoint',self.q_fn.cx.size())
-            # print('checkpoint',self.q_fn.cu.size())
-            # print('checkpoint',self.q_fn.cxx.size())
-            # print('checkpoint',self.q_fn.cxu.size())
-            # print('checkpoint',self.q_fn.cuu.size())
             self.qx[i] = self.q_fn.cx.mT
             self.qu[i] = self.q_fn.cu.mT
             self.qxx[i] = self.q_fn.cxx.squeeze(0).squeeze(1)
@@ -142,8 +128,6 @@ class fwdPass:
             u_temp = self.u[i]
             self.c[i] = self.computec(x_temp, u_temp)
             self.q[i] = self.computeq(x_temp, u_temp)  #  compute cost then used in resetfilter
-            # print('x, u temp', x_temp, u_temp)
-            # print(self.computenextx(x_temp, u_temp), self.x[i+1] )
             self.x[i+1] = self.computenextx(x_temp, u_temp)
         self.cost = self.q.sum() + self.computep(self.x[-1])
         self.costq = self.q.sum()
@@ -166,25 +150,6 @@ class fwdPass:
         self.filter = torch.vstack((self.logcost, self.err))
         self.step = 0
         self.failed = False
-
-    # def finalroll(self):
-    #     jerkCost = torch.zeros(1,N)
-    #     for i in range(self.N):
-    #         x_temp = self.x[i]
-    #         u_temp = self.u[i]
-    #         # time2barR((u_temp.tail(1))(0))
-    #         # jerkCost(i) = (u_temp.head(sys_order*dim).transpose() * barR * u_temp.head(sys_order*dim))(0); 
-
-    # get function should be implemented by @property, should take care of deepcopy thing      
-
-    # def removeColumn(self, matrix, colToRemove):
-    #     numRows = matrix.rows()
-    #     numCols = matrix.cols()-1
-    #     if( colToRemove < numCols ):
-    #         matrix.block(0,colToRemove,numRows,numCols-colToRemove) = matrix.block(0,colToRemove+1,numRows,numCols-colToRemove)
-    #     matrix.conservativeResize(numRows,numCols); 
-    #     return matrix    
-
 
 class bwdPass:
     def __init__(self, sys=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=1):
@@ -239,7 +204,6 @@ class ddpOptimizer:
         Qu_err = torch.tensor(0.0)
 
         if (fp.failed or bp.failed):
-            print('fpbp checkpoint', fp.failed, bp.failed)
             bp.reg += 1.0
         elif (fp.step == 0):
             bp.reg -= 1.0
@@ -257,39 +221,29 @@ class ddpOptimizer:
             fp.computeall()
         
         x, u, c, y, s, mu = fp.x, fp.u, fp.c, fp.y, fp.s, fp.mu 
-        # double V = fp.getp();
         Vx, Vxx = fp.px, fp.pxx
         fx,fu,fxx,fxu,fuu = fp.fx, fp.fu, fp.fxx, fp.fxu, fp.fuu
         qx,qu,qxx,qxu,quu = fp.qx, fp.qu, fp.qxx, fp.qxu, fp.quu   
         cx, cu = fp.cx, fp.cu
 
-        # todo: * to @ ?
         for i in range(self.N-1, -1, -1):
-            # print("%.12f" % x[i,0,0])
-            # print("%.12f" % u[i,0,0])
-            # print('checkpoint optimizer', i)
             Qx = qx[i] + cx[i].mT.matmul(s[i]) + fx[i].mT.matmul(Vx)
             Qu = qu[i] + cu[i].mT.matmul(s[i]) + fu[i].mT.matmul(Vx) # (5b)
 
             fxiVxx = fx[i].mT.matmul(Vxx)
-            # print('ckpt', Vx.size(), fxx[i].size(), torch.tensordot(Vx.mT,fxx[i],dims=1).squeeze(0).size())
-            Qxx = qxx[i] + fxiVxx.matmul(fx[i]) + torch.tensordot(Vx.mT,fxx[i],dims=1).squeeze(0)
-            Qxu = qxu[i] + fxiVxx.matmul(fu[i]) + torch.tensordot(Vx.mT,fxu[i],dims=1).squeeze(0)
-            Quu = quu[i] + fu[i].mT.matmul(Vxx).matmul(fu[i]) + torch.tensordot(Vx.mT,fuu[i],dims=1).squeeze(0)  # (5c-5e)
+            Qxx = qxx[i] + fxiVxx.matmul(fx[i])  + torch.tensordot(Vx.mT,fxx[i],dims=1).squeeze(0)
+            Qxu = qxu[i] + fxiVxx.matmul(fu[i])  + torch.tensordot(Vx.mT,fxu[i],dims=1).squeeze(0)
+            Quu = quu[i] + fu[i].mT.matmul(Vxx).matmul(fu[i])  + torch.tensordot(Vx.mT,fuu[i],dims=1).squeeze(0)  # (5c-5e)
             Quu = 0.5 * (Quu + Quu.mT)
-            torch.set_printoptions(precision=12)
-            print(Qxx)
             # todo S = s[i].asDiagonal();
             Quu_reg = Quu + quu[i] * (pow(fp.reg_exp_base, bp.reg) - 1.)
-
-            # Quu_reg = Quu + (pow(fp.reg_exp_base, bp.reg) - 1) * torch.eye(self.n_input, self.n_input)
 
             if (alg.infeas):
                 r = s[i] * y[i] - alg.mu
                 rhat = s[i] * (c[i] + y[i]) - r
                 yinv = 1. / y[i]
                 tempv1 = s[i] * yinv
-                SYinv = torch.diag(tempv1.squeeze())  # y is vector
+                SYinv = torch.diag(tempv1.squeeze())
                 cuitSYinvcui = cu[i].mT.matmul(SYinv).matmul(cu[i])
                 SYinvcxi = SYinv.matmul(cx[i])
 
@@ -297,7 +251,7 @@ class ddpOptimizer:
                     lltofQuuReg = torch.linalg.cholesky(Quu_reg + cuitSYinvcui) # compute the Cholesky decomposition 
                 except: 
                     bp.failed = True
-                    bp.opterr = torch.inf  # todo, assign fp, bp 
+                    bp.opterr = torch.inf 
                     self.fp = fp
                     self.bp = bp
                     self.alg = alg
@@ -308,9 +262,7 @@ class ddpOptimizer:
                 tempQux = Qxu.mT + cu[i].mT.matmul(SYinvcxi)
                 tempm = torch.hstack( (Qu, tempQux) )
 
-                # kK = - lltofQuuReg.solve(tempm)
                 kK = - torch.linalg.solve(Quu_reg + cuitSYinvcui, tempm)
-
                 ku = torch.unsqueeze(kK[:,0],-1)
                 Ku = kK[:,1:]
                 cuiku = cu[i].matmul(ku)
@@ -330,7 +282,7 @@ class ddpOptimizer:
                 r = s[i] *  c[i] + alg.mu
                 cinv = 1. / c[i]
                 tempv1 = s[i] * cinv
-                SCinv = torch.diag(tempv1.squeeze()) #  y is vector
+                SCinv = torch.diag(tempv1.squeeze())
                 SCinvcui = SCinv.matmul(cu[i])
                 SCinvcxi = SCinv.matmul(cx[i])
                 cuitSCinvcui = cu[i].mT.matmul(SCinvcui)
@@ -350,7 +302,6 @@ class ddpOptimizer:
                 tempQux = Qxu.mT - cu[i].mT.matmul(SCinvcxi)
                 temp = torch.hstack(( Qu, tempQux))
 
-                # kK = - lltofQuuReg.solve(temp)
                 kK = - torch.linalg.solve(Quu_reg - cuitSCinvcui, temp)
 
                 ku = torch.unsqueeze(kK[:,0],-1)
@@ -385,7 +336,6 @@ class ddpOptimizer:
                 c_err=torch.maximum(c_err, torch.linalg.vector_norm(c[i]+y[i], float('inf')) )
 
         bp.failed = False
-        # print('backward success')
         bp.opterr = torch.maximum( torch.maximum( Qu_err, c_err), mu_err)
         bp.dV = dV
 
@@ -400,7 +350,6 @@ class ddpOptimizer:
 
         xold, uold, yold, sold, cold=fp.x, fp.u, fp.y, fp.s, fp.c
         xnew, unew, ynew, snew, cnew=torch.zeros_like(fp.x), torch.zeros_like(fp.u), torch.zeros_like(fp.y), torch.zeros_like(fp.s), torch.zeros_like(fp.c)
-        # xnew, unew, ynew, snew, cnew=fp.x, fp.u, fp.y, fp.s, fp.c #todo: copy issue?
         cost, costq, logcost = torch.Tensor([0.]), torch.Tensor([0.]), torch.Tensor([0.])
         qnew = torch.zeros(self.N, 1)
         stepsize = 0.
@@ -427,7 +376,9 @@ class ddpOptimizer:
             else:
                 for i in range(self.N):
                     snew[i] = sold[i] + stepsize*bp.ks[i]+bp.Ks[i].matmul((xnew[i]-xold[i]).mT)
-                    unew[i] = uold[i] + stepsize*bp.ku[i]+bp.Ku[i].matmul((xnew[i]-xold[i]).mT)
+                    # print(snew[i].size(), sold[i].size(), bp.ks[i].size(), bp.Ks[i].size(), xnew[i].size())
+                    # print(unew[i].size(), uold[i].size(), bp.ku[i].size(), bp.Ku[i].size(), xnew[i].size())
+                    unew[i] = uold[i] + (stepsize*bp.ku[i]+bp.Ku[i].matmul((xnew[i]-xold[i]).mT)).mT
                     cnew[i] = fp.computec(xnew[i], unew[i])
 
                     if (    (cnew[i]>(1-tau)*cold[i]).any() or  
@@ -447,7 +398,6 @@ class ddpOptimizer:
                 costq = qnew.sum()
 
                 logcost = copy.deepcopy(cost)  
-                # logcost = torch.Tensor([0.])  
                 err = torch.Tensor([0.])          
                 if (alg.infeas):
                     for i in range(self.N): 
@@ -461,28 +411,23 @@ class ddpOptimizer:
                         logcost -= alg.mu * (-cnew[i]).log().sum()
                     err=torch.Tensor([0.])
                 
-
+                # torch.set_printoptions(precision=15)
+                # print('fpfilter', fp.filter)
                 candidate = torch.vstack((logcost, err))
-                # print('stepsize', stepsize, "%.8f" % cost)
-                # print('stepsize', stepsize, "%.8f" % candidate[0])
-                # print('stepsize', stepsize, "%.8f" % fp.filter[0])
-                # for i in range(len(fp.filter)):
-                if torch.any( torch.all(candidate>=fp.filter, 0) ):
-                # if (candidate[0]>=fp.filter[0, i] and candidate[1]>=fp.filter[1,i]):
+                # if torch.any( torch.all(candidate>=fp.filter, 0) ):
+                if torch.any( torch.all(candidate-torch.Tensor([[1e-13],[0.]])>=fp.filter, 0) ):
+                    # relax a bit for numerical stability, strange
                     failed=True
                     continue                    
                 else:
-                    idx=torch.all(candidate<=fp.filter,0) #todo: check
-                    fp.filter = fp.filter[:,~idx] #todo: check
+                    idx=torch.all(candidate<=fp.filter,0) 
+                    fp.filter = fp.filter[:,~idx]
                     fp.filter=torch.hstack((fp.filter,candidate))
-                        # if (candidate[0]>fp.filter[0, i] or candidate[1]>fp.filter[1, i]):
-                        #     columnidtokeep.push_back(i)
                     break
                   
         if (failed):
             fp.failed=failed
             fp.stepsize=0.0
-            # print('forward failed')
         else:
             fp.cost, fp.costq, fp.logcost = cost, costq, logcost
             fp.x, fp.u, fp.y, fp.s, fp.c, fp.q = xnew, unew, ynew, snew, cnew, qnew 
@@ -490,7 +435,6 @@ class ddpOptimizer:
             fp.stepsize=stepsize
             fp.step=step
             fp.failed=False
-            # print('forward success')
 
         self.fp = fp
         self.bp = bp
@@ -499,8 +443,6 @@ class ddpOptimizer:
     def optimizer(self):
         time_start = time.time()
         self.fp.initialroll()
-        # print('checkpoint', self.fp.cost)
-        # print(self.fp.x, self.fp.u)
         self.alg.mu = self.fp.cost/self.fp.N/self.fp.s[0].shape[0]
         self.fp.resetfilter(self.alg)
         self.bp.resetreg()
@@ -508,7 +450,6 @@ class ddpOptimizer:
         for iter in range(self.alg.maxiter):
             while True: 
                 self.backwardpass()
-                # print('checkpoint bpreg', self.bp.reg)
                 if ~self.bp.failed: 
                     break    
                 
@@ -518,11 +459,6 @@ class ddpOptimizer:
                 print('\n')
                 print('Iteration','Time','mu','Cost','Opt. error','Reg. power','Stepsize')
                 print('\n')
-            # print(f'{iter:12d}{time_used:12.4f}{self.alg.mu:12.4g}
-            #        {self.fp.cost:12.4g}{self.bp.opterr:12.4g}{self.bp.reg:12.4g}{fp.stepsize:12.3f} \n')
-            #             iter, time, alg.mu, fp.cost, bp.opterr, bp.reg, fp.stepsize)
-            # print('{0:12.4f}{1:12.4f}{2:12.4f}{3:12.4f}{4:12.4f}{5:12.4f}{6:12.4f}'.format(
-            #             iter, time_used, self.alg.mu, self.fp.cost, self.bp.opterr, self.bp.reg, self.fp.stepsize))
             print('%-12d%-12.4g%-12.4g%-12.4g%-12.4g%-12d%-12.3f\n'%(
                         iter, time_used, self.alg.mu, self.fp.cost, self.bp.opterr, self.bp.reg, self.fp.stepsize))
 
@@ -536,81 +472,4 @@ class ddpOptimizer:
                 self.fp.resetfilter(self.alg)
                 self.bp.resetreg()
 
-        return self.fp.x      # todo: traj to be returned  
-
-
-
-if __name__ == "__main__":
-    torch.manual_seed(0)
-    N = 5    # Number of time steps
-
-    # Create dynamics sys object
-    A = torch.eye(3, 3)
-    B = torch.randn(3, 2)
-    C = torch.randn(3, 3)
-    D = torch.randn(3, 2)
-    c1 = torch.zeros(1, 3)
-    c2 = torch.randn(1, 3)
-    state = torch.randn(1, 3)
-    input = torch.randn(1, 2)
-    lti = pp.module.LTI(A, B, C, D, c1, c2)    # Calculate trajectory
-
-    n_state = state.size(1)
-    n_input = input.size(1) 
-
-    state_all = torch.randn(N+1, 1, n_state)
-    input_all = torch.randn(N,   1, n_input) * 0.1
-    init_traj = {'state': state_all, 
-                 'input': input_all}
-    state_all[0] = state
-    for i in range(N):
-        # print('i', i, state_all[i])
-        state_all[i+1], _ = lti(state_all[i], input_all[i])
-
-    # Create cost object
-    cx = torch.zeros(1, 3)
-    cu = torch.zeros(1, 2)
-    cxx = torch.eye(3, 3)
-    cxx = cxx + cxx.mT
-    cxu = torch.zeros(3, 2)
-    cux = cxu.mT
-    cuu = torch.eye(2, 2)
-    cuu = cuu + cuu.mT
-    c = torch.zeros(1, 1)
-    stage_cost = pp.module.QuadCost(cx,cu,cxx,cxu,cux,cuu,c)
-    terminal_cost = pp.module.QuadCost(cx,cu,10.*cxx,cxu,cux,cuu,c)
-
-    # Create constraint object
-    gx = torch.zeros( 2*n_input, n_state)
-    gu = torch.vstack( (torch.eye(n_input, n_input), - torch.eye(n_input, n_input)) )
-    g = torch.hstack( (-1. * torch.ones(1, n_input), -1. * torch.ones(1, n_input)) )
-    # print('checkpoint', gx.size(), gu.size(), g.size())
-    lincon = pp.module.LinCon(gx, gu, g)
-    solver = ddpOptimizer(lti, stage_cost, terminal_cost, lincon,n_state,n_input,2*n_input, N, init_traj) 
-
-    traj_opt = solver.optimizer()
-
-
-
-    # # Create time plots to show dynamics
-    # f, ax = plt.subplots(nrows=4, sharex=True)
-    # for _i in range(2):
-    #     ax[_i].plot(time, state_all[:,_i], label='pp')
-    #     ax[_i].set_ylabel(f'State {_i}')
-    # for _i in range(2):
-    #     ax[_i+2].plot(time[:-1], obser_all[:,_i], label='pp')
-    #     ax[_i+2].set_ylabel(f'Observation {_i}')
-    # ax[-1].set_xlabel('time')
-    # ax[-1].legend()
-
-    # # Jacobian computation - Find jacobians at the last step
-    # vars = ['A', 'B', 'C', 'D', 'c1', 'c2']
-    # sys.set_refpoint()
-    # [print(_v, getattr(sys, _v)) for _v in vars]
-
-    # # Jacobian computation - Find jacobians at the 5th step
-    # idx = 5
-    # sys.set_refpoint(state=state_all[idx], input=input[idx], t=time[idx])
-    # [print(_v, getattr(sys, _v)) for _v in vars]
-
-    # plt.show()
+        return self.fp.x 

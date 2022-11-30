@@ -30,7 +30,6 @@ if __name__ == "__main__":
 
     # Initial state
     state = torch.tensor([[-1., 0.]])
-    state = torch.tensor([[-torch.pi, 0.]])
 
     # Create dynamics solver object
     sys = InvPend(dt)    # Calculate trajectory
@@ -41,7 +40,6 @@ if __name__ == "__main__":
     input_all = 0.02*torch.ones(N,    1, n_input)
     init_traj = {'state': state_all, 
                  'input': input_all}
-    # print("ckpt%.12f" % input_all[-1,0,0])
     state_all[0] = state
  
 
@@ -57,7 +55,6 @@ if __name__ == "__main__":
     gx = torch.zeros( 2*n_input, n_state)
     gu = torch.vstack( (torch.eye(n_input, n_input), - torch.eye(n_input, n_input)) )
     g = torch.hstack( (-0.25 * torch.ones(1, n_input), -0.25 * torch.ones(1, n_input)) )
-    # print('checkpoint', gx.size(), gu.size(), g.size())
     lincon = pp.module.LinCon(gx, gu, g)
     solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, n_state, n_input, gx.shape[0], N, init_traj) 
 
