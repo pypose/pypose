@@ -12,3 +12,5 @@ Modules
    module.IMUPreintegrator
    module.Cost
    module.QuadCost
+   module.Constraint
+   module.LinCon
