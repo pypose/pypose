@@ -23,12 +23,14 @@ class InvPend(System):
         return state
 
 if __name__ == "__main__":
+    torch.set_default_dtype(torch.float64)
     # Create parameters for inv pendulum trajectory
     dt = 0.05   # Delta t
     N = 10    # Number of time steps
 
     # Initial state
-    state = torch.tensor([[-torch.pi, 0.]], dtype=float)
+    state = torch.tensor([[-1., 0.]])
+    state = torch.tensor([[-torch.pi, 0.]])
 
     # Create dynamics solver object
     sys = InvPend(dt)    # Calculate trajectory
@@ -39,6 +41,7 @@ if __name__ == "__main__":
     input_all = 0.02*torch.ones(N,    1, n_input)
     init_traj = {'state': state_all, 
                  'input': input_all}
+    # print("ckpt%.12f" % input_all[-1,0,0])
     state_all[0] = state
  
 

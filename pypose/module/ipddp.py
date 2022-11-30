@@ -14,7 +14,7 @@ class algParam:
     r'''
     The class of algorithm parameter.
     '''
-    def __init__(self, mu=1.0, maxiter=20, tol=1.0e-7, infeas=False):
+    def __init__(self, mu=1.0, maxiter=45, tol=1.0e-7, infeas=False):
         self.mu = mu  
         self.maxiter = maxiter
         self.tol = torch.tensor(tol)
@@ -35,6 +35,7 @@ class fwdPass:
         # self.u = torch.zeros(self.N,   1, self.n_input)
         self.x = init_traj['state']
         self.u = init_traj['input']
+        # print("ckpt%.12f" % self.u[-1,0,0])
         self.c = torch.zeros(self.N, self.n_cons, 1)
         self.y = 0.01*torch.ones(self.N, self.n_cons, 1) 
         self.s = 0.1*torch.ones(self.N, self.n_cons, 1) 
@@ -264,16 +265,20 @@ class ddpOptimizer:
 
         # todo: * to @ ?
         for i in range(self.N-1, -1, -1):
+            # print("%.12f" % x[i,0,0])
+            # print("%.12f" % u[i,0,0])
             # print('checkpoint optimizer', i)
             Qx = qx[i] + cx[i].mT.matmul(s[i]) + fx[i].mT.matmul(Vx)
             Qu = qu[i] + cu[i].mT.matmul(s[i]) + fu[i].mT.matmul(Vx) # (5b)
 
             fxiVxx = fx[i].mT.matmul(Vxx)
-            Qxx = qxx[i] + fxiVxx.matmul(fx[i])
-            Qxu = qxu[i] + fxiVxx.matmul(fu[i])
-            Quu = quu[i] + fu[i].mT.matmul(Vxx).matmul(fu[i])  # (5c-5e)
+            # print('ckpt', Vx.size(), fxx[i].size(), torch.tensordot(Vx.mT,fxx[i],dims=1).squeeze(0).size())
+            Qxx = qxx[i] + fxiVxx.matmul(fx[i]) + torch.tensordot(Vx.mT,fxx[i],dims=1).squeeze(0)
+            Qxu = qxu[i] + fxiVxx.matmul(fu[i]) + torch.tensordot(Vx.mT,fxu[i],dims=1).squeeze(0)
+            Quu = quu[i] + fu[i].mT.matmul(Vxx).matmul(fu[i]) + torch.tensordot(Vx.mT,fuu[i],dims=1).squeeze(0)  # (5c-5e)
             Quu = 0.5 * (Quu + Quu.mT)
-
+            torch.set_printoptions(precision=12)
+            print(Qxx)
             # todo S = s[i].asDiagonal();
             Quu_reg = Quu + quu[i] * (pow(fp.reg_exp_base, bp.reg) - 1.)
 
@@ -403,9 +408,7 @@ class ddpOptimizer:
         tau = max(0.99, 1-alg.mu)
         steplist = pow(2.0, torch.linspace(-10, 0, 11).flip(0) )
         failed = False
-        step_saved = 0
         for step in range(steplist.shape[0]):
-            step_saved = step
             failed = False
             stepsize = steplist[step]
             xnew[0] = xold[0]
@@ -427,13 +430,14 @@ class ddpOptimizer:
                     unew[i] = uold[i] + stepsize*bp.ku[i]+bp.Ku[i].matmul((xnew[i]-xold[i]).mT)
                     cnew[i] = fp.computec(xnew[i], unew[i])
 
-
                     if (    (cnew[i]>(1-tau)*cold[i]).any() or  
                             (snew[i]<(1-tau)*sold[i]).any()   ):
                         failed = True
                         break
                     xnew[i+1] = fp.computenextx(xnew[i], unew[i])
-                        
+                
+
+        
             if (failed):
                 continue
             else:
@@ -441,7 +445,9 @@ class ddpOptimizer:
                     qnew[i] = fp.computeq(xnew[i], unew[i])
                 cost = qnew.sum() + fp.computep(xnew[-1])
                 costq = qnew.sum()
+
                 logcost = copy.deepcopy(cost)  
+                # logcost = torch.Tensor([0.])  
                 err = torch.Tensor([0.])          
                 if (alg.infeas):
                     for i in range(self.N): 
@@ -457,6 +463,9 @@ class ddpOptimizer:
                 
 
                 candidate = torch.vstack((logcost, err))
+                # print('stepsize', stepsize, "%.8f" % cost)
+                # print('stepsize', stepsize, "%.8f" % candidate[0])
+                # print('stepsize', stepsize, "%.8f" % fp.filter[0])
                 # for i in range(len(fp.filter)):
                 if torch.any( torch.all(candidate>=fp.filter, 0) ):
                 # if (candidate[0]>=fp.filter[0, i] and candidate[1]>=fp.filter[1,i]):
@@ -479,7 +488,7 @@ class ddpOptimizer:
             fp.x, fp.u, fp.y, fp.s, fp.c, fp.q = xnew, unew, ynew, snew, cnew, qnew 
             fp.err=err
             fp.stepsize=stepsize
-            fp.step=step_saved
+            fp.step=step
             fp.failed=False
             # print('forward success')
 
