@@ -280,6 +280,12 @@ class System(nn.Module):
     # second order derivative
     @property
     def fxx(self):
+        r'''
+        Quadraticized system state tensor.
+
+        .. math::
+            \mathbf{f}_{\mathbf{xx}} = \left. \frac{\partial^{2} \mathbf{f}}{\partial \mathbf{x}^{2}} \right|_{\chi^*}
+        '''
         def jac_func(x): # create a functional here
             func = lambda x: self.state_transition(x, self._ref_input)
             jac = jacobian(func, x, create_graph=True)
@@ -288,6 +294,12 @@ class System(nn.Module):
         
     @property
     def fxu(self):
+        r'''
+        Quadraticized system state-input tensor.
+
+        .. math::
+            \mathbf{f}_{\mathbf{xu}} = \left. \frac{\partial^{2} \mathbf{f}}{\partial \mathbf{x} \partial \mathbf{u}} \right|_{\chi^*}
+        '''
         def jac_func(u):
             func = lambda x: self.state_transition(x, u)
             jac = jacobian(func, self._ref_state, create_graph=True) # substitute x here
@@ -296,6 +308,12 @@ class System(nn.Module):
     
     @property
     def fux(self):
+        r'''
+        Quadraticized system input-state tensor.
+
+        .. math::
+            \mathbf{f}_{\mathbf{ux}} = \left. \frac{\partial^{2} \mathbf{f}}{\partial \mathbf{u} \partial \mathbf{x}} \right|_{\chi^*}
+        '''
         def jac_func(x):
             func = lambda u: self.state_transition(x, u)
             jac = jacobian(func, self._ref_input, create_graph=True)
@@ -304,6 +322,12 @@ class System(nn.Module):
  
     @property
     def fuu(self):
+        r'''
+        Quadraticized system input tensor.
+
+        .. math::
+            \mathbf{f}_{\mathbf{uu}} = \left. \frac{\partial^{2} \mathbf{f}}{\partial \mathbf{u}^{2}} \right|_{\chi^*}
+        '''
         def jac_func(u):
             func = lambda u: self.state_transition(self._ref_state, u)
             jac = jacobian(func, u, create_graph=True)

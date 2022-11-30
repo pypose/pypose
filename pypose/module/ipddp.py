@@ -111,9 +111,9 @@ class fwdPass:
             self.q_fn.set_refpoint(state=self.x[i], input=self.u[i])
             self.qx[i] = self.q_fn.cx.mT
             self.qu[i] = self.q_fn.cu.mT
-            self.qxx[i] = self.q_fn.cxx.squeeze(0).squeeze(1)
-            self.qxu[i] = self.q_fn.cxu.squeeze(0).squeeze(1)
-            self.quu[i] = self.q_fn.cuu.squeeze(0).squeeze(1)
+            self.qxx[i] = self.q_fn.cxx #.squeeze(0).squeeze(1) # squeezed inside cxx definition
+            self.qxu[i] = self.q_fn.cxu #.squeeze(0).squeeze(1)
+            self.quu[i] = self.q_fn.cuu #.squeeze(0).squeeze(1)
 
     def computecrelated(self):
         for i in range(self.N):

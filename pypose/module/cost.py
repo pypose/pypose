@@ -9,15 +9,14 @@ class Cost(nn.Module):
     r'''
     The base class of a cost function.
     
-    todo: change description
     The cost function :math:`\mathrm{cost}` is given by:
 
     .. math::
         \begin{aligned}
-            \mathrm{cost} = \mathrm{func}(\mathbf{x}_k, \mathbf{u}_k)
+            \mathrm{cost} = c(\mathbf{x}_k, \mathbf{u}_k)
         \end{aligned}
 
-    where :math:`k`, :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state(s), input(s), respectively.
+    where :math:`\mathbf{x}_{k}`, :math:`\mathbf{u}_{k}` are the state and input at time instant :math:`k`, respectively.
 
     Note:
         To use the class, users need to inherit this class and define methods
@@ -68,46 +67,24 @@ class Cost(nn.Module):
     def __init__(self):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
-        # self.register_buffer('_t',torch.zeros(1))
-        # self.register_forward_hook(self.forward_hook)
-
-    # def forward_hook(self, module, inputs, outputs):
-    #     r'''
-    #     Automatically advances the time step.
-    #     '''
-    #     self._t.add_(1)
 
     def forward(self, state, input):
         r'''
-        Defines the computation performed at every call that advances the system by one time step.
-
-        Note:
-            The :obj:`forward` method implicitly increments the time step via :obj:`forward_hook`.
-            :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity
-            such as time-varying system. One can directly access the current system time via the
-            property :obj:`systime`.
+        Defines the computation performed at every call.
         '''
         self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
         return self.cost(self.state, self.input)
 
-    def cost(self, state, input, t=None):
+    def cost(self, state, input):
         r'''
         Args:
             state (:obj:`Tensor`): The state of the dynamical system
             input (:obj:`Tensor`): The input to the dynamical system
-            t (:obj:`Tensor`): The time step of the dynamical system.  Default: ``None``.
 
         Returns:
-            Tensor: The state of the system at next time step
-
-        Note:
-            The users need to define this method and can access the current time via the property
-            :obj:`systime`.
+            Tensor: The stage cost of the system
         '''
-        raise NotImplementedError("The users need to define their own state transition method")
-
-    # def reset(self, t=0):
-    #     self._t.fill_(t)
+        raise NotImplementedError("The users need to define their own cost method")
 
     def set_refpoint(self, state=None, input=None):
         r'''
@@ -118,35 +95,25 @@ class Cost(nn.Module):
                 the the most recent state is taken. Default: ``None``.
             input (:obj:`Tensor`): The reference input to the dynamical system. If ``None``,
                 the the most recent input is taken. Default: ``None``.
-            t (:obj:`Tensor`): The reference time step of the dynamical system. If ``None``,
-                the the most recent timestamp is taken. Default: ``None``.
 
         Returns:
             None
 
         Warning:
-            For nonlinear systems, the users have to call this function before getting the
-            linearized system.
+            For nonlinear cost, the users have to call this function before getting the
+            linearized and quadraticized cost.
         '''
         self._ref_state = torch.tensor(self.state) if state is None else torch.atleast_1d(state)
         self._ref_input = torch.tensor(self.input) if input is None else torch.atleast_1d(input)
         self._ref_c = self.cost(self._ref_state, self._ref_input)
-
-    # @property
-    # def systime(self):
-    #     r'''
-    #         System time, automatically advanced by :obj:`forward_hook`.
-    #     '''
-    #     return self._t
 
     @property
     def cx(self):
         r'''
         Quadratic/quadraticized cost linear term on state
         
-        todo: change this
         .. math::
-            \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
+            c_{\mathbf{x}} = \left. \frac{\partial c}{\partial \mathbf{x}} \right|_{\chi^*}
         '''
         func = lambda x: self.cost(x, self._ref_input)
         return jacobian(func, self._ref_state, **self.jacargs)
@@ -156,22 +123,19 @@ class Cost(nn.Module):
         r'''
         Quadratic/quadraticized cost linear term on input
         
-        todo: change this
         .. math::
-            \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
+            c_{\mathbf{u}} = \left. \frac{\partial c}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
         func = lambda x: self.cost(self._ref_state, x)
         return jacobian(func, self._ref_input, **self.jacargs)    
-
 
     @property
     def cxx(self):
         r'''
         Quadratic/quadraticized cost quadratic term on state
         
-        todo: change this
         .. math::
-            \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
+            c_\mathbf{xx} = \left. \frac{\partial^{2} c}{\partial \mathbf{x}^{2}} \right|_{\chi^*}
         '''
         # https://discuss.pytorch.org/t/second-order-derivatives-of-loss-function/71797/4 need _ref to be requires_grad = True?
         # first_derivative = grad(self.cost(self._ref_state, self._ref_input), self._ref_state, create_graph=True)[0]
@@ -190,38 +154,49 @@ class Cost(nn.Module):
         # equivalent simpler form
         func = lambda x: self.cost(x, self._ref_input)
         jac_func = lambda x: jacobian(func, x, create_graph=True) 
-        return jacobian(jac_func, self._ref_state, **self.jacargs)
+        return jacobian(jac_func, self._ref_state, **self.jacargs).squeeze(0).squeeze(1)
 
     @property
     def cxu(self):
+        r'''
+        Quadratic/quadraticized cost quadratic term on state and input
+        
+        .. math::
+            c_\mathbf{xu} = \left. \frac{\partial^{2} c}{\partial \mathbf{x} \partial \mathbf{u}} \right|_{\chi^*}
+        '''
         def jac_func(u):
             func = lambda x: self.cost(x, u)
             jac = jacobian(func, self._ref_state, create_graph=True) # substitute x here
             return jac
-        return jacobian(jac_func, self._ref_input,  **self.jacargs)
+        return jacobian(jac_func, self._ref_input,  **self.jacargs).squeeze(0).squeeze(1)
     
     @property
     def cux(self):
+        r'''
+        Quadratic/quadraticized cost quadratic term on input and state
+        
+        .. math::
+            c_\mathbf{ux} = \left. \frac{\partial^{2} c}{\partial \mathbf{u} \partial \mathbf{x}} \right|_{\chi^*}
+        '''
         def jac_func(x):
             func = lambda u: self.cost(x, u)
             jac = jacobian(func, self._ref_input, create_graph=True)
             return jac
-        return jacobian(jac_func, self._ref_state,  **self.jacargs)
+        return jacobian(jac_func, self._ref_state,  **self.jacargs).squeeze(0).squeeze(1)
  
     @property
     def cuu(self):
         r'''
         Quadratic/quadraticized cost quadratic term on input
         
-        todo: change this
         .. math::
-            \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
+            c_\mathbf{uu} = \left. \frac{\partial^{2} c}{\partial \mathbf{u}^{2}} \right|_{\chi^*}
         '''
         def jac_func(u):
             func = lambda u: self.cost(self._ref_state, u)
             jac = jacobian(func, u, create_graph=True)
             return jac
-        return jacobian(jac_func, self._ref_input, **self.jacargs)
+        return jacobian(jac_func, self._ref_input, **self.jacargs).squeeze(0).squeeze(1)
 
     @property
     def c(self):
@@ -229,134 +204,67 @@ class Cost(nn.Module):
         Constant term generated by cost.
 
         .. math::
-            \mathbf{c}_1 = \mathbf{f}(\mathbf{x}^*, \mathbf{u}^*, t^*)
-                           - \mathbf{A}\mathbf{x}^* - \mathbf{B}\mathbf{u}^*
+            \mathrm{const} = c(\mathbf{x}^*, \mathbf{u}^*)
+                           - c_{\mathbf{x}}\mathbf{x}^* - c_{\mathbf{u}}\mathbf{u}^*
+                           - \frac{1}{2} \mathbf{x}^{*\top}c_{\mathbf{xx}}\mathbf{x}^*
+                           - \frac{1}{2} \mathbf{x}^{*\top}c_{\mathbf{xu}}\mathbf{u}^*
+                           - \frac{1}{2} \mathbf{u}^{*\top}c_{\mathbf{ux}}\mathbf{x}^*
+                           - \frac{1}{2} \mathbf{u}^{*\top}c_{\mathbf{uu}}\mathbf{u}^*
         '''
-        # Potential performance loss here - self.A and self.B involves jacobian eval
+        # Potential performance loss here - involves jacobian eval
         return self._ref_c - self._ref_state.matmul(self.cx.mT) - self._ref_input.matmul(self.cu.mT) \
-                           - self._ref_state.matmul(self.cxx).matmul(self._ref_state.mT) \
+                           - 0.5 * self._ref_state.matmul(self.cxx).matmul(self._ref_state.mT) \
                            - 0.5 * self._ref_state.matmul(self.cxu).matmul(self._ref_input.mT) \
                            - 0.5 * self._ref_input.matmul(self.cux).matmul(self._ref_state.mT) \
-                           - self._ref_input.matmul(self.cuu).matmul(self._ref_input.mT)
+                           - 0.5 * self._ref_input.matmul(self.cuu).matmul(self._ref_input.mT)
 
-
-class QuadCost0(Cost):
+class QuadCost(Cost):
     r'''
     Quadratic cost.
-    todo: bug here. here self.cx is not the initialization of cx, as cxx term will generate cx term when differentiation
-
-    todo: change
-    Args:
-        A (:obj:`Tensor`): The state matrix of LTI system.
-        B (:obj:`Tensor`): The input matrix of LTI system.
-        C (:obj:`Tensor`): The output matrix of LTI system.
-        D (:obj:`Tensor`): The observation matrix of LTI system,
-        c1 (:obj:`Tensor`): The constant input of LTI system,
-        c2 (:obj:`Tensor`): The constant output of LTI system.
-
-    A linear time-invariant lumped system can be described by state-space equation of the form:
-
-    .. math::
-        \begin{align*}
-            \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1 \\
-            \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2 \\
-        \end{align*}
-
-    where :math:`\mathbf{x}` and :math:`\mathbf{u}` are state and input of the current
-    timestamp of LTI system.
 
     Note:
-        The variables including state and input are row vectors, which is the last dimension of
-        a Tensor. :obj:`A`, :obj:`B`, :obj:`C`, :obj:`D`, :obj:`x`, :obj:`u` could be a single
-        matrix or batched matrices. In the batch case, their dimensions must be consistent so that
-        they can be multiplied for each channel.
-
-    Example:
-        >>> A = torch.randn(2, 3, 3)
-        >>> B = torch.randn(2, 3, 2)
-        >>> C = torch.randn(2, 3, 3)
-        >>> D = torch.randn(2, 3, 2)
-        >>> c1 = torch.randn(2, 1, 3)
-        >>> c2 = torch.randn(2, 1, 3)
-        >>> state = torch.randn(2, 1, 3)
-        >>> input = torch.randn(2, 1, 2)
-        >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
-        >>> lti(state, input)
-        tensor([[[-8.5639,  0.0523, -0.2576]],
-                [[ 4.1013, -1.5452, -0.0233]]]), 
-        tensor([[[-3.5780, -2.2970, -2.9314]], 
-                [[-0.4358,  1.7306,  2.7514]]]))
-
-    Note:
-        In this general example, all variables are in a batch. User definable as appropriate.
-
-    Note:
-        More practical examples can be found at `examples/module/dynamics
-        <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
+        More practical examples can be found at `examples/module/cost
+        <https://github.com/pypose/pypose/tree/main/examples/module/cost>`_.
     '''
     
-    def __init__(self, cx, cu, cxx, cxu, cux, cuu, c=None):
+    def __init__(self, Q, R, S, c=None):
         super(QuadCost, self).__init__()
-        assert cxx.ndim in (2, 3), "Invalid cost state Matrices dimensions" # todo ?
-        assert cuu.ndim in (2, 3), "Invalid cost input Matrices dimensions"
-        assert cx.ndim == cu.ndim == cxx.ndim == cxu.ndim == cux.ndim == cuu.ndim, "Invalid System Matrices dimensions"
-        self.cx, self.cu, self.cxx, self.cxu, self.cux, self.cuu = cx, cu, cxx, cxu, cux, cuu
-        self.c = c
-    
+        assert Q.ndim in (2, 3), "Invalid cost state Matrices dimensions"
+        assert R.ndim in (2, 3), "Invalid cost input Matrices dimensions"
+        assert Q.ndim == R.ndim == S.ndim, "Invalid System Matrices dimensions"
+        self.Q, self.R, self.S, self.c = Q, R, S, c
+        self.cxx, self.cuu, self.cxu = Q, R, S
+
     def forward(self, state, input):
         r'''
-        Perform one step advance for the quadratic cost.
+        Perform forward step for the quadratic cost.
 
         '''
-        if self.cx.ndim >= 3:
-            assert self.cx.ndim == state.ndim == input.ndim,  "Invalid System Matrices dimensions"
-
         return super(QuadCost, self).forward(state, input)
 
     def cost(self, state, input):
         r'''
-        Perform one step of LTI state transition.
+        Perform QuadCost computation.
 
         .. math::
-            \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1 \\
+            c = \frac{1}{2}(\mathbf{x}^{\top}\mathbf{Q}\mathbf{x} 
+                +  \mathbf{x}^{\top}\mathbf{S}\mathbf{u} 
+                +  \mathbf{u}^{\top}\mathbf{S}^{\top}\mathbf{x} 
+                +  \mathbf{u}^{\top}\mathbf{R}\mathbf{u}) + \mathrm{const} \\
 
         '''
-        # print('checkpoint', state.matmul(self.cxx.mT).size() )
-        # print(state.matmul(self.cx.mT).size())
-        # exit()
-        return state.matmul(self.cx.mT) + input.matmul(self.cu.mT) \
-                        + state.matmul(self.cxx).matmul(state.mT) \
-                        + 0.5 * state.matmul(self.cxu).matmul(input.mT) \
-                        + 0.5 * input.matmul(self.cux).matmul(state.mT) \
-                        + input.matmul(self.cuu).matmul(input.mT) \
-                        + self.c
+        return (0.5 *  state.matmul(self.Q).matmul(state.mT) \
+                + 0.5 * state.matmul(self.S).matmul(input.mT) \
+                + 0.5 * input.matmul(self.S.mT).matmul(state.mT) \
+                + 0.5 * input.matmul(self.R).matmul(input.mT) \
+                + self.c).squeeze()
 
-    @property
-    def cx(self):
-        r'''
-        System state matrix :obj:`cx`
-        '''
-        return self._cx
-
-    @cx.setter
-    def cx(self, cx):
-        self._cx = cx
-
-    @property
-    def cu(self):
-        r'''
-        System input matrix :obj:`cu`
-        '''
-        return self._cu
-
-    @cu.setter
-    def cu(self, cu):
-        self._cu = cu
+    # cx, cu cannot be defined via setter
 
     @property
     def cxx(self):
         r'''
-        System output matrix :obj:`cxx`
+        quadratic term on state :obj:`cxx`
         '''
         return self._cxx
 
@@ -367,29 +275,26 @@ class QuadCost0(Cost):
     @property
     def cxu(self):
         r'''
-        System observation matrix :obj:`cxu`
+        quadratic cross-term :obj:`cxu`
         '''
         return self._cxu
 
     @cxu.setter
     def cxu(self, cxu):
         self._cxu = cxu
+        self._cux = cxu.mT # set cux simultaneously
 
     @property
     def cux(self):
         r'''
-        System observation matrix :obj:`cux`
+        quadratic cross-term :obj:`cux`
         '''
         return self._cux
-
-    @cux.setter
-    def cux(self, cux):
-        self._cux = cux
 
     @property
     def cuu(self):
         r'''
-        System observation matrix :obj:`cuu`
+        quadratic term on state :obj:`cuu`
         '''
         return self._cuu
 
@@ -400,62 +305,7 @@ class QuadCost0(Cost):
     @property
     def c(self):
         r'''
-        Constant input :obj:`c`
-        '''
-        return self._c
-
-    @c.setter
-    def c(self, c):
-        self._c = c
-
-class QuadCost(Cost):
-    r'''
-    Quadratic cost.
-    Note:
-        More practical examples can be found at `examples/module/dynamics
-        <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
-    '''
-    
-    def __init__(self, Q, R, S, c=None):
-        super(QuadCost, self).__init__()
-        # assert cxx.ndim in (2, 3), "Invalid cost state Matrices dimensions" # todo ?
-        # assert cuu.ndim in (2, 3), "Invalid cost input Matrices dimensions"
-        # assert cx.ndim == cu.ndim == cxx.ndim == cxu.ndim == cux.ndim == cuu.ndim, "Invalid System Matrices dimensions"
-        # self.cx, self.cu, self.cxx, self.cxu, self.cux, self.cuu = cx, cu, cxx, cxu, cux, cuu
-        self.Q = Q
-        self.R = R
-        self.S = S
-        self.c = c
-    
-    def forward(self, state, input):
-        r'''
-        Perform one step advance for the quadratic cost.
-
-        '''
-        return super(QuadCost, self).forward(state, input)
-
-    def cost(self, state, input):
-        r'''
-        Perform one step of LTI state transition.
-
-        .. math::
-            \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1 \\
-
-        '''
-        # print('checkpoint', state.matmul(self.cxx.mT).size() )
-        # print(state.matmul(self.cx.mT).size())
-        # exit()
-        # print(state.size(), self.S.size(), input.size())
-        return (0.5 *  state.matmul(self.Q).matmul(state.mT) \
-                + 0.5 * state.matmul(self.S).matmul(input.mT) \
-                + 0.5 * input.matmul(self.S.mT).matmul(state.mT) \
-                + 0.5 * input.matmul(self.R).matmul(input.mT) \
-                + self.c).squeeze()
-
-    @property
-    def c(self):
-        r'''
-        Constant input :obj:`c`
+        Constant term :obj:`c`
         '''
         return self._c
 
@@ -464,27 +314,14 @@ class QuadCost(Cost):
         self._c = c
 
 if __name__ == "__main__":
-        # cx = torch.randn(2, 1, 3)
-        # cu = torch.randn(2, 1, 2)
-        # cxx = torch.randn(2, 3, 3)
-        # cxu = torch.randn(2, 3, 2)
-        # cux = torch.transpose(cxu, 1,2)
-        # cuu = torch.randn(2, 2, 2)
-        # c = torch.randn(2, 1, 1)
-        # state = torch.randn(2, 1, 3)
-        # input = torch.randn(2, 1, 2)
-        # quadcost = pp.module.QuadCost(cx,cu,cxx,cxu,cux,cuu,c)
-        # print(quadcost(state, input))
-        # print(quadcost.cx)
-
-        Q = torch.eye(3, 3)
-        S = torch.zeros(3, 2)
-        R = torch.eye(2, 2)
-        c = torch.zeros(1, 1)
-        state = torch.randn(1, 3)
-        input = torch.randn(1, 2)
-        quadcost = pp.module.QuadCost(Q, R, S, c)
-        print(state, input)
-        quadcost.set_refpoint(state=state, input=input)
-        print(quadcost.cx.size())
-        print(quadcost.cxx.size())
+    Q = torch.eye(3, 3)
+    S = torch.zeros(3, 2)
+    R = torch.eye(2, 2)
+    c = torch.zeros(1, 1)
+    state = torch.randn(1, 3)
+    input = torch.randn(1, 2)
+    quadcost = pp.module.QuadCost(Q, R, S, c)
+    print(state, input)
+    quadcost.set_refpoint(state=state, input=input)
+    print(quadcost.cx.size())
+    print(quadcost.cxx.size())
