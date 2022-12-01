@@ -26,24 +26,13 @@ class RobustModel(nn.Module):
     Then model regression becomes minimizing the output of the standardized model.
     This class is used during optimization but is not designed to expose to PyPose users.
     '''
-    def __init__(self, model, kernel=None, weight=None, auto=False):
+    def __init__(self, model, kernel=None, auto=False):
         super().__init__()
         self.model = model
         self.kernel = Trivial() if kernel is None else kernel
 
         if auto:
             self.register_forward_hook(self.kernel_forward)
-
-        if weight is not None:
-            # weight = self.validate_weight(weight)
-            self.register_buffer('weight', weight)
-
-    @torch.no_grad()
-    def validate(self, weight):
-        weight, info = cholesky_ex(weight, upper=True)
-        assert not torch.any(torch.isnan(weight)), \
-            'Cholesky decomposition failed. Weight is not positive-definite!'
-        return weight
 
     def forward(self, input, target, weight=None):
         output = self.model_forward(input)
@@ -56,14 +45,6 @@ class RobustModel(nn.Module):
             return self.model(input)
 
     def residual(self, output, target, weight=None):
-        # error = (output if target is None else output - target).unsqueeze(-1)
-        # if weight is not None:
-        #     residual = self.validate(weight) @ error
-        # elif hasattr(self, 'weight'):
-        #     residual = self.weight @ error
-        # else:
-        #     residual = error
-        # return residual.squeeze(-1)
         return (output if target is None else output - target)
 
     def kernel_forward(self, module, input, output):
@@ -188,12 +169,15 @@ class GaussNewton(_Optimizer):
         self.jackwargs = {'vectorize': vectorize, 'flatten': True}
         if kernel is not None and corrector is None:
             # auto diff of robust model will be computed
-            self.model = RobustModel(model, kernel, weight=weight, auto=True)
+            self.model = RobustModel(model, kernel, auto=True)
             self.corrector = Trivial()
         else:
             # manually Jacobian correction will be computed
-            self.model = RobustModel(model, kernel, weight=weight, auto=False)
+            self.model = RobustModel(model, kernel, auto=False)
             self.corrector = Trivial() if corrector is None else corrector
+        self.weight = weight
+        if self.weight is not None:
+            self.register_buffer('weight', weight)
 
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
@@ -251,15 +235,15 @@ class GaussNewton(_Optimizer):
             Early Stopping with error: 5.21540641784668e-07
         '''
         for pg in self.param_groups:
+            weight = self.weight if weight is None else weight
             R = self.model(input, target, weight)
             J = modjac(self.model, input=(input, target, weight), **self.jackwargs)
             R, J = self.corrector(R = R, J = J)
             J = J.reshape(tuple(R.shape)+(-1,))
-            A, b = J.permute([len(J.shape)-1,]+[i for i in range(len(J.shape)-1)]), R
+            A, b = J.permute([len(J.shape)-1,]+list(range(len(J.shape)-1))), R
             if weight is not None:
                 A, b = (weight @ A.unsqueeze(-1)).squeeze(-1), (weight @ b.unsqueeze(-1)).squeeze(-1)
             D = self.solver(A = A.reshape(A.shape[0], -1).T, b = -b.view(-1, 1))
-            # D = self.solver(A = J, b = -R.view(-1, 1)) 
             self.last = self.loss if hasattr(self, 'loss') \
                         else self.model.loss(input, target, weight)
             self.update_parameter(params = pg['params'], step = D)
@@ -382,12 +366,15 @@ class LevenbergMarquardt(_Optimizer):
         self.reject, self.reject_count = reject, 0
         if kernel is not None and corrector is None:
             # auto diff of robust model will be computed
-            self.model = RobustModel(model, kernel, weight, auto=True)
+            self.model = RobustModel(model, kernel, auto=True)
             self.corrector = Trivial()
         else:
             # manually Jacobian correction will be computed
-            self.model = RobustModel(model, kernel, weight, auto=False)
+            self.model = RobustModel(model, kernel, auto=False)
             self.corrector = Trivial() if corrector is None else corrector
+        self.weight = weight
+        if self.weight is not None:
+            self.register_buffer('weight', weight)
 
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
@@ -456,24 +443,23 @@ class LevenbergMarquardt(_Optimizer):
             <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.    
         '''
         for pg in self.param_groups:
+            weight = self.weight if weight is None else weight
             R = self.model(input, target, weight)
             J = modjac(self.model, input=(input, target, weight), **self.jackwargs)
             R, J = self.corrector(R = R, J = J)
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target, weight)
             J_T = J.reshape(tuple(R.shape)+(-1,))
-            J_T = J_T.permute([len(J_T.shape)-1,]+[i for i in range(len(J_T.shape)-1)])
+            J_T = J_T.permute([len(J_T.shape)-1,]+list(range(len(J_T.shape)-1)))
             if weight is not None:
                 J_T = (J_T.unsqueeze(-2) @ weight).squeeze(-2)
             J_T = J_T.reshape(J_T.shape[0], -1)
             A, self.reject_count = J_T @ J, 0
-            # A, self.reject_count = J.T @ J, 0
             A.diagonal().clamp_(pg['min'], pg['max'])
             while self.last <= self.loss:
                 A.diagonal().add_(A.diagonal() * pg['damping'])
                 try:
                     D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
-                    # D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
                 except Exception as e:
                     print(e, "\nLinear solver failed. Breaking optimization step...")
                     break
