@@ -5,6 +5,8 @@ Examples of IMU [preintegrating](./imu_integrator.py) and IMU [correction](./imu
 ## Installation
 
     python -m pip install -U matplotlib
+    pip install opencv-python
+    pip install pykitti
 
 ## Prepare Dataset
 
