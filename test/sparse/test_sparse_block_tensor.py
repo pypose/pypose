@@ -56,7 +56,7 @@ def sort_indices(indices: torch.Tensor):
 
     return torch_lexsort(indices)
 
-class TestSparseBlockTensor(unittest.TestCase):
+class sbTest_SparseBlockTensor(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -138,13 +138,13 @@ class TestSparseBlockTensor(unittest.TestCase):
 
             true_tensor = torch.Tensor([2]).to(device=device)
 
-            assert obj.tensor == true_tensor, f'test_overwrite fails with entry = f{entry}'
+            self.assertEqual( obj.tensor, true_tensor, f'test_overwrite fails with entry = f{entry}' )
 
     def test_torch_sparse_matrix(self):
         print()
         show_delimeter('Test PyTorch sparse matrix. ')
 
-        shape = ( *TestSparseBlockTensor.shape_blocks, *TestSparseBlockTensor.block_shape )
+        shape = ( *sbTest_SparseBlockTensor.shape_blocks, *sbTest_SparseBlockTensor.block_shape )
 
         test_entries = [
             { 'device': 'cpu'  },
@@ -156,8 +156,8 @@ class TestSparseBlockTensor(unittest.TestCase):
 
             device = entry['device']
 
-            indices = TestSparseBlockTensor.block_indices
-            values = TestSparseBlockTensor.values_raw.detach().clone().to(device=device)
+            indices = sbTest_SparseBlockTensor.block_indices
+            values = sbTest_SparseBlockTensor.values_raw.detach().clone().to(device=device)
 
             scoo = torch.sparse_coo_tensor(indices, values, shape).to(device=device)
             values[0, 0, 0] = -1
@@ -165,7 +165,7 @@ class TestSparseBlockTensor(unittest.TestCase):
             # This will make a copy of scoo
             scoo = scoo.coalesce()
 
-            assert scoo.values()[0, 0, 0] == -1, f'test_torch_sparse_matrix failed with entry = {entry}'
+            self.assertEqual(scoo.values()[0, 0, 0], -1, f'test_torch_sparse_matrix failed with entry = {entry}')
 
     def test_creation_empty(self):
         print()
@@ -191,13 +191,13 @@ class TestSparseBlockTensor(unittest.TestCase):
             print(f'sbt.dtype = {sbt.dtype}')
             print(f'sbt.type() = {sbt.type()}')
 
-            assert sbt.rows == 0, f'sbt.rows should be 0'
-            assert sbt.cols == 0, f'sbt.cols should be 0'
-            assert sbt.shape == (0, 0), f'sbt.shape should be (0, 0)'
-            assert sbt.shape_blocks == (0, 0), f'sbt.shape_blocks should be (0, 0)'
-            assert sbt.device == entry['torch_device'], f'sbt.device should be cuda:0'
-            assert sbt.dtype == torch.float32, f'sbt.dtype should be torch.float32'
-            assert sbt.type() == torch.float32, f'sbt.type() should return torch.float32'
+            self.assertEqual(sbt.rows, 0, f'sbt.rows should be 0')
+            self.assertEqual(sbt.cols, 0, f'sbt.cols should be 0')
+            self.assertEqual(sbt.shape, (0, 0), f'sbt.shape should be (0, 0)')
+            self.assertEqual(sbt.shape_blocks, (0, 0), f'sbt.shape_blocks should be (0, 0)')
+            self.assertEqual(sbt.device, entry['torch_device'], f'sbt.device should be cuda:0')
+            self.assertEqual(sbt.dtype, torch.float32, f'sbt.dtype should be torch.float32')
+            self.assertEqual(sbt.type(), torch.float32, f'sbt.type() should return torch.float32')
 
     def test_creation(self):
         print()
@@ -212,10 +212,10 @@ class TestSparseBlockTensor(unittest.TestCase):
             print(f'entry = {entry}')
 
             device = entry['device']
-            values = TestSparseBlockTensor.values_raw.to(device)
+            values = sbTest_SparseBlockTensor.values_raw.to(device)
 
-            sbt = SparseBlockTensor(TestSparseBlockTensor.block_shape, dtype=torch.float32, device=device)
-            sbt.create(shape_blocks=TestSparseBlockTensor.shape_blocks, block_indices=TestSparseBlockTensor.block_indices)
+            sbt = SparseBlockTensor(sbTest_SparseBlockTensor.block_shape, dtype=torch.float32, device=device)
+            sbt.create(shape_blocks=sbTest_SparseBlockTensor.shape_blocks, block_indices=sbTest_SparseBlockTensor.block_indices)
 
             print(f'sbt.rows = {sbt.rows}')
             print(f'sbt.cols = {sbt.cols}')
@@ -225,26 +225,28 @@ class TestSparseBlockTensor(unittest.TestCase):
             print(f'sbt.dtype = {sbt.dtype}')
             print(f'sbt.type() = {sbt.type()}')
 
-            assert sbt.rows == TestSparseBlockTensor.rows, f'sbt.rows should be {TestSparseBlockTensor.rows}'
-            assert sbt.cols == TestSparseBlockTensor.cols, f'sbt.cols should be {TestSparseBlockTensor.cols}'
-            assert sbt.shape == TestSparseBlockTensor.shape, f'sbt.shape should be {TestSparseBlockTensor.shape}'
-            assert sbt.shape_blocks == TestSparseBlockTensor.shape_blocks, f'sbt.shape_blocks should be {TestSparseBlockTensor.shape_blocks}'
-            assert sbt.device == entry['torch_device'], f'sbt.device should be {entry["torch_device"]}'
-            assert sbt.dtype == torch.float32, f'sbt.dtype should be torch.float32'
-            assert sbt.type() == torch.float32, f'sbt.type() should return torch.float32'
+            self.assertEqual(sbt.rows, sbTest_SparseBlockTensor.rows, f'sbt.rows should be {sbTest_SparseBlockTensor.rows}')
+            self.assertEqual(sbt.cols, sbTest_SparseBlockTensor.cols, f'sbt.cols should be {sbTest_SparseBlockTensor.cols}')
+            self.assertEqual(sbt.shape, sbTest_SparseBlockTensor.shape, f'sbt.shape should be {sbTest_SparseBlockTensor.shape}')
+            self.assertEqual(sbt.shape_blocks, sbTest_SparseBlockTensor.shape_blocks, f'sbt.shape_blocks should be {sbTest_SparseBlockTensor.shape_blocks}')
+            self.assertEqual(sbt.device, entry['torch_device'], f'sbt.device should be {entry["torch_device"]}')
+            self.assertEqual(sbt.dtype, torch.float32, f'sbt.dtype should be torch.float32')
+            self.assertEqual(sbt.type(), torch.float32, f'sbt.type() should return torch.float32')
 
             sbt.set_block_storage(values)
-            assert sbt.type() == torch.float32, f'sbt.type() should return torch.float32'
+            self.assertEqual(sbt.type(), torch.float32, f'sbt.type() should return torch.float32')
 
-            assert sbt.rows_of_block(0) == TestSparseBlockTensor.rows_block_0, f'sbt.rows_of_block(0) = {sbt.rows_of_block(0)}, not {TestSparseBlockTensor.rows_block_0}'
-            assert sbt.cols_of_block(0) == TestSparseBlockTensor.cols_block_0, f'sbt.cols_of_block(0) = {sbt.cols_of_block(0)}, not {TestSparseBlockTensor.cols_block_0}'
+            self.assertEqual( sbt.rows_of_block(0), sbTest_SparseBlockTensor.rows_block_0, f'sbt.rows_of_block(0) = {sbt.rows_of_block(0)}, not {sbTest_SparseBlockTensor.rows_block_0}' )
+            self.assertEqual( sbt.cols_of_block(0), sbTest_SparseBlockTensor.cols_block_0, f'sbt.cols_of_block(0) = {sbt.cols_of_block(0)}, not {sbTest_SparseBlockTensor.cols_block_0}' )
 
-            assert sbt.rows_of_block(TestSparseBlockTensor.last_block_row_idx) == \
-                TestSparseBlockTensor.rows_block_last, \
-                f'sbt.rows_of_block({TestSparseBlockTensor.last_block_row_idx}) = {sbt.rows_of_block(TestSparseBlockTensor.last_block_row_idx)}, not {TestSparseBlockTensor.rows_block_last}'
-            assert sbt.cols_of_block(TestSparseBlockTensor.last_block_col_idx) == \
-                TestSparseBlockTensor.cols_block_last, \
-                f'sbt.cols_of_block({TestSparseBlockTensor.last_block_col_idx}) = {sbt.cols_of_block(TestSparseBlockTensor.last_block_col_idx)}, not {TestSparseBlockTensor.cols_block_last}'
+            self.assertEqual( 
+                sbt.rows_of_block(sbTest_SparseBlockTensor.last_block_row_idx), 
+                sbTest_SparseBlockTensor.rows_block_last, 
+                f'sbt.rows_of_block({sbTest_SparseBlockTensor.last_block_row_idx}) = {sbt.rows_of_block(sbTest_SparseBlockTensor.last_block_row_idx)}, not {sbTest_SparseBlockTensor.rows_block_last}' )
+            self.assertEqual( 
+                sbt.cols_of_block(sbTest_SparseBlockTensor.last_block_col_idx), 
+                sbTest_SparseBlockTensor.cols_block_last, 
+                f'sbt.cols_of_block({sbTest_SparseBlockTensor.last_block_col_idx}) = {sbt.cols_of_block(sbTest_SparseBlockTensor.last_block_col_idx)}, not {sbTest_SparseBlockTensor.cols_block_last}' )
 
     def test_to(self):
         print()
@@ -271,10 +273,10 @@ class TestSparseBlockTensor(unittest.TestCase):
             print(f'entry = {entry}')
 
             device = entry['device']
-            values = TestSparseBlockTensor.values_raw.to(device)
+            values = sbTest_SparseBlockTensor.values_raw.to(device)
 
-            sbt = SparseBlockTensor(TestSparseBlockTensor.block_shape, dtype=torch.float32, device=device)
-            sbt.create(shape_blocks=TestSparseBlockTensor.shape_blocks, block_indices=TestSparseBlockTensor.block_indices)
+            sbt = SparseBlockTensor(sbTest_SparseBlockTensor.block_shape, dtype=torch.float32, device=device)
+            sbt.create(shape_blocks=sbTest_SparseBlockTensor.shape_blocks, block_indices=sbTest_SparseBlockTensor.block_indices)
             sbt.set_block_storage(values, clone=False)
 
             if device == 'cpu':
@@ -286,20 +288,21 @@ class TestSparseBlockTensor(unittest.TestCase):
                 print(f'args = {args}')
                 sbt_new = sbt.to( **args )
 
-                assert sbt_new.dtype == args['dtype'], f'sbt_new.dtype should be {args["dtype"]}'
-                assert (id(sbt_new) == id(sbt)) == \
-                    (not flag_copy), \
-                    f'Copy should not happen with args = {args}'
+                self.assertEqual(sbt_new.dtype, args['dtype'], f'sbt_new.dtype should be {args["dtype"]}')
+                self.assertEqual( 
+                    id(sbt_new) == id(sbt),
+                    not flag_copy,
+                    f'Copy should not happen with args = {args}' )
 
     def test_sbt_to_torch_sparse_coo(self):
         print()
         show_delimeter('Test sbt_to_torch_sparse_coo(). ')
 
-        shape = ( *TestSparseBlockTensor.shape_blocks, *TestSparseBlockTensor.block_shape )
+        shape = ( *sbTest_SparseBlockTensor.shape_blocks, *sbTest_SparseBlockTensor.block_shape )
 
         raw_true_scoo = torch.sparse_coo_tensor( 
-           TestSparseBlockTensor.block_indices,
-           TestSparseBlockTensor.values_raw,
+           sbTest_SparseBlockTensor.block_indices,
+           sbTest_SparseBlockTensor.values_raw,
            shape)
 
         test_entries = [
@@ -311,10 +314,10 @@ class TestSparseBlockTensor(unittest.TestCase):
             print(entry)
 
             device = entry['device']
-            values = TestSparseBlockTensor.values_raw.to(device)
+            values = sbTest_SparseBlockTensor.values_raw.to(device)
 
-            sbt = SparseBlockTensor(TestSparseBlockTensor.block_shape, dtype=torch.float32, device=device)
-            sbt.create(shape_blocks=TestSparseBlockTensor.shape_blocks, block_indices=TestSparseBlockTensor.block_indices)
+            sbt = SparseBlockTensor(sbTest_SparseBlockTensor.block_shape, dtype=torch.float32, device=device)
+            sbt.create(shape_blocks=sbTest_SparseBlockTensor.shape_blocks, block_indices=sbTest_SparseBlockTensor.block_indices)
             sbt.set_block_storage(values, clone=False)
 
             scoo = sbt_to_torch_sparse_coo(sbt)
@@ -327,22 +330,22 @@ class TestSparseBlockTensor(unittest.TestCase):
                 torch_equal( scoo.to_dense(), true_scoo.to_dense() )
             except Exception as exc:
                 print(exc)
-                assert False, f'test_sbt_to_torch_sparse_coo failed with entry {entry}'
+                self.assertTrue(False, f'test_sbt_to_torch_sparse_coo failed with entry {entry}')
 
     def test_torch_sparse_coo_to_sbt(self):
         print()
         show_delimeter('torch_sparse_coo_to_sbt. ')
 
-        shape = ( *TestSparseBlockTensor.shape_blocks, *TestSparseBlockTensor.block_shape )
+        shape = ( *sbTest_SparseBlockTensor.shape_blocks, *sbTest_SparseBlockTensor.block_shape )
 
         raw_true_scoo = torch.sparse_coo_tensor( 
-           TestSparseBlockTensor.block_indices,
-           TestSparseBlockTensor.values_raw,
+           sbTest_SparseBlockTensor.block_indices,
+           sbTest_SparseBlockTensor.values_raw,
            shape)
 
-        raw_true_sbt = SparseBlockTensor(TestSparseBlockTensor.block_shape, dtype=torch.float32)
-        raw_true_sbt.create(shape_blocks=TestSparseBlockTensor.shape_blocks, block_indices=TestSparseBlockTensor.block_indices)
-        raw_true_sbt.set_block_storage(TestSparseBlockTensor.values_raw, clone=False)
+        raw_true_sbt = SparseBlockTensor(sbTest_SparseBlockTensor.block_shape, dtype=torch.float32)
+        raw_true_sbt.create(shape_blocks=sbTest_SparseBlockTensor.shape_blocks, block_indices=sbTest_SparseBlockTensor.block_indices)
+        raw_true_sbt.set_block_storage(sbTest_SparseBlockTensor.values_raw, clone=False)
 
         test_entries = [
             { 'device': 'cpu'  },
@@ -367,7 +370,7 @@ class TestSparseBlockTensor(unittest.TestCase):
                 torch_equal( sbt.block_indices[:, :2], true_sbt_indices.permute((1, 0)) )
             except Exception as exc:
                 print(exc)
-                assert False, f'test_torch_sparse_coo_to_sbt failed with entry {entry}'
+                self.assertTrue(False, f'test_torch_sparse_coo_to_sbt failed with entry {entry}')
 
             # rearange block_storage.
             print(inverse_indices)
@@ -377,27 +380,27 @@ class TestSparseBlockTensor(unittest.TestCase):
                 torch_equal( sbt.block_storage, true_block_storage )
             except Exception as exc:
                 print(exc)
-                assert False, f'test_torch_sparse_coo_to_sbt failed with entry {entry}'
+                self.assertTrue(False, f'test_torch_sparse_coo_to_sbt failed with entry {entry}')
 
     def test_add_sbt(self):
         print()
         show_delimeter('test add with another sbt. ')
 
         # The main sbt.
-        raw_main_sbt = SparseBlockTensor(TestSparseBlockTensor.block_shape, dtype=torch.float32)
-        raw_main_sbt.create(shape_blocks=TestSparseBlockTensor.shape_blocks, block_indices=TestSparseBlockTensor.block_indices)
-        raw_main_sbt.set_block_storage(TestSparseBlockTensor.values_raw, clone=False)
+        raw_main_sbt = SparseBlockTensor(sbTest_SparseBlockTensor.block_shape, dtype=torch.float32)
+        raw_main_sbt.create(shape_blocks=sbTest_SparseBlockTensor.shape_blocks, block_indices=sbTest_SparseBlockTensor.block_indices)
+        raw_main_sbt.set_block_storage(sbTest_SparseBlockTensor.values_raw, clone=False)
 
         # The other smb.
-        other_block_storage = torch.rand_like(TestSparseBlockTensor.values_raw)
-        raw_other_sbt = SparseBlockTensor(TestSparseBlockTensor.block_shape, dtype=torch.float32)
-        raw_other_sbt.create(shape_blocks=TestSparseBlockTensor.shape_blocks, block_indices=TestSparseBlockTensor.block_indices)
+        other_block_storage = torch.rand_like(sbTest_SparseBlockTensor.values_raw)
+        raw_other_sbt = SparseBlockTensor(sbTest_SparseBlockTensor.block_shape, dtype=torch.float32)
+        raw_other_sbt.create(shape_blocks=sbTest_SparseBlockTensor.shape_blocks, block_indices=sbTest_SparseBlockTensor.block_indices)
         raw_other_sbt.set_block_storage(other_block_storage, clone=False)
 
         # The result.
         raw_true_result_block_storage = raw_main_sbt.block_storage + raw_other_sbt.block_storage
-        raw_result_sbt = SparseBlockTensor(TestSparseBlockTensor.block_shape, dtype=torch.float32)
-        raw_result_sbt.create(shape_blocks=TestSparseBlockTensor.shape_blocks, block_indices=TestSparseBlockTensor.block_indices)
+        raw_result_sbt = SparseBlockTensor(sbTest_SparseBlockTensor.block_shape, dtype=torch.float32)
+        raw_result_sbt.create(shape_blocks=sbTest_SparseBlockTensor.shape_blocks, block_indices=sbTest_SparseBlockTensor.block_indices)
         raw_result_sbt.set_block_storage(raw_true_result_block_storage, clone=False)
         raw_result_sbt = raw_result_sbt.coalesce()
 
@@ -421,16 +424,16 @@ class TestSparseBlockTensor(unittest.TestCase):
                 torch_equal( result.block_storage, true_result_sbt.block_storage )
             except Exception as exc:
                 print(exc)
-                assert False, f'test_add_sbt failed with entry {entry}'
+                self.assertTrue(False, f'test_add_sbt failed with entry {entry}')
 
     def test_add_sub_scalar(self):
         print()
         show_delimeter('test adding/subtracting a scalar. ')
 
         # The main sbt.
-        raw_sbt = SparseBlockTensor(TestSparseBlockTensor.block_shape, dtype=torch.float32)
-        raw_sbt.create(shape_blocks=TestSparseBlockTensor.shape_blocks, block_indices=TestSparseBlockTensor.block_indices)
-        raw_sbt.set_block_storage(TestSparseBlockTensor.values_raw, clone=False)
+        raw_sbt = SparseBlockTensor(sbTest_SparseBlockTensor.block_shape, dtype=torch.float32)
+        raw_sbt.create(shape_blocks=sbTest_SparseBlockTensor.shape_blocks, block_indices=sbTest_SparseBlockTensor.block_indices)
+        raw_sbt.set_block_storage(sbTest_SparseBlockTensor.values_raw, clone=False)
 
         test_entries = [
             { 'device': 'cpu',  'scalar': 1 },
@@ -456,7 +459,7 @@ class TestSparseBlockTensor(unittest.TestCase):
                 other = scalar
             else:
                 other = scalar.to(device=device)
-            block_storage = TestSparseBlockTensor.values_raw.to(device=device)
+            block_storage = sbTest_SparseBlockTensor.values_raw.to(device=device)
 
             # ========== Addition. ==========
 
@@ -470,7 +473,7 @@ class TestSparseBlockTensor(unittest.TestCase):
                 torch_equal( result.block_storage, true_result_values )
             except Exception as exc:
                 print(exc)
-                assert False, f'test_add_sub_scalar (add left) failed with entry {entry}'
+                self.assertTrue(False, f'test_add_sub_scalar (add left) failed with entry {entry}')
 
             # Perform the addition from right.
             result = other + sbt
@@ -479,7 +482,7 @@ class TestSparseBlockTensor(unittest.TestCase):
                 torch_equal( result.block_storage, true_result_values )
             except Exception as exc:
                 print(exc)
-                assert False, f'test_add_sub_scalar (add right) failed with entry {entry}'
+                self.assertTrue(False, f'test_add_sub_scalar (add right) failed with entry {entry}')
 
             # ========== Substraction. ==========
 
@@ -491,7 +494,7 @@ class TestSparseBlockTensor(unittest.TestCase):
                 torch_equal( result.block_storage, true_result_values )
             except Exception as exc:
                 print(exc)
-                assert False, f'test_add_sub_scalar (sub left) failed with entry {entry}'
+                self.assertTrue(False, f'test_add_sub_scalar (sub left) failed with entry {entry}')
 
             # Perform the subtraction from right.
             true_result_values = other - block_storage
@@ -501,16 +504,16 @@ class TestSparseBlockTensor(unittest.TestCase):
                 torch_equal( result.block_storage, true_result_values )
             except Exception as exc:
                 print(exc)
-                assert False, f'test_add_sub_scalar (sub right) failed with entry {entry}'
+                self.assertTrue(False, f'test_add_sub_scalar (sub right) failed with entry {entry}')
 
     def test_add_scalar_inplace(self):
         print()
         show_delimeter('test inplace-adding a scalar. ')
 
         # The main sbt.
-        raw_sbt = SparseBlockTensor(TestSparseBlockTensor.block_shape, dtype=torch.float32)
-        raw_sbt.create(shape_blocks=TestSparseBlockTensor.shape_blocks, block_indices=TestSparseBlockTensor.block_indices)
-        raw_sbt.set_block_storage(TestSparseBlockTensor.values_raw, clone=False)
+        raw_sbt = SparseBlockTensor(sbTest_SparseBlockTensor.block_shape, dtype=torch.float32)
+        raw_sbt.create(shape_blocks=sbTest_SparseBlockTensor.shape_blocks, block_indices=sbTest_SparseBlockTensor.block_indices)
+        raw_sbt.set_block_storage(sbTest_SparseBlockTensor.values_raw, clone=False)
 
         test_entries = [
             { 'device': 'cpu',  'scalar': 1 },
@@ -536,7 +539,7 @@ class TestSparseBlockTensor(unittest.TestCase):
                 other = scalar
             else:
                 other = scalar.to(device=device)
-            block_storage = TestSparseBlockTensor.values_raw.to(device=device)
+            block_storage = sbTest_SparseBlockTensor.values_raw.to(device=device)
 
             # The result values.
             true_result_values = block_storage + other
@@ -548,17 +551,17 @@ class TestSparseBlockTensor(unittest.TestCase):
                 torch_equal( sbt.block_storage, true_result_values )
             except Exception as exc:
                 print(exc)
-                assert False, f'test_add_scalar_inplace failed with entry {entry}'
+                self.assertTrue(False, f'test_add_scalar_inplace failed with entry {entry}')
 
     def test_sbt_2_bsr_cpu(self):
         print()
         show_delimeter('Test sbt to bsr conversion. ')
 
         raw_true_bsr = bsr_matrix(
-            ( TestSparseBlockTensor.bsr_data, 
-              TestSparseBlockTensor.bsr_indices,
-              TestSparseBlockTensor.bsr_indptr ),
-            shape=TestSparseBlockTensor.shape ).toarray()
+            ( sbTest_SparseBlockTensor.bsr_data, 
+              sbTest_SparseBlockTensor.bsr_indices,
+              sbTest_SparseBlockTensor.bsr_indptr ),
+            shape=sbTest_SparseBlockTensor.shape ).toarray()
 
         test_entries = [
             { 'device': 'cpu'  },
@@ -569,16 +572,16 @@ class TestSparseBlockTensor(unittest.TestCase):
             print(entry)
 
             device = entry['device']
-            values = TestSparseBlockTensor.values_raw.to(device)
+            values = sbTest_SparseBlockTensor.values_raw.to(device)
 
-            sbt = SparseBlockTensor(TestSparseBlockTensor.block_shape, dtype=torch.float32, device=device)
-            sbt.create(shape_blocks=TestSparseBlockTensor.shape_blocks, block_indices=TestSparseBlockTensor.block_indices)
+            sbt = SparseBlockTensor(sbTest_SparseBlockTensor.block_shape, dtype=torch.float32, device=device)
+            sbt.create(shape_blocks=sbTest_SparseBlockTensor.shape_blocks, block_indices=sbTest_SparseBlockTensor.block_indices)
             sbt.set_block_storage(values, clone=False)
 
             bsr = sbt_to_bsr_cpu(sbt)
             bsr = bsr.toarray()
 
-            assert np.allclose( bsr, raw_true_bsr ), f'test_sbt_2_bsr_cpu failed with entry {entry}'
+            self.assertTrue( np.allclose( bsr, raw_true_bsr ), f'test_sbt_2_bsr_cpu failed with entry {entry}' )
 
     def test_bsr_cpu_2_sbt(self):
         print()
@@ -586,33 +589,33 @@ class TestSparseBlockTensor(unittest.TestCase):
 
         # Create the BSR matrix.
         bsr = bsr_matrix( 
-            ( TestSparseBlockTensor.bsr_data, 
-              TestSparseBlockTensor.bsr_indices, 
-              TestSparseBlockTensor.bsr_indptr ), 
-            shape=TestSparseBlockTensor.shape )
+            ( sbTest_SparseBlockTensor.bsr_data, 
+              sbTest_SparseBlockTensor.bsr_indices, 
+              sbTest_SparseBlockTensor.bsr_indptr ), 
+            shape=sbTest_SparseBlockTensor.shape )
         
         # Convert BSR to SBM.
         sbt = bsr_cpu_to_sbt(bsr)
 
         # Check equality.
         dense_sbt = sbt_to_torch_sparse_coo(sbt).to_dense().permute((0,2,1,3)).numpy().reshape(
-            ( TestSparseBlockTensor.shape_blocks[0]*TestSparseBlockTensor.block_shape[0], 
-              TestSparseBlockTensor.shape_blocks[1]*TestSparseBlockTensor.block_shape[1] ) )
+            ( sbTest_SparseBlockTensor.shape_blocks[0]*sbTest_SparseBlockTensor.block_shape[0], 
+              sbTest_SparseBlockTensor.shape_blocks[1]*sbTest_SparseBlockTensor.block_shape[1] ) )
         dense_bsr = bsr.toarray()
 
         print(f'dense_sbt = \n{dense_sbt}')
         print(f'dense_bsr = \n{dense_bsr}')
 
-        assert np.allclose( dense_sbt, dense_bsr ), f'test_bsr_cpu_2_sbt failed'
+        self.assertTrue( np.allclose( dense_sbt, dense_bsr ), f'test_bsr_cpu_2_sbt failed' )
 
     def test_matmul(self):
         print()
         show_delimeter('Test matmul. ')
 
         # The Sparse Block Matrix.
-        raw_sbt = SparseBlockTensor(TestSparseBlockTensor.block_shape, dtype=torch.float32)
-        raw_sbt.create(shape_blocks=TestSparseBlockTensor.shape_blocks, block_indices=TestSparseBlockTensor.block_indices)
-        raw_sbt.set_block_storage(TestSparseBlockTensor.values_raw, clone=False)
+        raw_sbt = SparseBlockTensor(sbTest_SparseBlockTensor.block_shape, dtype=torch.float32)
+        raw_sbt.create(shape_blocks=sbTest_SparseBlockTensor.shape_blocks, block_indices=sbTest_SparseBlockTensor.block_indices)
+        raw_sbt.set_block_storage(sbTest_SparseBlockTensor.values_raw, clone=False)
 
         raw_sbt = raw_sbt.coalesce()
 
@@ -643,21 +646,21 @@ class TestSparseBlockTensor(unittest.TestCase):
             # a.T @ a.
             res_at_a = sbt.transpose().coalesce() @ sbt
             res_at_a_cpu = sbt_to_bsr_cpu(res_at_a).toarray()
-            assert np.allclose( res_at_a_cpu, true_res_at_a )
+            self.assertTrue( np.allclose( res_at_a_cpu, true_res_at_a ) )
 
             # a @ a.T.
             res_a_at = sbt @ sbt.transpose().coalesce()
             res_a_at_cpu = sbt_to_bsr_cpu(res_a_at).toarray()
-            assert np.allclose( res_a_at_cpu, true_res_a_at )
+            self.assertTrue( np.allclose( res_a_at_cpu, true_res_a_at ) )
 
     def test_multiply_scalar(self):
         print()
         show_delimeter('test multiplying a scalar. ')
 
         # The main sbt.
-        raw_sbt = SparseBlockTensor(TestSparseBlockTensor.block_shape, dtype=torch.float32)
-        raw_sbt.create(shape_blocks=TestSparseBlockTensor.shape_blocks, block_indices=TestSparseBlockTensor.block_indices)
-        raw_sbt.set_block_storage(TestSparseBlockTensor.values_raw, clone=False)
+        raw_sbt = SparseBlockTensor(sbTest_SparseBlockTensor.block_shape, dtype=torch.float32)
+        raw_sbt.create(shape_blocks=sbTest_SparseBlockTensor.shape_blocks, block_indices=sbTest_SparseBlockTensor.block_indices)
+        raw_sbt.set_block_storage(sbTest_SparseBlockTensor.values_raw, clone=False)
 
         test_entries = [
             { 'device': 'cpu',  'scalar': 2 },
@@ -683,7 +686,7 @@ class TestSparseBlockTensor(unittest.TestCase):
                 other = scalar
             else:
                 other = scalar.to(device=device)
-            block_storage = TestSparseBlockTensor.values_raw.to(device=device)
+            block_storage = sbTest_SparseBlockTensor.values_raw.to(device=device)
 
             # The result values.
             true_result_values = block_storage * other
@@ -695,7 +698,7 @@ class TestSparseBlockTensor(unittest.TestCase):
                 torch_equal( result.block_storage, true_result_values )
             except Exception as exc:
                 print(exc)
-                assert False, f'test_multiply_scalar (left) failed with entry {entry}'
+                self.assertTrue(False, f'test_multiply_scalar (left) failed with entry {entry}')
 
             # Perform the multiplication from right.
             result = other * sbt
@@ -704,16 +707,16 @@ class TestSparseBlockTensor(unittest.TestCase):
                 torch_equal( result.block_storage, true_result_values )
             except Exception as exc:
                 print(exc)
-                assert False, f'test_multiply_scalar (right) failed with entry {entry}'
+                self.assertTrue(False, f'test_multiply_scalar (right) failed with entry {entry}')
 
     def test_multiply_scalar_inplace(self):
         print()
         show_delimeter('test inplace multiplying a scalar. ')
 
         # The main sbt.
-        raw_sbt = SparseBlockTensor(TestSparseBlockTensor.block_shape, dtype=torch.float32)
-        raw_sbt.create(shape_blocks=TestSparseBlockTensor.shape_blocks, block_indices=TestSparseBlockTensor.block_indices)
-        raw_sbt.set_block_storage(TestSparseBlockTensor.values_raw, clone=False)
+        raw_sbt = SparseBlockTensor(sbTest_SparseBlockTensor.block_shape, dtype=torch.float32)
+        raw_sbt.create(shape_blocks=sbTest_SparseBlockTensor.shape_blocks, block_indices=sbTest_SparseBlockTensor.block_indices)
+        raw_sbt.set_block_storage(sbTest_SparseBlockTensor.values_raw, clone=False)
 
         test_entries = [
             { 'device': 'cpu',  'scalar': 2 },
@@ -739,7 +742,7 @@ class TestSparseBlockTensor(unittest.TestCase):
                 other = scalar
             else:
                 other = scalar.to(device=device)
-            block_storage = TestSparseBlockTensor.values_raw.to(device=device)
+            block_storage = sbTest_SparseBlockTensor.values_raw.to(device=device)
 
             # The result values.
             true_result_values = block_storage * other
@@ -751,7 +754,7 @@ class TestSparseBlockTensor(unittest.TestCase):
                 torch_equal( sbt.block_storage, true_result_values )
             except Exception as exc:
                 print(exc)
-                assert False, f'test_inplace_multiply_scalar failed with entry {entry}'
+                self.assertTrue(False, f'test_inplace_multiply_scalar failed with entry {entry}')
 
 if __name__ == '__main__':
     import os

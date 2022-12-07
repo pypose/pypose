@@ -112,7 +112,7 @@ class Test_cu_SparseBlockTensor(unittest.TestCase):
         np_bsm = bsr.toarray()
 
         # Compare.
-        assert np.allclose( np_cu, np_bsm ), f'test_sbt_to_cupy failed. '
+        self.assertTrue( np.allclose( np_cu, np_bsm ), f'test_sbt_to_cupy failed. ' )
 
     def test_sbt_to_cupy_duplicate_block_index(self):
         print()
@@ -144,7 +144,7 @@ class Test_cu_SparseBlockTensor(unittest.TestCase):
         np_bsm = bsr.toarray()
 
         # Compare.
-        assert np.allclose( np_cu, np_bsm ), f'test_sbt_to_cupy_duplicate_block_index failed. '
+        self.assertTrue( np.allclose( np_cu, np_bsm ), f'test_sbt_to_cupy_duplicate_block_index failed. ' )
 
 if __name__ == '__main__':
     import os
