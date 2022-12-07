@@ -129,8 +129,16 @@ dmypy.json
 .pyre/
 .vscode
 
+# Visual Studio Code.
+*.code-workspace
+
 # sphinx
 docs/source/generated
 
 # Operating system
 .DS_Store
+examples/imu/2011*
+examples/imu/save
+
+# Temporary for removing folders.
+test/unit_tests/

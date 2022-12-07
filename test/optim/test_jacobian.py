@@ -70,8 +70,30 @@ class TestJacobian:
         J = pp.optim.functional.modjac(model, input=None, flatten=True)
         self.verify_jacobian(J)
 
+    def test_batched_jacobian(self):
+        class PoseTransform(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.p0 = pp.Parameter(pp.randn_so3(2))
+                self.p1 = pp.Parameter(pp.randn_so3())
+
+            def forward(self, x):
+                return ( self.p0 + self.p1).Exp() * x
+
+        print()
+        model, input = PoseTransform(), pp.randn_SO3()
+
+        print(f'model.p0.numel(): {model.p0.numel()}')
+        print(f'model.p1.numel(): {model.p1.numel()}')
+
+        output = model(input)
+
+        J = pp.optim.functional.modjac( model, input, flatten=True )
+        print(f'J.shape = {J.shape}')
+        print(f'J = \n{J}')
 
 if __name__ == '__main__':
     test = TestJacobian()
-    test.test_torch_jacobian()
-    test.test_pypose_jacobian()
+    # test.test_torch_jacobian()
+    # test.test_pypose_jacobian()
+    test.test_batched_jacobian()
