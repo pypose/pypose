@@ -10,6 +10,7 @@ Basics
     :template: autosummary/class.rst
     add
     add_
+    mul
     Exp
     Log
     Inv
@@ -23,6 +24,10 @@ Basics
     randn_SO3
     randn_se3
     randn_SE3
+    randn_sim3
+    randn_Sim3
+    randn_rxso3
+    randn_RxSO3
     randn_like
     identity_so3
     identity_SO3
