@@ -67,42 +67,43 @@ class System(nn.Module):
 
     Example:
 
-        A simple linear time-varying system.  Here we just show an example for advancing one
+        A simple linear time-varying system.  Here we show an example for advancing one
         time step of the system at a given time step and computing the linearization.
-        For generating one trajecotry given a series of inputs and advanced use of linearization,
-        see the `examples` folder.
 
-        >>> import math
+        >>> import math, torch
         >>> import pypose as pp
-        >>> import torch
+        ... 
         >>> class Floquet(pp.module.System):
         ...     def __init__(self):
-        ...         super(Floquet, self).__init__()
-        ...
+        ...         super().__init__()
+        ... 
         ...     def state_transition(self, state, input, t):
-        ...         cc = torch.cos(2 * math.pi * t / 100)
-        ...         ss = torch.sin(2 * math.pi * t / 100)
+        ... 
+        ...         cc = (2 * math.pi * t / 100).cos()
+        ...         ss = (2 * math.pi * t / 100).sin()
+        ... 
         ...         A = torch.tensor([[   1., cc/10],
         ...                           [cc/10,    1.]])
         ...         B = torch.tensor([[ss],
         ...                           [1.]])
-        ...         return state.matmul(A) + B.matmul(input)
-        ...
+        ... 
+        ...         return A @ state + B @ input
+        ... 
         ...     def observation(self, state, input, t):
         ...         return state + t
         ...
-        >>> solver = Floquet()
-        >>> time_curr = 8 # We start from t = 8, and advance one step to t = 9
-        >>> input = torch.sin(2 * math.pi * torch.tensor(time_curr) / 50)
-        >>> state_curr = torch.tensor([1., 1.])
-        >>> solver.reset(t = time_curr)
-        >>> state_next, obser_curr = solver(state_curr, input)
+        >>> # Start from t = 8, and advance one step to t = 9.
+        >>> step, current = 8, torch.tensor([1., 1.])
+        >>> input = torch.tensor(2 * math.pi / 50 * step).sin()
         ... 
-        >>> solver.set_refpoint()
-        >>> print(state_next)
-        >>> print(obser_curr)
-        >>> print(solver.A)
-        >>> print(solver.B)
+        >>> system = Floquet().reset(t = step)
+        >>> next, observation = system(current, input)
+        >>> system.set_refpoint()
+        ... 
+        >>> print(next)        # Next state
+        >>> print(observation) # Observation
+        >>> print(system.A)    # Linearized state matrix
+        >>> print(system.B)    # Linearized input matrix
         tensor([1.4944, 1.9320])
         tensor([9., 9.])
         tensor([[1.0000, 0.0844],
@@ -111,7 +112,8 @@ class System(nn.Module):
                 [1.0000]])
 
     Note:
-        More practical examples can be found at `examples/module/dynamics
+        For generating one trajecotry given a series of inputs, advanced use of
+        linearization, and more practical examples can be found at `examples/module/dynamics
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
     '''
 
@@ -175,6 +177,7 @@ class System(nn.Module):
 
     def reset(self, t=0):
         self._t.fill_(t)
+        return self
 
     def set_refpoint(self, state=None, input=None, t=None):
         r'''
@@ -200,6 +203,7 @@ class System(nn.Module):
         self._ref_t = self.systime if t is None else t
         self._ref_f = self.state_transition(self._ref_state, self._ref_input, self._ref_t)
         self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
+        return self
 
     @property
     def systime(self):
@@ -341,7 +345,6 @@ class LTI(System):
     def forward(self, state, input):
         r'''
         Perform one step advance for the LTI system.
-
         '''
         if self.A.ndim >= 3:
             assert self.A.ndim == state.ndim == input.ndim,  "Invalid System Matrices dimensions"
