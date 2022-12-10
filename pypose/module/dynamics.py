@@ -312,15 +312,21 @@ class LTI(System):
         they can be multiplied for each channel.
 
     Example:
-        >>> A = torch.randn(2, 3, 3)
-        >>> B = torch.randn(2, 3, 2)
-        >>> C = torch.randn(2, 3, 3)
-        >>> D = torch.randn(2, 3, 2)
-        >>> c1 = torch.randn(2, 1, 3)
-        >>> c2 = torch.randn(2, 1, 3)
-        >>> state = torch.randn(2, 1, 3)
-        >>> input = torch.randn(2, 1, 2)
-        >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
+        >>> # Batch, State, Input, Observe Dimension
+        >>> Bd, Sd, Id, Od = 2, 3, 2, 2
+        >>> # Linear System Matrices
+        >>> device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        >>> A = torch.randn(Bd, Sd, Sd)
+        >>> B = torch.randn(Bd, Sd, Id)
+        >>> C = torch.randn(Bd, Od, Sd)
+        >>> D = torch.randn(Bd, Od, Id)
+        >>> c1 = torch.randn(Bd, Sd)
+        >>> c2 = torch.randn(Bd, Od)
+        ...
+        >>> lti = pp.module.LTI(A, B, C, D, c1, c2).to(device)
+        ...
+        >>> state = torch.randn(Bd, Sd, device=device)
+        >>> input = torch.randn(Bd, Id, device=device)
         >>> lti(state, input)
         tensor([[[-8.5639,  0.0523, -0.2576]],
                 [[ 4.1013, -1.5452, -0.0233]]]), 
@@ -336,39 +342,39 @@ class LTI(System):
     '''
     
     def __init__(self, A, B, C, D, c1=None, c2=None):
-        super(LTI, self).__init__()
-        assert A.ndim in (2, 3), "Invalid System Matrices dimensions"
+        super().__init__()
+        assert A.ndim >= 2, "Matrices dimensions has to be no smaller than 2"
         assert A.ndim == B.ndim == C.ndim == D.ndim, "Invalid System Matrices dimensions"
-        self.A, self.B, self.C, self.D = A, B, C, D
-        self.c1, self.c2 = c1, c2
-    
+        self.register_buffer('A', A)
+        self.register_buffer('B', B)
+        self.register_buffer('C', C)
+        self.register_buffer('D', D)
+        self.register_buffer('c1', c1)
+        self.register_buffer('c2', c2)
+
     def forward(self, state, input):
         r'''
         Perform one step advance for the LTI system.
         '''
-        if self.A.ndim >= 3:
-            assert self.A.ndim == state.ndim == input.ndim,  "Invalid System Matrices dimensions"
-
-        return super(LTI, self).forward(state, input)
+        return super().forward(state, input)
 
     def state_transition(self, state, input, t=None):
         r'''
         Perform one step of LTI state transition.
 
         .. math::
-            \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1 \\
-
+            \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1
         '''
-        return state.matmul(self.A.mT) + input.matmul(self.B.mT) + self.c1
+        return pp.bmv(self.A, state) + pp.bmv(self.B, input) + self.c1
 
     def observation(self, state, input, t=None):
         r'''
         Return the observation of LTI system at current time step.
 
         .. math::
-            \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2 \\
+            \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2
         '''
-        return state.matmul(self.C.mT) + input.matmul(self.D.mT) + self.c2
+        return pp.bmv(self.C, state) + pp.bmv(self.D, input) + self.c2
 
     @property
     def A(self):
