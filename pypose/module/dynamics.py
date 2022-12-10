@@ -198,8 +198,8 @@ class System(nn.Module):
             For nonlinear systems, the users have to call this function before getting the
             linearized system.
         '''
-        self._ref_state = torch.tensor(self.state) if state is None else torch.atleast_1d(state)
-        self._ref_input = torch.tensor(self.input) if input is None else torch.atleast_1d(input)
+        self._ref_state = self.state.clone() if state is None else torch.atleast_1d(state)
+        self._ref_input = self.input.clone() if input is None else torch.atleast_1d(input)
         self._ref_t = self.systime if t is None else t
         self._ref_f = self.state_transition(self._ref_state, self._ref_input, self._ref_t)
         self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)

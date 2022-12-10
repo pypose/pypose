@@ -87,7 +87,7 @@ def test_dynamics_cartpole():
     assert torch.allclose(state_ref, state_all[:5])
 
     # Jacobian computation - Find jacobians at the last step
-    jacob_state, jacob_input = state_all[-1, :].T, input[-1]
+    jacob_state, jacob_input = state_all[-1], input[-1]
     cartPoleSolver.set_refpoint(state=jacob_state, input=jacob_input.unsqueeze(0), t=time[-1])
 
     assert torch.allclose(A_ref, cartPoleSolver.A)
