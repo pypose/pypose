@@ -267,7 +267,7 @@ class System(nn.Module):
                            - \mathbf{A}\mathbf{x}^* - \mathbf{B}\mathbf{u}^*
         '''
         # Potential performance loss here - self.A and self.B involves jacobian eval
-        return self._ref_f - self._ref_state.matmul(self.A.mT) - self._ref_input.matmul(self.B.mT)
+        return self._ref_f - pp.bmv(self.A, self._ref_state) - pp.bmv(self.B, self._ref_input)
     
     @property
     def c2(self):
@@ -279,7 +279,7 @@ class System(nn.Module):
                            - \mathbf{C}\mathbf{x}^* - \mathbf{D}\mathbf{u}^*
         '''
         # Potential performance loss here - self.C and self.D involves jacobian eval
-        return self._ref_g - self._ref_state.matmul(self.C.mT) - self._ref_input.matmul(self.D.mT)
+        return self._ref_g - pp.bmv(self.C, self._ref_state) - pp.bmv(self.D, self._ref_input)
 
 
 class LTI(System):
