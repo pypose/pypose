@@ -83,9 +83,9 @@ class System(nn.Module):
         ...         ss = (2 * math.pi * t / 100).sin()
         ... 
         ...         A = torch.tensor([[   1., cc/10],
-        ...                           [cc/10,    1.]])
+        ...                           [cc/10,    1.]], device=t.device)
         ...         B = torch.tensor([[ss],
-        ...                           [1.]])
+        ...                           [1.]], device=t.device)
         ... 
         ...         return A @ state + B @ input
         ... 
@@ -192,15 +192,15 @@ class System(nn.Module):
                 the the most recent timestamp is taken. Default: ``None``.
 
         Returns:
-            None
+            The ``self`` module.
 
         Warning:
             For nonlinear systems, the users have to call this function before getting the
             linearized system.
         '''
-        self._ref_state = self.state.clone() if state is None else torch.atleast_1d(state)
-        self._ref_input = self.input.clone() if input is None else torch.atleast_1d(input)
-        self._ref_t = self.systime if t is None else t
+        self._ref_state = self.state if state is None else torch.atleast_1d(state)
+        self._ref_input = self.input if input is None else torch.atleast_1d(input)
+        self._ref_t = self.systime if t is None else torch.atleast_1d(t)
         self._ref_f = self.state_transition(self._ref_state, self._ref_input, self._ref_t)
         self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
         return self
