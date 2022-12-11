@@ -7,8 +7,9 @@
 1. Sphinx docs come with a makefile build system. To preview, build PyPose locally and
 
 ```bash
+sudo apt install build-essential
+pip install -r requirements/dev.txt
 cd docs
-pip install -r requirements.txt
 make html
 ```
 
