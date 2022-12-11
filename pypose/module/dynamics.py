@@ -140,8 +140,9 @@ class System(nn.Module):
             property :obj:`systime`.
         '''
         self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
-        return self.state_transition(self.state, self.input, self.systime), \
-            self.observation(self.state, self.input, self.systime)
+        state = self.state_transition(self.state, self.input, self.systime)
+        observ = self.observation(self.state, self.input, self.systime)
+        return state, observ
 
     def state_transition(self, state, input, t=None):
         r'''
