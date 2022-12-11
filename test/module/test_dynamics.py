@@ -87,7 +87,7 @@ def test_dynamics_cartpole():
     assert torch.allclose(state_ref, state_all[:5])
 
     # Jacobian computation - Find jacobians at the last step
-    jacob_state, jacob_input = state_all[-1, :].T, input[-1]
+    jacob_state, jacob_input = state_all[-1], input[-1]
     cartPoleSolver.set_refpoint(state=jacob_state, input=jacob_input.unsqueeze(0), t=time[-1])
 
     assert torch.allclose(A_ref, cartPoleSolver.A)
@@ -230,10 +230,10 @@ def test_dynamics_lti():
     B_1 = torch.randn(5, 4, 2)
     C_1 = torch.randn(5, 3, 4)
     D_1 = torch.randn(5, 3, 2)
-    c1_1 = torch.randn(5, 1, 4)
-    c2_1 = torch.randn(5, 1, 3)
-    state_1 = torch.randn(5, 1, 4)
-    input_1 = torch.randn(5, 1, 2)
+    c1_1 = torch.randn(5, 4)
+    c2_1 = torch.randn(5, 3)
+    state_1 = torch.randn(5, 4)
+    input_1 = torch.randn(5, 2)
 
     lti_1 = pp.module.LTI(A_1, B_1, C_1, D_1, c1_1, c2_1)
   
@@ -241,8 +241,9 @@ def test_dynamics_lti():
 
     z_1, y_1 = lti_1(state_1,input_1)
 
-    z_1_ref = state_1.matmul(A_1.mT) + input_1.matmul(B_1.mT) + c1_1
-    y_1_ref = state_1.matmul(C_1.mT) + input_1.matmul(D_1.mT) + c2_1
+    z_1_ref = pp.bmv(A_1, state_1) + pp.bmv(B_1, input_1) + c1_1
+
+    y_1_ref = pp.bmv(C_1, state_1) + pp.bmv(D_1, input_1) + c2_1
 
     assert torch.allclose(z_1, z_1_ref)
     assert torch.allclose(y_1, y_1_ref)
@@ -254,17 +255,17 @@ def test_dynamics_lti():
     B_2 = torch.randn(4, 2)
     C_2 = torch.randn(3, 4)
     D_2 = torch.randn(3, 2)
-    c1_2 = torch.randn(1, 4)
-    c2_2 = torch.randn(1, 3)
-    state_2 = torch.randn(5, 1, 4)
-    input_2 = torch.randn(5, 1, 2)
+    c1_2 = torch.randn(4)
+    c2_2 = torch.randn(3)
+    state_2 = torch.randn(5, 4)
+    input_2 = torch.randn(5, 2)
 
     lti_2 = pp.module.LTI(A_2, B_2, C_2, D_2, c1_2, c2_2)
 
-    z_2, y_2 = lti_2(state_2,input_2)
+    z_2, y_2 = lti_2(state_2, input_2)
 
-    z_2_ref = state_2.matmul(A_2.mT) + input_2.matmul(B_2.mT) + c1_2
-    y_2_ref = state_2.matmul(C_2.mT) + input_2.matmul(D_2.mT) + c2_2
+    z_2_ref = pp.bmv(A_2, state_2) + pp.bmv(B_2, input_2) + c1_2
+    y_2_ref = pp.bmv(C_2, state_2) + pp.bmv(D_2, input_2) + c2_2
 
     assert torch.allclose(z_2, z_2_ref)
     assert torch.allclose(y_2, y_2_ref)
@@ -276,17 +277,17 @@ def test_dynamics_lti():
     B_3 = torch.randn(4, 2)
     C_3 = torch.randn(3, 4)
     D_3 = torch.randn(3, 2)
-    c1_3 = torch.randn(1, 4)
-    c2_3 = torch.randn(1, 3)
-    state_3 = torch.randn(1, 4)
-    input_3 = torch.randn(1, 2)
+    c1_3 = torch.randn(4)
+    c2_3 = torch.randn(3)
+    state_3 = torch.randn(4)
+    input_3 = torch.randn(2)
 
     lti_3 = pp.module.LTI(A_3, B_3, C_3, D_3, c1_3, c2_3)
 
     z_3, y_3 = lti_3(state_3,input_3)
 
-    z_3_ref = state_3.matmul(A_3.mT) + input_3.matmul(B_3.mT) + c1_3
-    y_3_ref = state_3.matmul(C_3.mT) + input_3.matmul(D_3.mT) + c2_3
+    z_3_ref = A_3.mv(state_3) + B_3.mv(input_3) + c1_3
+    y_3_ref = C_3.mv(state_3) + D_3.mv(input_3) + c2_3
 
     assert torch.allclose(z_3, z_3_ref)
     assert torch.allclose(y_3, y_3_ref)
