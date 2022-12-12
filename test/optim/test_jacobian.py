@@ -45,7 +45,7 @@ class TestJacobian:
                 self.w = pp.Parameter(pp.randn_so3())
 
             def forward(self):
-                return self.p.Exp()
+                return self.p.Exp().tensor()
 
         model, input = PoseTransform().to(device), pp.randn_SO3(device=device)
         J1 = pp.optim.functional.modjac(model, input=None, flatten=True)

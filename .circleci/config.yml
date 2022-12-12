@@ -113,8 +113,8 @@ jobs:
             export "PATH=~/miniconda3/bin:$PATH" && conda init bash && . $HOME/miniconda3/etc/profile.d/conda.sh
             conda activate pyenv
             pip install dist/pypose-*.whl
+            pip install -r requirements/dev.txt
             cd docs
-            pip install -r requirements.txt
             make dirhtml
             tar -czvf build/docs.tar.gz build/dirhtml/*
       - store_artifacts:
@@ -165,15 +165,15 @@ workflows:
     jobs:
       - linux_build_wheel:
           cuda_version: "11.3.1"
-          torch_version: "1.12.1"
+          torch_version: "1.13.0"
           python_version: "3.8"
       - build_docs:
           requires: [linux_build_wheel]
           cuda_version: "11.3.1"
-          torch_version: "1.11.0"
+          torch_version: "1.13.0"
           python_version: "3.8"
       - run_tests:
           requires: [linux_build_wheel]
           cuda_version: "11.3.1"
-          torch_version: "1.12.1"
+          torch_version: "1.13.0"
           python_version: "3.8"
