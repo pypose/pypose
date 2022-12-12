@@ -91,7 +91,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
         print('Done')
-        assert idx < 10, "Optimization requires too many steps."
+        assert idx < 9, "Optimization requires too many steps."
 
 
     def test_optim_liegroup(self):
@@ -108,7 +108,8 @@ class TestOptim:
         inputs = pp.randn_RxSO3(2, 2).to(device)
         target = pp.identity_rxso3(2, 2).to(device)
         posnet = PoseInv(2, 2).to(device)
-        optimizer = pp.optim.LM(posnet)
+        info = torch.eye(4, device=device)
+        optimizer = pp.optim.LM(posnet, weight=info)
 
         for idx in range(10):
             loss = optimizer.step(inputs, target)
@@ -118,7 +119,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
         
-        assert idx < 10, "Optimization requires too many steps."
+        assert idx < 9, "Optimization requires too many steps."
 
 
     def test_optim_with_kernel(self):
@@ -148,7 +149,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
 
-        assert idx < 10, "Optimization requires too many steps."
+        assert idx < 9, "Optimization requires too many steps."
 
     def test_optim_strategy_constant(self):
 
@@ -174,6 +175,8 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.item())
                 break
 
+        assert idx < 9, "Optimization requires too many steps."
+
     def test_optim_strategy_adaptive(self):
 
         class PoseInv(nn.Module):
@@ -198,6 +201,8 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.item())
                 break
 
+        assert idx < 9, "Optimization requires too many steps."
+
     def test_optim_trustregion(self):
         class PoseInv(nn.Module):
             def __init__(self, *dim):
@@ -221,7 +226,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.item())
                 break
 
-        assert idx < 10, "Optimization requires too many steps."
+        assert idx < 9, "Optimization requires too many steps."
 
 
 if __name__ == '__main__':
