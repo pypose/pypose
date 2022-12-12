@@ -17,7 +17,7 @@ def bmv(input, vec, *, out=None):
         the ``vec`` has to be a (:math:`\cdots\times m`) tensor,
         and ``out`` will be a (:math:`\cdots\times n`) tensor.
         Different from ``torch.mv``, which is not broadcast, this function
-        is broaddcast and supports batched product.
+        is broadcast and supports batched product.
 
     Example:
         >>> matrix = torch.randn(2, 1, 3, 2)
