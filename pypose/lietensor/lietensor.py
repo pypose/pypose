@@ -810,13 +810,6 @@ class LieTensor(torch.Tensor):
           - :meth:`rxso3`
 
     Note:
-        In most of the cases, Lie Group should be used. Lie Algebra is used only
-        when it needs to be optimized by back-propagation via gradients: in this
-        case, LieTensor is taken as :meth:`pypose.Parameter` in a module, which follows
-        PyTorch traditions.
-
-
-    Note:
         Two attributes :obj:`shape` and :obj:`lshape` are available for LieTensor.
         The only differece is the :obj:`lshape` hides the last dimension of :obj:`shape`,
         since :obj:`lshape` takes the data in the last dimension as a single :obj:`ltype` item.
@@ -878,6 +871,12 @@ class LieTensor(torch.Tensor):
             so3Type LieTensor:
             tensor([[-1.5948,  0.3113, -0.9807]], device='cuda:0', dtype=torch.float64,
                 grad_fn=<AliasBackward0>)
+
+    Note:
+        In most of the cases, Lie Group is expected to be used, therefore we only provide
+        `converting functions <https://pypose.org/docs/main/convert/>`_ between Lie Groups
+        and other data structures, e.g., transformation matrix, Euler angle, etc. The users
+        can convert data between Lie Group and Lie algebra with :obj:`Exp` and :obj:`Log`.
     """
     def __init__(self, *data, ltype:LieType):
         assert self.shape[-1:] == ltype.dimension, 'The last dimension of a LieTensor has to be ' \
