@@ -131,7 +131,7 @@ class EKF(nn.Module):
         The covariance of system transition noise.
         '''
         if not hasattr(self, '_Q'):
-            raise NotImplementedError('Call set_uncertainty() to defines\
+            raise NotImplementedError('Call set_uncertainty() to define\
                                         transition covariance Q.')
         return self._Q
 
@@ -141,7 +141,7 @@ class EKF(nn.Module):
         The covariance of system observation noise.
         '''
         if not hasattr(self, '_R'):
-            raise NotImplementedError('Call set_uncertainty() to defines\
+            raise NotImplementedError('Call set_uncertainty() to define\
                                         transition covariance R.')
         return self._R
 
