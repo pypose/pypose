@@ -138,11 +138,15 @@ class System(nn.Module):
             :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity
             such as time-varying system. One can directly access the current system time via the
             property :obj:`systime`.
+
+        Note:
+            To introduce noise in a model, redefine this method via
+            subclassing. See example in ``examples/module/ekf/tank_robot.py``.
         '''
         self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
         state = self.state_transition(self.state, self.input, self.systime)
-        observ = self.observation(self.state, self.input, self.systime)
-        return state, observ
+        obs = self.observation(self.state, self.input, self.systime)
+        return state, obs
 
     def state_transition(self, state, input, t=None):
         r'''
@@ -156,7 +160,8 @@ class System(nn.Module):
 
         Note:
             The users need to define this method and can access the current time via the property
-            :obj:`systime`.
+            :obj:`systime`. Don't introduce system transision noise in this function, as it will
+            be used for linearizing the system automaticalluy.
         '''
         raise NotImplementedError("The users need to define their own state transition method")
 
@@ -172,7 +177,8 @@ class System(nn.Module):
 
         Note:
             The users need to define this method and can access the current system time via the
-            property :obj:`systime`.
+            property :obj:`systime`. Don't introduce system transision noise in this function,
+            as it will be used for linearizing the system automaticalluy.
         '''
         raise NotImplementedError("The users need to define their own observation method")
 

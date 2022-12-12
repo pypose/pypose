@@ -10,15 +10,31 @@ class TankRobot(pp.module.System):
         self.register_buffer("Q", Q)
         self.register_buffer("R", R)
 
+    def forward(self, state, input):
+        '''
+        Add noise here. Safely remove this function if you don't need noise.
+        '''
+        state, obs = super().forward(state, input)
+        state = state + self.noise(self.Q)
+        obs   = obs   + self.noise(self.R)
+        return state, obs
+
     def state_transition(self, state, input, t=None):
+        '''
+        Don't add noise in this function, as it will be used for automatically
+        linearizing the system by the parent class ``pp.module.System``.
+        '''
         theta = state[2] + input[1]
         vx = input[0] * theta.cos()
         vy = input[0] * theta.sin()
-        state = torch.stack([state[0] + vx, state[1] + vy, theta])
-        return state + self.noise(self.Q)
+        return torch.stack([state[0] + vx, state[1] + vy, theta])
 
     def observation(self, state, input, t=None):
-        return state + self.noise(self.R)
+        '''
+        Don't add noise in this function, as it will be used for automatically
+        linearizing the system by the parent class ``pp.module.System``.
+        '''
+        return state
 
     def noise(self, W):
         r'''
