@@ -35,7 +35,7 @@ class RobustModel(nn.Module):
             self.register_forward_hook(self.kernel_forward)
 
         if weight is not None:
-            weight = self.validate_weight(weight)
+            weight = self.validate(weight)
             self.register_buffer('weight', weight)
 
     @torch.no_grad()
