@@ -111,6 +111,11 @@ class EKF(nn.Module):
         ... print('Est error:', (states - estim).norm(dim=-1))
         Est error: tensor([5.7655, 5.3436, 3.5947, 0.3359, 0.0639])
 
+    Warning:
+        Don't introduce noise in ``System`` methods ``state_transition`` and ``observation``,
+        as they are used for automatically linearizing the system by the parent class
+        ``pypose.module.System``.
+
     Note:
         Implementation is based on Section 5.1 of this book
 
