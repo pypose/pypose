@@ -17,5 +17,6 @@ Convert
     tensor
     translation
     rotation
+    euler
     scale
     matrix

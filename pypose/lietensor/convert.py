@@ -609,7 +609,7 @@ def euler2SO3(euler: torch.Tensor):
     r"""Convert batched Euler angles (roll, pitch, and yaw) to SO3Type LieTensor.
 
     Args:
-        euler (Tensor): the euler angles to convert.
+        euler (Tensor): the euler angles in radians to convert.
 
     Return:
         LieTensor: the converted SO3Type LieTensor.
@@ -622,9 +622,9 @@ def euler2SO3(euler: torch.Tensor):
     .. math::
         {\displaystyle \mathbf{y}_i={
         \begin{bmatrix}\,
-        \sin(\alpha_i)\cos(\beta_i)\cos(\gamma_i) - \cos(\alpha_i)\sin(\beta_i)\sin(\gamma_i)\\\,
-        \cos(\alpha_i)\sin(\beta_i)\cos(\gamma_i) + \sin(\alpha_i)\cos(\beta_i)\sin(\gamma_i)\\\,
-        \cos(\alpha_i)\cos(\beta_i)\sin(\gamma_i) - \sin(\alpha_i)\sin(\beta_i)\cos(\gamma_i)\\\,
+        \sin(\alpha_i)\cos(\beta_i)\cos(\gamma_i) - \cos(\alpha_i)\sin(\beta_i)\sin(\gamma_i)\\
+        \cos(\alpha_i)\sin(\beta_i)\cos(\gamma_i) + \sin(\alpha_i)\cos(\beta_i)\sin(\gamma_i)\\
+        \cos(\alpha_i)\cos(\beta_i)\sin(\gamma_i) - \sin(\alpha_i)\sin(\beta_i)\cos(\gamma_i)\\
         \cos(\alpha_i)\cos(\beta_i)\cos(\gamma_i) + \sin(\alpha_i)\sin(\beta_i)\sin(\gamma_i)
         \end{bmatrix}}},
 
@@ -632,7 +632,12 @@ def euler2SO3(euler: torch.Tensor):
     are roll, pitch, and yaw, respectively.
 
     Note:
-        The last dimension of the input tensor has to be 3.
+        The last dimension of the input tensor has to be 3. The Euler angle takes the rotation
+        sequence of x (roll), y (pitch), then z (yaw) axis (counterclockwise).
+
+    Note:
+        Any given rotation has two possible quaternion representations. If one is known, the other
+        is just the negative of all four terms. This function only returns one of them.
 
     Examples:
         >>> input = torch.randn(2, 3, requires_grad=True, dtype=torch.float64)
@@ -640,6 +645,8 @@ def euler2SO3(euler: torch.Tensor):
         SO3Type LieTensor:
         tensor([[-0.4873,  0.1162,  0.4829,  0.7182],
                 [ 0.3813,  0.4059, -0.2966,  0.7758]], dtype=torch.float64, grad_fn=<AliasBackward0>)
+
+    See :obj:`euler` for more information.
     """
     if not torch.is_tensor(euler):
         euler = torch.tensor(euler)
@@ -662,7 +669,7 @@ def tensor(inputs):
     Convert a :obj:`LieTensor` into a :obj:`torch.Tensor` without changing data.
 
     Args:
-        inputs (LieTensor): the input LieTensor.
+        inputs (:obj:`LieTensor`): the input LieTensor.
 
     Return:
         Tensor: the torch.Tensor form of LieTensor.
@@ -680,12 +687,15 @@ def translation(inputs):
     r'''
     Extract the translation part from a :obj:`LieTensor`.
 
+    Args:
+        inputs (:obj:`LieTensor`): the input LieTensor.
+
     Return:
         Tensor: the batched translation vectors.
 
     Warning:
-        The :obj:`SO3`, :obj:`so3`, :obj:`RxSO3`, and :obj:`rxso3` types do not contain translation. 
-        Calling :obj:`translation()` on these types will return zero vector(s).
+        The :obj:`SO3`, :obj:`so3`, :obj:`RxSO3`, and :obj:`rxso3` types do not contain
+        translation. Calling :obj:`translation()` on these types will return zero vector(s).
 
     Example:
         >>> x = pp.randn_SE3(2)
@@ -704,6 +714,9 @@ def rotation(inputs):
     r'''
     Extract the rotation part from a :obj:`LieTensor`.
 
+    Args:
+        inputs (:obj:`LieTensor`): the input LieTensor.
+
     Return:
         SO3: the batched quaternions.
 
@@ -720,6 +733,9 @@ def rotation(inputs):
 def scale(inputs):
     r'''
     Extract the scale part from a :obj:`LieTensor`.
+
+    Args:
+        inputs (:obj:`LieTensor`): the input LieTensor.
 
     Return:
         Tensor: the batched scale scalars.
@@ -742,9 +758,13 @@ def scale(inputs):
         '''
     return inputs.scale()
 
+
 def matrix(inputs):
     r'''
     Convert a :obj:`LieTensor` into matrix form.
+
+    Args:
+        inputs (:obj:`LieTensor`): the input LieTensor.
 
     Return:
         Tensor: the batched matrix form (torch.Tensor) of LieTensor.
@@ -760,3 +780,40 @@ def matrix(inputs):
                  [-0.4603,  0.4130,  0.7858]]])
     '''
     return inputs.matrix()
+
+
+def euler(inputs):
+    """
+    Convert batched LieTensor into Euler angles (roll, pitch, yaw).
+
+    Args:
+        inputs (:obj:`LieTensor`): the input LieTensor.
+
+    Return:
+        :obj:`Tensor`: the batched Euler angles in radians.
+
+    Supported input type: :obj:`so3`, :obj:`SO3`, :obj:`se3`, :obj:`SE3`,
+    :obj:`sim3`, :obj:`Sim3`, :obj:`rxso3`, and :obj:`RxSO3`.
+
+    Note:
+        The last dimension of the output tensor is 3. The Euler angle takes the rotation
+        sequence of x (roll), y (pitch), then z (yaw) axis (counterclockwise).
+
+    Example:
+
+        >>> x = pp.randn_SO3()
+        >>> x.euler()  # equivalent to pp.euler(x)
+        tensor([-0.6599,  0.2749, -0.3263])
+
+        >>> x = pp.randn_Sim3(2)
+        >>> x.euler()  # equivalent to pp.euler(x)
+        tensor([[-0.2701, -0.8006, -0.4150],
+                [ 2.1550,  0.1768,  0.9368]])
+
+        >>> x = pp.randn_rxso3()
+        >>> x.euler()  # equivalent to pp.euler(x)
+        tensor([ 1.2676, -0.4783, -0.3596])
+
+    See :obj:`euler2SO3` for more information.
+    """
+    return inputs.euler()
