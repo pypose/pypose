@@ -87,7 +87,7 @@ class System(nn.Module):
         ...         B = torch.tensor([[ss],
         ...                           [1.]], device=t.device)
         ... 
-        ...         return A @ state + B @ input
+        ...         return pp.bmv(A, state) + pp.bmv(B, input)
         ... 
         ...     def observation(self, state, input, t):
         ...         return state + t
