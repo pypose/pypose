@@ -177,8 +177,6 @@ class GaussNewton(_Optimizer):
             self.model = RobustModel(model, kernel, auto=False)
             self.corrector = Trivial() if corrector is None else corrector
         self.weight = weight
-        if self.weight is not None:
-            self.register_buffer('weight', weight)
 
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
@@ -374,8 +372,6 @@ class LevenbergMarquardt(_Optimizer):
             self.model = RobustModel(model, kernel, auto=False)
             self.corrector = Trivial() if corrector is None else corrector
         self.weight = weight
-        if self.weight is not None:
-            self.register_buffer('weight', weight)
 
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
