@@ -108,7 +108,7 @@ class EKF(nn.Module):
         ...     v = r * torch.randn(N) # observation noise
         ...     states[i+1], observ[i] = model(states[i] + w, inputs[i])
         ...     estim[i+1], P[i+1] = ekf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
-        ... print('Est error:', (states-estim).norm(dim=-1))
+        ... print('Est error:', (states - estim).norm(dim=-1))
         Est error: tensor([5.7655, 5.3436, 3.5947, 0.3359, 0.0639])
 
     Note:
