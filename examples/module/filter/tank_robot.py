@@ -10,15 +10,6 @@ class TankRobot(pp.module.System):
         self.register_buffer("Q", Q)
         self.register_buffer("R", R)
 
-    def forward(self, state, input):
-        '''
-        Add noise here. Safely remove this function if you don't need noise.
-        '''
-        state, obs = super().forward(state, input)
-        state = state + self.noise(self.Q)
-        obs   = obs   + self.noise(self.R)
-        return state, obs
-
     def state_transition(self, state, input, t=None):
         '''
         Don't add noise in this function, as it will be used for automatically
@@ -35,13 +26,6 @@ class TankRobot(pp.module.System):
         linearizing the system by the parent class ``pp.module.System``.
         '''
         return state
-
-    def noise(self, W):
-        r'''
-        Randomly generated batched noises.
-        '''
-        n = torch.randn(W.shape[:-1], device=W.device, dtype=W.dtype)
-        return pp.bmv(W, n)
 
 
 def creatPlot(state, est):
@@ -66,20 +50,23 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     device = args.device
-    N, q, r = 100, 0.2, 0.2  # steps, covariance of transition and observation noise
-    input  = torch.randn(N, 2, device=device) * 0.1 + torch.tensor([1, 0], device=device)
-    state  = torch.zeros(N, 3, device=device)               # true states
-    est    = torch.randn(N, 3, device=device) + 10          # estimation
-    obs    = torch.zeros(N, 3, device=device)               # observation
-    cov    = torch.eye(3, 3, device=device).repeat(N, 1, 1) # estimation covariance
-    Q      = torch.eye(3, device=device) * q                # covariance of transition
-    R      = torch.eye(3, device=device) * r                # covariance of observation
+    T, N, M = 100, 3, 2     # steps, state dim, input dim
+    q, r, p = 0.2, 0.2, 10  # covariance of transition noise, observation noise, and estimation
+    input = torch.randn(T, M, device=device) * 0.1 + torch.tensor([1, 0], device=device)
+    state = torch.zeros(T, N, device=device)                   # true states
+    est   = torch.randn(T, N, device=device) * p               # estimation
+    obs   = torch.zeros(T, N, device=device)                   # observation
+    P     = torch.eye(N, device=device).repeat(T, 1, 1) * p**2 # estimation covariance
+    Q     = torch.eye(N, device=device) * q**2                 # covariance of transition
+    R     = torch.eye(N, device=device) * r**2                 # covariance of observation
 
     robot = TankRobot(Q, R).to(device)
     ekf = EKF(robot, Q, R).to(device)
 
-    for i in range(N - 1):
-        state[i+1], obs[i] = robot(state[i], input[i])  # model measurement
-        est[i+1], cov[i+1] = ekf(est[i], obs[i], input[i], cov[i])
+    for i in range(T - 1):
+        w = q * torch.randn(N, device=device)
+        v = r * torch.randn(N, device=device)
+        state[i+1], obs[i] = robot(state[i] + w, input[i])  # model measurement
+        est[i+1], P[i+1] = ekf(est[i], obs[i] + v, input[i], P[i])
 
     creatPlot(state, est)
