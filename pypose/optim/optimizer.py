@@ -98,8 +98,7 @@ class GaussNewton(_Optimizer):
                 \bm{x}~(\text{input}), \bm{y}~(\text{target}), \rho~(\text{kernel})              \\
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
-            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial } {\partial \bm{\theta}_{t-1}}}
-                          \left(\bm{f}\right)                                                    \\
+            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f} } {\partial \bm{\theta}_{t-1}}}             \\
             &\hspace{5mm} \mathbf{R} = \bm{f(\bm{\theta}_{t-1}, \bm{x})}-\bm{y}                  \\
             &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
             &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{W}\mathbf{J}, -\mathbf{W}\mathbf{R})                 \\
@@ -274,18 +273,15 @@ class LevenbergMarquardt(_Optimizer):
                            \epsilon_{l}~(\text{max})                                             \\
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
-            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial } {\partial \bm{\theta}_{t-1}}}
-                          \left(\sqrt{\mathbf{W}}\bm{f}\right)~(\sqrt{\cdot}
-                          \text{is the Cholesky decomposition})                                  \\
-            &\hspace{5mm} \mathbf{A} \leftarrow (\mathbf{J}^T \mathbf{J})
+            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}} {\partial \bm{\theta}_{t-1}}}       \\
+            &\hspace{5mm} \mathbf{A} \leftarrow (\mathbf{J}^T \mathbf{W} \mathbf{J})
                                      .\mathrm{diagnal\_clamp(\epsilon_{s}, \epsilon_{l})}        \\
-            &\hspace{5mm} \mathbf{R} = \sqrt{\mathbf{W}}
-                        (\bm{f(\bm{\theta}_{t-1}, \bm{x})}-\bm{y})                               \\
+            &\hspace{5mm} \mathbf{R} = \bm{f(\bm{\theta}_{t-1}, \bm{x})}-\bm{y}                               \\
             &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
             &\hspace{5mm} \textbf{while}~\text{first iteration}~\textbf{or}~
                                          \text{loss not decreasing}                              \\
             &\hspace{10mm} \mathbf{A} \leftarrow \mathbf{A} + \lambda \mathrm{diag}(\mathbf{A})  \\
-            &\hspace{10mm} \bm{\delta} = \mathrm{solver}(\mathbf{A}, -\mathbf{J}^T\mathbf{R})    \\
+            &\hspace{10mm} \bm{\delta} = \mathrm{solver}(\mathbf{A}, -\mathbf{J}^T \mathbf{W} \mathbf{R})     \\
             &\hspace{10mm} \lambda \leftarrow \mathrm{strategy}(\lambda,\text{model information})\\
             &\hspace{10mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}              \\
             &\hspace{10mm} \textbf{if}~\text{loss not decreasing}~\textbf{and}~
