@@ -70,17 +70,46 @@ class EKF(nn.Module):
     posteriori estimation, respectively.
 
     Example:
-        1. Initialize model and filter
+        1. Define a Nonlinear Time Invariant (NTI) system model
 
         >>> import torch, pypose as pp
-        >>> model = pp.module.System()  # System model
-        >>> filter = pp.module.EKF(model)
+        >>> class NTI(pp.module.System):
+        ...     def __init__(self):
+        ...         super().__init__()
+        ...
+        ...     def state_transition(self, state, input, t=None):
+        ...         return state.cos() + input
+        ...
+        ...     def observation(self, state, input, t):
+        ...         return state.sin() + input
 
-        2. Calculate filter for one iteration
+        2. Create a model and filter
 
-        >>> # u is system input
-        >>> state, observation = model(state, u)  # model measurement
-        >>> est_state, P = filter(est_state, observation, P, u)
+        >>> model = NTI()
+        >>> ekf = pp.module.EKF(model)
+
+        3. Prepare data
+
+        >>> T, N = 5, 2 # steps, state dim
+        >>> states = torch.zeros(T, N)
+        >>> inputs = torch.randn(T, N)
+        >>> observ = torch.zeros(T, N)
+        >>> # std of transition, observation, and estimation
+        >>> q, r, p = 0.1, 0.1, 10
+        >>> Q = torch.eye(N) * q**2
+        >>> R = torch.eye(N) * r**2
+        >>> P = torch.eye(N).repeat(T, 1, 1) * p**2
+        >>> estim = torch.randn(T, N) * p
+
+        4. Perform EKF prediction. Note that estimation error becomes smaller with more steps.
+
+        >>> for i in range(T - 1):
+        ...     w = q * torch.randn(N) # transition noise
+        ...     v = r * torch.randn(N) # observation noise
+        ...     states[i+1], observ[i] = model(states[i] + w, inputs[i])
+        ...     estim[i+1], cov[i+1] = ekf(estim[i], observ[i] + v, inputs[i], cov[i], Q, R)
+        ... print('Est error:', (states-estim).norm(dim=-1))
+        Est error: tensor([5.7655, 5.3436, 3.5947, 0.3359, 0.0639])
 
     Note:
         Implementation is based on Section 5.1 of this book
