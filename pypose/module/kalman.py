@@ -112,9 +112,10 @@ class EKF(nn.Module):
         Est error: tensor([5.7655, 5.3436, 3.5947, 0.3359, 0.0639])
 
     Warning:
-        Don't introduce noise in ``System`` methods ``state_transition`` and ``observation``,
-        as they are used for automatically linearizing the system by the parent class
-        ``pypose.module.System``.
+        Don't introduce noise in ``System`` methods ``state_transition`` and ``observation``
+        for filter testing, as those methods are used for automatically linearizing the system
+        by the parent class ``pypose.module.System``, unless your system model explicitly
+        introduces noise.
 
     Note:
         Implementation is based on Section 5.1 of this book
