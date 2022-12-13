@@ -99,12 +99,10 @@ class GaussNewton(_Optimizer):
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
             &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial } {\partial \bm{\theta}_{t-1}}}
-                          \left(\sqrt{\mathbf{W}}\bm{f}\right)~(\sqrt{\cdot}
-                          \text{is the Cholesky decomposition})                                  \\
-            &\hspace{5mm} \mathbf{R} = \sqrt{\mathbf{W}}
-                        (\bm{f(\bm{\theta}_{t-1}, \bm{x})}-\bm{y})                               \\
+                          \left(\bm{f}\right)                                                    \\
+            &\hspace{5mm} \mathbf{R} = \bm{f(\bm{\theta}_{t-1}, \bm{x})}-\bm{y}                  \\
             &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
-            &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{J}, -\mathbf{R})                 \\
+            &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{W}\mathbf{J}, -\mathbf{W}\mathbf{R})                 \\
             &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}               \\
             &\rule{113mm}{0.4pt}                                                          \\[-1.ex]
             &\bf{return} \:  \theta_t                                                     \\[-1.ex]
