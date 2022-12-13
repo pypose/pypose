@@ -1,7 +1,7 @@
 import argparse
+import torch, pypose as pp
 from pypose.module import EKF
-import math, matplotlib.pyplot as plt
-import torch, pypose as pp, numpy as np
+import matplotlib.pyplot as plt
 
 
 class TankRobot(pp.module.System):

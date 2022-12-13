@@ -1,5 +1,6 @@
+import torch
 from torch import nn
-import torch, pypose as pp
+from ..basics import bmv
 from torch.linalg import pinv
 
 
@@ -117,12 +118,12 @@ class EKF(nn.Module):
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
 
-        x = pp.bmv(A, x) + pp.bmv(B, u) + c1      # 1. System transition
-        P = A @ P @ A.mT + Q                      # 2. Covariance predict
-        K = P @ C.mT @ pinv(C @ P @ C.mT + R)     # 3. Kalman gain
-        e = y - pp.bmv(C, x) - pp.bmv(D, u) - c2  #    predicted observation error
-        x = x + pp.bmv(K, e)                      # 4. Posteriori state
-        P = (I - K @ C) @ P                       # 5. Posteriori covariance
+        x = bmv(A, x) + bmv(B, u) + c1        # 1. System transition
+        P = A @ P @ A.mT + Q                  # 2. Covariance predict
+        K = P @ C.mT @ pinv(C @ P @ C.mT + R) # 3. Kalman gain
+        e = y - bmv(C, x) - bmv(D, u) - c2    #    predicted observation error
+        x = x + bmv(K, e)                     # 4. Posteriori state
+        P = (I - K @ C) @ P                   # 5. Posteriori covariance
         return x, P
 
     @property
