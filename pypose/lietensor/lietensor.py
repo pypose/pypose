@@ -1105,7 +1105,9 @@ class LieTensor(torch.Tensor):
 
         roll = torch.atan2(t0, t1)
         pitch = torch.asin(t2.clamp(-1, 1))
-        yaw = torch.atan2(t3, t4)
+        # sigularity when pitch angle = +/- 90
+        yaw = torch.where(-0.998< t2 < 0.998, torch.atan2(t3, t4), 
+                                            - torch.sign(t2) * 2 * torch.atan2(x, w))
 
         return torch.stack([roll, pitch, yaw], dim=-1)
 
