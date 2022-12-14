@@ -635,7 +635,7 @@ def euler2SO3(euler: torch.Tensor):
         The last dimension of the input tensor has to be 3. The Euler angle takes the rotation
         sequence of x (roll), y (pitch), then z (yaw) axis (counterclockwise).
 
-    Note:
+    Warning:
         Any given rotation has two possible quaternion representations. If one is known, the other
         is just the negative of all four terms. This function only returns one of them.
 
@@ -795,9 +795,11 @@ def euler(inputs):
     Supported input type: :obj:`so3`, :obj:`SO3`, :obj:`se3`, :obj:`SE3`,
     :obj:`sim3`, :obj:`Sim3`, :obj:`rxso3`, and :obj:`RxSO3`.
 
-    Note:
-        The last dimension of the output tensor is 3. The Euler angle takes the rotation
-        sequence of x (roll), y (pitch), then z (yaw) axis (counterclockwise).
+    Warning:
+        The Euler angle takes the rotation sequence of x (roll), y (pitch),
+        and z (yaw) axis (counterclockwise). There is always more than one
+        solution that can result in the same orientation, while this function
+        only returns one of them.
 
     Example:
 
