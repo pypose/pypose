@@ -1099,13 +1099,12 @@ class LieTensor(torch.Tensor):
 
         t0 = 2 * (w * x + y * z)
         t1 = (sqw + sqz) - (sqx + sqy)
-        roll = torch.atan2(t0, t1)
-
-        t2 = 2.0 * (w * y - z * x)
-        pitch = torch.asin(t2.clamp(-1, 1))
-
+        t2 = 2.0 * (w * y - z * x) / (sqx + sqy + sqz + sqw)
         t3 = 2 * (w * z + x * y)
         t4 = (sqw + sqx) - (sqy+ sqz)
+
+        roll = torch.atan2(t0, t1)
+        pitch = torch.asin(t2.clamp(-1, 1))
         yaw = torch.atan2(t3, t4)
 
         return torch.stack([roll, pitch, yaw], dim=-1)
