@@ -283,9 +283,9 @@ class IMUPreintegrator(nn.Module):
                 Rij = self.Rij # default is None
 
             if Rij is not None:
-                Rij = Rij * inte_state['rot']
+                Rij = Rij * inte_state['gamma']
             else:
-                Rij = inte_state['rot']
+                Rij = inte_state['gamma']
 
             cov_input_state ={
                 'Rij': Rij.detach(),
@@ -317,7 +317,7 @@ class IMUPreintegrator(nn.Module):
         else:
             if init_rot is None:
                 init_rot = pp.identity_SO3(B, 1, dtype=dt.dtype, device=dt.device)
-            inte_rot = inte_rot * incre_r
+            inte_rot = init_rot * incre_r
             a = acc - inte_rot[:,1:,:].Inv() @ self.gravity
 
         dv = torch.zeros(B, 1, 3, dtype=dt.dtype, device=dt.device)
@@ -331,15 +331,15 @@ class IMUPreintegrator(nn.Module):
         incre_t = torch.cumsum(dt, dim = 1)
         incre_t = torch.cat([torch.zeros(B, 1, 1, dtype=dt.dtype, device=dt.device), incre_t], dim =1)
 
-        return {'a':a, 'vel':incre_v[...,1:,:], 'pos':incre_p[:,1:,:], 'rot':incre_r[:,1:,:],
+        return {'a':a, 'alpha':incre_p[:,1:,:], 'beta':incre_v[...,1:,:], 'gamma':incre_r[:,1:,:],
                 't':incre_t[...,1:,:], 'dr': dr[:,1:,:]}
 
     @classmethod
     def predict(cls, init_state, integrate):
         return {
-            'rot': init_state['rot'] * integrate['rot'],
-            'vel': init_state['vel'] + init_state['rot'] * integrate['vel'],
-            'pos': init_state['pos'] + init_state['rot'] * integrate['pos'] + init_state['vel'] * integrate['t'],
+            'rot': init_state['rot'] * integrate['gamma'],
+            'vel': init_state['vel'] + init_state['rot'] * integrate['beta'],
+            'pos': init_state['pos'] + init_state['rot'] * integrate['alpha'] + init_state['vel'] * integrate['t'],
         }
 
     @classmethod
