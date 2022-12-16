@@ -782,12 +782,14 @@ def matrix(inputs):
     return inputs.matrix()
 
 
-def euler(inputs):
+def euler(inputs, eps = 2e-4):
     """
     Convert batched LieTensor into Euler angles (roll, pitch, yaw).
 
     Args:
         inputs (:obj:`LieTensor`): the input LieTensor.
+        eps (:obj:`float`): the threshold to avoid the sigularity caused 
+            by gimbal lock.
 
     Return:
         :obj:`Tensor`: the batched Euler angles in radians.
@@ -800,6 +802,11 @@ def euler(inputs):
         and z (yaw) axis (counterclockwise). There is always more than one
         solution that can result in the same orientation, while this function
         only returns one of them.
+        
+        When the pitch angle approximate +/- 90 degree (north/south pole), 
+        there will be sigularity problem due to the gimbal lock.
+        Please check this website for more details: 
+        `euclideanspace <http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToEuler>`_.
 
     Example:
 
