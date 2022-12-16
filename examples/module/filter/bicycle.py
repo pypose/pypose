@@ -1,7 +1,6 @@
-import argparse
 import torch, pypose as pp
+import argparse, numpy as np
 from pypose.module import EKF
-import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 from matplotlib.legend_handler import HandlerLine2D
