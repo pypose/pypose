@@ -1088,7 +1088,7 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.scale(self)
 
-    def euler(self) -> torch.Tensor:
+    def euler(self, eps=2e-4) -> torch.Tensor:
         r'''
         See :meth:`pypose.euler`
         '''
@@ -1106,7 +1106,7 @@ class LieTensor(torch.Tensor):
         roll = torch.atan2(t0, t1)
         pitch = torch.asin(t2.clamp(-1, 1))
         # sigularity when pitch angle ~ +/-pi/2
-        flag = -0.998 < t2 < 0.998
+        flag = -1. + eps < t2 < 1. - eps
         yaw1 = torch.atan2(t3, t4)
         yaw2 = -2 * torch.sign(t2) * torch.atan2(x, w)
         yaw = torch.where(flag, yaw1, yaw2)
