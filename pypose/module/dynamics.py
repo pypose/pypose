@@ -196,8 +196,8 @@ class System(nn.Module):
             For nonlinear systems, the users have to call this function before getting the
             linearized system.
         '''
-        self._ref_state = torch.tensor(self.state) if state is None else torch.atleast_1d(state)
-        self._ref_input = torch.tensor(self.input) if input is None else torch.atleast_1d(input)
+        self._ref_state = self.state.clone() if state is None else torch.atleast_1d(state)
+        self._ref_input = self.input.clone() if input is None else torch.atleast_1d(input)
         self._ref_t = self.systime if t is None else t
         self._ref_f = self.state_transition(self._ref_state, self._ref_input, self._ref_t)
         self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
@@ -334,10 +334,11 @@ class LTI(System):
     
     def __init__(self, A, B, C, D, c1=None, c2=None):
         super(LTI, self).__init__()
-        assert A.ndim in (2, 3), "Invalid System Matrices dimensions"
         assert A.ndim == B.ndim == C.ndim == D.ndim, "Invalid System Matrices dimensions"
         self.A, self.B, self.C, self.D = A, B, C, D
         self.c1, self.c2 = c1, c2
+        self.n_state = self.B.size(-2)
+        self.n_ctrl = self.B.size(-1)
     
     def forward(self, state, input):
         r'''
@@ -357,8 +358,8 @@ class LTI(System):
             \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1 \\
 
         '''
-
-        return torch.einsum('...ik,...k->...i', [self.A, state]) + torch.einsum('...ik,...k->...i', [self.B, input]) + self.c1
+        return pp.bmv(self.A, state) + pp.bmv(self.B, input) + self.c1
+        #return torch.einsum('...ik,...k->...i', [self.A, state]) + torch.einsum('...ik,...k->...i', [self.B, input]) + self.c1
 
     def observation(self, state, input, t=None):
         r'''
@@ -367,8 +368,9 @@ class LTI(System):
         .. math::
             \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2 \\
         '''
-        
-        return torch.einsum('...ik,...k->...i', [self.C, state]) + torch.einsum('...ik,...k->...i', [self.D, input]) + self.c2
+
+        return pp.bmv(self.C, state) + pp.bmv(self.D, input) + self.c2
+        #return torch.einsum('...ik,...k->...i', [self.C, state]) + torch.einsum('...ik,...k->...i', [self.D, input]) + self.c2
 
 
     @property
@@ -436,4 +438,19 @@ class LTI(System):
     @c2.setter
     def c2(self, c2):
         self._c2 = c2
+
+    @property
+    def n_state(self):
+        return self._n_state
+
+    @n_state.setter
+    def n_state(self, n_state):
+        self._n_state = n_state
         
+    @property
+    def n_ctrl(self):
+        return self._n_ctrl
+
+    @n_ctrl.setter
+    def n_ctrl(self, n_ctrl):
+        self._n_ctrl = n_ctrl
