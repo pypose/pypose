@@ -87,7 +87,7 @@ def test_dynamics_cartpole():
     assert torch.allclose(state_ref, state_all[:5])
 
     # Jacobian computation - Find jacobians at the last step
-    jacob_state, jacob_input = state_all[-1, :].T, input[-1]
+    jacob_state, jacob_input = state_all[-1], input[-1]
     cartPoleSolver.set_refpoint(state=jacob_state, input=jacob_input.unsqueeze(0), t=time[-1])
 
     assert torch.allclose(A_ref, cartPoleSolver.A)
@@ -248,16 +248,16 @@ def test_dynamics_lti():
     z_14, y_14 = lti_1(z_13,input_1)
     z_15, y_15 = lti_1(z_14,input_1)
 
-    z_1_ref = torch.einsum('...ik,...k->...i', [A_1, state_1]) + torch.einsum('...ik,...k->...i', [B_1, input_1]) + c1_1
-    y_1_ref = torch.einsum('...ik,...k->...i', [C_1, state_1]) + torch.einsum('...ik,...k->...i', [D_1, input_1]) + c2_1
-    z_12_ref = torch.einsum('...ik,...k->...i', [A_1, z_1_ref]) + torch.einsum('...ik,...k->...i', [B_1, input_1]) + c1_1
-    y_12_ref = torch.einsum('...ik,...k->...i', [C_1, z_1_ref]) + torch.einsum('...ik,...k->...i', [D_1, input_1]) + c2_1
-    z_13_ref = torch.einsum('...ik,...k->...i', [A_1, z_12_ref]) + torch.einsum('...ik,...k->...i', [B_1, input_1]) + c1_1
-    y_13_ref = torch.einsum('...ik,...k->...i', [C_1, z_12_ref]) + torch.einsum('...ik,...k->...i', [D_1, input_1]) + c2_1
-    z_14_ref = torch.einsum('...ik,...k->...i', [A_1, z_13_ref]) + torch.einsum('...ik,...k->...i', [B_1, input_1]) + c1_1
-    y_14_ref = torch.einsum('...ik,...k->...i', [C_1, z_13_ref]) + torch.einsum('...ik,...k->...i', [D_1, input_1]) + c2_1
-    z_15_ref = torch.einsum('...ik,...k->...i', [A_1, z_14_ref]) + torch.einsum('...ik,...k->...i', [B_1, input_1]) + c1_1
-    y_15_ref = torch.einsum('...ik,...k->...i', [C_1, z_14_ref]) + torch.einsum('...ik,...k->...i', [D_1, input_1]) + c2_1
+    z_1_ref = pp.bmv(A_1, state_1) + pp.bmv(B_1, input_1) + c1_1
+    y_1_ref = pp.bmv(C_1, state_1) + pp.bmv(D_1, input_1) + c2_1
+    z_12_ref = pp.bmv(A_1, z_1_ref) + pp.bmv(B_1, input_1) + c1_1
+    y_12_ref = pp.bmv(C_1, z_1_ref) + pp.bmv(D_1, input_1) + c2_1
+    z_13_ref = pp.bmv(A_1, z_12_ref) + pp.bmv(B_1, input_1) + c1_1
+    y_13_ref = pp.bmv(C_1, z_12_ref) + pp.bmv(D_1, input_1) + c2_1
+    z_14_ref = pp.bmv(A_1, z_13_ref) + pp.bmv(B_1, input_1) + c1_1
+    y_14_ref = pp.bmv(C_1, z_13_ref) + pp.bmv(D_1, input_1) + c2_1
+    z_15_ref = pp.bmv(A_1, z_14_ref) + pp.bmv(B_1, input_1) + c1_1
+    y_15_ref = pp.bmv(C_1, z_14_ref) + pp.bmv(D_1, input_1) + c2_1
 
     assert torch.allclose(z_1, z_1_ref)
     assert torch.allclose(y_1, y_1_ref)
@@ -286,8 +286,8 @@ def test_dynamics_lti():
 
     z_2, y_2 = lti_2(state_2,input_2)
 
-    z_2_ref = torch.einsum('...ik,...k->...i', [A_2, state_2]) + torch.einsum('...ik,...k->...i', [B_2, input_2]) + c1_2
-    y_2_ref = torch.einsum('...ik,...k->...i', [C_2, state_2]) + torch.einsum('...ik,...k->...i', [D_2, input_2]) + c2_2
+    z_2_ref = pp.bmv(A_2, state_2) + pp.bmv(B_2, input_2) + c1_2
+    y_2_ref = pp.bmv(C_2, state_2) + pp.bmv(D_2, input_2) + c2_2
 
     assert torch.allclose(z_2, z_2_ref)
     assert torch.allclose(y_2, y_2_ref)
@@ -308,8 +308,8 @@ def test_dynamics_lti():
 
     z_3, y_3 = lti_3(state_3,input_3)
 
-    z_3_ref = torch.einsum('...ik,...k->...i', [A_3, state_3]) + torch.einsum('...ik,...k->...i', [B_3, input_3]) + c1_3
-    y_3_ref = torch.einsum('...ik,...k->...i', [C_3, state_3]) + torch.einsum('...ik,...k->...i', [D_3, input_3]) + c2_3
+    z_3_ref = pp.bmv(A_3, state_3) + pp.bmv(B_3, input_3) + c1_3
+    y_3_ref = pp.bmv(C_3, state_3) + pp.bmv(D_3, input_3) + c2_3
 
     assert torch.allclose(z_3, z_3_ref)
     assert torch.allclose(y_3, y_3_ref)
