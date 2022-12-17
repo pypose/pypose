@@ -236,7 +236,7 @@ class GaussNewton(_Optimizer):
             J = modjac(self.model, input=(input, target, weight), **self.jackwargs)
             R, J = self.corrector(R = R, J = J)
             J = J.reshape(tuple(R.shape)+(-1,))
-            A, b = J.permute([len(J.shape)-1,]+list(range(len(J.shape)-1))), R
+            A, b = J.permute([J.ndim-1,]+list(range(J.ndim-1))), R
             if weight is not None:
                 A, b = (weight @ A.unsqueeze(-1)).squeeze(-1), (weight @ b.unsqueeze(-1)).squeeze(-1)
             D = self.solver(A = A.reshape(A.shape[0], -1).T, b = -b.view(-1, 1))
@@ -440,11 +440,16 @@ class LevenbergMarquardt(_Optimizer):
             R, J = self.corrector(R = R, J = J)
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target, weight)
+            # Let Nr: number of residuals, Dr: dimension of each residual, Np: number of model parameters
+            # Now, the shape of R: [Nr, Dr], J: [Nr*Dr, Np], weight: [Nr, Dr, Dr]
             J_T = J.reshape(tuple(R.shape)+(-1,))
-            J_T = J_T.permute([len(J_T.shape)-1,]+list(range(len(J_T.shape)-1)))
+            # Now, J_T: [Nr, Dr, Np]
+            J_T = J_T.permute([J_T.ndim-1,]+list(range(J_T.ndim-1)))
+            # Now, J_T: [Np, Nr, Dr]
             if weight is not None:
                 J_T = (J_T.unsqueeze(-2) @ weight).squeeze(-2)
             J_T = J_T.reshape(J_T.shape[0], -1)
+            # Now, J_T: [Np, Nr*Dr]
             A, self.reject_count = J_T @ J, 0
             A.diagonal().clamp_(pg['min'], pg['max'])
             while self.last <= self.loss:
