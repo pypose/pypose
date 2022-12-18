@@ -1088,6 +1088,31 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.scale(self)
 
+    def euler(self, eps=2e-4) -> torch.Tensor:
+        r'''
+        See :meth:`pypose.euler`
+        '''
+        data = self.rotation().tensor()
+        x, y = data[..., 0], data[..., 1]
+        z, w = data[..., 2], data[..., 3]
+        xx, yy, zz, ww = x*x, y*y, z*z, w*w
+
+        t0 = 2 * (w * x + y * z)
+        t1 = (ww + zz) - (xx + yy)
+        t2 = 2 * (w * y - z * x) / (xx + yy + zz + ww)
+        t3 = 2 * (w * z + x * y)
+        t4 = (ww + xx) - (yy + zz)
+
+        roll = torch.atan2(t0, t1)
+        pitch = torch.asin(t2.clamp(-1, 1))
+        # sigularity when pitch angle ~ +/-pi/2
+        flag = -1. + eps < t2 < 1. - eps
+        yaw1 = torch.atan2(t3, t4)
+        yaw2 = -2 * torch.sign(t2) * torch.atan2(x, w)
+        yaw = torch.where(flag, yaw1, yaw2)
+
+        return torch.stack([roll, pitch, yaw], dim=-1)
+
     def identity_(self):
         r'''
         Inplace set the LieTensor to identity.
