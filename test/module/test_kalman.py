@@ -16,24 +16,24 @@ class TestKalman:
 
             def observation(self, state, input, t):
                 return state.sin() + input
-
-        model = NTI()
-        ekf = pp.module.EKF(model)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model = NTI().to(device)
+        ekf = pp.module.EKF(model).to(device)
 
         T, N = 5, 2 # steps, state dim
-        states = torch.zeros(T, N)
-        inputs = torch.randn(T, N)
-        observ = torch.zeros(T, N)
+        states = torch.zeros(T, N, device=device)
+        inputs = torch.randn(T, N, device=device)
+        observ = torch.zeros(T, N, device=device)
         # std of transition, observation, and estimation
         q, r, p = 0.1, 0.1, 10
-        Q = torch.eye(N) * q**2
-        R = torch.eye(N) * r**2
-        P = torch.eye(N).repeat(T, 1, 1) * p**2
-        estim = torch.randn(T, N) * p
+        Q = torch.eye(N, device=device) * q**2
+        R = torch.eye(N, device=device) * r**2
+        P = torch.eye(N, device=device).repeat(T, 1, 1) * p**2
+        estim = torch.randn(T, N, device=device) * p
 
         for i in range(T - 1):
-            w = q * torch.randn(N) # transition noise
-            v = r * torch.randn(N) # observation noise
+            w = q * torch.randn(N, device=device) # transition noise
+            v = r * torch.randn(N, device=device) # observation noise
             states[i+1], observ[i] = model(states[i] + w, inputs[i])
             estim[i+1], P[i+1] = ekf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
         error =  (states - estim).norm(dim=-1)
