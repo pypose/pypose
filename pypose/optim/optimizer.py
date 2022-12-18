@@ -1,4 +1,5 @@
 import torch, warnings
+from ..basics import bmv
 from torch import nn, finfo
 from .functional import modjac
 from .strategy import TrustRegion
@@ -35,7 +36,7 @@ class RobustModel(nn.Module):
             self.register_forward_hook(self.kernel_forward)
 
         if weight is not None:
-            weight = self.validate_weight(weight)
+            weight = self.validate(weight)
             self.register_buffer('weight', weight)
 
     @torch.no_grad()
@@ -56,14 +57,14 @@ class RobustModel(nn.Module):
             return self.model(input)
 
     def residual(self, output, target, weight=None):
-        error = (output if target is None else output - target).unsqueeze(-1)
+        error = (output if target is None else output - target)
         if weight is not None:
-            residual = self.validate(weight) @ error
+            residual = bmv(self.validate(weight), error)
         elif hasattr(self, 'weight'):
-            residual = self.weight @ error
+            residual = bmv(self.weight, error)
         else:
             residual = error
-        return residual.squeeze(-1)
+        return residual
 
     def kernel_forward(self, module, input, output):
         # eps is to prevent grad of sqrt() from being inf

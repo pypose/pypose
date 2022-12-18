@@ -9,7 +9,8 @@ from .lietensor import add, add_, mul, cumops, cummul, cumprod, cumops_, cummul_
 from .lietensor import Exp, Log, Inv, Mul, Retr, Act, Adj, AdjT, Jinvp, Jr
 from .lietensor import SO3_type, so3_type, SE3_type, se3_type
 from .lietensor import Sim3_type, sim3_type, RxSO3_type, rxso3_type
-from .lietensor import tensor, translation, rotation, scale, matrix
+from .lietensor import tensor, translation, rotation, scale, matrix, euler
 from .lietensor import mat2SO3, mat2SE3, mat2Sim3, mat2RxSO3, from_matrix, matrix, euler2SO3, vec2skew
 from .lietensor import gradcheck, gradgradcheck
 from . import module, optim
+from .basics import *

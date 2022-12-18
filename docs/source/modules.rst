@@ -9,4 +9,5 @@ Modules
    :template: autosummary/class-no-inherit.rst
    module.System
    module.LTI
+   module.EKF
    module.IMUPreintegrator

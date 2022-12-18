@@ -67,42 +67,43 @@ class System(nn.Module):
 
     Example:
 
-        A simple linear time-varying system.  Here we just show an example for advancing one
+        A simple linear time-varying system.  Here we show an example for advancing one
         time step of the system at a given time step and computing the linearization.
-        For generating one trajecotry given a series of inputs and advanced use of linearization,
-        see the `examples` folder.
 
-        >>> import math
+        >>> import math, torch
         >>> import pypose as pp
-        >>> import torch
+        ... 
         >>> class Floquet(pp.module.System):
         ...     def __init__(self):
-        ...         super(Floquet, self).__init__()
-        ...
+        ...         super().__init__()
+        ... 
         ...     def state_transition(self, state, input, t):
-        ...         cc = torch.cos(2 * math.pi * t / 100)
-        ...         ss = torch.sin(2 * math.pi * t / 100)
+        ... 
+        ...         cc = (2 * math.pi * t / 100).cos()
+        ...         ss = (2 * math.pi * t / 100).sin()
+        ... 
         ...         A = torch.tensor([[   1., cc/10],
-        ...                           [cc/10,    1.]])
+        ...                           [cc/10,    1.]], device=t.device)
         ...         B = torch.tensor([[ss],
-        ...                           [1.]])
-        ...         return state.matmul(A) + B.matmul(input)
-        ...
+        ...                           [1.]], device=t.device)
+        ... 
+        ...         return pp.bmv(A, state) + pp.bmv(B, input)
+        ... 
         ...     def observation(self, state, input, t):
         ...         return state + t
         ...
-        >>> solver = Floquet()
-        >>> time_curr = 8 # We start from t = 8, and advance one step to t = 9
-        >>> input = torch.sin(2 * math.pi * torch.tensor(time_curr) / 50)
-        >>> state_curr = torch.tensor([1., 1.])
-        >>> solver.reset(t = time_curr)
-        >>> state_next, obser_curr = solver(state_curr, input)
+        >>> # Start from t = 8, and advance one step to t = 9.
+        >>> step, current = 8, torch.tensor([1., 1.])
+        >>> input = torch.tensor(2 * math.pi / 50 * step).sin()
         ... 
-        >>> solver.set_refpoint()
-        >>> print(state_next)
-        >>> print(obser_curr)
-        >>> print(solver.A)
-        >>> print(solver.B)
+        >>> system = Floquet().reset(t = step)
+        >>> next, observation = system(current, input)
+        >>> system.set_refpoint()
+        ... 
+        >>> print(next)        # Next state
+        >>> print(observation) # Observation
+        >>> print(system.A)    # Linearized state matrix
+        >>> print(system.B)    # Linearized input matrix
         tensor([1.4944, 1.9320])
         tensor([9., 9.])
         tensor([[1.0000, 0.0844],
@@ -111,7 +112,8 @@ class System(nn.Module):
                 [1.0000]])
 
     Note:
-        More practical examples can be found at `examples/module/dynamics
+        For generating one trajecotry given a series of inputs, advanced use of
+        linearization, and more practical examples can be found at `examples/module/dynamics
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
     '''
 
@@ -136,10 +138,15 @@ class System(nn.Module):
             :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity
             such as time-varying system. One can directly access the current system time via the
             property :obj:`systime`.
+
+        Note:
+            To introduce noise in a model, redefine this method via
+            subclassing. See example in ``examples/module/ekf/tank_robot.py``.
         '''
         self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
-        return self.state_transition(self.state, self.input, self.systime), \
-            self.observation(self.state, self.input, self.systime)
+        state = self.state_transition(self.state, self.input, self.systime)
+        obs = self.observation(self.state, self.input, self.systime)
+        return state, obs
 
     def state_transition(self, state, input, t=None):
         r'''
@@ -153,7 +160,8 @@ class System(nn.Module):
 
         Note:
             The users need to define this method and can access the current time via the property
-            :obj:`systime`.
+            :obj:`systime`. Don't introduce system transision noise in this function, as it will
+            be used for linearizing the system automaticalluy.
         '''
         raise NotImplementedError("The users need to define their own state transition method")
 
@@ -169,12 +177,14 @@ class System(nn.Module):
 
         Note:
             The users need to define this method and can access the current system time via the
-            property :obj:`systime`.
+            property :obj:`systime`. Don't introduce system transision noise in this function,
+            as it will be used for linearizing the system automaticalluy.
         '''
         raise NotImplementedError("The users need to define their own observation method")
 
     def reset(self, t=0):
         self._t.fill_(t)
+        return self
 
     def set_refpoint(self, state=None, input=None, t=None):
         r'''
@@ -189,17 +199,18 @@ class System(nn.Module):
                 the the most recent timestamp is taken. Default: ``None``.
 
         Returns:
-            None
+            The ``self`` module.
 
         Warning:
             For nonlinear systems, the users have to call this function before getting the
             linearized system.
         '''
-        self._ref_state = torch.tensor(self.state) if state is None else torch.atleast_1d(state)
-        self._ref_input = torch.tensor(self.input) if input is None else torch.atleast_1d(input)
-        self._ref_t = self.systime if t is None else t
+        self._ref_state = self.state if state is None else torch.atleast_1d(state)
+        self._ref_input = self.input if input is None else torch.atleast_1d(input)
+        self._ref_t = self.systime if t is None else torch.atleast_1d(t)
         self._ref_f = self.state_transition(self._ref_state, self._ref_input, self._ref_t)
         self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
+        return self
 
     @property
     def systime(self):
@@ -263,7 +274,7 @@ class System(nn.Module):
                            - \mathbf{A}\mathbf{x}^* - \mathbf{B}\mathbf{u}^*
         '''
         # Potential performance loss here - self.A and self.B involves jacobian eval
-        return self._ref_f - self._ref_state.matmul(self.A.mT) - self._ref_input.matmul(self.B.mT)
+        return self._ref_f - pp.bmv(self.A, self._ref_state) - pp.bmv(self.B, self._ref_input)
     
     @property
     def c2(self):
@@ -275,7 +286,7 @@ class System(nn.Module):
                            - \mathbf{C}\mathbf{x}^* - \mathbf{D}\mathbf{u}^*
         '''
         # Potential performance loss here - self.C and self.D involves jacobian eval
-        return self._ref_g - self._ref_state.matmul(self.C.mT) - self._ref_input.matmul(self.D.mT)
+        return self._ref_g - pp.bmv(self.C, self._ref_state) - pp.bmv(self.D, self._ref_input)
 
 
 class LTI(System):
@@ -308,15 +319,21 @@ class LTI(System):
         they can be multiplied for each channel.
 
     Example:
-        >>> A = torch.randn(2, 3, 3)
-        >>> B = torch.randn(2, 3, 2)
-        >>> C = torch.randn(2, 3, 3)
-        >>> D = torch.randn(2, 3, 2)
-        >>> c1 = torch.randn(2, 1, 3)
-        >>> c2 = torch.randn(2, 1, 3)
-        >>> state = torch.randn(2, 1, 3)
-        >>> input = torch.randn(2, 1, 2)
-        >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
+        >>> # Batch, State, Input, Observe Dimension
+        >>> Bd, Sd, Id, Od = 2, 3, 2, 2
+        >>> # Linear System Matrices
+        >>> device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        >>> A = torch.randn(Bd, Sd, Sd)
+        >>> B = torch.randn(Bd, Sd, Id)
+        >>> C = torch.randn(Bd, Od, Sd)
+        >>> D = torch.randn(Bd, Od, Id)
+        >>> c1 = torch.randn(Bd, Sd)
+        >>> c2 = torch.randn(Bd, Od)
+        ...
+        >>> lti = pp.module.LTI(A, B, C, D, c1, c2).to(device)
+        ...
+        >>> state = torch.randn(Bd, Sd, device=device)
+        >>> input = torch.randn(Bd, Id, device=device)
         >>> lti(state, input)
         tensor([[[-8.5639,  0.0523, -0.2576]],
                 [[ 4.1013, -1.5452, -0.0233]]]), 
@@ -332,40 +349,39 @@ class LTI(System):
     '''
     
     def __init__(self, A, B, C, D, c1=None, c2=None):
-        super(LTI, self).__init__()
-        assert A.ndim in (2, 3), "Invalid System Matrices dimensions"
+        super().__init__()
+        assert A.ndim >= 2, "Matrices dimensions has to be no smaller than 2"
         assert A.ndim == B.ndim == C.ndim == D.ndim, "Invalid System Matrices dimensions"
-        self.A, self.B, self.C, self.D = A, B, C, D
-        self.c1, self.c2 = c1, c2
-    
+        self.register_buffer('A', A)
+        self.register_buffer('B', B)
+        self.register_buffer('C', C)
+        self.register_buffer('D', D)
+        self.register_buffer('c1', c1)
+        self.register_buffer('c2', c2)
+
     def forward(self, state, input):
         r'''
         Perform one step advance for the LTI system.
-
         '''
-        if self.A.ndim >= 3:
-            assert self.A.ndim == state.ndim == input.ndim,  "Invalid System Matrices dimensions"
-
-        return super(LTI, self).forward(state, input)
+        return super().forward(state, input)
 
     def state_transition(self, state, input, t=None):
         r'''
         Perform one step of LTI state transition.
 
         .. math::
-            \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1 \\
-
+            \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1
         '''
-        return state.matmul(self.A.mT) + input.matmul(self.B.mT) + self.c1
+        return pp.bmv(self.A, state) + pp.bmv(self.B, input) + self.c1
 
     def observation(self, state, input, t=None):
         r'''
         Return the observation of LTI system at current time step.
 
         .. math::
-            \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2 \\
+            \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2
         '''
-        return state.matmul(self.C.mT) + input.matmul(self.D.mT) + self.c2
+        return pp.bmv(self.C, state) + pp.bmv(self.D, input) + self.c2
 
     @property
     def A(self):
