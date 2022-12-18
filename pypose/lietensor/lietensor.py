@@ -1141,7 +1141,7 @@ class LieTensor(torch.Tensor):
         r"""
         See :func:`pypose.cumops`
         """
-        return self.ltype.cumops(self, other, dim, ops)
+        return self.ltype.cumops(self, dim, ops)
 
     def cummul(self, dim):
         r"""
@@ -1159,7 +1159,7 @@ class LieTensor(torch.Tensor):
         r"""
         Inplace version of :func:`pypose.cumops`
         """
-        return self.ltype.cumops_(self, other, dim, ops)
+        return self.ltype.cumops_(self, dim, ops)
 
     def cummul_(self, dim):
         r"""
