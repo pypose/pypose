@@ -10,4 +10,5 @@ Modules
    module.System
    module.LTI
    module.DP_LQR
+   module.EKF
    module.IMUPreintegrator
