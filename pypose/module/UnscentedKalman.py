@@ -1,6 +1,7 @@
 """
-author: xiao haitao
+author: xiao hai tao
 date:2022-12-19
+
 """
 import torch
 from torch import nn
