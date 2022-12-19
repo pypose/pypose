@@ -1,11 +1,14 @@
-import math
+"""
+author: xiao haitao
+date:2022-12-19
+"""
+
+
 import pypose as pp
 import torch as torch
+class TestUKF:
 
-
-class TestKalman:
-
-    def test_kalman(self):
+    def test_ukf(self):
 
         class NTI(pp.module.System):
             def __init__(self):
@@ -18,9 +21,9 @@ class TestKalman:
                 return state.sin() + input
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = NTI().to(device)
-        ekf = pp.module.EKF(model).to(device)
+        ukf = pp.module.UKF(model).to(device)
 
-        T, N = 5, 2 # steps, state dim
+        T, N = 20, 2 # steps, state dim
         states = torch.zeros(T, N, device=device)
         inputs = torch.randn(T, N, device=device)
         observ = torch.zeros(T, N, device=device)
@@ -32,15 +35,15 @@ class TestKalman:
         estim = torch.randn(T, N, device=device) * p
 
         for i in range(T - 1):
+            print('%d is start'%(i+1))
             w = q * torch.randn(N, device=device) # transition noise
             v = r * torch.randn(N, device=device) # observation noise
             states[i+1], observ[i] = model(states[i] + w, inputs[i])
-            estim[i+1], P[i+1] = ekf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
+            estim[i+1], P[i+1] = ukf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
         error =  (states - estim).norm(dim=-1)
         print(error)
         assert torch.all(error[0] - error[-1] > 0), "Filter error last step too large."
 
-
 if __name__ == '__main__':
-    test = TestKalman()
-    test.test_kalman()
+    test = TestUKF()
+    test.test_ukf()
