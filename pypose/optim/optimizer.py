@@ -35,9 +35,9 @@ class RobustModel(nn.Module):
         if auto:
             self.register_forward_hook(self.kernel_forward)
 
-    def forward(self, input, target, weight=None):
+    def forward(self, input, target):
         output = self.model_forward(input)
-        return self.residual(output, target, weight)
+        return self.residual(output, target)
 
     def model_forward(self, input):
         if isinstance(input, tuple):
@@ -45,8 +45,8 @@ class RobustModel(nn.Module):
         else:
             return self.model(input)
 
-    def residual(self, output, target, weight=None):
-        return (output if target is None else output - target)
+    def residual(self, output, target):
+        return output if target is None else output - target
 
     def kernel_forward(self, module, input, output):
         # eps is to prevent grad of sqrt() from being inf
@@ -54,9 +54,9 @@ class RobustModel(nn.Module):
         eps = finfo(output.dtype).eps
         return self.kernel(output.square().sum(-1)).clamp(min=eps).sqrt()
 
-    def loss(self, input, target, weight=None):
+    def loss(self, input, target):
         output = self.model_forward(input)
-        residual = self.residual(output, target, weight)
+        residual = self.residual(output, target)
         return self.kernel(residual.square().sum(-1)).sum()
 
 
@@ -232,8 +232,8 @@ class GaussNewton(_Optimizer):
         '''
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
-            R = self.model(input, target, weight)
-            J = modjac(self.model, input=(input, target, weight), **self.jackwargs)
+            R = self.model(input, target)
+            J = modjac(self.model, input=(input, target), **self.jackwargs)
             R, J = self.corrector(R = R, J = J)
             J = J.reshape(tuple(R.shape)+(-1,))
             A, b = J.permute([J.ndim-1,]+list(range(J.ndim-1))), R
@@ -241,9 +241,9 @@ class GaussNewton(_Optimizer):
                 A, b = (weight @ A.unsqueeze(-1)).squeeze(-1), (weight @ b.unsqueeze(-1)).squeeze(-1)
             D = self.solver(A = A.reshape(A.shape[0], -1).T, b = -b.view(-1, 1))
             self.last = self.loss if hasattr(self, 'loss') \
-                        else self.model.loss(input, target, weight)
+                        else self.model.loss(input, target)
             self.update_parameter(params = pg['params'], step = D)
-            self.loss = self.model.loss(input, target, weight)
+            self.loss = self.model.loss(input, target)
         return self.loss
 
 
@@ -435,11 +435,11 @@ class LevenbergMarquardt(_Optimizer):
         '''
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
-            R = self.model(input, target, weight)
-            J = modjac(self.model, input=(input, target, weight), **self.jackwargs)
+            R = self.model(input, target)
+            J = modjac(self.model, input=(input, target), **self.jackwargs)
             R, J = self.corrector(R = R, J = J)
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
-                                    else self.model.loss(input, target, weight)
+                                    else self.model.loss(input, target)
             # Let Nr: number of residuals, Dr: dimension of each residual, Np: number of model parameters
             # Now, the shape of R: [Nr, Dr], J: [Nr*Dr, Np], weight: [Nr, Dr, Dr]
             J_T = J.reshape(tuple(R.shape)+(-1,))
@@ -460,7 +460,7 @@ class LevenbergMarquardt(_Optimizer):
                     print(e, "\nLinear solver failed. Breaking optimization step...")
                     break
                 self.update_parameter(pg['params'], D)
-                self.loss = self.model.loss(input, target, weight)
+                self.loss = self.model.loss(input, target)
                 self.strategy.update(pg, last=self.last, loss=self.loss, J=J, D=D, R=R.view(-1, 1))
                 if self.last < self.loss and self.reject_count < self.reject: # reject step
                     self.update_parameter(params = pg['params'], step = -D)
