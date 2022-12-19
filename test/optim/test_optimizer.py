@@ -283,11 +283,11 @@ class TestOptim:
 
 if __name__ == '__main__':
     test = TestOptim()
-    test.test_optim_liealgebra()
-    test.test_optim_liegroup()
-    test.test_optim_with_kernel()
-    test.test_optim_strategy_constant()
-    test.test_optim_strategy_adaptive()
-    test.test_optim_trustregion()
-    test.test_optim_multiparameter()
+    # test.test_optim_liealgebra()
+    # test.test_optim_liegroup()
+    # test.test_optim_with_kernel()
+    # test.test_optim_strategy_constant()
+    # test.test_optim_strategy_adaptive()
+    # test.test_optim_trustregion()
+    # test.test_optim_multiparameter()
     test.test_optim_anybatch()
