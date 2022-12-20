@@ -36,7 +36,6 @@ class TestUKF:
             states[i + 1], observ[i] = model(states[i] + w, inputs[i])
             estim[i + 1], P[i + 1] = ukf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
         error = (states - estim).norm(dim=-1)
-
         assert torch.all(error[0] - error[-1] > 0), "Filter error last step too large."
 
 
