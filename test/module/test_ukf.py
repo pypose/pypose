@@ -19,7 +19,7 @@ class TestUKF:
         model = NTI().to(device)
         ukf = pp.module.UKF(model).to(device)
 
-        T, N = 20, 2  # steps, state dim
+        T, N = 5, 2  # steps, state dim
         states = torch.zeros(T, N, device=device)
         inputs = torch.randn(T, N, device=device)
         observ = torch.zeros(T, N, device=device)
@@ -31,13 +31,12 @@ class TestUKF:
         estim = torch.randn(T, N, device=device) * p
 
         for i in range(T - 1):
-            print('%d is start' % (i + 1))
             w = q * torch.randn(N, device=device)  # transition noise
             v = r * torch.randn(N, device=device)  # observation noise
             states[i + 1], observ[i] = model(states[i] + w, inputs[i])
             estim[i + 1], P[i + 1] = ukf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
         error = (states - estim).norm(dim=-1)
-
+        print(error)
         assert torch.all(error[0] - error[-1] > 0), "Filter error last step too large."
 
 

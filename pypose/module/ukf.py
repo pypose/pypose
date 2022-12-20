@@ -18,51 +18,43 @@ class UKF(nn.Module):
         return 1 / (2 * self.dim)
 
     def compute_sigma(self, x, u, P, C, D, c2):  # compute sigma point
-
+        r'''
+        compute sigma point
+        '''
         x_sigma = []
         y_sigma = []
         for loop in range(1, self.loop_range):
 
             if loop <= self.dim:
-                x_ = x + torch.sqrt_(self.weight * P).mT
+                x_ = x + torch.sqrt_(self.weight * P).mT[loop-1]
             else:
-                x_ = x - torch.sqrt_(self.weight * P).mT
-
-            y_ = bmv(C, x_) + bmv(D, u) + c2  # compute Observation
+                x_ = x - torch.sqrt_(self.weight * P).mT[loop - self.dim-1]
+            y_ = bmv(C, x_) + bmv(D, u) + c2    # compute Observation
             x_sigma.append(x_)
             y_sigma.append(y_)
 
-        return torch.cat(x_sigma, dim=0), torch.cat(y_sigma, dim=0)
+        return torch.cat(x_sigma, dim=0).reshape(-1,self.dim), torch.cat(y_sigma, dim=0).reshape(-1,self.dim)
 
-    def compute_conv_mix(self, P, x_estimate, x_sigma, y_estimate, y_sigma):  # compute mix covariance
+    def compute_conv_mix(self, P, x_estimate, x_sigma, y_estimate, y_sigma):
+        r'''
+        compute mix covariance
+        '''
+        p_estimate = torch.zeros((P.shape), device=P.device, dtype=P.dtype)
+        e_x = torch.sub(x_sigma,x_estimate).unsqueeze(1)
+        e_y = torch.sub(y_sigma,y_estimate).unsqueeze(1)
+        p_estimate+= torch.sum(torch.bmm(e_x,e_y.permute(0, 2, 1)))
 
+        return self.weight * p_estimate
+
+    def compute_conv(self, P, estimate, sigma, noise=0):
+        r'''
+        compute covariance
+        '''
         P_estimate = torch.zeros((P.shape), device=P.device, dtype=P.dtype)
-        for loop in range(1, self.loop_range):
-            e_x = x_sigma[loop - 1] - x_estimate
-            e_y = y_sigma[loop - 1] - y_estimate
+        e = torch.sub(sigma,estimate).unsqueeze(1)
+        P_estimate += torch.sum(torch.bmm(e, e.permute(0, 2, 1)))
 
-            P_estimate += torch.matmul(e_x, e_y.t()) * self.weight
-
-        return P_estimate
-
-    def compute_conv(self, P, estimate, sigma, noise=0):  # compute covariance
-
-        P_estimate = torch.zeros((P.shape), device=P.device, dtype=P.dtype)
-
-        for loop in range(1, self.loop_range):
-            e = sigma[loop - 1] - estimate
-            P_estimate += self.weight * torch.matmul(e, e.t())
-
-        return P_estimate + noise
-
-    def matrix_conv(self, P, estimate, sigma,
-                    noise):  # Optimal State Estimation: Kalman, H∞, and Nonlinear Approaches 14.49 Covariance matrix approximation， Is this correct ?
-
-        P_estimate = torch.zeros((P.shape), device=P.device, dtype=P.dtype)
-        for loop in range(1, self.loop_range):
-            print(estimate)
-            P_estimate += estimate @ P @ estimate.t() * self.weight
-        return P_estimate + noise
+        return self.weight*P_estimate + noise
 
     def forward(self, x, y, u, P, Q=None, R=None):
         r'''

@@ -3,9 +3,9 @@ import pypose as pp
 import torch as torch
 
 
-class TestKalman:
+class TestEKF:
 
-    def test_kalman(self):
+    def test_ekf(self):
 
         class NTI(pp.module.System):
             def __init__(self):
@@ -37,9 +37,10 @@ class TestKalman:
             states[i+1], observ[i] = model(states[i] + w, inputs[i])
             estim[i+1], P[i+1] = ekf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
         error =  (states - estim).norm(dim=-1)
+
         assert torch.all(error[0] - error[-1] > 0), "Filter error last step too large."
 
 
 if __name__ == '__main__':
-    test = TestKalman()
-    test.test_kalman()
+    test = TestEKF()
+    test.test_ekf()
