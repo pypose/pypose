@@ -44,17 +44,20 @@ class UKF(nn.Module):
         e_y = torch.sub(y_sigma,y_estimate).unsqueeze(1)
         p_estimate+= torch.sum(torch.bmm(e_x,e_y.permute(0, 2, 1)))
 
+        p_estimate = torch.sum(torch.diag_embed(p_estimate),dim = 0)
         return self.weight * p_estimate
 
     def compute_conv(self, P, estimate, sigma, noise=0):
         r'''
         compute covariance
         '''
-        P_estimate = torch.zeros((P.shape), device=P.device, dtype=P.dtype)
+        p_estimate = torch.zeros((P.shape), device=P.device, dtype=P.dtype)
         e = torch.sub(sigma,estimate).unsqueeze(1)
-        P_estimate += torch.sum(torch.bmm(e, e.permute(0, 2, 1)))
+        p_estimate += torch.sum(torch.bmm(e, e.permute(0, 2, 1)))
+        p_estimate = torch.sum(torch.diag_embed(p_estimate),dim = 0)
 
-        return self.weight*P_estimate + noise
+
+        return self.weight*p_estimate + noise
 
     def forward(self, x, y, u, P, Q=None, R=None):
         r'''
@@ -79,9 +82,11 @@ class UKF(nn.Module):
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
         x = bmv(A, x) + bmv(B, u) + c1
+
         self.dim = x.shape[0]
         self.weight = self.compute_weight()
         self.loop_range = self.dim * 2 + 1
+
 
         # compute sigma point,mean,covariance
         x_sigma, y_sigma = self.compute_sigma(x, u, P, C, D, c2)
