@@ -11,7 +11,7 @@ class Bicycle(pp.module.System):
     This is an implementation of the 2D Bicycle kinematic model,
     see: https://dingyan89.medium.com/simple-understanding-of-kinematic-bicycle-model-81cac6420357
     The robot is given a rotational and forward velocity, and traverses the 2D plane accordingly.
-    This model is Nonlinear Time Invariant (NTI) and can be filtered with the ``pp.module.EKF``.
+    This model is Nonlinear Time Invariant (NTI) and can be filtered with the ``pp.module.UKF``.
     '''
     def __init__(self):
         super().__init__()
@@ -64,7 +64,7 @@ def createPlot(state, est, cov):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='EKF Example')
+    parser = argparse.ArgumentParser(description='UKF Example')
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
     args = parser.parse_args()
 

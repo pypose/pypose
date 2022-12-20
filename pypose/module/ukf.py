@@ -77,10 +77,10 @@ class UKF(nn.Module):
         r'''
         compute mix covariance
         '''
-        p_estimate = torch.zeros((P.shape), device=P.device, dtype=P.dtype)
+        # p_estimate = torch.zeros((P.shape), device=P.device, dtype=P.dtype)
         e_x = torch.sub(x_sigma,x_estimate).unsqueeze(2)
         e_y = torch.sub(y_sigma,y_estimate).unsqueeze(2)
-        p_estimate+= torch.sum(torch.bmm(e_x,e_y.permute(0, 2, 1)),dim = 0)
+        p_estimate = torch.sum(torch.bmm(e_x,e_y.permute(0, 2, 1)),dim = 0)
 
         # p_estimate =torch.diag_embed(p_estimate)[0]
         return self.weight * p_estimate
@@ -89,9 +89,9 @@ class UKF(nn.Module):
         r'''
         compute covariance
         '''
-        p_estimate = torch.zeros((P.shape), device=P.device, dtype=P.dtype)
+
         e = torch.sub(sigma,estimate).unsqueeze(2)
-        p_estimate += torch.sum(torch.bmm(e, e.permute(0, 2, 1)),dim =0 )
+        p_estimate = torch.sum(torch.bmm(e, e.permute(0, 2, 1)),dim =0 )
         # p_estimate =torch.diag_embed(p_estimate)[0]
 
 
