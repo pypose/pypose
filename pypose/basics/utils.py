@@ -33,7 +33,7 @@ def matrix_taylor_polynomial(p, I):
     return p_sqrt
 
 
-def matrix_pade_approximant(p, I):
+def matrix_pade_approximant(p, I, matrix_compute_device):
     p_sqrt = pade_p[0] * I
     q_sqrt = pade_q[0] * I
     p_app = I - p
@@ -46,12 +46,15 @@ def matrix_pade_approximant(p, I):
     # It seems that single matrix is faster on CPU and batched matrices are faster on GPU
     # Please check which one is faster before running the code;
 
-    if I.device == torch.device('cpu'):
+    if I.device == torch.device('cuda:0') and matrix_compute_device == 'cpu':
 
-        return torch.linalg.solve(q_sqrt, p_sqrt)
+        return torch.linalg.solve(q_sqrt.cpu(), p_sqrt.cpu()).cuda()
+    elif I.device == torch.device('cpu') and matrix_compute_device == 'cuda':
+
+        return torch.linalg.solve(q_sqrt.cuda(), p_sqrt.cuda()).cpu()
     else:
 
-        return torch.linalg.solve(q_sqrt.cuda(), p_sqrt.cuda()).cuda()
+        return torch.linalg.solve(q_sqrt, p_sqrt)
     # return torch.linalg.solve(q_sqrt, p_sqrt)
     # return torch.linalg.solve(q_sqrt.cpu(), p_sqrt.cpu()).cuda()
     # return torch.linalg.inv(q_sqrt).mm(p_sqrt)
@@ -79,13 +82,15 @@ def matrix_pade_approximant_inverse(p, I):
 # Differentiable Matrix Square Root by MPA_Lya
 class MPA_Lya(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, M):
+    def forward(ctx, param):
+        M = param[0]
+        matrix_compute_device = param[1]
         normM = torch.norm(M, dim=[1, 2]).reshape(M.size(0), 1, 1)
         I = torch.eye(M.size(1), requires_grad=False, device=M.device).reshape(1, M.size(1), M.size(1)).repeat(
             M.size(0), 1, 1)
         # This is for MTP calculation
         # M_sqrt = matrix_taylor_polynomial(M/normM,I)
-        M_sqrt = matrix_pade_approximant(M / normM, I)
+        M_sqrt = matrix_pade_approximant(M / normM, I, matrix_compute_device)
         M_sqrt = M_sqrt * torch.sqrt(normM)
         ctx.save_for_backward(M, M_sqrt, normM, I)
         return M_sqrt

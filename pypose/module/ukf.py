@@ -10,10 +10,11 @@ class UKF(nn.Module):
     Performs Batched Unscented Kalman Filter (UKF).
     '''
 
-    def __init__(self, model, Q=None, R=None):
+    def __init__(self, model, Q=None, R=None, matrix_square_root_device='cpu'):
         super().__init__()
         self.set_uncertainty(Q=Q, R=R)
         self.model = model
+        self.matrix_square_root_device = matrix_square_root_device
 
     def compute_weight(self):
         return 1 / (2 * self.dim)
@@ -29,13 +30,14 @@ class UKF(nn.Module):
         for loop in range(1, self.loop_range):
 
             nP = (self.dim * P).unsqueeze(0)
+            param = nP, self.matrix_square_root_device
 
             if loop <= self.dim:
 
-                x_ = x + matrix_sqrt(nP)[0].mT[loop - 1]
+                x_ = x + matrix_sqrt(param)[0].mT[loop - 1]
             else:
 
-                x_ = x - matrix_sqrt(nP)[0].mT[loop - self.dim - 1]
+                x_ = x - matrix_sqrt(param)[0].mT[loop - self.dim - 1]
 
             y_ = bmv(C, x_) + bmv(D, u) + c2  # compute Observation
             x_sigma.append(x_)

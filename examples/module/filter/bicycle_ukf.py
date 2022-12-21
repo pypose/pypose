@@ -13,6 +13,7 @@ class Bicycle(pp.module.System):
     The robot is given a rotational and forward velocity, and traverses the 2D plane accordingly.
     This model is Nonlinear Time Invariant (NTI) and can be filtered with the ``pp.module.UKF``.
     '''
+
     def __init__(self):
         super().__init__()
 
@@ -53,9 +54,9 @@ def createPlot(state, est, cov):
         ax.add_artist(e)
         e.set_facecolor("none")
         e.set_edgecolor(color[i])
-    state_plot = ax.quiver(state[:-1,0], state[:-1,1],
-                state[1:,0]-state[:-1,0], state[1:,1]-state[:-1,1],
-                scale_units="xy", angles="xy", scale=1, color=color, label="True State")
+    state_plot = ax.quiver(state[:-1, 0], state[:-1, 1],
+                           state[1:, 0] - state[:-1, 0], state[1:, 1] - state[:-1, 1],
+                           scale_units="xy", angles="xy", scale=1, color=color, label="True State")
     est_plot, = ax.plot(est[:, 0], est[:, 1], '.-', label="Estimated State")
     ax.legend(handler_map={est_plot: HandlerLine2D(numpoints=1)})
     plt.title("UKF Example")
@@ -66,26 +67,27 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='UKF Example')
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
+    parser.add_argument("--matrix_square_root_device", type=str, default='cpu', help="cuda or cpu")
     args = parser.parse_args()
-
     device = args.device
-    T, N, M = 30, 3, 2     # steps, state dim, input dim
+    matrix_square_root_device = args.matrix_square_root_device
+    T, N, M = 30, 3, 2  # steps, state dim, input dim
     q, r, p = 0.2, 0.2, 5  # covariance of transition noise, observation noise, and estimation
     input = torch.randn(T, M, device=device) * 0.1 + torch.tensor([1, 0], device=device)
-    state = torch.zeros(T, N, device=device)                   # true states
-    est   = torch.randn(T, N, device=device) * p               # estimation
-    obs   = torch.zeros(T, N, device=device)                   # observation
-    P     = torch.eye(N, device=device).repeat(T, 1, 1) * p**2 # estimation covariance
-    Q     = torch.eye(N, device=device) * q**2                 # covariance of transition
-    R     = torch.eye(N, device=device) * r**2                 # covariance of observation
+    state = torch.zeros(T, N, device=device)  # true states
+    est = torch.randn(T, N, device=device) * p  # estimation
+    obs = torch.zeros(T, N, device=device)  # observation
+    P = torch.eye(N, device=device).repeat(T, 1, 1) * p ** 2  # estimation covariance
+    Q = torch.eye(N, device=device) * q ** 2  # covariance of transition
+    R = torch.eye(N, device=device) * r ** 2  # covariance of observation
 
     robot = Bicycle().to(device)
-    ukf = UKF(robot, Q, R).to(device)
+    ukf = UKF(robot, Q, R, matrix_square_root_device).to(device)
 
     for i in range(T - 1):
         w = q * torch.randn(N, device=device)
         v = r * torch.randn(N, device=device)
-        state[i+1], obs[i] = robot(state[i] + w, input[i])  # model measurement
-        est[i+1], P[i+1] = ukf(est[i], obs[i] + v, input[i], P[i])
+        state[i + 1], obs[i] = robot(state[i] + w, input[i])  # model measurement
+        est[i + 1], P[i + 1] = ukf(est[i], obs[i] + v, input[i], P[i])
 
     createPlot(state, est, P)
