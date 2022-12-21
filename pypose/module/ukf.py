@@ -27,28 +27,30 @@ class UKF(nn.Module):
         matrix_sqrt = MPA_Lya.apply
 
         for loop in range(1, self.loop_range):
+
             nP = (self.dim * P).unsqueeze(0)
+
             if loop <= self.dim:
 
-                x_ = x + matrix_sqrt(nP)[0].mT[loop-1]
+                x_ = x + matrix_sqrt(nP)[0].mT[loop - 1]
             else:
 
-                x_ = x - matrix_sqrt(nP)[0].mT[loop - self.dim-1]
+                x_ = x - matrix_sqrt(nP)[0].mT[loop - self.dim - 1]
 
-            y_ = bmv(C, x_) + bmv(D, u) + c2    # compute Observation
+            y_ = bmv(C, x_) + bmv(D, u) + c2  # compute Observation
             x_sigma.append(x_)
             y_sigma.append(y_)
 
-        return torch.cat(x_sigma, dim=0).reshape(-1,self.dim), torch.cat(y_sigma, dim=0).reshape(-1,self.dim)
+        return torch.cat(x_sigma, dim=0).reshape(-1, self.dim), torch.cat(y_sigma, dim=0).reshape(-1, self.dim)
 
     def compute_conv_mix(self, x_estimate, x_sigma, y_estimate, y_sigma):
         r'''
         compute mix covariance
         '''
 
-        e_x = torch.sub(x_sigma,x_estimate).unsqueeze(2)
-        e_y = torch.sub(y_sigma,y_estimate).unsqueeze(2)
-        p_estimate = torch.sum(torch.bmm(e_x,e_y.permute(0, 2, 1)),dim = 0)
+        e_x = torch.sub(x_sigma, x_estimate).unsqueeze(2)
+        e_y = torch.sub(y_sigma, y_estimate).unsqueeze(2)
+        p_estimate = torch.sum(torch.bmm(e_x, e_y.permute(0, 2, 1)), dim=0)
 
         return self.weight * p_estimate
 
@@ -57,8 +59,8 @@ class UKF(nn.Module):
         compute covariance
         '''
 
-        e = torch.sub(sigma,estimate).unsqueeze(2)
-        p_estimate = torch.sum(torch.bmm(e, e.permute(0, 2, 1)),dim =0 )
+        e = torch.sub(sigma, estimate).unsqueeze(2)
+        p_estimate = torch.sum(torch.bmm(e, e.permute(0, 2, 1)), dim=0)
 
         return self.weight * p_estimate + noise
 
@@ -89,7 +91,6 @@ class UKF(nn.Module):
         self.dim = x.shape[0]
         self.weight = self.compute_weight()
         self.loop_range = self.dim * 2 + 1
-
 
         # compute sigma point,mean,covariance
         x_sigma, y_sigma = self.compute_sigma(x, u, P, C, D, c2)
