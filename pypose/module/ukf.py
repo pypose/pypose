@@ -161,13 +161,15 @@ class UKF(nn.Module):
         matrix_sqrt = MPA_Lya.apply
 
         # gather index
-        index_repeat = tuple(torch.cat([torch.tensor([2], dtype=torch.int64), torch.ones(self.dim - 1, dtype=torch.int64)]).numpy())
+        index_repeat = tuple(
+            torch.cat([torch.tensor([2], dtype=torch.int64), torch.ones(self.dim - 1, dtype=torch.int64)]).numpy())
         index_weight = torch.arange(self.dim, device=P.device, dtype=P.dtype).unsqueeze(1)
         index = torch.ones(self.dim, self.dim, device=P.device, dtype=P.dtype)
 
-        index_finall = torch.as_tensor(index * index_weight, dtype=torch.int64, device=P.device).repeat(index_repeat).unsqueeze(1).reshape(2 * self.dim, 1, self.dim)
+        index_finall = torch.as_tensor(index * index_weight, dtype=torch.int64, device=P.device).repeat(
+            index_repeat).unsqueeze(1).reshape(2 * self.dim, 1, self.dim)
 
-        #compute root of P
+        # compute root of P
         repeat_dim = tuple(torch.cat([torch.tensor([self.dim * 2]), torch.tensor(P.shape)]).numpy())  # repeat dim
         p_repeat = P.expand(repeat_dim)
 
@@ -187,13 +189,13 @@ class UKF(nn.Module):
         compute mix covariance
 
         Args:
-        x_estimate (:obj:`Tensor`): matrices to be multiplied.
-        x_sigma (:obj:`Tensor`): vectors to be multiplied.
-        y_estimate (:obj:`Tensor`): matrices to be multiplied.
-        y_sigma (:obj:`Tensor`): vectors to be multiplied.
+            x_estimate (:obj:`Tensor`):  System prior state estimation.
+            x_sigma (:obj:`Tensor`):  Sigma point of estimation.
+            y_estimate (:obj:`Tensor`): Observation  estimation.
+            y_sigma (:obj:`Tensor`): Observation estimation of sigma point .
 
         Return:
-            out (:obj:`Tensor`): the mix covariance of x,y .
+            out (:obj:`Tensor`): Prior state estimation of mix covariance .
         '''
 
         e_x = torch.sub(x_sigma, x_estimate).unsqueeze(2)
@@ -207,11 +209,11 @@ class UKF(nn.Module):
         compute covariance
 
         Args:
-        estimate (:obj:`Tensor`): estimate.
-        sigma (:obj:`Tensor`):  sigma point of  estimate.
+            estimate (:obj:`Tensor`): System estimate.
+            sigma (:obj:`Tensor`):  Sigma point of estimate.
 
         Return:
-            out (:obj:`Tensor`): the  covariance of estimate .
+            out (:obj:`Tensor`): the covariance of estimate .
         '''
 
         e = torch.sub(sigma, estimate).unsqueeze(2)
