@@ -81,6 +81,9 @@ def matrix_pade_approximant_inverse(p, I):
 
 # Differentiable Matrix Square Root by MPA_Lya
 class MPA_Lya(torch.autograd.Function):
+    def __int__(self,matrix_compute_device='cpu'):
+        self.matrix_compute_device = matrix_compute_device
+        print(matrix_compute_device)
     @staticmethod
     def forward(ctx, param):
         M = param[0]
