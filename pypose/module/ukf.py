@@ -161,46 +161,26 @@ class UKF(nn.Module):
         matrix_sqrt = MPA_Lya.apply
 
         # gather index
-        index_repeat =  tuple(torch.cat([torch.tensor([2],dtype=torch.int64), torch.ones(self.dim-1,dtype=torch.int64)]).numpy())
-        index_weight = torch.arange(self.dim,device=P.device,dtype=P.dtype).unsqueeze(1)
-        index = torch.ones(self.dim,self.dim,device=P.device,dtype=P.dtype)
-        index_finall = torch.tensor(index * index_weight,dtype=torch.int64,device=P.device).repeat(index_repeat).unsqueeze(1).reshape(2*self.dim,1,self.dim)
+        index_repeat = tuple(torch.cat([torch.tensor([2], dtype=torch.int64), torch.ones(self.dim - 1, dtype=torch.int64)]).numpy())
+        index_weight = torch.arange(self.dim, device=P.device, dtype=P.dtype).unsqueeze(1)
+        index = torch.ones(self.dim, self.dim, device=P.device, dtype=P.dtype)
 
+        index_finall = torch.as_tensor(index * index_weight, dtype=torch.int64, device=P.device).repeat(index_repeat).unsqueeze(1).reshape(2 * self.dim, 1, self.dim)
 
-        repeat_dim = tuple(torch.cat([torch.tensor([self.dim * 2]), torch.tensor(P.shape)]).numpy()) #repeat dim
+        #compute root of P
+        repeat_dim = tuple(torch.cat([torch.tensor([self.dim * 2]), torch.tensor(P.shape)]).numpy())  # repeat dim
         p_repeat = P.expand(repeat_dim)
-        np_repeat = self.dim * p_repeat  # np calculate
-        np_repeat = matrix_sqrt([np_repeat, self.matrix_square_root_device]) #square root of np
+
+        np_repeat = self.dim * p_repeat  # calculate np
+        np_repeat = matrix_sqrt([np_repeat, self.matrix_square_root_device])  # square root of np
         np_repeat[self.dim:] *= -1
-        np_repeat_select = np_repeat.gather(1, index_finall) #select point from np_repeat
+        np_repeat_select = np_repeat.gather(1, index_finall)  # select point from np_repeat
 
+        # compute sigma point
+        x_sigma = x + np_repeat_select
+        y_sigma = bmv(C, x_sigma) + bmv(D, u) + c2
 
-        x_sigma1 = x+np_repeat_select
-        y_sigma1 = bmv(C,x_sigma1) + bmv(D,u) + c2
-
-        x_sigma = []
-        y_sigma = []
-        for loop in range(1, self.loop_range):
-
-
-            nP = (self.dim * P).unsqueeze(0)
-            param = nP, self.matrix_square_root_device
-
-            if loop <= self.dim:
-
-                x_ = x + matrix_sqrt(param)[0].mT[loop - 1]
-            else:
-
-                x_ = x - matrix_sqrt(param)[0].mT[loop - self.dim - 1]
-
-            y_ = bmv(C, x_) + bmv(D, u) + c2  # compute Observation
-            x_sigma.append(x_)
-            y_sigma.append(y_)
-        x_sigma = torch.cat(x_sigma, dim=0).reshape(-1, self.dim)
-        y_sigma = torch.cat(y_sigma, dim=0).reshape(-1, self.dim)
-        print(sum(x_sigma.view(-1)-x_sigma1.view(-1)),sum(y_sigma.view(-1)-y_sigma1.view(-1)))
-
-        return x_sigma1.reshape(-1, self.dim), y_sigma1.reshape(-1, self.dim)
+        return x_sigma.reshape(-1, self.dim), y_sigma.reshape(-1, self.dim)
 
     def compute_conv_mix(self, x_estimate, x_sigma, y_estimate, y_sigma):
         r'''
