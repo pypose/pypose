@@ -33,41 +33,63 @@ class UKF(nn.Module):
 
     .. math::
         \begin{align*}
-            \mathbf{z}_{k+1} = \mathbf{A}_{k}\mathbf{x}_{k} + \mathbf{B}_{k}\mathbf{u}_{k}
+            \mathbf{z}_{k+1} &= \mathbf{A}_{k}\mathbf{x}_{k} + \mathbf{B}_{k}\mathbf{u}_{k}
                              + \mathbf{c}_{k}^1 + \mathbf{w}_k\\
-            \mathbf{y}_{k} = \mathbf{C}_{k}\mathbf{x}_{k} + \mathbf{D}_{k}\mathbf{u}_{k}
+            \mathbf{y}_{k} &= \mathbf{C}_{k}\mathbf{x}_{k} + \mathbf{D}_{k}\mathbf{u}_{k}
                            + \mathbf{c}_{k}^2 + \mathbf{v}_k\\
         \end{align*}
 
     UKF can be described as the following five equations, where the subscript :math:`\cdot_{k}`
     is omited for simplicity.
 
-    1. Priori State Estimation.
+    1.Sigma Point.
 
         .. math::
-            \mathbf{x}^{-} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u}_k + \mathbf{c}_1
+            \begin{align*}
+                \mathbf{x}^{\left ( i \right ) } = \mathbf{x}^{+} +  \mathbf{\check{x }}^{\left ( i \right ) },
+                \quad i=\quad1,...,2n\\
+                \mathbf{\check{x}}^{\left ( i \right ) }  = \left ( \sqrt{nP}  \right ) _{i}^{T},
+                 \quad i=\quad1,...,n\\
+                \mathbf{\check{x}}^{\left ( n+i \right ) }  = -\left ( \sqrt{nP}  \right ) _{i}^{T},
+                 \quad i=\quad1,...,n\\
+            \end{align*}
 
-    2. Priori Covariance Propagation.
+    2. Priori State Estimation.
 
         .. math::
-            \mathbf{P}^{-} = \mathbf{A}\mathbf{P}\mathbf{A}^{T} + \mathbf{Q}
+             \mathbf{x}^{-} = \frac{1}{2n} \sum_{i=1}^{2n} \left ( f\left ( x^{i},u,t  \right ) +w_{k}  \right )
 
+    3. Priori Covariance.
+
+        .. math::
+            \mathbf{P}_{k}^{-} = \frac{1}{2} \sum_{1}^{2n}\left ( x^{\left ( i \right ) }-x^{-}  \right )  \left ( x^{\left ( i \right )} -x^- \right )^T+\mathbf{Q}_{k-1}
+
+    4.Observational estimation
+
+        .. math::
+            \check{y} = \frac{1}{2n} \sum_{i=1}^{2n}\left (g\left ( x^{i},u,t \right ) +\mathbf{R}_{k}   \right  )
+    5 Observational Covariance.
+
+        .. math::
+            \mathbf{P}_{y} = \frac{1}{2n} \sum_{i=1}^{2n}\left ( y^{\left ( i \right ) }- \check{y}  \right )  \left ( y^{\left ( i \right )} - \check{y} \right )^T+\mathbf{R}_{k}
+    6 Priori and Observation Covariance :
+
+        .. math::
+            \mathbf{P}_{xy} = \frac{1}{2n} \sum_{i=1}^{2n}\left ( x^{\left ( i \right ) }-x^-  \right )  \left ( y^{\left ( i \right )} -\check{y} \right )^T
     3. Update Kalman Gain
 
         .. math::
-            \mathbf{K} = \mathbf{P}\mathbf{C}^{T}
-                        (\mathbf{C}\mathbf{P} \mathbf{C}^{T} + \mathbf{R})^{-1}
+            \mathbf{K} = \mathbf{P}_{xy}\mathbf{P}_{y}^{-1}
 
     4. Posteriori State Estimation
 
         .. math::
-            \mathbf{x}^{+} = \mathbf{x}^{-} + \mathbf{K} (\mathbf{y} -
-                        \mathbf{C}\mathbf{x}^{-} - \mathbf{D}\mathbf{u} - \mathbf{c}_2)
+            \mathbf{x}^{+} = \mathbf{x}^{-} + \mathbf{K} (y-\check{y} )
 
     5. Posteriori Covariance Estimation
 
         .. math::
-            \mathbf{P} = (\mathbf{I} - \mathbf{K}\mathbf{C}) \mathbf{P}^{-}
+            \mathbf{P} = \mathbf{P}_{k}^{-} - \mathbf{K}\mathbf{P}_{y}\mathbf{K}_T
 
     where superscript :math:`\cdot^{-}` and :math:`\cdot^{+}` denote the priori and
     posteriori estimation, respectively.
@@ -112,7 +134,7 @@ class UKF(nn.Module):
         ...     states[i+1], observ[i] = model(states[i] + w, inputs[i])
         ...     estim[i+1], P[i+1] = ukf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
         ... print('Est error:', (states - estim).norm(dim=-1))
-        Est error: tensor([10.9069,  9.6868,  1.7228,  1.6782,  0.5352])
+        Est error: tensor([8.8161, 9.0322, 5.4756, 2.2453, 0.9141])
 
     Warning:
         Don't introduce noise in ``System`` methods ``state_transition`` and ``observation``
@@ -195,7 +217,7 @@ class UKF(nn.Module):
             y_sigma (:obj:`Tensor`): Observation estimation of sigma point .
 
         Return:
-            out (:obj:`Tensor`): Prior state estimation of mix covariance .
+            out (:obj:`Tensor`): Mix covariance pf prior state estimation   .
         '''
 
         e_x = torch.sub(x_sigma, x_estimate).unsqueeze(2)
@@ -213,7 +235,7 @@ class UKF(nn.Module):
             sigma (:obj:`Tensor`):  Sigma point of estimate.
 
         Return:
-            out (:obj:`Tensor`): the covariance of estimate .
+            out (:obj:`Tensor`): the covariance of  prior state estimation .
         '''
 
         e = torch.sub(sigma, estimate).unsqueeze(2)
@@ -243,7 +265,7 @@ class UKF(nn.Module):
         c1, c2 = self.model.c1, self.model.c2
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
-        x = bmv(A, x) + bmv(B, u) + c1
+        # x = bmv(A, x) + bmv(B, u) + c1
 
         self.dim = x.shape[0]
         self.weight = self.compute_weight()
@@ -251,9 +273,11 @@ class UKF(nn.Module):
 
         # compute sigma point,mean,covariance
         x_sigma, y_sigma = self.compute_sigma(x, u, P, C, D, c2)
+        x_sigma =  bmv(A,x_sigma) + bmv(B, u) + c1
         x_estimate = self.weight * torch.sum(x_sigma, dim=0)
         Pk = self.compute_conv(x_estimate, x_sigma, Q)
         x_sigma, y_sigma = self.compute_sigma(x_estimate, u, Pk, C, D, c2)
+
         y_estimate = self.weight * torch.sum(y_sigma, dim=0)
         Py = self.compute_conv(y_estimate, y_sigma, R)
         Pxy = self.compute_conv_mix(x_estimate, x_sigma, y_estimate, y_sigma)

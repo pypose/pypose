@@ -10,4 +10,6 @@ Modules
    module.System
    module.LTI
    module.EKF
+   module.UKF
    module.IMUPreintegrator
+   
