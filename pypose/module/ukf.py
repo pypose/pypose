@@ -188,7 +188,7 @@ class UKF(nn.Module):
         index_weight = torch.arange(self.dim, device=P.device, dtype=P.dtype).unsqueeze(1)
         index = torch.ones(self.dim, self.dim, device=P.device, dtype=P.dtype)
 
-        index_finall = torch.as_tensor(index * index_weight, dtype=torch.int64, device=P.device).repeat(
+        index_gather = torch.as_tensor(index * index_weight, dtype=torch.int64, device=P.device).repeat(
             index_repeat).unsqueeze(1).reshape(2 * self.dim, 1, self.dim)
 
         # compute root of P
@@ -198,7 +198,7 @@ class UKF(nn.Module):
         np_repeat = self.dim * p_repeat  # calculate np
         np_repeat = matrix_sqrt([np_repeat, self.matrix_square_root_device])  # square root of np
         np_repeat[self.dim:] *= -1
-        np_repeat_select = np_repeat.gather(1, index_finall)  # select point from np_repeat
+        np_repeat_select = np_repeat.gather(1, index_gather)  # select point from np_repeat
 
         # compute sigma point
         x_sigma = x + np_repeat_select
@@ -273,7 +273,7 @@ class UKF(nn.Module):
 
         # compute sigma point,mean,covariance
         x_sigma, y_sigma = self.compute_sigma(x, u, P, C, D, c2)
-        x_sigma =  bmv(A,x_sigma) + bmv(B, u) + c1
+        x_sigma = bmv(A, x_sigma) + bmv(B, u) + c1
         x_estimate = self.weight * torch.sum(x_sigma, dim=0)
         Pk = self.compute_conv(x_estimate, x_sigma, Q)
         x_sigma, y_sigma = self.compute_sigma(x_estimate, u, Pk, C, D, c2)
