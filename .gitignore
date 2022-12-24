@@ -134,3 +134,6 @@ docs/source/generated
 
 # Operating system
 .DS_Store
+
+# training folder
+/work

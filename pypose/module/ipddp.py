@@ -424,7 +424,8 @@ class ddpOptimizer:
                 cost = qnew.sum() + fp.computep(xnew[-1])
                 costq = qnew.sum()
 
-                logcost = copy.deepcopy(cost)  
+                # logcost = copy.deepcopy(cost)
+                logcost = cost.detach()
                 err = torch.Tensor([0.])          
                 if (alg.infeas):
                     for i in range(self.N): 
@@ -488,7 +489,7 @@ class ddpOptimizer:
                 print('\n')
                 print('Iteration','Time','mu','Cost','Opt. error','Reg. power','Stepsize')
                 print('\n')
-            print('%-12d%-12.4g%-12.4g%-12.4g%-12.4g%-12d%-12.3f\n'%(
+                print('%-12d%-12.4g%-12.4g%-12.4g%-12.4g%-12d%-12.3f\n'%(
                         iter, time_used, self.alg.mu, self.fp.cost, self.bp.opterr, self.bp.reg, self.fp.stepsize))
 
             #-----------termination conditions---------------
