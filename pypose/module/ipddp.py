@@ -21,6 +21,11 @@ class algParam:
         self.infeas = infeas
 
 class fwdPass:
+    r'''
+    The class used in forwardpass 
+    here forwardpass means compute trajectory from inputs
+    (different from the forward in neural network) 
+    '''
     def __init__(self,sys=None, stage_cost=None, terminal_cost=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=1, init_traj=None):
         self.f_fn = sys
         self.p_fn = terminal_cost
@@ -30,6 +35,8 @@ class fwdPass:
         self.n_state = n_state
         self.n_input = n_input
         self.n_cons = n_cons
+
+        # initilize all the variables used in the forward pass
         # defined in dynamics function
         # self.x = torch.zeros(self.N+1, 1, self.n_state)
         # self.u = torch.zeros(self.N,   1, self.n_input)
@@ -152,6 +159,11 @@ class fwdPass:
         self.failed = False
 
 class bwdPass:
+    r'''
+    The class used in backwardpass 
+    here backwardpass means compute gains for next iteration from current trajectory
+    (different from the backward in neural network, which computes the gradient) 
+    '''
     def __init__(self, sys=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=1):
         self.f_fn = sys
         self.c_fn = cons
@@ -184,13 +196,24 @@ class bwdPass:
         self.recovery = 0
 
 class ddpOptimizer:
+    r'''
+    The class of ipddp optimizer
+    iterates between forwardpass and backwardpass to get a final trajectory
+    '''
     def __init__(self, sys=None, stage_cost=None, terminal_cost=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=None, init_traj=None):
+        r'''
+        Initialize three key classes
+        '''
         self.alg = algParam()
         self.fp = fwdPass(sys=sys, stage_cost=stage_cost, terminal_cost=terminal_cost, cons=cons, n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon, init_traj=init_traj)
         self.bp = bwdPass(sys=sys,            cons=cons,n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon)
         self.N = horizon
 
+
     def backwardpass(self):
+        r'''
+        Compute controller gains for next iteration from current trajectory.
+        '''
         fp = self.fp
         bp = self.bp
         alg = self.alg
@@ -203,6 +226,7 @@ class ddpOptimizer:
         mu_err = torch.tensor(0.0)
         Qu_err = torch.tensor(0.0)
 
+        # set regularization parameter
         if (fp.failed or bp.failed):
             bp.reg += 1.0
         elif (fp.step == 0):
@@ -217,6 +241,7 @@ class ddpOptimizer:
         elif (bp.reg > 24.0):
             bp.reg = 24.0
 
+        # recompute the first, second derivatives of the updated trajectory
         if ~fp.failed:
             fp.computeall()
         
@@ -226,6 +251,7 @@ class ddpOptimizer:
         qx,qu,qxx,qxu,quu = fp.qx, fp.qu, fp.qxx, fp.qxu, fp.quu   
         cx, cu = fp.cx, fp.cu
 
+        # backward recursions, similar to iLQR backward recursion, but more variables involved
         for i in range(self.N-1, -1, -1):
             Qx = qx[i] + cx[i].mT.matmul(s[i]) + fx[i].mT.matmul(Vx)
             Qu = qu[i] + cu[i].mT.matmul(s[i]) + fu[i].mT.matmul(Vx) # (5b)
@@ -238,7 +264,7 @@ class ddpOptimizer:
             # todo S = s[i].asDiagonal();
             Quu_reg = Quu + quu[i] * (pow(fp.reg_exp_base, bp.reg) - 1.)
 
-            if (alg.infeas):
+            if (alg.infeas): #  start from infeasible/feasible trajs.
                 r = s[i] * y[i] - alg.mu
                 rhat = s[i] * (c[i] + y[i]) - r
                 yinv = 1. / y[i]
@@ -303,9 +329,9 @@ class ddpOptimizer:
                 temp = torch.hstack(( Qu, tempQux))
 
                 kK = - torch.linalg.solve(Quu_reg - cuitSCinvcui, temp)
-
                 ku = torch.unsqueeze(kK[:,0],-1)
                 Ku = kK[:,1:]
+
                 cuiku = cu[i].matmul(ku)
                 bp.ks[i] = - cinv * (r + s[i] * cuiku)
                 bp.Ks[i] = - SCinv.matmul(cx[i] + cu[i].matmul(Ku)) # (11) checked
@@ -344,6 +370,9 @@ class ddpOptimizer:
         self.alg = alg
 
     def forwardpass(self):
+        r'''
+        Compute new trajectory from controller gains.
+        '''
         fp = self.fp
         bp = self.bp
         alg = self.alg
@@ -357,11 +386,11 @@ class ddpOptimizer:
         tau = max(0.99, 1-alg.mu)
         steplist = pow(2.0, torch.linspace(-10, 0, 11).flip(0) )
         failed = False
-        for step in range(steplist.shape[0]):
+        for step in range(steplist.shape[0]): # line search
             failed = False
             stepsize = steplist[step]
             xnew[0] = xold[0]
-            if (alg.infeas):
+            if (alg.infeas): #  start from infeasible/feasible trajs. 
                 for i in range(self.N):
                     ynew[i] = yold[i] + stepsize*bp.ky[i]+bp.Ky[i].matmul((xnew[i]-xold[i]).mT)
                     snew[i] = sold[i] + stepsize*bp.ks[i]+bp.Ks[i].matmul((xnew[i]-xold[i]).mT)
@@ -374,15 +403,13 @@ class ddpOptimizer:
                     unew[i] = uold[i] + (stepsize*bp.ku[i]+bp.Ku[i].matmul((xnew[i]-xold[i]).mT)).mT
                     xnew[i+1] = fp.computenextx(xnew[i], unew[i])
             else:
-                for i in range(self.N):
+                for i in range(self.N): # forward recuisions
                     snew[i] = sold[i] + stepsize*bp.ks[i]+bp.Ks[i].matmul((xnew[i]-xold[i]).mT)
-                    # print(snew[i].size(), sold[i].size(), bp.ks[i].size(), bp.Ks[i].size(), xnew[i].size())
-                    # print(unew[i].size(), uold[i].size(), bp.ku[i].size(), bp.Ku[i].size(), xnew[i].size())
                     unew[i] = uold[i] + (stepsize*bp.ku[i]+bp.Ku[i].matmul((xnew[i]-xold[i]).mT)).mT
                     cnew[i] = fp.computec(xnew[i], unew[i])
 
                     if (    (cnew[i]>(1-tau)*cold[i]).any() or  
-                            (snew[i]<(1-tau)*sold[i]).any()   ):
+                            (snew[i]<(1-tau)*sold[i]).any()   ): # check if the inequality holds, with some thresholds
                         failed = True
                         break
                     xnew[i+1] = fp.computenextx(xnew[i], unew[i])
@@ -411,8 +438,7 @@ class ddpOptimizer:
                         logcost -= alg.mu * (-cnew[i]).log().sum()
                     err=torch.Tensor([0.])
                 
-                # torch.set_printoptions(precision=15)
-                # print('fpfilter', fp.filter)
+                # step filter
                 candidate = torch.vstack((logcost, err))
                 # if torch.any( torch.all(candidate>=fp.filter, 0) ):
                 if torch.any( torch.all(candidate-torch.Tensor([[1e-13],[0.]])>=fp.filter, 0) ):
@@ -441,6 +467,9 @@ class ddpOptimizer:
         self.alg = alg
 
     def optimizer(self):
+        r'''
+        Call forwardpass and backwardpass to solve trajectory
+        '''
         time_start = time.time()
         self.fp.initialroll()
         self.alg.mu = self.fp.cost/self.fp.N/self.fp.s[0].shape[0]
@@ -462,7 +491,7 @@ class ddpOptimizer:
             print('%-12d%-12.4g%-12.4g%-12.4g%-12.4g%-12d%-12.3f\n'%(
                         iter, time_used, self.alg.mu, self.fp.cost, self.bp.opterr, self.bp.reg, self.fp.stepsize))
 
-                    #-----------termination conditions---------------
+            #-----------termination conditions---------------
             if (max(self.bp.opterr, self.alg.mu)<=self.alg.tol):
                 print("~~~Optimality reached~~~")
                 break
