@@ -502,4 +502,107 @@ class ddpOptimizer:
                 self.fp.resetfilter(self.alg)
                 self.bp.resetreg()
 
-        return self.fp.x 
+        return self.fp.x, self.fp.u
+
+
+
+    def forward(self):
+        # detached version to solve the best traj
+        self.optimizer()
+
+        # contruct a computation graph
+        # todo: backwardpass once and forwardpass once, no regularization, no if_else, no algParam
+        # self.backwardpass_simplified()
+        # self.forwardpass_simplified()
+        # todo: how to possibly reuse the backwardpass forwardpass code?
+    def backwardpass_simplified(self):
+        fp = self.fp
+        bp = self.bp
+
+        self.n_state = fp.n_state
+        self.n_input = fp.n_input
+        self.N = fp.N
+
+        fp.computeall()
+        
+        x, u, c, y, s, mu = fp.x, fp.u, fp.c, fp.y, fp.s, fp.mu 
+        Vx, Vxx = fp.px, fp.pxx
+        fx,fu,fxx,fxu,fuu = fp.fx, fp.fu, fp.fxx, fp.fxu, fp.fuu
+        qx,qu,qxx,qxu,quu = fp.qx, fp.qu, fp.qxx, fp.qxu, fp.quu   
+        cx, cu = fp.cx, fp.cu
+
+        # backward recursions, similar to iLQR backward recursion, but more variables involved
+        for i in range(self.N-1, -1, -1):
+            Qx = qx[i] + cx[i].mT.matmul(s[i]) + fx[i].mT.matmul(Vx)
+            Qu = qu[i] + cu[i].mT.matmul(s[i]) + fu[i].mT.matmul(Vx) # (5b)
+
+            fxiVxx = fx[i].mT.matmul(Vxx)
+            Qxx = qxx[i] + fxiVxx.matmul(fx[i])  + torch.tensordot(Vx.mT,fxx[i],dims=1).squeeze(0)
+            Qxu = qxu[i] + fxiVxx.matmul(fu[i])  + torch.tensordot(Vx.mT,fxu[i],dims=1).squeeze(0)
+            Quu = quu[i] + fu[i].mT.matmul(Vxx).matmul(fu[i])  + torch.tensordot(Vx.mT,fuu[i],dims=1).squeeze(0)  # (5c-5e)
+            Quu = 0.5 * (Quu + Quu.mT)
+            # todo S = s[i].asDiagonal();
+            Quu_reg = Quu
+
+            r = s[i] *  c[i] + alg.mu
+            cinv = 1. / c[i]
+            tempv1 = s[i] * cinv
+            SCinv = torch.diag(tempv1.squeeze())
+            SCinvcui = SCinv.matmul(cu[i])
+            SCinvcxi = SCinv.matmul(cx[i])
+            cuitSCinvcui = cu[i].mT.matmul(SCinvcui)
+            
+            tempv2 = cinv * r
+            Qu -= cu[i].mT.matmul(tempv2) # (12b)            
+            tempQux = Qxu.mT - cu[i].mT.matmul(SCinvcxi)
+            temp = torch.hstack(( Qu, tempQux))
+
+            kK = - torch.linalg.solve(Quu_reg - cuitSCinvcui, temp)
+            ku = torch.unsqueeze(kK[:,0],-1)
+            Ku = kK[:,1:]
+
+            cuiku = cu[i].matmul(ku)
+            bp.ks[i] = - cinv * (r + s[i] * cuiku)
+            bp.Ks[i] = - SCinv.matmul(cx[i] + cu[i].matmul(Ku)) # (11) checked
+            bp.ky[i] = torch.zeros(c[i].shape[0], 1)
+            bp.Ky[i] = torch.zeros(c[i].shape[0], self.n_state)       
+            Quu = Quu - cuitSCinvcui # (12e)
+            Qxu = tempQux.mT # Qxu - cx[i].transpose() * SCinvcui; // (12d)
+            Qxx -= cx[i].mT.matmul(SCinvcxi) # (12c)
+            Qx -= cx[i].mT.matmul(tempv2) # (12a)
+        
+            QxuKu = Qxu.matmul(Ku)
+            KutQuu = Ku.mT.matmul(Quu)
+
+            Vx = Qx + Ku.mT.matmul(Qu) + KutQuu.matmul(ku) + Qxu.matmul(ku) # (btw 11-12)
+            Vxx = Qxx + QxuKu.mT + QxuKu + KutQuu.matmul(Ku) # (btw 11-12)
+            Vxx = 0.5 * ( Vxx + Vxx.mT) # for symmetry
+
+            bp.ku[i] = ku
+            bp.Ku[i] = Ku
+
+        self.fp = fp
+        self.bp = bp
+    
+    def forwardpass_simplified(self):
+        fp = self.fp
+        bp = self.bp
+
+        xold, uold, yold, sold, cold=fp.x, fp.u, fp.y, fp.s, fp.c
+        xnew, unew, ynew, snew, cnew=torch.zeros_like(fp.x), torch.zeros_like(fp.u), torch.zeros_like(fp.y), torch.zeros_like(fp.s), torch.zeros_like(fp.c)
+        cost = torch.Tensor([0.])
+        qnew = torch.zeros(self.N, 1)
+        
+        # assume full step?
+        stepsize = 1.0
+        xnew[0] = xold[0] 
+        for i in range(self.N): # forward recuisions
+            snew[i] = sold[i] + stepsize*bp.ks[i]+bp.Ks[i].matmul((xnew[i]-xold[i]).mT)
+            unew[i] = uold[i] + (stepsize*bp.ku[i]+bp.Ku[i].matmul((xnew[i]-xold[i]).mT)).mT
+            cnew[i] = fp.computec(xnew[i], unew[i])
+            xnew[i+1] = fp.computenextx(xnew[i], unew[i])
+    
+            qnew[i] = fp.computeq(xnew[i], unew[i])
+        cost = qnew.sum() + fp.computep(xnew[-1])
+        self.fp = fp
+        self.bp = bp
