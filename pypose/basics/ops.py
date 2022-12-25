@@ -112,7 +112,7 @@ class MatrixSquareRoot:
             torch.Size([2, 10, 10])
         Note:
             The ``input`` has to be a (:math:`\cdots\times n \times m`) tensor,and ``input_sqrt`` will be a (:math:`\cdots\times n \times m`) tensor.
-            The initial values of P and Q in the code are different from those in the paper, so the code and formula are different.`Link <https://github.com/KingJamesSong/FastDifferentiableMatSqrt/issues/2#issuecomment-1364681194>`_
+            The initial values of P and Q in the code are different from those in the paper, so the code and formula are different. `Link <https://github.com/KingJamesSong/FastDifferentiableMatSqrt/issues/2#issuecomment-1364681194>`_
         Refrence:
             [1] Yue Song, Nicu Sebe, and Wei Wang. Fast differentiable matrix square root. ICLR. 2022.
 
