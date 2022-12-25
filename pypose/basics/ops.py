@@ -102,6 +102,9 @@ class MatrixSquareRoot:
 
             .. math::
                 \mathbf{Q} _N \mathbf{A} \frac{1}2{} ={\sqrt{\left \| \mathbf{A}  \right \|_{F}  }}\mathbf{ P_m}
+        Note:
+            The initial values of P and Q in the code are different from those in the paper, so the code and formula are different
+             https://github.com/KingJamesSong/FastDifferentiableMatSqrt/issues/2#issuecomment-1364681194
         Refrence:
             [1] Yue Song, Nicu Sebe, and Wei Wang. Fast differentiable matrix square root. ICLR. 2022.
 
