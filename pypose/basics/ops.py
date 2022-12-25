@@ -117,6 +117,9 @@ class MatrixSquareRoot:
             [1] Yue Song, Nicu Sebe, and Wei Wang. Fast differentiable matrix square root. ICLR. 2022.
 
         '''
+        assert input.ndim == 3, 'Invalid Input dim'
+        assert input.ndim == input_norm.ndim and input.ndim == I.ndim, 'Input arguments invalid'
+        assert input.shape == I.shape, 'Input shape not equal to Identity matrix shape.'
 
         mpm.mp.dps = 32  # Set precision
         mpm.mp.pretty = True
