@@ -1,8 +1,7 @@
 import torch
 from torch import nn
-from ..basics import bmv
+from ..basics import bmv, MatrixSquareRoot
 from torch.linalg import pinv
-from pypose.basics.utils import *
 
 
 class UKF(nn.Module):
@@ -150,11 +149,10 @@ class UKF(nn.Module):
           Cleveland State University, 2006
     '''
 
-    def __init__(self, model, Q=None, R=None, matrix_square_root_device='cpu'):
+    def __init__(self, model, Q=None, R=None):
         super().__init__()
         self.set_uncertainty(Q=Q, R=R)
         self.model = model
-        self.matrix_square_root_device = matrix_square_root_device
 
     def compute_weight(self):
         r'''
@@ -180,8 +178,7 @@ class UKF(nn.Module):
         Return:
             list of :obj:`Tensor`: sigma point and Oerservation
         '''
-        matrix_sqrt = MPA_Lya.apply
-
+        smsr = MatrixSquareRoot()
         # gather index
         index_repeat = tuple(
             torch.cat([torch.tensor([2], dtype=torch.int64), torch.ones(self.dim - 1, dtype=torch.int64)]).numpy())
@@ -193,15 +190,21 @@ class UKF(nn.Module):
 
         # compute root of P
         repeat_dim = tuple(torch.cat([torch.tensor([self.dim * 2]), torch.tensor(P.shape)]).numpy())  # repeat dim
-        p_repeat = P.expand(repeat_dim)
+        p_expand = P.expand(repeat_dim)
 
-        np_repeat = self.dim * p_repeat  # calculate np
-        np_repeat = matrix_sqrt([np_repeat, self.matrix_square_root_device])  # square root of np
-        np_repeat[self.dim:] *= -1
-        np_repeat_select = np_repeat.gather(1, index_gather)  # select point from np_repeat
+        np_expand = self.dim * p_expand  # calculate np
+        np_expand_norm = torch.linalg.norm(np_expand, dim=[1, 2]).reshape(np_expand.size(0), 1, 1)
+        I_np = torch.eye(np_expand.size(1), requires_grad=False, device=np_expand.device).reshape(1, np_expand.size(1),
+                                                                                                  np_expand.size(
+                                                                                                      1)).repeat(
+            np_expand.size(0), 1, 1)
+
+        np_expand_sqrt = smsr.matrix_pade_approximant(np_expand, np_expand_norm, I_np)  # square root of np
+        np_expand_sqrt[self.dim:] *= -1
+        np_select = np_expand_sqrt.gather(1, index_gather)  # select point from np_expand_sqrt
 
         # compute sigma point
-        x_sigma = x + np_repeat_select
+        x_sigma = x + np_select
         y_sigma = bmv(C, x_sigma) + bmv(D, u) + c2
 
         return x_sigma.reshape(-1, self.dim), y_sigma.reshape(-1, self.dim)

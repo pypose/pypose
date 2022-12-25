@@ -16,9 +16,9 @@ class TestUKF:
                 return state.sin() + input
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        matrix_square_root_device = 'cpu'
+
         model = NTI().to(device)
-        ukf = pp.module.UKF(model,matrix_square_root_device=matrix_square_root_device).to(device)
+        ukf = pp.module.UKF(model).to(device)
 
         T, N = 5, 2  # steps, state dim
         states = torch.zeros(T, N, device=device)
@@ -30,7 +30,6 @@ class TestUKF:
         R = torch.eye(N, device=device) * r ** 2
         P = torch.eye(N, device=device).repeat(T, 1, 1) * p ** 2
         estim = torch.randn(T, N, device=device) * p
-
         for i in range(T - 1):
             w = q * torch.randn(N, device=device)  # transition noise
             v = r * torch.randn(N, device=device)  # observation noise
