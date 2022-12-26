@@ -97,24 +97,26 @@ def main():
                                 N, init_traj) 
 
         # x_true, u_true, objs_true = _ipddp.optimizer()
-        x_true = _ipddp.optimizer()
+        fp, _, _ = _ipddp.forward()
+        x_true, u_true = fp.x, fp.u
         print('x_true solved')
         sys_ = InvPend(_dt_param*dt)
         _ipddp = ddpOptimizer(sys_, stage_cost, terminal_cost, lincon, 
                                 n_state, n_input, gx.shape[0], 
                                 N, init_traj) 
         # x_pred, u_pred, objs_pred = _lqr2.forward(x_init, expert['Q'], expert['p'])
-        x_pred = _ipddp.optimizer()
+        fp, _, _ = _ipddp.forward()
+        x_pred, u_pred = fp.x, fp.u
         print('x_pred solved')
-        # traj_loss = torch.mean((u_true - u_pred)**2) + \
-        #             torch.mean((x_true - x_pred)**2)
-        traj_loss = torch.mean((x_true - x_pred)**2)
+        traj_loss = torch.mean((u_true - u_pred)**2) + \
+                    torch.mean((x_true - x_pred)**2)
+        # traj_loss = torch.mean((x_true - x_pred)**2)
         return traj_loss
 
     opt = optim.RMSprop([dt_param], lr=1e-2)
 
     n_batch = 1
-    for i in range(1000):
+    for i in range(5):
 
         t1 = time.time()
         # x_init = torch.randn(n_batch,n_state).to(device)
@@ -136,16 +138,15 @@ def main():
         time_d.write('{},{}\n'.format(backward_time, overall_time))
         time_d.flush()
 
-        plot_interval = 100
+        plot_interval = 1
         if i % plot_interval == 0:
-            os.system('./plot.py "{}" &'.format(args.save))
-            print(A, expert['A'])
-            print(B, expert['B'])
+            # os.system('./plot.py "{}" &'.format(args.save))
+            print(dt_param, expert['dt_param'])
         print('{:04d}: traj_loss: {:.4f} model_loss: {:.4f}'.format(
             i, traj_loss.item(), model_loss.item()))
 
-        print("backward_time = ", backward_time)
-        print("overall_time = ", overall_time)
+        # print("backward_time = ", backward_time)
+        # print("overall_time = ", overall_time)
 
 
 if __name__=='__main__':

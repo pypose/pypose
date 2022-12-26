@@ -43,8 +43,8 @@ class fwdPass:
         self.x = init_traj['state']
         self.u = init_traj['input']
         self.c = torch.zeros(self.N, self.n_cons, 1)
-        self.y = 0.01*torch.ones(self.N, self.n_cons, 1) 
-        self.s = 0.1*torch.ones(self.N, self.n_cons, 1) 
+        self.y = 0.01*torch.ones(self.N, self.n_cons, 1)
+        self.s = 0.1*torch.ones(self.N, self.n_cons, 1)
         self.mu = self.y*self.s
 
         self.p = torch.Tensor([0.0])
@@ -91,8 +91,8 @@ class fwdPass:
         return self.q_fn(x, u)
     
     def computeall(self):
-        self.computeprelated()
         self.computefrelated()
+        self.computeprelated()
         self.computeqrelated()
         self.computecrelated()
 
@@ -478,6 +478,13 @@ class ddpOptimizer:
         self.bp.resetreg()
 
         for iter in range(self.alg.maxiter):
+            # self.fp.x = detach_maybe(self.fp.x)
+            # self.fp.u = detach_maybe(self.fp.u)
+            # self.fp.c = detach_maybe(self.fp.c)
+            # self.fp.y = detach_maybe(self.fp.y)
+            # self.fp.s = detach_maybe(self.fp.s)
+            # self.fp.mu = detach_maybe(self.fp.mu)
+
             while True: 
                 self.backwardpass()
                 if ~self.bp.failed: 
@@ -485,39 +492,53 @@ class ddpOptimizer:
                 
             self.forwardpass()
             time_used = time.time() - time_start
-            if (iter % 10 == 1):
-                print('\n')
-                print('Iteration','Time','mu','Cost','Opt. error','Reg. power','Stepsize')
-                print('\n')
-                print('%-12d%-12.4g%-12.4g%-12.4g%-12.4g%-12d%-12.3f\n'%(
-                        iter, time_used, self.alg.mu, self.fp.cost, self.bp.opterr, self.bp.reg, self.fp.stepsize))
+            # if (iter % 10 == 1):
+            #     print('\n')
+            #     print('Iteration','Time','mu','Cost','Opt. error','Reg. power','Stepsize')
+            #     print('\n')
+            #     print('%-12d%-12.4g%-12.4g%-12.4g%-12.4g%-12d%-12.3f\n'%(
+            #             iter, time_used, self.alg.mu, self.fp.cost, self.bp.opterr, self.bp.reg, self.fp.stepsize))
 
             #-----------termination conditions---------------
-            if (max(self.bp.opterr, self.alg.mu)<=self.alg.tol):
-                print("~~~Optimality reached~~~")
-                break
+            # if (max(self.bp.opterr, self.alg.mu)<=self.alg.tol):
+            #     print("~~~Optimality reached~~~")
+            #     break
             
             if (self.bp.opterr <= 0.2*self.alg.mu):
                 self.alg.mu = max(self.alg.tol/10.0, min(0.2*self.alg.mu, pow(self.alg.mu, 1.2) ) )
                 self.fp.resetfilter(self.alg)
                 self.bp.resetreg()
 
-        return self.fp.x, self.fp.u
+        return self.fp, self.bp, self.alg
 
 
 
     def forward(self):
         # detached version to solve the best traj
-        self.optimizer()
+        with torch.no_grad():
+            fp_best,bp_best,alg_best = self.optimizer()
 
+        with torch.autograd.set_detect_anomaly(True):
+            self.fp = fp_best
+            # self.fp.x.requires_grad_()
+            self.fp.x[0].requires_grad_()
+            self.fp.u.requires_grad_()
+            self.bp = bp_best
+            self.alg = alg_best
+            self.fp.initialroll()
+            self.backwardpass_simplified()
+            self.forwardpass_simplified()
         # contruct a computation graph
         # todo: backwardpass once and forwardpass once, no regularization, no if_else, no algParam
         # self.backwardpass_simplified()
         # self.forwardpass_simplified()
         # todo: how to possibly reuse the backwardpass forwardpass code?
+        return self.fp, self.bp, self.alg
+        
     def backwardpass_simplified(self):
         fp = self.fp
         bp = self.bp
+        alg = self.alg
 
         self.n_state = fp.n_state
         self.n_input = fp.n_input
@@ -530,6 +551,10 @@ class ddpOptimizer:
         fx,fu,fxx,fxu,fuu = fp.fx, fp.fu, fp.fxx, fp.fxu, fp.fuu
         qx,qu,qxx,qxu,quu = fp.qx, fp.qu, fp.qxx, fp.qxu, fp.quu   
         cx, cu = fp.cx, fp.cu
+        # print('x',x) 
+        # print('Vx',fp.px) # need keep the graph?
+        # print('cx', cx)
+        # exit()
 
         # backward recursions, similar to iLQR backward recursion, but more variables involved
         for i in range(self.N-1, -1, -1):
@@ -606,3 +631,8 @@ class ddpOptimizer:
         cost = qnew.sum() + fp.computep(xnew[-1])
         self.fp = fp
         self.bp = bp
+
+def detach_maybe(x):
+    if x is None:
+        return None
+    return x if not x.requires_grad else x.detach()
