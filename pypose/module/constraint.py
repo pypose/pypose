@@ -27,6 +27,7 @@ class Constraint(nn.Module):
     def __init__(self):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
+        self.jacargs = {'vectorize':False, 'strategy':'reverse-mode'}
 
     def forward(self, state, input):
         r'''

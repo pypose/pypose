@@ -64,14 +64,14 @@ def main():
     expert = dict(
         Q = torch.eye(n_sc).to(device),
         p = torch.randn(n_sc).to(device),
-        dt_param = torch.Tensor([1.0]).to(device)
+        dt_param = torch.Tensor([0.5]).to(device)
     )
     fname = os.path.join(args.save, 'expert.pkl')
     with open(fname, 'wb') as fi:
         pkl.dump(expert, fi)
 
     torch.manual_seed(args.seed)
-    dt_param = torch.Tensor([0.9]).to(device).requires_grad_()
+    dt_param = torch.Tensor([0.3]).to(device).requires_grad_()
 
     state = torch.tensor([[-1., 0.]])
     state_all =      torch.zeros(N+1, 1, n_state)
@@ -91,15 +91,6 @@ def main():
     time_d.flush()
 
     def get_loss(_dt_param):
-        sys = InvPend(expert['dt_param']*dt)
-        _ipddp = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, 
-                                n_state, n_input, gx.shape[0], 
-                                N, init_traj) 
-
-        # x_true, u_true, objs_true = _ipddp.optimizer()
-        fp, _, _ = _ipddp.forward()
-        x_true, u_true = fp.x, fp.u
-        print('x_true solved')
         sys_ = InvPend(_dt_param*dt)
         _ipddp = ddpOptimizer(sys_, stage_cost, terminal_cost, lincon, 
                                 n_state, n_input, gx.shape[0], 
@@ -108,6 +99,18 @@ def main():
         fp, _, _ = _ipddp.forward()
         x_pred, u_pred = fp.x, fp.u
         print('x_pred solved')
+
+        sys = InvPend(expert['dt_param']*dt)
+        ipddp = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, 
+                                n_state, n_input, gx.shape[0], 
+                                N, init_traj) 
+
+        # x_true, u_true, objs_true = _ipddp.optimizer()
+        fp, _, _ = ipddp.optimizer()
+        # fp, _, _ = ipddp.forward()
+        x_true, u_true = fp.x, fp.u
+        print('x_true solved')
+        # print('true pred', u_true, u_pred)
         traj_loss = torch.mean((u_true - u_pred)**2) + \
                     torch.mean((x_true - x_pred)**2)
         # traj_loss = torch.mean((x_true - x_pred)**2)
@@ -116,14 +119,15 @@ def main():
     opt = optim.RMSprop([dt_param], lr=1e-2)
 
     n_batch = 1
-    for i in range(5):
+    for i in range(100):
 
         t1 = time.time()
         # x_init = torch.randn(n_batch,n_state).to(device)
         traj_loss = get_loss(dt_param)
         opt.zero_grad()
         t2 = time.time()
-        traj_loss.backward()
+        with torch.autograd.set_detect_anomaly(True):
+            traj_loss.backward()
         t3 = time.time()
         backward_time = t3 - t2
         opt.step()

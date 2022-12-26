@@ -15,8 +15,8 @@ class InvPend(System):
     def state_transition(self, state, input, t=None):
         # x, xDot = state
         force = input.squeeze()
-        _dstate = torch.stack((state[0,1], force+torch.sin(state[0,0])))
-
+        # _dstate = torch.stack((state[0,1], force+torch.sin(state[0,0])))
+        _dstate = torch.stack((state[0,1], force+state[0,0]))
         return state + torch.mul(_dstate, self.tau)
 
     def observation(self, state, input, t=None):

@@ -91,8 +91,8 @@ class fwdPass:
         return self.q_fn(x, u)
     
     def computeall(self):
-        self.computefrelated()
         self.computeprelated()
+        self.computefrelated()
         self.computeqrelated()
         self.computecrelated()
 
@@ -511,8 +511,6 @@ class ddpOptimizer:
 
         return self.fp, self.bp, self.alg
 
-
-
     def forward(self):
         # detached version to solve the best traj
         with torch.no_grad():
@@ -520,9 +518,6 @@ class ddpOptimizer:
 
         with torch.autograd.set_detect_anomaly(True):
             self.fp = fp_best
-            # self.fp.x.requires_grad_()
-            self.fp.x[0].requires_grad_()
-            self.fp.u.requires_grad_()
             self.bp = bp_best
             self.alg = alg_best
             self.fp.initialroll()
@@ -617,7 +612,6 @@ class ddpOptimizer:
         xnew, unew, ynew, snew, cnew=torch.zeros_like(fp.x), torch.zeros_like(fp.u), torch.zeros_like(fp.y), torch.zeros_like(fp.s), torch.zeros_like(fp.c)
         cost = torch.Tensor([0.])
         qnew = torch.zeros(self.N, 1)
-        
         # assume full step?
         stepsize = 1.0
         xnew[0] = xold[0] 
@@ -625,10 +619,12 @@ class ddpOptimizer:
             snew[i] = sold[i] + stepsize*bp.ks[i]+bp.Ks[i].matmul((xnew[i]-xold[i]).mT)
             unew[i] = uold[i] + (stepsize*bp.ku[i]+bp.Ku[i].matmul((xnew[i]-xold[i]).mT)).mT
             cnew[i] = fp.computec(xnew[i], unew[i])
-            xnew[i+1] = fp.computenextx(xnew[i], unew[i])
-    
+            xnew[i+1] = fp.computenextx(xnew[i], unew[i])    
             qnew[i] = fp.computeq(xnew[i], unew[i])
         cost = qnew.sum() + fp.computep(xnew[-1])
+        
+        fp.x, fp.u, fp.y, fp.s, fp.c, fp.q = xnew, unew, ynew, snew, cnew, qnew 
+
         self.fp = fp
         self.bp = bp
 

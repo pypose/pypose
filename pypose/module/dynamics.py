@@ -117,7 +117,8 @@ class System(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
+        # self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
+        self.jacargs = {'vectorize':False, 'strategy':'reverse-mode'}
         self.register_buffer('_t',torch.zeros(1))
         self.register_forward_hook(self.forward_hook)
 
