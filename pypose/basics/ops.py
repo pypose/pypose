@@ -44,7 +44,7 @@ def msqrt(input, method='mpa'):
             input_sqrt (:obj:`Tensor`): the matrix square root of input.
         Example:
             >>> matrix = torch.randn(2,10,10)
-            >>> out = pp.msqrt(input)
+            >>> out = pp.msqrt(matrix)
             >>> out.shape
             torch.Size([2, 10, 10])
      '''
