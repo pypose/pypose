@@ -71,7 +71,7 @@ class IMUPreintegrator(nn.Module):
             gyro (torch.Tensor): angular rate (:math:`\omega`) in IMU body frame.
             acc (torch.Tensor): linear acceleration (:math:`\mathbf{a}`) in IMU body frame
                 (raw sensor input with gravity).
-            rot (:obj:`pypose.SO3`, optional): known IMU rotation.
+            rot (:obj:`pypose.SO3`, optional): known IMU rotation on the body frame.
             gyro_cov (torch.Tensor, optional): covariance matrix of angular rate.
                 If not given, the default state in constructor will be used.
             acc_cov (torch.Tensor, optional): covariance matrix of linear acceleration.
@@ -283,13 +283,13 @@ class IMUPreintegrator(nn.Module):
                 Rij = self.Rij # default is None
 
             if Rij is not None:
-                Rij = Rij * inte_state['gamma']
+                Rij = Rij * inte_state['Dr']
             else:
-                Rij = inte_state['gamma']
+                Rij = inte_state['Dr']
 
             cov_input_state ={
                 'Rij': Rij.detach(),
-                'Rk': inte_state['dr'].detach(),
+                'Rk': inte_state['w'].detach(),
                 'Ha': pp.vec2skew(inte_state['a'].detach()),
                 'dt': dt.detach() 
             }
@@ -308,9 +308,45 @@ class IMUPreintegrator(nn.Module):
         return {**predict, **cov}
 
     def integrate(self, dt, gyro, acc, rot:pp.SO3=None, init_rot:pp.SO3=None):
+        r"""
+        Integrate the IMU sensor signals gyroscope (angular rate
+        :math:`\omega`), linear acceleration (:math:`\mathbf{a}`) in body frame to
+        calculate the increments on the rotation (:math:`\Delta r`), velocity (:math:`\Delta v`)
+        and position (:math:`\Delta p`) of the IMU states.
+        The IMU rotation of the body frame (:code:`\rot`) is optional,
+        which can be utilized to compensate the gravity.
+
+        Shape:
+            - input (:obj:`dt`, :obj:`gyro`, :obj:`acc`): This layer supports the input shape with
+              :math:`(B, F, H_{in})`, :math:`(F, H_{in})` and :math:`(H_{in})`, where :math:`B` is
+              the batch size (or the number of IMU), :math:`F` is the number of frames
+              (measurements), and :math:`H_{in}` is the raw sensor signals.
+
+            - init_rot (Optional): The initial orientation of the integration, which helps to 
+              compensate for the gravity. It contains the shape :math:`(B, H_{in})`. 
+
+            - rot (Optional): The ground truth orientation of the integration. If this parameter is
+              given, the integrator will use the ground truth orientation to compensate the gravity.
+
+            - output: a :obj:`dict` of integrated state including ``a``: acceleration in the body frame
+              without gravity ``Dp``: position increments, ``Dr``: rotation increments, ``Dv``: velocity 
+              increments, ``w``: rotation velocity and ``t``: time increments, each of which has a shape
+              :math:`(B, F, H_{out})`, where :math:`H_{out}` is the signal dimension.
+             
+
+        Integration:
+
+        .. math::
+            \begin{align*}
+                {\Delta}r_{ij} &= \int_{t \in [t_i, t_j]} w_k \ dt \\
+                {\Delta}v_{ij} &= \int_{t \in [t_i, t_j]} R_{k} a_k \ dt \\
+                {\Delta}p_{ij} &= \int\int_{t \in [t_i, t_j]} R_{k} a_k\ dt^2\  \\
+            \end{align*}
+        
+        """
         B, F = dt.shape[:2]
-        dr = torch.cat([pp.identity_SO3(B, 1, dtype=dt.dtype, device=dt.device), pp.so3(gyro*dt).Exp()], dim=1)
-        incre_r = pp.cumprod(dr, dim = 1, left=False)
+        w = torch.cat([pp.identity_SO3(B, 1, dtype=dt.dtype, device=dt.device), pp.so3(gyro*dt).Exp()], dim=1)
+        incre_r = pp.cumprod(w, dim = 1, left=False)
 
         if isinstance(rot, pp.LieTensor):
             a = acc - rot.Inv() @ self.gravity
@@ -331,15 +367,15 @@ class IMUPreintegrator(nn.Module):
         incre_t = torch.cumsum(dt, dim = 1)
         incre_t = torch.cat([torch.zeros(B, 1, 1, dtype=dt.dtype, device=dt.device), incre_t], dim =1)
 
-        return {'a':a, 'alpha':incre_p[:,1:,:], 'beta':incre_v[...,1:,:], 'gamma':incre_r[:,1:,:],
-                't':incre_t[...,1:,:], 'dr': dr[:,1:,:]}
+        return {'a':a, 'Dp':incre_p[:,1:,:], 'Dv':incre_v[...,1:,:], 'Dr':incre_r[:,1:,:],
+                't':incre_t[...,1:,:], 'w': w[:,1:,:]}
 
     @classmethod
     def predict(cls, init_state, integrate):
         return {
-            'rot': init_state['rot'] * integrate['gamma'],
-            'vel': init_state['vel'] + init_state['rot'] * integrate['beta'],
-            'pos': init_state['pos'] + init_state['rot'] * integrate['alpha'] + init_state['vel'] * integrate['t'],
+            'rot': init_state['rot'] * integrate['Dr'],
+            'vel': init_state['vel'] + init_state['rot'] * integrate['Dv'],
+            'pos': init_state['pos'] + init_state['rot'] * integrate['Dp'] + init_state['vel'] * integrate['t'],
         }
 
     @classmethod

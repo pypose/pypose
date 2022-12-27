@@ -165,6 +165,7 @@ def test_lietensor():
 
     euler = torch.randn(5,3).to(device)
     X = pp.euler2SO3(euler)
+    assert euler == X.euler()
 
     for i in range(128):
         x = torch.randn(4, 5, device=device)
