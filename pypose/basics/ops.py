@@ -33,9 +33,39 @@ def bmv(input, vec, *, out=None):
     return torch.matmul(input, vec.unsqueeze(-1), out=out).squeeze(-1)
 
 
-class msqrt:
+def msqrt(input, method='mpa'):
     r'''
-     Compute Matrix Square root
+        compute batched matrix square root
+        Args:
+            input (:obj:`Tensor`): matrices to be square rooted.
+            method(:obj:`Str`, optional): Calculation method of matrix square root. Default: ``pade_appro``
+
+        Return:
+            input_sqrt (:obj:`Tensor`): the matrix square root of input.
+        Example:
+            >>> matrix = torch.randn(2,10,10)
+            >>> out = pp.msqrt(input)
+            >>> out.shape
+            torch.Size([2, 10, 10])
+     '''
+    assert input.ndim == 3, 'Invalid Input dim'
+
+    if method == 'mpa':
+        # matrix pade approximant
+
+        input_norm = torch.linalg.norm(input, dim=[1, 2]).reshape(input.size(0), 1, 1)
+        I = torch.eye(input.size(1), device=input.device).reshape(1, input.size(1),
+                                                                  input.size(
+                                                                      1)).repeat(
+            input.size(0), 1, 1)
+        return Msqrt().matrix_pade_approximant(input, input_norm, I)
+    else:
+        ValueError('The model_name parameters are incorrect')
+
+
+class Msqrt:
+    r'''
+     Compute batched Matrix Square root
     '''
 
     def matrix_pade_approximant(self, input, input_norm, I):
@@ -103,7 +133,7 @@ class msqrt:
             .. math::
                 \mathbf{Q} _N \mathbf{A} \frac{1}2{} ={\sqrt{\left \| \mathbf{A}  \right \|_{F}  }}\mathbf{ P_m}
         Example:
-            >>> m_sqrt = msqrt()
+            >>> m_sqrt = Msqrt()
             >>> input = torch.randn(2,10,10)
             >>> input_norm = torch.linalg.norm(input, dim=[1, 2]).reshape(input.size(0), 1, 1)
             >>> I = torch.eye(input.size(1), requires_grad=False, device=input.device).reshape(1, input.size(1),input.size(1)).repeat(input.size(0), 1, 1)
@@ -113,11 +143,11 @@ class msqrt:
         Note:
             - ``input`` has to be a (:math:`\cdots\times n \times m`) tensor,and ``input_sqrt`` will be a (:math:`\cdots\times n \times m`) tensor.
             - The initial values of P and Q in the code are different from those in the paper, so the code and formula are different. `Link <https://github.com/KingJamesSong/FastDifferentiableMatSqrt/issues/2#issuecomment-1364681194>`_
+
         Refrence:
             [1] Yue Song, Nicu Sebe, and Wei Wang. Fast differentiable matrix square root. ICLR. 2022.
 
         '''
-        assert input.ndim == 3, 'Invalid Input dim'
         assert input.ndim == input_norm.ndim and input.ndim == I.ndim, 'Input arguments invalid'
         assert input.shape == I.shape, 'Input shape not equal to Identity matrix shape.'
 

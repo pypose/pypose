@@ -178,7 +178,6 @@ class UKF(nn.Module):
         Return:
             list of :obj:`Tensor`: sigma point and Oerservation
         '''
-        m_sqrt = msqrt()
         # gather index
         index_repeat = tuple(
             torch.cat([torch.tensor([2], dtype=torch.int64), torch.ones(self.dim - 1, dtype=torch.int64)]).numpy())
@@ -191,15 +190,8 @@ class UKF(nn.Module):
         # compute root of P
         repeat_dim = tuple(torch.cat([torch.tensor([self.dim * 2]), torch.tensor(P.shape)]).numpy())  # repeat dim
         p_expand = P.expand(repeat_dim)
-
         np_expand = self.dim * p_expand  # calculate np
-        np_expand_norm = torch.linalg.norm(np_expand, dim=[1, 2]).reshape(np_expand.size(0), 1, 1)
-        I_np = torch.eye(np_expand.size(1), requires_grad=False, device=np_expand.device).reshape(1, np_expand.size(1),
-                                                                                                  np_expand.size(
-                                                                                                      1)).repeat(
-            np_expand.size(0), 1, 1)
-
-        np_expand_sqrt = m_sqrt.matrix_pade_approximant(np_expand, np_expand_norm, I_np)  # square root of np
+        np_expand_sqrt = msqrt(np_expand)  # square root of np
         np_expand_sqrt[self.dim:] *= -1
         np_select = np_expand_sqrt.gather(1, index_gather)  # select point from np_expand_sqrt
 
