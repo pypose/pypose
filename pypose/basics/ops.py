@@ -103,16 +103,16 @@ class MatrixSquareRoot:
             .. math::
                 \mathbf{Q} _N \mathbf{A} \frac{1}2{} ={\sqrt{\left \| \mathbf{A}  \right \|_{F}  }}\mathbf{ P_m}
         Example:
-            >>> smsr = MatrixSquareRoot()
+            >>> sqrtm = MatrixSquareRoot()
             >>> input = torch.randn(2,10,10)
             >>> input_norm = torch.linalg.norm(input, dim=[1, 2]).reshape(input.size(0), 1, 1)
             >>> I = torch.eye(input.size(1), requires_grad=False, device=input.device).reshape(1, input.size(1),input.size(1)).repeat(input.size(0), 1, 1)
-            >>> input_sqrt = smsr.matrix_pade_approximant(input,input_norm,I)
+            >>> input_sqrt = sqrtm.matrix_pade_approximant(input,input_norm,I)
             >>> input_sqrt.shape
             torch.Size([2, 10, 10])
         Note:
-            The ``input`` has to be a (:math:`\cdots\times n \times m`) tensor,and ``input_sqrt`` will be a (:math:`\cdots\times n \times m`) tensor.
-            The initial values of P and Q in the code are different from those in the paper, so the code and formula are different. `Link <https://github.com/KingJamesSong/FastDifferentiableMatSqrt/issues/2#issuecomment-1364681194>`_
+            - ``input`` has to be a (:math:`\cdots\times n \times m`) tensor,and ``input_sqrt`` will be a (:math:`\cdots\times n \times m`) tensor.
+            - The initial values of P and Q in the code are different from those in the paper, so the code and formula are different. `Link <https://github.com/KingJamesSong/FastDifferentiableMatSqrt/issues/2#issuecomment-1364681194>`_
         Refrence:
             [1] Yue Song, Nicu Sebe, and Wei Wang. Fast differentiable matrix square root. ICLR. 2022.
 

@@ -45,3 +45,4 @@ Basics
     cummul_
     cumops
     cumops_
+    MatrixSquareRoot

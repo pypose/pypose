@@ -1,11 +1,9 @@
-import torch
 import argparse
-from pypose.module import EKF
 from bicycle import Bicycle
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Filer Model Example')
-    parser.add_argument("--model_name", type=str, default='ekf', help="ekf or ukf")
+    parser.add_argument("--model_name", type=str, default='ukf', help="ekf or ukf")
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
     args = parser.parse_args()
 
