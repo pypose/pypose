@@ -45,7 +45,7 @@ def msqrt(input, method='mpa'):
         input_sqrt (:obj:`Tensor`): the matrix square root of input.
 
     Note:
-        - when ``method`` == mpa , ``input`` has to be a (:math:`b\times n \times n`) tensor,and ``out`` will be a (:math:`b\times n \times n`) tensor.
+        - ``input`` has to be a (:math:`b\times n \times n`) tensor,and ``out`` will be a (:math:`b\times n \times n`) tensor.
 
     Example1:
         >>> matrix = torch.randn(10, 10).unsqueeze(0)
