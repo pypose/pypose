@@ -33,7 +33,7 @@ def bmv(input, vec, *, out=None):
     return torch.matmul(input, vec.unsqueeze(-1), out=out).squeeze(-1)
 
 
-class MatrixSquareRoot:
+class msqrt:
     r'''
      Compute Matrix Square root
     '''
@@ -103,11 +103,11 @@ class MatrixSquareRoot:
             .. math::
                 \mathbf{Q} _N \mathbf{A} \frac{1}2{} ={\sqrt{\left \| \mathbf{A}  \right \|_{F}  }}\mathbf{ P_m}
         Example:
-            >>> sqrtm = MatrixSquareRoot()
+            >>> m_sqrt = msqrt()
             >>> input = torch.randn(2,10,10)
             >>> input_norm = torch.linalg.norm(input, dim=[1, 2]).reshape(input.size(0), 1, 1)
             >>> I = torch.eye(input.size(1), requires_grad=False, device=input.device).reshape(1, input.size(1),input.size(1)).repeat(input.size(0), 1, 1)
-            >>> input_sqrt = sqrtm.matrix_pade_approximant(input,input_norm,I)
+            >>> input_sqrt = m_sqrt.matrix_pade_approximant(input,input_norm,I)
             >>> input_sqrt.shape
             torch.Size([2, 10, 10])
         Note:

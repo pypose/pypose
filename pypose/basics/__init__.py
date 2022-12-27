@@ -1,3 +1,3 @@
 
 from .ops import bmv
-from .ops import MatrixSquareRoot
+from .ops import msqrt
