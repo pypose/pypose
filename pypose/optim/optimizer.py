@@ -442,17 +442,13 @@ class LevenbergMarquardt(_Optimizer):
                                     else self.model.loss(input, target)
             # Let Nr: number of residuals, Dr: dimension of each residual, Np: number of model parameters
             # Now, the shape of R: [Nr, Dr], J: [Nr*Dr, Np], weight: [Nr, Dr, Dr]
-            print("R.shape = {}, J.shape = {}".format(R.shape, J.shape))
             J_T = J.reshape(tuple(R.shape)+(-1,))
-            print("J_T1.shape = {}".format(J_T.shape))
             # Now, J_T: [Nr, Dr, Np]
             J_T = J_T.permute([J_T.ndim-1,]+list(range(J_T.ndim-1)))
-            print("J_T2.shape = {}".format(J_T.shape))
             # Now, J_T: [Np, Nr, Dr]
             if weight is not None:
                 J_T = (J_T.unsqueeze(-2) @ weight).squeeze(-2)
             J_T = J_T.reshape(J_T.shape[0], -1)
-            print("J_T3.shape = {}".format(J_T.shape))
             # Now, J_T: [Np, Nr*Dr]
             A, self.reject_count = J_T @ J, 0
             A.diagonal().clamp_(pg['min'], pg['max'])
