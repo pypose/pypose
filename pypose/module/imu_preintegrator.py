@@ -88,7 +88,7 @@ class IMUPreintegrator(nn.Module):
 
             - init_state (Optional): The initial state of the integration. It contains
               :code:`pos`: initial position, :code:`rot`: initial rotation, :code:`vel`: initial
-              velocity, with the shape :math:`(B, H_{in})`
+              velocity, with the shape :math:`(B, H_{in})`.
 
             - output: a :obj:`dict` of integrated state including ``pos``: position,
               ``rot``: rotation, and ``vel``: velocity, each of which has a shape
@@ -307,7 +307,8 @@ class IMUPreintegrator(nn.Module):
 
         return {**predict, **cov}
 
-    def integrate(self, dt, gyro, acc, rot:pp.SO3=None, init_rot:pp.SO3=None):
+    @classmethod
+    def integrate(cls, dt, gyro, acc, rot:pp.SO3=None, init_rot:pp.SO3=None):
         r"""
         Integrate the IMU sensor signals gyroscope (angular rate
         :math:`\omega`), linear acceleration (:math:`\mathbf{a}`) in body frame to
@@ -316,16 +317,25 @@ class IMUPreintegrator(nn.Module):
         The IMU rotation of the body frame (:code:`\rot`) is optional,
         which can be utilized to compensate the gravity.
 
+        Args:
+            dt (torch.Tensor): time interval from last update.
+            gyro (torch.Tensor): angular rate (:math:`\omega`) in IMU body frame.
+            acc (torch.Tensor): linear acceleration (:math:`\mathbf{a}`) in IMU body frame
+                (raw sensor input with gravity).
+            rot (:obj:`pypose.SO3`, optional): known IMU rotation on the body frame.
+            init_rot (:obj:`pypose.SO3`, optional): the initial orientation of the IMU state.
+                If not given, the initial state in constructor will be used.
+
         Shape:
             - input (:obj:`dt`, :obj:`gyro`, :obj:`acc`): This layer supports the input shape with
               :math:`(B, F, H_{in})`, :math:`(F, H_{in})` and :math:`(H_{in})`, where :math:`B` is
               the batch size (or the number of IMU), :math:`F` is the number of frames
               (measurements), and :math:`H_{in}` is the raw sensor signals.
 
-            - init_rot (Optional): The initial orientation of the integration, which helps to 
+            - init_rot: The initial orientation of the integration, which helps to 
               compensate for the gravity. It contains the shape :math:`(B, H_{in})`. 
 
-            - rot (Optional): The ground truth orientation of the integration. If this parameter is
+            - rot: The ground truth orientation of the integration. If this parameter is
               given, the integrator will use the ground truth orientation to compensate the gravity.
 
             - output: a :obj:`dict` of integrated state including ``a``: acceleration in the body frame
@@ -372,6 +382,40 @@ class IMUPreintegrator(nn.Module):
 
     @classmethod
     def predict(cls, init_state, integrate):
+        r"""
+        Propogate the next IMU state from the initial IMU state (:obj:`init_state`) with 
+        the preintegrated IMU measurements (:math:`\Delta{p}`, :math:`\Delta{v}` and :math:`\Delta{r}`).
+
+        Args:
+            init_state (Dict): the initial state of the integration. The dictionary
+                should be in form of :obj:`{'pos': torch.Tensor, 'rot': pypose.SO3, 'vel':
+                torch.Tensor}`.
+            integrate (Dict): the preintegrated IMU measurements. The dictionary
+                should be in form of :obj:`{'Dp': torch.Tensor, 'Dr': pypose.SO3, 'Dv':
+                torch.Tensor, 't': torch.Tensor}`.
+
+        Shape:
+            - init_state: The initial state of the integration. It contains :code:`pos`: initial position,
+              :code:`rot`: initial rotation, :code:`vel`: initial velocity, with the shape :math:`(B, H_{in})`.
+
+            - integrate: The preintegrated IMU measurements. It contains :obj:`Dp`, :obj:`Dv` :obj:`Dr`
+              and :obj:`t`, with the shape :math:`(B, F, H_{out})`. It follows the output of the 
+              function :obj:`integrate`.
+
+            - output: a :obj:`dict` of integrated state including ``pos``: position,
+              ``rot``: rotation, and ``vel``: velocity, each of which has a shape
+              :math:`(B, F, H_{out})`, where :math:`H_{out}` is the signal dimension.
+
+        Propagation:
+
+        .. math::
+            \begin{align*}
+                R_j &= {\Delta}R_{ij} * R_i                                                     \\
+                v_j &= R_i * {\Delta}v_{ij}   + v_i + g \Delta t_{ij}                           \\
+                p_j &= R_i * {\Delta}p_{ij}   + p_i + v_i \Delta t_{ij} + 1/2 g \Delta t_{ij}^2 \\
+            \end{align*}
+
+        """
         return {
             'rot': init_state['rot'] * integrate['Dr'],
             'vel': init_state['vel'] + init_state['rot'] * integrate['Dv'],
