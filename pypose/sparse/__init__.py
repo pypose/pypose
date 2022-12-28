@@ -1,1 +1,1 @@
-from .sparse_block_tensor import SparseBlockTensor
+from .sparse_block_tensor import SparseBlockTensorNew

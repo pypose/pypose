@@ -16,6 +16,32 @@ from torch.utils.dlpack import ( to_dlpack, from_dlpack )
 INDEX_TYPE = torch.int64
 FLOAT_TYPE = torch.float32
 
+
+class SparseBlockTensorNew(torch.Tensor):
+    def __init__(self, *data):
+        pass
+
+    @staticmethod
+    def to_sparse(data):
+        '''
+            this function turns tensor into sparse format
+        '''
+        if( not isinstance(data, torch.Tensor) ):
+            raise NotImplementedError("Input of SparseBlockTensor has to be a Tensor (dense or sparse)")
+
+        if( data.is_sparse ):
+            return data
+        else:
+            data = data.to_sparse_coo()
+            return data
+
+    @staticmethod
+    def __new__(cls, *data):
+        #sbt = cls.to_sparse( data[0] ) if isinstance(data[0], torch.Tensor) else cls.to_sparse(torch.Tensor(*data))
+        sbt = data[0] if isinstance(data[0], torch.Tensor) else torch.Tensor(*data)
+        return torch.Tensor.as_subclass( sbt, SparseBlockTensorNew)
+
+
 # ========== Mutual conversion betwen torch sparse coo tensor and SparseBlockTensor. ==========
 
 def sbt_to_torch_sparse_coo(sbt):
@@ -706,11 +732,6 @@ class SparseBlockTensor(object):
         CCS - Column Compressed Structure.
         '''
         raise NotImplementedError()
-class SparseBlockTensorNew(torch.sparse_coo_tensor):
-    def __init__(self, *data):
-        pass
-    
-    @staticmethod
-    def __new__(cls, *data):
-        sbt = data[0] if isinstance(data[0], torch.sparse_coo_tensor) else torch.sparse_coo_tensor(*data)
-        return torch.sparse_coo_tensor.as_subclass( sbt, SparseBlockTensorNew)
+
+
+
