@@ -1,8 +1,7 @@
+import torch, pypose as pp
+import math, matplotlib.pyplot as plt
 from pypose.module.dynamics import System
-import torch as torch
-import numpy as np
-import matplotlib.pyplot as plt
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 # Create class for cart-pole dynamics
 class CartPole(System):
@@ -19,8 +18,8 @@ class CartPole(System):
     def state_transition(self, state, input, t=None):
         x, xDot, theta, thetaDot = state
         force = input.squeeze()
-        costheta = torch.cos(theta)
-        sintheta = torch.sin(theta)
+        costheta = theta.cos()
+        sintheta = theta.sin()
 
         temp = (force + self.polemassLength * thetaDot**2 * sintheta) / self.totalMass
 
@@ -31,20 +30,23 @@ class CartPole(System):
 
         _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
 
-        return state + torch.mul(_dstate, self.tau)
+        return state + _dstate * self.tau
 
     def observation(self, state, input, t=None):
         return state
 
-def createTimePlot(x, y, figname="Un-named plot", title=None, xlabel=None, ylabel=None):
-    f = plt.figure(figname)
-    plt.plot(x, y)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.title(title)
-    return f
+
+def subPlot(ax, x, y, xlabel=None, ylabel=None):
+    x = x.detach().cpu().numpy()
+    y = y.detach().cpu().numpy()
+    ax.plot(x, y)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+
 
 if __name__ == "__main__":
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Create parameters for cart pole trajectory
     dt = 0.01   # Delta t
     len = 1.5   # Length of pole
@@ -54,37 +56,26 @@ if __name__ == "__main__":
     N = 1000    # Number of time steps
 
     # Time and input
-    time  = torch.arange(0, N+1) * dt
+    time  = torch.arange(0, N, device=device) * dt
     input = torch.sin(time)
-    # Initial state
-    state = torch.tensor([0, 0, np.pi, 0], dtype=float)
+    state = torch.zeros(N, 4, dtype=float, device=device)
+    state[0] = torch.tensor([0, 0, math.pi, 0], dtype=float, device=device)
 
     # Create dynamics solver object
-    cartPoleSolver = CartPole(dt, len, m_cart, m_pole, g)
-
-    # Calculate trajectory
-    state_all = torch.zeros(N+1, 4, dtype=float)
-    state_all[0,:] = state
-
-    for i in range(N):
-        state_all[i+1], _ = cartPoleSolver(state_all[i], input[i])
-
-    # Create time plots to show dynamics
-    x, xdot, theta, thetadot = state_all.T
-    x_fig = createTimePlot(time, x, figname ="x Plot", xlabel="Time", ylabel="x", title="x Plot")
-    xdot_fig = createTimePlot(time, xdot, figname="x dot Plot", xlabel="Time", ylabel="x dot", title="x dot Plot")
-    theta_fig = createTimePlot(time, theta, figname="theta Plot", xlabel="Time", ylabel="theta", title="theta Plot")
-    thetadot_fig = createTimePlot(time, thetadot, figname="theta dot Plot", xlabel="Time", ylabel="theta dot", title="theta dot Plot")
+    model = CartPole(dt, len, m_cart, m_pole, g).to(device)
+    for i in range(N - 1):
+        state[i + 1], _ = model(state[i], input[i])
 
     # Jacobian computation - Find jacobians at the last step
-    jacob_state, jacob_input = state_all[-1,:].T, input[-1]
-    cartPoleSolver.set_refpoint(state=jacob_state, input=jacob_input.unsqueeze(0), t=time[-1])
-    A = cartPoleSolver.A
-    B = cartPoleSolver.B
-    C = cartPoleSolver.C
-    D = cartPoleSolver.D
-    c1 = cartPoleSolver.c1
-    c2 = cartPoleSolver.c2
+    model.set_refpoint(state=state[-1,:], input=input[-1], t=time[-1])
+    vars = ['A', 'B', 'C', 'D', 'c1', 'c2']
+    [print(v, getattr(model, v)) for v in vars]
 
+    # Create time plots to show dynamics
+    f, ax = plt.subplots(nrows=4, sharex=True)
+    x, xdot, theta, thetadot = state.T
+    subPlot(ax[0], time, x, ylabel='X')
+    subPlot(ax[1], time, xdot, ylabel='X dot')
+    subPlot(ax[2], time, theta, ylabel='Theta')
+    subPlot(ax[3], time, thetadot, ylabel='Theta dot', xlabel='Time')
     plt.show()
-    
