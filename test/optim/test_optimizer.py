@@ -267,8 +267,16 @@ class TestOptim:
         B1, B2, M, N = 2, 3, 2, 2
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # inputs = pp.randn_SE3(B1, B2, M, N).to(device)
-        inputs = pp.randn_SE3(M, N).expand(B1, B2, M, N, 7).to(device)
+        # inputs = pp.randn_SE3(M, N).expand(B1, B2, M, N, 7).to(device)  @ pp.randn_SE3(B1, B2, M, N, sigma=0.1).to(device)
+        inputs = pp.randn_SE3(M, N).to(device)
+
+
         invnet = PoseInv(M, N).to(device)
+
+        # print(inputs)
+        # print(invnet.pose)
+        print((invnet.pose @ inputs).Log().tensor())
+
         strategy = pp.optim.strategy.TrustRegion(radius=1e6)
         optimizer = pp.optim.LM(invnet, strategy=strategy)
 
@@ -284,11 +292,11 @@ class TestOptim:
 
 if __name__ == '__main__':
     test = TestOptim()
-    test.test_optim_liealgebra()
-    test.test_optim_liegroup()
-    test.test_optim_with_kernel()
-    test.test_optim_strategy_constant()
-    test.test_optim_strategy_adaptive()
-    test.test_optim_trustregion()
-    test.test_optim_multiparameter()
+    # test.test_optim_liealgebra()
+    # test.test_optim_liegroup()
+    # test.test_optim_with_kernel()
+    # test.test_optim_strategy_constant()
+    # test.test_optim_strategy_adaptive()
+    # test.test_optim_trustregion()
+    # test.test_optim_multiparameter()
     test.test_optim_anybatch()
