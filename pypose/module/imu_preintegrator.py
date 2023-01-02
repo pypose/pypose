@@ -121,8 +121,8 @@ class IMUPreintegrator(nn.Module):
 
     def forward(self, dt, gyro, acc, rot:pp.SO3=None, gyro_cov=None, acc_cov=None, init_state=None):
         r"""
-        Propagate IMU states from duration (:math:`\delta t`), gyroscope (angular rate
-        :math:`\omega`), linear acceleration (:math:`\mathbf{a}`) in body frame, as well as
+        Propagate IMU states from duration (:math:`\delta t`), angular rate
+        (:math:`\omega`), linear acceleration (:math:`\mathbf{a}`) in body frame, as well as
         their measurement covariance for gyroscope :math:`C_{g}` and acceleration
         :math:`C_{\mathbf{a}}`. Known IMU rotation estimation :math:`R` can be provided for
         better precision.
@@ -397,7 +397,7 @@ class IMUPreintegrator(nn.Module):
                 torch.Tensor}`.
             integrate (Dict): the preintegrated IMU measurements. The dictionary
                 should be in form of :obj:`{'Dp': torch.Tensor, 'Dr': pypose.SO3, 'Dv':
-                torch.Tensor, 't': torch.Tensor}`.
+                torch.Tensor, 'Dt': torch.Tensor}`.
 
         Shape:
             - init_state: The initial state of the integration. It contains :code:`pos`: initial
