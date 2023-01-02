@@ -8,16 +8,18 @@ class IMUPreintegrator(nn.Module):
     Applies preintegration over IMU input signals.
 
     Args:
-        pos (torch.Tensor, optional): initial position. Default: :obj:`torch.zeros(3)`.
-        rot (pypose.SO3, optional): initial rotation. Default: :meth:`pypose.identity_SO3`.
-        vel (torch.Tensor, optional): initial position. Default: ``torch.zeros(3)``.
-        gravity (float, optional): the gravity acceleration. Default: ``9.81007``.
-        gyro_cov: covariance of the gyroscope. Use a three-element tensor, if the covariance
-            on the three axes are different.  Default: ``(3.2e-3)**2``.
-        acc_cov: covariance of the accelerator. Use a three-element tensor, if the covariance
-            on the three axes are different. Default: ``(8e-2)**2``.
-        prop_cov (Bool, optional): flag to propagate the covariance matrix. Default: ``True``.
-        reset (Bool, optional): flag to reset the initial states after the :obj:`forward`
+        pos (``torch.Tensor``, optional): initial position. Default: :obj:`torch.zeros(3)`.
+        rot (``pypose.SO3``, optional): initial rotation. Default: :meth:`pypose.identity_SO3`.
+        vel (``torch.Tensor``, optional): initial position. Default: ``torch.zeros(3)``.
+        gravity (``float``, optional): the gravity acceleration. Default: ``9.81007``.
+        gyro_cov (``torch.Tensor`` or ``float``, optional): covariance of the gyroscope.
+            Use a three-element tensor, if the covariance on the three axes are different.
+            Default: ``(3.2e-3)**2``.
+        acc_cov (``torch.Tensor``  or ``float``, optional): covariance of the accelerator.
+            Use a three-element tensor, if the covariance on the three axes are different.
+            Default: ``(8e-2)**2``.
+        prop_cov (``bool``, optional): flag to propagate the covariance matrix. Default: ``True``.
+        reset (``bool``, optional): flag to reset the initial states after the :obj:`forward`
             function is called. If ``False``, the integration starts from the last integration.
             This flag is ignored if :obj:`init_state` is not ``None``. Default: ``False``.
 
@@ -128,16 +130,16 @@ class IMUPreintegrator(nn.Module):
         better precision.
 
         Args:
-            dt (torch.Tensor): time interval from last update.
-            gyro (torch.Tensor): angular rate (:math:`\omega`) in IMU body frame.
-            acc (torch.Tensor): linear acceleration (:math:`\mathbf{a}`) in IMU body frame
+            dt (``torch.Tensor``): time interval from last update.
+            gyro (``torch.Tensor``): angular rate (:math:`\omega`) in IMU body frame.
+            acc (``torch.Tensor``): linear acceleration (:math:`\mathbf{a}`) in IMU body frame
                 (raw sensor input with gravity).
             rot (:obj:`pypose.SO3`, optional): known IMU rotation on the body frame.
-            gyro_cov (torch.Tensor, optional): covariance matrix of angular rate.
+            gyro_cov (``torch.Tensor``, optional): covariance matrix of angular rate.
                 If not given, the default state in constructor will be used.
-            acc_cov (torch.Tensor, optional): covariance matrix of linear acceleration.
+            acc_cov (``torch.Tensor``, optional): covariance matrix of linear acceleration.
                 If not given, the default state in constructor will be used.
-            init_state (Dict, optional): the initial state of the integration. The dictionary
+            init_state (``dict``, optional): the initial state of the integration. The dictionary
                 should be in form of :obj:`{'pos': torch.Tensor, 'rot': pypose.SO3, 'vel':
                 torch.Tensor}`. If not given, the initial state in constructor will be used.
 
@@ -322,9 +324,9 @@ class IMUPreintegrator(nn.Module):
             \end{align*}
 
         Args:
-            dt (torch.Tensor): time interval from last update.
+            dt (``torch.Tensor``): time interval from last update.
             gyro (torch.Tensor): angular rate (:math:`\omega`) in IMU body frame.
-            acc (torch.Tensor): linear acceleration (:math:`\mathbf{a}`) in IMU body frame
+            acc (``torch.Tensor``): linear acceleration (:math:`\mathbf{a}`) in IMU body frame
                 (raw sensor input with gravity).
             rot (:obj:`pypose.SO3`, optional): known IMU rotation on the body frame.
             init_rot (:obj:`pypose.SO3`, optional): the initial orientation of the IMU state.
@@ -344,7 +346,7 @@ class IMUPreintegrator(nn.Module):
               gravity.
 
         Return:
-            ``dict``: integrated state including ``a``: acceleration in the body frame
+            ``dict``: integrated states including ``a``: acceleration in the body frame
             without gravity ``Dp``: position increments, ``Dr``: rotation increments,
             ``Dv``: velocity increments, ``w``: rotation velocity and ``Dt``: time increments,
             each of which has a shape :math:`(B, F, H_{out})`, where :math:`H_{out}` is the
@@ -392,10 +394,10 @@ class IMUPreintegrator(nn.Module):
             \end{align*}
 
         Args:
-            init_state (Dict): the initial state of the integration. The dictionary
+            init_state (``dict``): the initial state of the integration. The dictionary
                 should be in form of :obj:`{'pos': torch.Tensor, 'rot': pypose.SO3, 'vel':
                 torch.Tensor}`.
-            integrate (Dict): the preintegrated IMU measurements. The dictionary
+            integrate (``dict``): the preintegrated IMU measurements. The dictionary
                 should be in form of :obj:`{'Dp': torch.Tensor, 'Dr': pypose.SO3, 'Dv':
                 torch.Tensor, 'Dt': torch.Tensor}`.
 
@@ -409,7 +411,7 @@ class IMUPreintegrator(nn.Module):
               output of the function :obj:`integrate`.
 
         Return:
-            ``dict``: integrated state including ``pos``: position, ``rot``: rotation, and
+            ``dict``: integrated states including ``pos``: position, ``rot``: rotation, and
             ``vel``: velocity, each of which has a shape :math:`(B, F, H_{out})`, where
             :math:`H_{out}` is the signal dimension.
         """
