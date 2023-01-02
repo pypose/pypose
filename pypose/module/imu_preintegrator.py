@@ -263,7 +263,7 @@ class IMUPreintegrator(nn.Module):
         if init_state is None:
             init_state = {'pos': self.pos, 'rot': self.rot, 'vel': self.vel}
 
-        inte_state = self.integrate(dt, gyro, acc, rot, init_state['rot'])
+        inte_state = self.integrate(dt, gyro, acc, rot = rot, init_rot = init_state['rot'])
         predict = self.predict(init_state, inte_state)
 
         if self.prop_cov:
@@ -305,8 +305,7 @@ class IMUPreintegrator(nn.Module):
 
         return {**predict, **cov}
 
-    @classmethod
-    def integrate(cls, dt, gyro, acc, rot:pp.SO3=None, init_rot:pp.SO3=None):
+    def integrate(self, dt, gyro, acc, rot:pp.SO3=None, init_rot:pp.SO3=None):
         r"""
         Integrate the IMU sensor signals gyroscope (angular rate
         :math:`\omega`), linear acceleration (:math:`\mathbf{a}`) in body frame to
@@ -338,7 +337,7 @@ class IMUPreintegrator(nn.Module):
               frames (measurements), and :math:`H_{in}` is the raw sensor signals.
 
             - init_rot: The initial orientation of the integration, which helps to 
-              compensate for the gravity. It contains the shape :math:`(B, H_{in})`. 
+              compensate for the gravity. It contains the shape :math:`(B, H_{in})`. d
 
             - rot: The ground truth orientation of the integration. If this parameter is
               given, the integrator will use the ground truth orientation to compensate the
@@ -347,7 +346,7 @@ class IMUPreintegrator(nn.Module):
         Return:
             ``dict``: integrated state including ``a``: acceleration in the body frame
             without gravity ``Dp``: position increments, ``Dr``: rotation increments,
-            ``Dv``: velocity increments, ``w``: rotation velocity and ``t``: time increments,
+            ``Dv``: velocity increments, ``w``: rotation velocity and ``Dt``: time increments,
             each of which has a shape :math:`(B, F, H_{out})`, where :math:`H_{out}` is the
             signal dimension.
         """
@@ -376,7 +375,7 @@ class IMUPreintegrator(nn.Module):
         incre_t = torch.cat([torch.zeros(B, 1, 1, dtype=dt.dtype, device=dt.device), incre_t], dim =1)
 
         return {'a':a, 'Dp':incre_p[:,1:,:], 'Dv':incre_v[...,1:,:], 'Dr':incre_r[:,1:,:],
-                't':incre_t[...,1:,:], 'w': w[:,1:,:]}
+                'Dt':incre_t[...,1:,:], 'w': w[:,1:,:]}
 
     @classmethod
     def predict(cls, init_state, integrate):
@@ -406,7 +405,7 @@ class IMUPreintegrator(nn.Module):
               shape :math:`(B, H_{in})`.
 
             - integrate: The preintegrated IMU measurements. It contains :obj:`Dp`, :obj:`Dv`,
-              :obj:`Dr`, and :obj:`t`, with the shape :math:`(B, F, H_{out})`. It follows the
+              :obj:`Dr`, and :obj:`Dt`, with the shape :math:`(B, F, H_{out})`. It follows the
               output of the function :obj:`integrate`.
 
         Return:
@@ -417,7 +416,7 @@ class IMUPreintegrator(nn.Module):
         return {
             'rot': init_state['rot'] * integrate['Dr'],
             'vel': init_state['vel'] + init_state['rot'] * integrate['Dv'],
-            'pos': init_state['pos'] + init_state['rot'] * integrate['Dp'] + init_state['vel'] * integrate['t'],
+            'pos': init_state['pos'] + init_state['rot'] * integrate['Dp'] + init_state['vel'] * integrate['Dt'],
         }
 
     @classmethod
