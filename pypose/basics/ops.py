@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import mpmath as mpm
-
+from .. import LieTensor
 
 def bmv(input, vec, *, out=None):
     r'''
