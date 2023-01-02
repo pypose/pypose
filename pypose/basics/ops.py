@@ -1,5 +1,5 @@
 import torch
-
+from .. import LieTensor
 
 def bmv(input, vec, *, out=None):
     r'''
@@ -28,4 +28,6 @@ def bmv(input, vec, *, out=None):
     '''
     assert input.ndim >= 2 and vec.ndim >= 1, 'Input arguments invalid'
     assert input.shape[-1] == vec.shape[-1], 'matrix-vector shape invalid'
+    input = input.tensor() if isinstance(input, LieTensor) else input
+    vec = vec.tensor() if isinstance(vec, LieTensor) else vec
     return torch.matmul(input, vec.unsqueeze(-1), out=out).squeeze(-1)
