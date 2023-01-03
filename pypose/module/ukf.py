@@ -15,8 +15,6 @@ class UKF(nn.Module):
             Ignored if provided during each iteration. Default: ``None``
         R (:obj:`Tensor`, optional): The covariance matrices of system observation noise.
             Ignored if provided during each iteration. Default: ``None``
-        matrix_square_root_device(:obj:`String`, optional): The compute type of  Differentiable Matrix Square Root. Default: ``cpu``
-
 
     A non-linear system can be described as
 
@@ -28,67 +26,73 @@ class UKF(nn.Module):
             \quad \mathbf{v}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
         \end{aligned}
 
-    It will be linearized automatically:
-
-    .. math::
-        \begin{align*}
-            \mathbf{z}_{k+1} &= \mathbf{A}_{k}\mathbf{x}_{k} + \mathbf{B}_{k}\mathbf{u}_{k}
-                             + \mathbf{c}_{k}^1 + \mathbf{w}_k\\
-            \mathbf{y}_{k} &= \mathbf{C}_{k}\mathbf{x}_{k} + \mathbf{D}_{k}\mathbf{u}_{k}
-                           + \mathbf{c}_{k}^2 + \mathbf{v}_k\\
-        \end{align*}
-
-    UKF can be described as the following five equations, where the subscript :math:`\cdot_{k}`
+    UKF can be described as the following equations, where the subscript :math:`\cdot_{k}`
     is omited for simplicity.
 
-    1.Sigma Point.
+    1. Sigma Points.
 
         .. math::
-            \begin{align*}
-                \mathbf{x}^{\left ( i \right ) } = \mathbf{x}^{+} +  \mathbf{\check{x }}^{\left ( i \right ) },
-                \quad i=\quad1,...,2n\\
-                \mathbf{\check{x}}^{\left ( i \right ) }  = \left ( \sqrt{nP}  \right ) _{i}^{T},
-                 \quad i=\quad1,...,n\\
-                \mathbf{\check{x}}^{\left ( n+i \right ) }  = -\left ( \sqrt{nP}  \right ) _{i}^{T},
-                 \quad i=\quad1,...,n\\
-            \end{align*}
+            \begin{aligned}
+                & \mathbf{x}^{\left ( i \right ) } = \mathbf{x}^{+} +
+                    \mathbf{\check{x}}^{\left(i \right)}, & \quad i=1, ..., 2n\\
+                & \mathbf{\check{x}}^{\left(i \right)} = \left(\sqrt{nP} \right)_{i}^{T},
+                 & \quad i=1, ..., n \\
+                & \mathbf{\check{x}}^{\left (n+i \right)} = -\left(\sqrt{nP} \right)_{i}^{T},
+                 & \quad i=1, ..., n \\
+            \end{aligned}
+
+       where :math:`\left(\sqrt{nP}\right) _{i}` is the :math:`i`-th row of
+       :math:`\left(\sqrt{nP} \right)`, :math:`n` is the dimension of state :math:`\mathbf{x}`.
 
     2. Priori State Estimation.
 
         .. math::
-             \mathbf{x}^{-} = \frac{1}{2n} \sum_{i=1}^{2n} \left ( f\left ( x^{i},u,t  \right ) +w_{k}  \right )
+             \mathbf{x}^{-} = \frac{1}{2n} \sum_{i=1}^{2n} f(\mathbf{x}^{(i)}, \mathbf{u}, t)
 
     3. Priori Covariance.
 
         .. math::
-            \mathbf{P}_{k}^{-} = \frac{1}{2} \sum_{1}^{2n}\left ( x^{\left ( i \right ) }-x^{-}  \right )  \left ( x^{\left ( i \right )} -x^- \right )^T+\mathbf{Q}_{k-1}
+            \mathbf{P}^{-} = \frac{1}{2n} \sum_{i=1}^{2n}
+                \left(\mathbf{x}^{(i)} - \mathbf{x}^{-} \right)
+                \left(\mathbf{x}^{(i)} - \mathbf{x}^- \right)^T + \mathbf{Q}
 
-    4.Observational estimation
-
-        .. math::
-            \check{y} = \frac{1}{2n} \sum_{i=1}^{2n}\left (g\left ( x^{i},u,t \right ) +\mathbf{R}_{k}   \right  )
-    5 Observational Covariance.
+    4. Observational Estimation.
 
         .. math::
-            \mathbf{P}_{y} = \frac{1}{2n} \sum_{i=1}^{2n}\left ( y^{\left ( i \right ) }- \check{y}  \right )  \left ( y^{\left ( i \right )} - \check{y} \right )^T+\mathbf{R}_{k}
-    6 Priori and Observation Covariance :
+            \begin{aligned}
+                & \mathbf{y}^{(i)} = g \left( \mathbf{x}^{(i)}, \mathbf{u}, t \right),
+                    & \quad i = 1, \cdots, 2n \\
+                & \bar{\mathbf{y}} = \frac{1}{2n} \sum_{i=1}^{2n} \mathbf{y}^{(i)}
+            \end{aligned}
+
+    5. Observational Covariance.
 
         .. math::
-            \mathbf{P}_{xy} = \frac{1}{2n} \sum_{i=1}^{2n}\left ( x^{\left ( i \right ) }-x^-  \right )  \left ( y^{\left ( i \right )} -\check{y} \right )^T
-    3. Update Kalman Gain
+            \mathbf{P}_{y} = \frac{1}{2n} \sum_{i=1}^{2n}
+                \left(\mathbf{y}^{(i)}- \bar{\mathbf{y}} \right)
+                \left( \mathbf{y}^{(i)} - \bar{\mathbf{y}} \right)^T + \mathbf{R}
+
+    6. Priori and Observation Covariance:
+
+        .. math::
+            \mathbf{P}_{xy} = \frac{1}{2n} \sum_{i=1}^{2n}
+                \left( \mathbf{x}^{(i)} - \mathbf{x}^- \right)
+                \left( \mathbf{y}^{(i)} - \bar{\mathbf{y}} \right)^T
+
+    7. Kalman Gain
 
         .. math::
             \mathbf{K} = \mathbf{P}_{xy}\mathbf{P}_{y}^{-1}
 
-    4. Posteriori State Estimation
+    8. Posteriori State Estimation.
 
         .. math::
-            \mathbf{x}^{+} = \mathbf{x}^{-} + \mathbf{K} (y-\check{y} )
+            \mathbf{x}^{+} = \mathbf{x}^{-} + \mathbf{K} (\mathbf{y}- \bar{\mathbf{y}})
 
-    5. Posteriori Covariance Estimation
+    9. Posteriori Covariance Estimation.
 
         .. math::
-            \mathbf{P} = \mathbf{P}_{k}^{-} - \mathbf{K}\mathbf{P}_{y}\mathbf{K}_T
+            \mathbf{P} = \mathbf{P}^{-} - \mathbf{K}\mathbf{P}_{y}\mathbf{K}^T
 
     where superscript :math:`\cdot^{-}` and :math:`\cdot^{+}` denote the priori and
     posteriori estimation, respectively.

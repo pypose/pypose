@@ -1,3 +1,2 @@
 
-from .ops import bmv
-from .ops import msqrt
+from .ops import bmv, msqrt
