@@ -257,10 +257,10 @@ class IMUPreintegrator(nn.Module):
 
         Return:
             ``dict``: integrated state including ``pos``: position, ``rot``: rotation,
-            and ``vel``: velocity, each of which has a shape :math:`(B, F, H_{out})`, where
-            :math:`H_{out}` is the signal dimension. The state also include
-            ``cov``: covariance matrix with a shape of :math:`(B, 9, 9)` and ``Rij``: the 
-            rotation matrix from frame i to j.
+            and ``vel``: velocity, each of which has a shape :math:`(B, F, H_{out})`.
+            The state also include ``cov``: covariance matrix with a shape of 
+            :math:`(B, 9, 9)` and ``Rij``: the rotation from frame i to j with a shape 
+            of :math:`(B, 1, H_{out})`, where :math:`H_{out}` is the signal dimension.
         """
         assert(0 < len(acc.shape) == len(dt.shape) == len(gyro.shape) <= 3)
         acc = self._check(acc); gyro = self._check(gyro)
