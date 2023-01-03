@@ -254,6 +254,13 @@ class IMUPreintegrator(nn.Module):
               Maximum-a-posteriori Estimation
               <https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf>`_, Technical Report
               GT-IRIM-CP&R-2015-001, 2015.
+
+        Return:
+            ``dict``: integrated state including ``pos``: position, ``rot``: rotation,
+            and ``vel``: velocity, each of which has a shape :math:`(B, F, H_{out})`, where
+            :math:`H_{out}` is the signal dimension. The state also include
+            ``cov``: covariance matrix with a shape of :math:`(B, 9, 9)` and ``Rij``: the 
+            rotation matrix from frame i to j.
         """
         assert(0 < len(acc.shape) == len(dt.shape) == len(gyro.shape) <= 3)
         acc = self._check(acc); gyro = self._check(gyro)
