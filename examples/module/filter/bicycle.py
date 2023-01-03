@@ -29,15 +29,17 @@ def model_factory(robot, model_name, device, Q, R):
         return UKF(robot, Q, R).to(device)
 
     else:
-        raise ValueError('The model_name parameters are incorrect')
+        raise ValueError('The model_name parameter is incorrect')
 
 
 class Bicycle(pp.module.System):
     '''
     This is an implementation of the 2D Bicycle kinematic model,
-    see: https://dingyan89.medium.com/simple-understanding-of-kinematic-bicycle-model-81cac6420357
+    see: https://dingyan89.medium.com/simple-understanding-of-kinematic-bicycle-model
+    -81cac6420357
     The robot is given a rotational and forward velocity, and traverses the 2D plane accordingly.
-    This model is Nonlinear Time Invariant (NTI) and can be filtered with the ``pp.module.EKF`` and  ``pp.module.UKF``.
+    This model is Nonlinear Time Invariant (NTI) and can be filtered with the
+    ``pp.module.EKF`` and  ``pp.module.UKF``.
 
     Args:
         T(:obj:`Int`, optional):steps
@@ -99,7 +101,8 @@ class Bicycle(pp.module.System):
             e.set_edgecolor(color[i])
         state_plot = ax.quiver(state[:-1, 0], state[:-1, 1],
                                state[1:, 0] - state[:-1, 0], state[1:, 1] - state[:-1, 1],
-                               scale_units="xy", angles="xy", scale=1, color=color, label="True State")
+                               scale_units="xy", angles="xy", scale=1, color=color,
+                               label="True State")
         est_plot, = ax.plot(est[:, 0], est[:, 1], '.-', label="Estimated State")
         ax.legend(handler_map={est_plot: HandlerLine2D(numpoints=1)})
         plt.title("%s Example" % self.model_name.upper())
@@ -111,11 +114,14 @@ class Bicycle(pp.module.System):
         """
         assert robot is not None, 'bicycle robot is uninitialized'
 
-        input = torch.randn(self.T, self.M, device=self.device) * 0.1 + torch.tensor([1, 0], device=self.device)
+        input = torch.randn(self.T, self.M, device=self.device) * 0.1 + torch.tensor([1, 0],
+                                                                                     device=self.device)
         state = torch.zeros(self.T, self.N, device=self.device)  # true states
         est = torch.randn(self.T, self.N, device=self.device) * self.p  # estimation
         obs = torch.zeros(self.T, self.N, device=self.device)  # observation
-        P = torch.eye(self.N, device=self.device).repeat(self.T, 1, 1) * self.p ** 2  # estimation covariance
+        P = torch.eye(self.N, device=self.device).repeat(self.T, 1,
+                                                         1) * self.p ** 2  # estimation
+        # covariance
         Q = torch.eye(self.N, device=self.device) * self.q ** 2  # covariance of transition
         R = torch.eye(self.N, device=self.device) * self.r ** 2  # covariance of observation
 

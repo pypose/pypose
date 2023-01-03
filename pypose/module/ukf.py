@@ -15,8 +15,6 @@ class UKF(nn.Module):
             Ignored if provided during each iteration. Default: ``None``
         R (:obj:`Tensor`, optional): The covariance matrices of system observation noise.
             Ignored if provided during each iteration. Default: ``None``
-        matrix_square_root_device(:obj:`String`, optional): The compute type of  Differentiable Matrix Square Root. Default: ``cpu``
-
 
     A non-linear system can be described as
 
@@ -26,66 +24,70 @@ class UKF(nn.Module):
             \quad \mathbf{w}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{Q})  \\
             \mathbf{y}_{k} &= \mathbf{g}(\mathbf{x}_k, \mathbf{u}_k, t_k) + \mathbf{v}_k,
             \quad \mathbf{v}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
+
         \end{aligned}
 
-    It will be linearized automatically:
 
-    .. math::
-        \begin{align*}
-            \mathbf{z}_{k+1} &= \mathbf{A}_{k}\mathbf{x}_{k} + \mathbf{B}_{k}\mathbf{u}_{k}
-                             + \mathbf{c}_{k}^1 + \mathbf{w}_k\\
-            \mathbf{y}_{k} &= \mathbf{C}_{k}\mathbf{x}_{k} + \mathbf{D}_{k}\mathbf{u}_{k}
-                           + \mathbf{c}_{k}^2 + \mathbf{v}_k\\
-        \end{align*}
-
-    UKF can be described as the following five equations, where the subscript :math:`\cdot_{k}`
+    UKF can be described as the following nine equations, where the subscript :math:`\cdot_{k}`
     is omited for simplicity.
 
     1.Sigma Point.
 
         .. math::
             \begin{align*}
-                \mathbf{x}^{\left ( i \right ) } = \mathbf{x}^{+} +  \mathbf{\check{x }}^{\left ( i \right ) },
-                \quad i=\quad1,...,2n\\
-                \mathbf{\check{x}}^{\left ( i \right ) }  = \left ( \sqrt{nP}  \right ) _{i}^{T},
-                 \quad i=\quad1,...,n\\
-                \mathbf{\check{x}}^{\left ( n+i \right ) }  = -\left ( \sqrt{nP}  \right ) _{i}^{T},
-                 \quad i=\quad1,...,n\\
+                \mathbf{x}^{(i)} = \mathbf{x}^{+} + \tilde{\mathbf{x}}^{(i)},
+                \quad i=\quad1, ..., 2n\\
+                \tilde{\mathbf{x}}^{(i)} = (\sqrt{\mathbf{nP} })_{i}^{T},
+                \quad i=\quad1, ..., n\\
+                \tilde{\mathbf{x}}^{( n + i)} = -(\sqrt{\mathbf{nP} })_{i}^{T},
+                \quad i=\quad1, ..., n\\
+
             \end{align*}
 
     2. Priori State Estimation.
 
         .. math::
-             \mathbf{x}^{-} = \frac{1}{2n} \sum_{i=1}^{2n} \left ( f\left ( x^{i},u,t  \right ) +w_{k}  \right )
+             \mathbf{x}^{-} = \frac{1}{2n} \sum_{i=1}^{2n} \mathbf{f}
+             (\mathbf{x} ^{i}, \mathbf{u}, t)
 
     3. Priori Covariance.
 
         .. math::
-            \mathbf{P}_{k}^{-} = \frac{1}{2} \sum_{1}^{2n}\left ( x^{\left ( i \right ) }-x^{-}  \right )  \left ( x^{\left ( i \right )} -x^- \right )^T+\mathbf{Q}_{k-1}
+            \mathbf{P}_{k}^{-} = \frac{1}{2n}
+                \sum_{i=1}^{2n}( \mathbf{x} ^{(i) } - \mathbf{x} ^{-})
+                (\mathbf{x} ^{(i)} - \mathbf{x}^-)^T + \mathbf{Q}
 
     4.Observational estimation
 
         .. math::
-            \check{y} = \frac{1}{2n} \sum_{i=1}^{2n}\left (g\left ( x^{i},u,t \right ) +\mathbf{R}_{k}   \right  )
+            \hat{\mathbf{y} } = \frac{1}{2n} \sum_{i=1}^{2n}
+            \mathbf{g} (\mathbf{x} ^{i},\mathbf{u} ,t)
+
     5 Observational Covariance.
 
         .. math::
-            \mathbf{P}_{y} = \frac{1}{2n} \sum_{i=1}^{2n}\left ( y^{\left ( i \right ) }- \check{y}  \right )  \left ( y^{\left ( i \right )} - \check{y} \right )^T+\mathbf{R}_{k}
+            \mathbf{P}_{y} = \frac{1}{2n} \sum_{i=1}^{2n}
+            (\mathbf{y}^{(i)} - \hat{\mathbf{y}})(\mathbf{y}^{(i)} -
+            \hat{\mathbf{y} })^T+\mathbf{R}
+
     6 Priori and Observation Covariance :
 
         .. math::
-            \mathbf{P}_{xy} = \frac{1}{2n} \sum_{i=1}^{2n}\left ( x^{\left ( i \right ) }-x^-  \right )  \left ( y^{\left ( i \right )} -\check{y} \right )^T
-    3. Update Kalman Gain
+            \mathbf{P}_{xy} = \frac{1}{2n}
+            \sum_{i=1}^{2n}(\mathbf{x}^{(i)} - \mathbf{x}^-)
+            (\mathbf{y}^{(i)} - \hat{\mathbf{y}})^T
+
+    7. Update Kalman Gain
 
         .. math::
             \mathbf{K} = \mathbf{P}_{xy}\mathbf{P}_{y}^{-1}
 
-    4. Posteriori State Estimation
+    8. Posteriori State Estimation
 
         .. math::
-            \mathbf{x}^{+} = \mathbf{x}^{-} + \mathbf{K} (y-\check{y} )
+            \mathbf{x}^{+} = \mathbf{x}^{-} + \mathbf{K} (\mathbf{y}  - \hat{\mathbf{y} })
 
-    5. Posteriori Covariance Estimation
+    9. Posteriori Covariance Estimation
 
         .. math::
             \mathbf{P} = \mathbf{P}_{k}^{-} - \mathbf{K}\mathbf{P}_{y}\mathbf{K}_T
@@ -136,10 +138,13 @@ class UKF(nn.Module):
         Est error: tensor([8.8161, 9.0322, 5.4756, 2.2453, 0.9141])
 
     Warning:
-        Don't introduce noise in ``System`` methods ``state_transition`` and ``observation``
+
+        1.Don't introduce noise in ``System`` methods ``state_transition`` and ``observation``
         for filter testing, as those methods are used for automatically linearizing the system
         by the parent class ``pypose.module.System``, unless your system model explicitly
         introduces noise.
+
+        2.You need to pay attention to RAM/VARM and input dimensions
 
     Note:
         Implementation is based on Section 14.3 of this book
@@ -154,86 +159,104 @@ class UKF(nn.Module):
         self.set_uncertainty(Q=Q, R=R)
         self.model = model
 
-    def compute_weight(self):
+    def compute_lambda(self):
+
+        return 3 - self.dim
+
+    def compute_weight(self, method='norm'):
         r'''
         compute ukf weight
+
+        Args:
+            method (:obj:`str`, optional): method of sigma point weight, the valid values are
+            ``norm``, `weight`.Default:norm
 
         Return:
         out (:obj:`int`): the ukf weight.
         '''
-        return 1 / (2 * self.dim)
+        if method == 'norm':
+            weight = 1 / (2 * self.dim)
 
-    def compute_sigma(self, x, u, P, C, D, c2):  # compute sigma point
+        elif method == 'weight':
+
+            weight_lambda = self.compute_lambda()
+            weight = torch.full(size=(2 * self.dim + 1,),
+                                fill_value=1 / (2 * (self.dim + weight_lambda)),
+                                dtype=self.dtype, device=self.device)
+            weight[0] = weight_lambda / (self.dim + weight_lambda)
+
+        else:
+            raise ValueError('The method parameters  is incorrect')
+
+        return weight
+
+    def compute_sigma_point(self, x, P):  # compute sigma point
         r'''
         compute sigma point and Observation
 
         Args:
             x (:obj:`Tensor`): estimated system state of previous step
-            u (:obj:`Tensor`): system input at current step
             P (:obj:`Tensor`): state estimation covariance of previous step
-            C (:obj:`Tensor`): The output matrix of LTI system.
-            D (:obj:`Tensor`): The observation matrix of LTI system,
-            c2 (:obj:`Tensor`): The constant output of LTI system.
 
         Return:
             list of :obj:`Tensor`: sigma point and Oerservation
         '''
         # gather index
         index_repeat = tuple(
-            torch.cat([torch.tensor([2], dtype=torch.int64), torch.ones(self.dim - 1, dtype=torch.int64)]).numpy())
-        index_weight = torch.arange(self.dim, device=P.device, dtype=P.dtype).unsqueeze(1)
-        index = torch.ones(self.dim, self.dim, device=P.device, dtype=P.dtype)
+            torch.cat([torch.tensor([2], dtype=torch.int64),
+                       torch.ones(self.dim - 1, dtype=torch.int64)]))
+        index_weight = torch.arange(self.dim, device=self.device, dtype=self.dtype).unsqueeze(1)
+        index = torch.ones(self.dim, self.dim, device=self.device, dtype=self.dtype)
 
-        index_gather = torch.as_tensor(index * index_weight, dtype=torch.int64, device=P.device).repeat(
+        index_gather = torch.as_tensor(index * index_weight, dtype=torch.int64,
+                                       device=self.device).repeat(
             index_repeat).unsqueeze(1).reshape(2 * self.dim, 1, self.dim)
 
-        # compute root of P
-        repeat_dim = tuple(torch.cat([torch.tensor([self.dim * 2]), torch.tensor(P.shape)]).numpy())  # repeat dim
+        # unscented transform
+        repeat_dim = tuple(torch.cat(
+            [torch.tensor([self.dim * 2]), torch.tensor(P.shape)]))  # repeat dim
         p_expand = P.expand(repeat_dim)
         np_expand = self.dim * p_expand  # calculate np
         np_expand_sqrt = msqrt(np_expand)  # square root of np
-        np_expand_sqrt[self.dim:] *= -1
-        np_select = np_expand_sqrt.gather(1, index_gather)  # select point from np_expand_sqrt
+        np_select = np_expand_sqrt.gather(1, index_gather).reshape(-1, self.dim)  # select point
+        np_select[self.dim:] *= -1
+        x_sigma_point = x + np_select
+        return x_sigma_point
 
-        # compute sigma point
-        x_sigma = x + np_select
-        y_sigma = bmv(C, x_sigma) + bmv(D, u) + c2
-
-        return x_sigma.reshape(-1, self.dim), y_sigma.reshape(-1, self.dim)
-
-    def compute_conv_mix(self, x_estimate, x_sigma, y_estimate, y_sigma):
+    def compute_conv_mix(self, x_estimate, x_sigma_point, y_estimate, y_sigma_point):
         r'''
         compute mix covariance
 
         Args:
             x_estimate (:obj:`Tensor`):  System prior state estimation.
-            x_sigma (:obj:`Tensor`):  Sigma point of estimation.
+            x_sigma_point (:obj:`Tensor`):  Sigma point of estimation.
             y_estimate (:obj:`Tensor`): Observation  estimation.
-            y_sigma (:obj:`Tensor`): Observation estimation of sigma point .
+            y_sigma_point (:obj:`Tensor`): Observation estimation of sigma point .
 
         Return:
             out (:obj:`Tensor`): Mix covariance pf prior state estimation   .
         '''
 
-        e_x = torch.sub(x_sigma, x_estimate).unsqueeze(2)
-        e_y = torch.sub(y_sigma, y_estimate).unsqueeze(2)
+        e_x = torch.sub(x_sigma_point, x_estimate).unsqueeze(2)
+        e_y = torch.sub(y_sigma_point, y_estimate).unsqueeze(2)
+
         p_estimate = torch.sum(torch.bmm(e_x, e_y.permute(0, 2, 1)), dim=0)
 
         return self.weight * p_estimate
 
-    def compute_conv(self, estimate, sigma, noise=0):
+    def compute_conv(self, estimate, sigma_point, noise=0):
         r'''
         compute covariance
 
         Args:
             estimate (:obj:`Tensor`): System estimate.
-            sigma (:obj:`Tensor`):  Sigma point of estimate.
+            sigma_point (:obj:`Tensor`):  Sigma point of estimate.
 
         Return:
             out (:obj:`Tensor`): the covariance of  prior state estimation .
         '''
 
-        e = torch.sub(sigma, estimate).unsqueeze(2)
+        e = torch.sub(sigma_point, estimate).unsqueeze(2)
         p_estimate = torch.sum(torch.bmm(e, e.permute(0, 2, 1)), dim=0)
 
         return self.weight * p_estimate + noise
@@ -255,27 +278,27 @@ class UKF(nn.Module):
         '''
         # Upper cases are matrices, lower cases are vectors
         self.model.set_refpoint(state=x, input=u)
-        A, B = self.model.A, self.model.B
-        C, D = self.model.C, self.model.D
-        c1, c2 = self.model.c1, self.model.c2
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
-        # x = bmv(A, x) + bmv(B, u) + c1
 
         self.dim = x.shape[0]
+        self.dtype = P.dtype
+        self.device = P.device
         self.weight = self.compute_weight()
-        self.loop_range = self.dim * 2 + 1
 
         # compute sigma point,mean,covariance
-        x_sigma, y_sigma = self.compute_sigma(x, u, P, C, D, c2)
-        x_sigma = bmv(A, x_sigma) + bmv(B, u) + c1
-        x_estimate = self.weight * torch.sum(x_sigma, dim=0)
-        Pk = self.compute_conv(x_estimate, x_sigma, Q)
-        x_sigma, y_sigma = self.compute_sigma(x_estimate, u, Pk, C, D, c2)
+        x_sigma_point = self.compute_sigma_point(x, P)
+        x_sigma_point = self.model.state_transition(x_sigma_point, u)
+        x_estimate = self.weight * torch.sum(x_sigma_point, dim=0)
 
-        y_estimate = self.weight * torch.sum(y_sigma, dim=0)
-        Py = self.compute_conv(y_estimate, y_sigma, R)
-        Pxy = self.compute_conv_mix(x_estimate, x_sigma, y_estimate, y_sigma)
+        Pk = self.compute_conv(x_estimate, x_sigma_point, Q)
+
+        x_sigma_point = self.compute_sigma_point(x_estimate, Pk)
+        y_sigma_point = self.model.observation(x_sigma_point, u)
+        y_estimate = self.weight * torch.sum(y_sigma_point, dim=0)
+
+        Py = self.compute_conv(y_estimate, y_sigma_point, R)
+        Pxy = self.compute_conv_mix(x_estimate, x_sigma_point, y_estimate, y_sigma_point)
 
         # Equation
         K = Pxy @ pinv(Py)
