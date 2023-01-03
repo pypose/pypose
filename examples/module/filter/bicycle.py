@@ -68,10 +68,17 @@ class Bicycle(pp.module.System):
         Don't add noise in this function, as it will be used for automatically
         linearizing the system by the parent class ``pp.module.System``.
         '''
-        theta = state[2] + input[1]  # update heading (theta) from rotational velocity
-        vx = input[0] * theta.cos()  # input[0] is magnitude of forward velocity
-        vy = input[0] * theta.sin()
-        return torch.stack([state[0] + vx, state[1] + vy, theta])
+        if state.ndim<2:
+            theta = state[2] + input[1]  # update heading (theta) from rotational velocity
+            vx = input[0] * theta.cos()  # input[0] is magnitude of forward velocity
+            vy = input[0] * theta.sin()
+            return torch.stack([state[0] + vx, state[1] + vy, theta])
+
+        else:
+            theta = state[:, 2] + input[1]
+            vx = input[0] * theta.cos()
+            vy = input[0] * theta.sin()
+            return torch.stack([state[:, 0] + vx, state[:, 1] + vy, theta] ,dim = 1)
 
     def observation(self, state, input, t=None):
         '''
