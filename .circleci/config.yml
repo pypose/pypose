@@ -47,7 +47,7 @@ commands:
             DEBIAN_FRONTEND=noninteractive apt-get install -y wget curl git-all ninja-build
             cd /tmp
             wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-            chmod +x Miniconda3-latest-Linux-x86_64.sh && ./Miniconda3-latest-Linux-x86_64.sh -b
+            bash Miniconda3-latest-Linux-x86_64.sh -b
             export "PATH=~/miniconda3/bin:$PATH" && conda init bash && . $HOME/miniconda3/etc/profile.d/conda.sh
             # python dependencies
             conda create -n pyenv -y python=${PYTHON_VERSION} setuptools pytorch=${TORCH_VERSION} cudatoolkit=${CUDA_VERSION_SHORT} -c pytorch
@@ -165,15 +165,15 @@ workflows:
     jobs:
       - linux_build_wheel:
           cuda_version: "11.3.1"
-          torch_version: "1.13.0"
+          torch_version: "1.13.1"
           python_version: "3.8"
       - build_docs:
           requires: [linux_build_wheel]
           cuda_version: "11.3.1"
-          torch_version: "1.13.0"
+          torch_version: "1.13.1"
           python_version: "3.8"
       - run_tests:
           requires: [linux_build_wheel]
           cuda_version: "11.3.1"
-          torch_version: "1.13.0"
+          torch_version: "1.13.1"
           python_version: "3.8"
