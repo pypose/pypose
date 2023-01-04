@@ -141,12 +141,10 @@ class UKF(nn.Module):
 
     Warning:
 
-        1.Don't introduce noise in ``System`` methods ``state_transition`` and ``observation``
+        Don't introduce noise in ``System`` methods ``state_transition`` and ``observation``
         for filter testing, as those methods are used for automatically linearizing the system
         by the parent class ``pypose.module.System``, unless your system model explicitly
         introduces noise.
-
-        2.You need to pay attention to RAM/VARM and input dimensions
 
     Note:
         Implementation is based on Section 14.3 of this book
