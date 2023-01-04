@@ -12,6 +12,7 @@ Basics
     add_
     mul
     bmv
+    msqrt
     Exp
     Log
     Inv
@@ -45,4 +46,3 @@ Basics
     cummul_
     cumops
     cumops_
-    msqrt

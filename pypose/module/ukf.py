@@ -24,73 +24,75 @@ class UKF(nn.Module):
             \quad \mathbf{w}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{Q})  \\
             \mathbf{y}_{k} &= \mathbf{g}(\mathbf{x}_k, \mathbf{u}_k, t_k) + \mathbf{v}_k,
             \quad \mathbf{v}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
-
         \end{aligned}
 
-
-    UKF can be described as the following nine equations, where the subscript :math:`\cdot_{k}`
+    UKF can be described as the following equations, where the subscript :math:`\cdot_{k}`
     is omited for simplicity.
 
-    1.Sigma Point.
+    1. Sigma Points.
 
         .. math::
-            \begin{align*}
-                \mathbf{x}^{(i)} = \mathbf{x}^{+} + \tilde{\mathbf{x}}^{(i)},
-                \quad i=\quad1, ..., 2n\\
-                \tilde{\mathbf{x}}^{(i)} = (\sqrt{\mathbf{nP} })_{i}^{T},
-                \quad i=\quad1, ..., n\\
-                \tilde{\mathbf{x}}^{( n + i)} = -(\sqrt{\mathbf{nP} })_{i}^{T},
-                \quad i=\quad1, ..., n\\
+            \begin{aligned}
+                & \mathbf{x}^{\left ( i \right ) } = \mathbf{x}^{+} +
+                    \mathbf{\check{x}}^{\left(i \right)}, & \quad i=1, ..., 2n\\
+                & \mathbf{\check{x}}^{\left(i \right)} = \left(\sqrt{nP} \right)_{i}^{T},
+                 & \quad i=1, ..., n \\
+                & \mathbf{\check{x}}^{\left (n+i \right)} = -\left(\sqrt{nP} \right)_{i}^{T},
+                 & \quad i=1, ..., n \\
+            \end{aligned}
 
-            \end{align*}
+       where :math:`\left(\sqrt{nP}\right) _{i}` is the :math:`i`-th row of
+       :math:`\left(\sqrt{nP} \right)`, :math:`n` is the dimension of state :math:`\mathbf{x}`.
 
     2. Priori State Estimation.
 
         .. math::
-             \mathbf{x}^{-} = \frac{1}{2n} \sum_{i=1}^{2n} \mathbf{f}
-             (\mathbf{x} ^{i}, \mathbf{u}, t)
+             \mathbf{x}^{-} = \frac{1}{2n} \sum_{i=1}^{2n} f(\mathbf{x}^{(i)}, \mathbf{u}, t)
 
     3. Priori Covariance.
 
         .. math::
-            \mathbf{P}_{k}^{-} = \frac{1}{2n}
-                \sum_{i=1}^{2n}( \mathbf{x} ^{(i) } - \mathbf{x} ^{-})
-                (\mathbf{x} ^{(i)} - \mathbf{x}^-)^T + \mathbf{Q}
+            \mathbf{P}^{-} = \frac{1}{2n} \sum_{i=1}^{2n}
+                \left(\mathbf{x}^{(i)} - \mathbf{x}^{-} \right)
+                \left(\mathbf{x}^{(i)} - \mathbf{x}^- \right)^T + \mathbf{Q}
 
-    4.Observational estimation
+    4. Observational Estimation.
 
         .. math::
-            \hat{\mathbf{y} } = \frac{1}{2n} \sum_{i=1}^{2n}
-            \mathbf{g} (\mathbf{x} ^{i},\mathbf{u} ,t)
+            \begin{aligned}
+                & \mathbf{y}^{(i)} = g \left( \mathbf{x}^{(i)}, \mathbf{u}, t \right),
+                    & \quad i = 1, \cdots, 2n \\
+                & \bar{\mathbf{y}} = \frac{1}{2n} \sum_{i=1}^{2n} \mathbf{y}^{(i)}
+            \end{aligned}
 
-    5 Observational Covariance.
+    5. Observational Covariance.
 
         .. math::
             \mathbf{P}_{y} = \frac{1}{2n} \sum_{i=1}^{2n}
-            (\mathbf{y}^{(i)} - \hat{\mathbf{y}})(\mathbf{y}^{(i)} -
-            \hat{\mathbf{y} })^T+\mathbf{R}
+                \left(\mathbf{y}^{(i)}- \bar{\mathbf{y}} \right)
+                \left( \mathbf{y}^{(i)} - \bar{\mathbf{y}} \right)^T + \mathbf{R}
 
-    6 Priori and Observation Covariance :
+    6. Priori and Observation Covariance:
 
         .. math::
-            \mathbf{P}_{xy} = \frac{1}{2n}
-            \sum_{i=1}^{2n}(\mathbf{x}^{(i)} - \mathbf{x}^-)
-            (\mathbf{y}^{(i)} - \hat{\mathbf{y}})^T
+            \mathbf{P}_{xy} = \frac{1}{2n} \sum_{i=1}^{2n}
+                \left( \mathbf{x}^{(i)} - \mathbf{x}^- \right)
+                \left( \mathbf{y}^{(i)} - \bar{\mathbf{y}} \right)^T
 
-    7. Update Kalman Gain
+    7. Kalman Gain
 
         .. math::
             \mathbf{K} = \mathbf{P}_{xy}\mathbf{P}_{y}^{-1}
 
-    8. Posteriori State Estimation
+    8. Posteriori State Estimation.
 
         .. math::
-            \mathbf{x}^{+} = \mathbf{x}^{-} + \mathbf{K} (\mathbf{y}  - \hat{\mathbf{y} })
+            \mathbf{x}^{+} = \mathbf{x}^{-} + \mathbf{K} (\mathbf{y}- \bar{\mathbf{y}})
 
-    9. Posteriori Covariance Estimation
+    9. Posteriori Covariance Estimation.
 
         .. math::
-            \mathbf{P} = \mathbf{P}_{k}^{-} - \mathbf{K}\mathbf{P}_{y}\mathbf{K}_T
+            \mathbf{P} = \mathbf{P}^{-} - \mathbf{K}\mathbf{P}_{y}\mathbf{K}^T
 
     where superscript :math:`\cdot^{-}` and :math:`\cdot^{+}` denote the priori and
     posteriori estimation, respectively.
@@ -139,12 +141,10 @@ class UKF(nn.Module):
 
     Warning:
 
-        1.Don't introduce noise in ``System`` methods ``state_transition`` and ``observation``
+        Don't introduce noise in ``System`` methods ``state_transition`` and ``observation``
         for filter testing, as those methods are used for automatically linearizing the system
         by the parent class ``pypose.module.System``, unless your system model explicitly
         introduces noise.
-
-        2.You need to pay attention to RAM/VARM and input dimensions
 
     Note:
         Implementation is based on Section 14.3 of this book
