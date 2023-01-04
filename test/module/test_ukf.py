@@ -12,7 +12,7 @@ class TestUKF:
             def state_transition(self, state, input, t=None):
                 return state.cos() + input
 
-            def observation(self, state, input, t):
+            def observation(self, state, input, t=None):
                 return state.sin() + input
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
