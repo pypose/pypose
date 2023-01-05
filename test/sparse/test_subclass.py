@@ -1,45 +1,102 @@
 
-import pytest
-
 import torch
 
-class MyTensor(torch.Tensor):
-    def __init__(self, **data):
-        s = torch.sparse_coo_tensor(**data)
+_HANDLED_FUNCS_SPARSE = [
+    'matmul','smm',
+    'is_sparse', 'dense_dim','sparse_dim', 'to_dense', 'values',
+    #'coalesce', 'is_coalesced', 'indices' COO only
+    #'crow_indices', 'col_indices' CSR and BSR only
+] # decided according to "https://pytorch.org/docs/stable/sparse.html"
 
-        # copy from s to self
+class SparseBlockTensor(torch.Tensor):
 
-    @staticmethod
-    def __new__(cls, indices, values, shape):
-        s = torch.sparse_coo_tensor(indices, values, shape)
+    @classmethod
+    def __torch_function__(cls, func, types, args=(), kwargs={}):
+        global _HANDLED_FUNCS_SPARSE
+
+        mytypes = (torch.Tensor if t is SparseBlockTensor else t for t in types)
+        myargs = ( (t.sbt, t.dummy) if isinstance(t, SparseBlockTensor) else t for t in args)
+        # t.sbt is the sparse matrix
+        # t.dummy is the corresponding represent matrix
+        data = torch.Tensor.__torch_function__(func, mytypes, myargs, kwargs)
+
+        print(f'func.__name__ = {func.__name__}')
+
+        # if func.__name__ in _HANDLED_FUNCS_SPARSE:
+        #     print("enter func.__name__ : line 19 ")
+        #     #out = MyTensor()
+        #     #out.sbt = data[0]
+        #     return out
 
 
-    # @staticmethod
-    # def __new__(cls, *data):
-    #     sbt = data[0] if isinstance(data[0], torch.Tensor) else torch.Tensor(*data)
-    #     # return torch.Tensor.as_subclass(sbt, MyTensor)
-    #     print(f'cls = {cls}')
-    #     return super().__new__(cls, *data)
+        # else:
+        #     out = data
 
-# def test_creation():
-#     t = torch.rand((3,3))
-#     my_tensor = MyTensor( t )
+        return data
 
-#     print(f'type(my_tensor) = {type(my_tensor)}')
+    def __repr__(self):
+        r"""
+        t = SparseBlockTensor()
+        >>>t
+        SparseBlockTensor()
+        """
+        return "SparseBlockTensor()"
 
-# def test_sparse_creation():
-#     i = [[0, 1, 1],[2, 0, 2]]
-#     v = [3, 4, 5]
-#     s = torch.sparse_coo_tensor(i, v, (2, 3), dtype=torch.float32, device='cpu')
+    def __str__(self):
+        r"""
+        t = SparseBlockTensor()
+        print( t )
+        ' SparseBlockTensor() '
+        """
+        return "SparseBlockTensor"
 
-#     my_tensor = MyTensor( s )
 
-#     print(f'type(my_tensor) = {type(my_tensor)}')
+    def __matmul__(self, other):
+        r'''
+        return the corresponding sparse matrix and index matrix
+        '''
+        #print("in here")
 
-# def test_init():
-#     i = [[0, 1, 1],[2, 0, 2]]
-#     v = [3, 4, 5]
-#     s = torch.sparse_coo_tensor(i, v, (2, 3))
+        out = SparseBlockTensor()
+        out.sbt = self.sbt @ other.sbt
+        out.dummy = self.dummy @ other.dummy # Need to change to the represent matrix ( COO )user specified !!!!!!!!! 
+        #print(f"out.sbt = {out.sbt} ")
+        #print(f"out.dummy = {out.dummy}" )
+        return out
 
-#     my_tensor = MyTensor(i, v, (2, 3))
-#     print(f'type(my_tensor) = {type(my_tensor)}')
+    def __add__(self, other):
+        pass
+
+    def __mul__(self, other):
+        pass
+
+
+def sparse_block_tensor(indices, values, size=None, dtype=None, device=None, requires_grad=False):
+    data = torch.sparse_coo_tensor(indices, values, size=size, dtype=dtype, device=device, requires_grad=requires_grad)
+    x = SparseBlockTensor()
+    x.sbt = data
+    x.dummy = data # for now need to modify
+    return x
+
+def test_simple():
+    print()
+
+    i = [[0, 1, 2],[2, 0, 2]]
+    v = [3, 4, 5]
+    x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
+
+    print(f'type(x) = {type(x)}')
+    print(f'x.sbt = {x.sbt}')
+    
+    #print(x)
+
+    #y = x.to_dense()
+    #print(y)
+
+    z = x @ x
+    #print(z)
+    #print(f'z = {z}')
+    #print(f'type(z) = {type(z)}')
+
+if __name__ == '__main__':
+    test_simple()
