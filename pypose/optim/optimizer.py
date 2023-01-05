@@ -235,7 +235,7 @@ class GaussNewton(_Optimizer):
             R = self.model(input, target)
             J = modjac(self.model, input=(input, target), **self.jackwargs)
             R, J = self.corrector(R = R, J = J)
-            A = J.T.reshape((-1,) + R.shape), R
+            A, b = J.T.reshape((-1,) + R.shape), R
             if weight is not None:
                 A, b = (weight @ A.unsqueeze(-1)).squeeze(-1), (weight @ b.unsqueeze(-1)).squeeze(-1)
             D = self.solver(A = A.reshape(A.shape[0], -1).T, b = -b.view(-1, 1))
