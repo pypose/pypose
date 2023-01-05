@@ -3,43 +3,49 @@ import pytest
 
 import torch
 
+_HANDLED_FUNCS_SPARSE = [
+    'matmul'
+]
 class MyTensor(torch.Tensor):
-    def __init__(self, **data):
-        s = torch.sparse_coo_tensor(**data)
 
-        # copy from s to self
+    @classmethod
+    def __torch_function__(cls, func, types, args=(), kwargs={}):
+        global _HANDLED_FUNCS_SPARSE
 
-    @staticmethod
-    def __new__(cls, indices, values, shape):
-        s = torch.sparse_coo_tensor(indices, values, shape)
+        mytypes = (torch.Tensor if t is MyTensor else t for t in types)
+        myargs = (t.sbt if isinstance(t, MyTensor) else t for t in args)
+        res = torch.Tensor.__torch_function__(func, mytypes, myargs, kwargs)
+
+        print(f'func.__name__ = {func.__name__}')
+        if func.__name__ in _HANDLED_FUNCS_SPARSE:
+            out = MyTensor()
+            out.sbt = res
+        else:
+            out = res
+
+        return out
 
 
-    # @staticmethod
-    # def __new__(cls, *data):
-    #     sbt = data[0] if isinstance(data[0], torch.Tensor) else torch.Tensor(*data)
-    #     # return torch.Tensor.as_subclass(sbt, MyTensor)
-    #     print(f'cls = {cls}')
-    #     return super().__new__(cls, *data)
+def sparse_block_tensor(indices, values, size=None, dtype=None, device=None, requires_grad=False):
+    data = torch.sparse_coo_tensor(indices, values, size=size, dtype=dtype, device=device, requires_grad=requires_grad)
+    x = MyTensor()
+    x.sbt = data
+    return x
 
-# def test_creation():
-#     t = torch.rand((3,3))
-#     my_tensor = MyTensor( t )
+def test_simple():
+    print()
 
-#     print(f'type(my_tensor) = {type(my_tensor)}')
+    i = [[0, 1, 2],[2, 0, 2]]
+    v = [3, 4, 5]
+    x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
 
-# def test_sparse_creation():
-#     i = [[0, 1, 1],[2, 0, 2]]
-#     v = [3, 4, 5]
-#     s = torch.sparse_coo_tensor(i, v, (2, 3), dtype=torch.float32, device='cpu')
+    print(f'type(x) = {type(x)}')
+    print(f'x.sbt = {x.sbt}')
+    
+    print(x)
 
-#     my_tensor = MyTensor( s )
+    y = x.to_dense()
+    print(y)
 
-#     print(f'type(my_tensor) = {type(my_tensor)}')
-
-# def test_init():
-#     i = [[0, 1, 1],[2, 0, 2]]
-#     v = [3, 4, 5]
-#     s = torch.sparse_coo_tensor(i, v, (2, 3))
-
-#     my_tensor = MyTensor(i, v, (2, 3))
-#     print(f'type(my_tensor) = {type(my_tensor)}')
+    z = x @ x
+    print(f'type(z) = {type(z)}')
