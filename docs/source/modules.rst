@@ -11,3 +11,4 @@ Modules
    module.LTI
    module.EKF
    module.IMUPreintegrator
+   module.DPLQR
