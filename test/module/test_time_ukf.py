@@ -1,7 +1,11 @@
+import time
+import numpy as np
 import torch
 from torch import nn
-from ..basics import bmv
 from torch.linalg import pinv
+import pypose as pp
+from pypose.basics import bmv, msqrt
+import matplotlib.pyplot as plt
 
 
 class UKF(nn.Module):
@@ -154,10 +158,11 @@ class UKF(nn.Module):
           Cleveland State University, 2006
     '''
 
-    def __init__(self, model, Q=None, R=None):
+    def __init__(self, model, msqrt_method='cholesky', Q=None, R=None):
         super().__init__()
         self.set_uncertainty(Q=Q, R=R)
         self.model = model
+        self.msqrt_method = msqrt_method
 
     def compute_lambda(self):
 
@@ -217,11 +222,14 @@ class UKF(nn.Module):
             [torch.tensor([self.dim * 2]), torch.tensor(P.shape)]))  # repeat dim
         p_expand = P.expand(repeat_dim)
         np_expand = self.dim * p_expand  # calculate np
-        np_expand_sqrt = torch.linalg.cholesky(np_expand, upper=True)  # square root of np
+        if self.msqrt_method == 'cholesky':
+            np_expand_sqrt = torch.linalg.cholesky(np_expand, upper=True)  # square root of np
+        else:
+            np_expand_sqrt = msqrt(np_expand)  # square root of np
+
         np_select = np_expand_sqrt.gather(1, index_gather).reshape(-1, self.dim)  # select point
         np_select[self.dim:] *= -1
         x_sigma_point = x + np_select
-
         return x_sigma_point
 
     def compute_conv_mix(self, x_estimate, x_sigma_point, y_estimate, y_sigma_point):
@@ -341,3 +349,58 @@ class UKF(nn.Module):
             self.register_buffer("_Q", Q)
         if R is not None:
             self.register_buffer("_R", R)
+
+
+class TestUKF:
+
+    def test_ukf(self):
+        class NTI(pp.module.System):
+            def __init__(self):
+                super().__init__()
+
+            def state_transition(self, state, input, t=None):
+                return state.cos() + input
+
+            def observation(self, state, input, t=None):
+                return state.sin() + input
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # The CPU will
+        # be faster
+        model = NTI().to(device)
+        msqrt_methods = ['cholesky', 'msqrt']
+        N = 3  # state dim
+
+        for msqrt_method in msqrt_methods:
+
+            ukf = UKF(model, msqrt_method=msqrt_method).to(device)
+            list_time = []
+            for T in range(100, 2000, 300):  # steps
+                states = torch.zeros(T, N, device=device)
+                inputs = torch.randn(T, N, device=device)
+                observ = torch.zeros(T, N, device=device)
+                # std of transition, observation, and estimation
+                q, r, p = 0.1, 0.1, 10
+                Q = torch.eye(N, device=device) * q ** 2
+                R = torch.eye(N, device=device) * r ** 2
+                P = torch.eye(N, device=device).repeat(T, 1, 1) * p ** 2
+                estim = torch.randn(T, N, device=device) * p
+                st_time = time.time()
+                for i in range(T - 1):
+                    w = q * torch.randn(N, device=device)  # transition noise
+                    v = r * torch.randn(N, device=device)  # observation noise
+                    states[i + 1], observ[i] = model(states[i] + w, inputs[i])
+                    estim[i + 1], P[i + 1] = ukf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
+                error = (states - estim).norm(dim=-1)
+                ed_time = time.time()
+                list_time.append([T, (ed_time - st_time)])
+                assert torch.all(error[0] - error[-1] > 0), "Filter error last step too large."
+            list_time = np.array(list_time)
+            plt.plot(list_time[:, 0], list_time[:, 1])
+
+        plt.legend(msqrt_methods)
+        plt.show()
+
+
+if __name__ == '__main__':
+    test = TestUKF()
+    test.test_ukf()
