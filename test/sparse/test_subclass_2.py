@@ -2,33 +2,54 @@
 import torch
 from torch.utils._pytree import tree_map, tree_flatten
 
-class SBTProxyOperation(object):
+class SBTOperation(object):
     def __init__(self, func_name):
         super().__init__()
         self.func_name = func_name
 
-    def __call__(self, func, types, p_args=(), kwargs={}):
-        # Find the fist SparseBlockTensor in operands.
-        sbt = [ op for op in p_args if isinstance(op, SparseBlockTensor) ][0]
-        return sbt._p
+    def storage_pre(self, func, types, args=(), kwargs={}):
+        s_array = []
+        p_array = []
+        for arg in args:
+            # Convert the sparse hybrid Tensor _s to sparse coo tensor.
+            s_array.append( arg._s if isinstance(arg, SparseBlockTensor) else arg )
+            
+            p_array.append( arg._p if isinstance(arg, SparseBlockTensor) else arg )
+        return s_array, p_array
 
-class SBTProxySameOperationAsStorage(SBTProxyOperation):
+    def storage_post(self, func, types, s_outs=(), p_outs=(), kwargs={}):
+        # s_outs (outs for storage _s) and p_outs (outs for proxy _p) are
+        # assumed to have the exact same order in the list.
+        return s_outs, p_outs
+    
+    def proxy_op(self, func, types, p_args=(), kwargs={}):
+        # Defaut operation on the proxy Tensor.
+        # Assume that the operation does not need to even touch the
+        # proxy tensor. For most of such operations, the proxy Tensor 
+        # is the only sparse Tensor in the list of arguments.
+        # Find the first sparse Tensor in operands.
+        p = [ op for op in p_args 
+                if isinstance(op, torch.Tensor) and 
+                   op.is_sparse == True ][0]
+        return p
+
+class SBTProxySameOperationAsStorage(SBTOperation):
     def __init__(self, func_name):
         super().__init__(func_name)
 
-    def __call__(self, func, types, p_args=(), kwargs={}):
+    def proxy_op(self, func, types, p_args=(), kwargs={}):
         # This only gets called when the operation on sbt._s returns sparse Tensor.
         torch.Tensor.__torch_function__(func, types, p_args, kwargs)
 
 _HANDLED_FUNCS_SPARSE = dict()
 
-def _add_sparse_op(name, create_new_layout=False):
+def _add_sparse_op(name, cls):
     global _HANDLED_FUNCS_SPARSE
-    _HANDLED_FUNCS_SPARSE[name] = SBTOperationMetaData(name, create_new_layout)
+    _HANDLED_FUNCS_SPARSE[name] = cls(name)
 
 # Any supported operations that result in torch.Tensor should be added here.
-_add_sparse_op( 'abs',    False )
-_add_sparse_op( 'matmul', True  )
+_add_sparse_op( 'abs',    SBTProxyOperation )
+_add_sparse_op( 'matmul', SBTProxySameOperationAsStorage )
 
 def _is_handled_func(func_name):
     return func_name in _HANDLED_FUNCS_SPARSE
