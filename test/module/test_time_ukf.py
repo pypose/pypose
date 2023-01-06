@@ -396,7 +396,8 @@ class TestUKF:
                 assert torch.all(error[0] - error[-1] > 0), "Filter error last step too large."
             list_time = np.array(list_time)
             plt.plot(list_time[:, 0], list_time[:, 1])
-
+        plt.xlabel('Time Step Number')
+        plt.ylabel('time cost')
         plt.legend(msqrt_methods)
         plt.show()
 
