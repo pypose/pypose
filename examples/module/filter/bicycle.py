@@ -7,7 +7,7 @@ from matplotlib.legend_handler import HandlerLine2D
 from pypose.module import EKF, UKF
 
 
-def model_factory(robot, model_name, device, Q, R):
+def model_factory(robot, model_name, device, Q, R, weight_method):
     r"""
     filter model factory
 
@@ -26,7 +26,7 @@ def model_factory(robot, model_name, device, Q, R):
         return EKF(robot, Q, R).to(device)
 
     elif model_name.lower() == 'ukf':
-        return UKF(robot, Q, R).to(device)
+        return UKF(robot, Q, R, weight_method=weight_method).to(device)
 
     else:
         raise ValueError('The model_name parameter is incorrect')
@@ -115,7 +115,7 @@ class Bicycle(pp.module.System):
         plt.title("%s Example" % self.model_name.upper())
         plt.show()
 
-    def run_estimate(self, robot):
+    def run_estimate(self, robot, weight_method):
         r"""
         run estimate task
         """
@@ -132,7 +132,7 @@ class Bicycle(pp.module.System):
         Q = torch.eye(self.N, device=self.device) * self.q ** 2  # covariance of transition
         R = torch.eye(self.N, device=self.device) * self.r ** 2  # covariance of observation
 
-        filter_model = model_factory(robot, self.model_name, self.device, Q, R)
+        filter_model = model_factory(robot, self.model_name, self.device, Q, R, weight_method)
 
         for i in range(self.T - 1):
             w = self.q * torch.randn(self.N, device=self.device)

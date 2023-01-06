@@ -154,10 +154,11 @@ class UKF(nn.Module):
           Cleveland State University, 2006
     '''
 
-    def __init__(self, model, Q=None, R=None):
+    def __init__(self, model, Q=None, R=None, weight_method='weight'):
         super().__init__()
         self.set_uncertainty(Q=Q, R=R)
         self.model = model
+        self.weight_method = weight_method
 
     def compute_lambda(self):
 
@@ -174,21 +175,23 @@ class UKF(nn.Module):
         Return:
         out (:obj:`int`): the ukf weight.
         '''
-        if method == 'norm':
-            weight = 1 / (2 * self.dim)
+        if self.weight_method == 'norm':
+            weight_mean = torch.tensor([1 / (2 * self.dim)], dtype=self.dtype,
+                                       device=self.device)
+            weight_sigma_point = self.dim
 
-        elif method == 'weight':
-
+        elif self.weight_method == 'weight':
             weight_lambda = self.compute_lambda()
-            weight = torch.full(size=(2 * self.dim + 1,),
-                                fill_value=1 / (2 * (self.dim + weight_lambda)),
-                                dtype=self.dtype, device=self.device)
-            weight[0] = weight_lambda / (self.dim + weight_lambda)
+            weight_mean = torch.full(size=(2 * self.dim + 1,),
+                                     fill_value=1 / (2 * (self.dim + weight_lambda)),
+                                     dtype=self.dtype, device=self.device)
+            weight_mean[0] = weight_lambda / (self.dim + weight_lambda)
+            weight_sigma_point = self.dim + weight_lambda
 
         else:
             raise ValueError('The method parameters  is incorrect')
 
-        return weight
+        return weight_sigma_point, weight_mean.unsqueeze(1)
 
     def compute_sigma_point(self, x, P):  # compute sigma point
         r'''
@@ -216,13 +219,16 @@ class UKF(nn.Module):
         repeat_dim = tuple(torch.cat(
             [torch.tensor([self.dim * 2]), torch.tensor(P.shape)]))  # repeat dim
         p_expand = P.expand(repeat_dim)
-        np_expand = self.dim * p_expand  # calculate np
+        np_expand = self.weight_sigma_point * p_expand  # calculate np
         np_expand_sqrt = torch.linalg.cholesky(np_expand, upper=True)  # square root of np
         np_select = np_expand_sqrt.gather(1, index_gather).reshape(-1, self.dim)  # select point
         np_select[self.dim:] *= -1
         x_sigma_point = x + np_select
 
-        return x_sigma_point
+        if self.weight_method == 'weight':
+            return torch.cat([x.unsqueeze(0), x_sigma_point])
+        else:
+            return x_sigma_point
 
     def compute_conv_mix(self, x_estimate, x_sigma_point, y_estimate, y_sigma_point):
         r'''
@@ -241,9 +247,11 @@ class UKF(nn.Module):
         e_x = torch.sub(x_sigma_point, x_estimate).unsqueeze(2)
         e_y = torch.sub(y_sigma_point, y_estimate).unsqueeze(2)
 
-        p_estimate = torch.sum(torch.bmm(e_x, e_y.permute(0, 2, 1)), dim=0)
+        p_estimate = torch.sum(
+            self.weight_mean.unsqueeze(1) * torch.bmm(e_x, e_y.permute(0, 2, 1)),
+            dim=0)
 
-        return self.weight * p_estimate
+        return p_estimate
 
     def compute_conv(self, estimate, sigma_point, noise=0):
         r'''
@@ -258,9 +266,10 @@ class UKF(nn.Module):
         '''
 
         e = torch.sub(sigma_point, estimate).unsqueeze(2)
-        p_estimate = torch.sum(torch.bmm(e, e.permute(0, 2, 1)), dim=0)
+        p_estimate = torch.sum(self.weight_mean.unsqueeze(1) * torch.bmm(e, e.permute(0, 2, 1)),
+                               dim=0) + noise
 
-        return self.weight * p_estimate + noise
+        return p_estimate
 
     def forward(self, x, y, u, P, Q=None, R=None):
         r'''
@@ -285,18 +294,18 @@ class UKF(nn.Module):
         self.dim = x.shape[0]
         self.dtype = P.dtype
         self.device = P.device
-        self.weight = self.compute_weight()
+        self.weight_sigma_point, self.weight_mean = self.compute_weight()
 
         # compute sigma point,mean,covariance
         x_sigma_point = self.compute_sigma_point(x, P)
         x_sigma_point = self.model.state_transition(x_sigma_point, u)
-        x_estimate = self.weight * torch.sum(x_sigma_point, dim=0)
+        x_estimate = torch.sum(self.weight_mean * x_sigma_point, dim=0)
 
         Pk = self.compute_conv(x_estimate, x_sigma_point, Q)
 
         x_sigma_point = self.compute_sigma_point(x_estimate, Pk)
         y_sigma_point = self.model.observation(x_sigma_point, u)
-        y_estimate = self.weight * torch.sum(y_sigma_point, dim=0)
+        y_estimate = torch.sum(self.weight_mean * y_sigma_point, dim=0)
 
         Py = self.compute_conv(y_estimate, y_sigma_point, R)
         Pxy = self.compute_conv_mix(x_estimate, x_sigma_point, y_estimate, y_sigma_point)
