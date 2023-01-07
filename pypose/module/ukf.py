@@ -15,6 +15,8 @@ class UKF(nn.Module):
             Ignored if provided during each iteration. Default: ``None``
         R (:obj:`Tensor`, optional): The covariance matrices of system observation noise.
             Ignored if provided during each iteration. Default: ``None``
+        weight_method (:obj:`Str`, optional): Methods of calculating different weights
+        for UKF. Default: ``weight``
 
     A non-linear system can be described as
 
@@ -164,7 +166,7 @@ class UKF(nn.Module):
 
         return 3 - self.dim
 
-    def compute_weight(self, method='norm'):
+    def compute_weight(self):
         r'''
         compute ukf weight
 
@@ -227,6 +229,7 @@ class UKF(nn.Module):
 
         if self.weight_method == 'weight':
             return torch.cat([x.unsqueeze(0), x_sigma_point])
+
         else:
             return x_sigma_point
 
