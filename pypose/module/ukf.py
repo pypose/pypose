@@ -15,8 +15,8 @@ class UKF(nn.Module):
             Ignored if provided during each iteration. Default: ``None``
         R (:obj:`Tensor`, optional): The covariance matrices of system observation noise.
             Ignored if provided during each iteration. Default: ``None``
-        weight_method (:obj:`Str`, optional): Methods of calculating different weights
-        for UKF. Default: ``weight``
+        weight_method (:obj:`Str`, optional): Methods of calculating different weights for UKF.
+            Default: ``weight``
 
     A non-linear system can be described as
 
