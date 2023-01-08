@@ -11,8 +11,30 @@ import setproctitle
 import sys
 sys.path.append("..")
 from dynamics.cartpole import CartPole
-
+from torch import nn
 # import setGPU
+
+class CartPoleRevised(CartPole):
+    def __init__(self, dt, length, cartmass, polemass, gravity):
+        super(CartPoleRevised, self).__init__(dt, length, cartmass, polemass, gravity)
+
+    def state_transition(self, state, input, t=None):
+        # x, xDot, theta, thetaDot = state[0]
+        force = input.squeeze()
+        costheta = torch.cos(state[0,2].clone())
+        sintheta = torch.sin(state[0,2].clone())
+        # print(self.polemassLength, thetaDot, self.totalMass, costheta)
+        temp = (force + self.polemassLength * (state[0,3].clone())**2 * sintheta) / self.totalMass
+
+        thetaAcc = (self.gravity * sintheta - costheta * temp) / \
+            (self.length * (4.0 / 3.0 - self.polemass * costheta**2 / self.totalMass))
+    
+        xAcc = temp - self.polemassLength * thetaAcc * costheta / self.totalMass
+
+        _dstate = torch.stack((state[0,1], xAcc, state[0,3], thetaAcc))
+
+        return state + torch.mul(_dstate, self.tau)
+
 
 
 def main():
@@ -20,11 +42,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_state', type=int, default=4)
     parser.add_argument('--n_input', type=int, default=1)
-    parser.add_argument('--T', type=int, default=2)
+    parser.add_argument('--T', type=int, default=4)
     parser.add_argument('--save', type=str)
     parser.add_argument('--work', type=str, default='work')
     parser.add_argument('--no-cuda', action='store_true')
-    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--seed', type=int, default=1)
     args = parser.parse_args()
 
     args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -48,7 +70,7 @@ def main():
     assert expert_seed != args.seed
     torch.manual_seed(expert_seed)
 
-    dt = 0.01   # Delta t
+    dt = 0.05   # Delta t
     Q = dt*torch.eye(n_state, n_state)
     R = dt*torch.eye(n_input, n_input)
     S = torch.zeros(n_state, n_input)
@@ -66,14 +88,14 @@ def main():
     expert = dict(
         Q = torch.eye(n_sc).to(device),
         p = torch.randn(n_sc).to(device),
-        param = torch.Tensor([1.5, 20, 10]).to(device) # len, m_cart, m_pole
+        param = torch.Tensor([1.5, 20]).to(device) # len, m_cart, m_pole
     )
     fname = os.path.join(args.save, 'expert.pkl')
     with open(fname, 'wb') as fi:
         pkl.dump(expert, fi)
 
     torch.manual_seed(args.seed)
-    param = torch.Tensor([1.2, 18, 8]).to(device).requires_grad_()
+    param = torch.Tensor([0.5, 25]).to(device).requires_grad_()
 
     state = torch.tensor([[0, 0, torch.pi, 0]])
     state_all =      torch.zeros(N+1, 1, n_state)
@@ -93,7 +115,7 @@ def main():
     time_d.flush()
 
     def get_loss(_param):
-        sys_ = CartPole(dt, len=_param[0], m_cart=_param[1], m_pole=_param[2], g=9.81)
+        sys_ = CartPoleRevised(dt, length=_param[0], cartmass=_param[1], polemass=10, gravity=9.81)
         _ipddp = ddpOptimizer(sys_, stage_cost, terminal_cost, lincon, 
                                 n_state, n_input, gx.shape[0], 
                                 N, init_traj) 
@@ -102,7 +124,7 @@ def main():
         x_pred, u_pred = fp.x, fp.u
         print('x_pred solved')
 
-        sys = CartPole(dt, len=expert['param'][0], m_cart=expert['param'][1], m_pole=expert['param'][2], g=9.81)
+        sys = CartPoleRevised(dt, length=expert['param'][0], cartmass=expert['param'][1], polemass=10, gravity=9.81)
         ipddp = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, 
                                 n_state, n_input, gx.shape[0], 
                                 N, init_traj) 
@@ -112,16 +134,17 @@ def main():
         # fp, _, _ = ipddp.forward()
         x_true, u_true = fp.x, fp.u
         print('x_true solved')
-        # print('true pred', u_true, u_pred)
-        traj_loss = torch.mean((u_true - u_pred)**2) + \
-                    torch.mean((x_true - x_pred)**2)
+        # print('true pred', x_true, x_pred)
+        traj_loss = 1e9*(torch.mean((u_true - u_pred)**2) + \
+                    torch.mean((x_true - x_pred)**2))
         # traj_loss = torch.mean((x_true - x_pred)**2)
         return traj_loss
 
-    opt = optim.RMSprop([param], lr=1e-2)
+    # opt = optim.RMSprop([param], lr=5e-1)
+    opt = optim.SGD([param], lr=5e-1)
 
     n_batch = 1
-    for i in range(200):
+    for i in range(100):
 
         t1 = time.time()
         # x_init = torch.randn(n_batch,n_state).to(device)
@@ -130,6 +153,9 @@ def main():
         t2 = time.time()
         with torch.autograd.set_detect_anomaly(True):
             traj_loss.backward()
+            print('grad', param.grad)
+            nn.utils.clip_grad_norm_(param, 0.5)
+
         t3 = time.time()
         backward_time = t3 - t2
         opt.step()
