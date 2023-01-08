@@ -500,14 +500,17 @@ class ddpOptimizer:
             #             iter, time_used, self.alg.mu, self.fp.cost, self.bp.opterr, self.bp.reg, self.fp.stepsize))
 
             #-----------termination conditions---------------
-            # if (max(self.bp.opterr, self.alg.mu)<=self.alg.tol):
-            #     print("~~~Optimality reached~~~")
-            #     break
+            if (max(self.bp.opterr, self.alg.mu)<=self.alg.tol):
+                print("~~~Optimality reached~~~")
+                break
             
             if (self.bp.opterr <= 0.2*self.alg.mu):
                 self.alg.mu = max(self.alg.tol/10.0, min(0.2*self.alg.mu, pow(self.alg.mu, 1.2) ) )
                 self.fp.resetfilter(self.alg)
                 self.bp.resetreg()
+
+            if iter == self.alg.maxiter - 1:
+                print("max iter reached, not the optimal one!")
 
         return self.fp, self.bp, self.alg
 

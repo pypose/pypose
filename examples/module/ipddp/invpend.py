@@ -8,14 +8,16 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Create class for inverted-pendulum dynamics
 class InvPend(System):
-    def __init__(self, dt):
+    def __init__(self, dt, length=[10.0], gravity=10.0):
         super(InvPend, self).__init__()
         self.tau = dt
+        self.length = length
+        self.gravity = gravity
 
     def state_transition(self, state, input, t=None):
         # x, xDot = state
         force = input.squeeze()
-        _dstate = torch.stack((state[0,1], force+torch.sin(state[0,0].clone())))
+        _dstate = torch.stack((state[0,1], force+self.gravity/self.length[0]*torch.sin(state[0,0].clone())))
         # _dstate = torch.stack((state[0,1], force+state[0,0]))
         return state + torch.mul(_dstate, self.tau)
 
