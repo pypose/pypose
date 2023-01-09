@@ -46,7 +46,7 @@ def main():
     parser.add_argument('--save', type=str)
     parser.add_argument('--work', type=str, default='work')
     parser.add_argument('--no-cuda', action='store_true')
-    parser.add_argument('--seed', type=int, default=1)
+    parser.add_argument('--seed', type=int, default=2)
     args = parser.parse_args()
 
     args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -144,7 +144,7 @@ def main():
     opt = optim.SGD([param], lr=5e-1)
 
     n_batch = 1
-    for i in range(100):
+    for i in range(150):
 
         t1 = time.time()
         # x_init = torch.randn(n_batch,n_state).to(device)

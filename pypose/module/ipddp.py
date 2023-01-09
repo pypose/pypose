@@ -543,12 +543,12 @@ class ddpOptimizer:
         self.N = fp.N
 
         fp.computeall()
-        
         x, u, c, y, s, mu = fp.x, fp.u, fp.c, fp.y, fp.s, fp.mu 
-        Vx, Vxx = fp.px, fp.pxx
-        fx,fu,fxx,fxu,fuu = fp.fx, fp.fu, fp.fxx, fp.fxu, fp.fuu
-        qx,qu,qxx,qxu,quu = fp.qx, fp.qu, fp.qxx, fp.qxu, fp.quu   
-        cx, cu = fp.cx, fp.cu
+        with torch.no_grad(): # detach
+            Vx, Vxx = fp.px, fp.pxx
+            fx,fu,fxx,fxu,fuu = fp.fx, fp.fu, fp.fxx, fp.fxu, fp.fuu
+            qx,qu,qxx,qxu,quu = fp.qx, fp.qu, fp.qxx, fp.qxu, fp.quu   
+            cx, cu = fp.cx, fp.cu
         # print('x',x) 
         # print('Vx',fp.px) # need keep the graph?
         # print('cx', cx)
