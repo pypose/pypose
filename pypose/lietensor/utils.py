@@ -1642,17 +1642,17 @@ def Log(input):
 
         If :math:`\|\boldsymbol{\nu}_i\| > \text{eps}`:
 
-            .. math::
-                \mathbf{y}_i = 
-                    \left\{
-                        \begin{array}{ll} 
-                            2\frac{\mathrm{arctan}(\|\boldsymbol{\nu}_i\|/w_i)}{\|
-                            \boldsymbol{\nu}_i\|}\boldsymbol{\nu}_i, 
-                                \quad \|w_i\| > \text{eps}, \\
-                            \mathrm{sign}(w_i) \frac{\pi}{\|\boldsymbol{\nu}_i\|}
-                                \boldsymbol{\nu}_i, \quad \|w_i\| \leq \text{eps},
-                        \end{array}
-                    \right.
+        .. math::
+            \mathbf{y}_i = 
+                \left\{
+                    \begin{array}{ll} 
+                        2\frac{\mathrm{arctan}(\|\boldsymbol{\nu}_i\|/w_i)}{\|
+                        \boldsymbol{\nu}_i\|}\boldsymbol{\nu}_i, 
+                            \quad \|w_i\| > \text{eps}, \\
+                        \mathrm{sign}(w_i) \frac{\pi}{\|\boldsymbol{\nu}_i\|}
+                            \boldsymbol{\nu}_i, \quad \|w_i\| \leq \text{eps},
+                    \end{array}
+                \right.
 
         otherwise:
 
