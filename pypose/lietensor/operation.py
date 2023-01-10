@@ -4,7 +4,7 @@ import torch, warnings
 from torch import nn, linalg
 from torch.autograd import Function
 
-from .basics import vec2skew, cumops, cummul, cumprod
+from .basics import vec2skew, cumops, cummul, cumprod, pm
 
 
 def so3_Jl(x):
@@ -320,9 +320,7 @@ class SO3_Log(torch.autograd.Function):
 
         factor = torch.zeros_like(v_norm, requires_grad=False)
         factor[idx1] = 2.0 * torch.atan(v_norm[idx1]/w[idx1]) / v_norm[idx1]
-        sign = torch.sign(w[idx2])
-        sign[sign==0] = 1
-        factor[idx2] = sign * torch.pi / v_norm[idx2]
+        factor[idx2] = pm(w[idx2]) * torch.pi / v_norm[idx2]
         factor[idx3] = 2.0 * (1.0 / w[idx3] - v_norm[idx3] * v_norm[idx3] / (3 * w[idx3]**3))
         output = factor * v
         ctx.save_for_backward(output)
