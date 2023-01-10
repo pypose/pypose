@@ -412,7 +412,8 @@ class LevenbergMarquardt(_Optimizer):
             ...
             >>> posinv = PoseInv(2, 2)
             >>> input = pp.randn_SE3(2, 2)
-            >>> optimizer = pp.optim.LM(posinv, damping=1e-6)
+            >>> strategy = pp.optim.strategy.Adaptive(damping=1e-6)
+            >>> optimizer = pp.optim.LM(posinv, strategy=strategy)
             ...
             >>> for idx in range(10):
             ...     loss = optimizer.step(input)
