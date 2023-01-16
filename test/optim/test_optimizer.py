@@ -228,6 +228,59 @@ class TestOptim:
 
         assert idx < 9, "Optimization requires too many steps."
 
+    def test_optim_multiparameter(self):
+        class PoseInv(nn.Module):
+            def __init__(self, *dim):
+                super().__init__()
+                self.pose1 = pp.Parameter(pp.randn_SE3(*dim))
+                self.pose2 = pp.Parameter(pp.randn_SE3(*dim))
+
+            def forward(self, inputs):
+                return ((self.pose1 @ inputs).Log().tensor() + (self.pose2 @ inputs).Log().tensor())
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        inputs = pp.randn_SE3(2, 2).to(device)
+        invnet = PoseInv(2, 2).to(device)
+        strategy = pp.optim.strategy.TrustRegion(radius=1e6)
+        optimizer = pp.optim.LM(invnet, strategy=strategy)
+
+        for idx in range(10):
+            loss = optimizer.step(inputs)
+            print('Pose loss %.7f @ %dit'%(loss, idx))
+            if loss < 1e-5:
+                print('Early Stoping!')
+                print('Optimization Early Done with loss:', loss.item())
+                break
+
+        assert idx < 9, "Optimization requires too many steps."
+
+    def test_optim_anybatch(self):
+
+        class PoseInv(nn.Module):
+            def __init__(self, *dim):
+                super().__init__()
+                self.pose1 = pp.Parameter(pp.randn_SE3(*dim))
+                self.pose2 = pp.Parameter(pp.randn_SE3(*dim))
+
+            def forward(self, inputs):
+                return ((self.pose1 @ inputs).Log().tensor() + (self.pose2 @ inputs).Log().tensor())
+
+        B1, B2, M, N = 2, 3, 2, 2
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        inputs = pp.randn_SE3(B2, B1, M, N, sigma=0.0001).to(device)
+        invnet = PoseInv(M, N).to(device)
+        strategy = pp.optim.strategy.TrustRegion(radius=1e6)
+        optimizer = pp.optim.LM(invnet, strategy=strategy)
+
+        for idx in range(10):
+            loss = optimizer.step(inputs)
+            print('Pose loss %.7f @ %dit'%(loss, idx))
+            if loss < 1e-5:
+                print('Early Stoping!')
+                print('Optimization Early Done with loss:', loss.item())
+                break
+        
+        assert idx < 9, "Optimization requires too many steps."
 
 if __name__ == '__main__':
     test = TestOptim()
@@ -237,3 +290,5 @@ if __name__ == '__main__':
     test.test_optim_strategy_constant()
     test.test_optim_strategy_adaptive()
     test.test_optim_trustregion()
+    test.test_optim_multiparameter()
+    test.test_optim_anybatch()
