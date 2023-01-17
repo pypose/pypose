@@ -298,15 +298,15 @@ class LTI(System):
         B (:obj:`Tensor`): The input matrix of LTI system.
         C (:obj:`Tensor`): The output matrix of LTI system.
         D (:obj:`Tensor`): The observation matrix of LTI system,
-        c1 (:obj:`Tensor`): The constant input of LTI system,
-        c2 (:obj:`Tensor`): The constant output of LTI system.
+        c1 (:obj:`Tensor`, optional): The constant input of LTI system. Default: ``None``
+        c2 (:obj:`Tensor`, optional): The constant output of LTI system. Default: ``None``
 
     A linear time-invariant lumped system can be described by state-space equation of the form:
 
     .. math::
         \begin{align*}
-            \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1 \\
-            \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2 \\
+            \mathbf{x}_{k+1} = \mathbf{A}\mathbf{x}_k + \mathbf{B}\mathbf{u}_k + \mathbf{c}_1 \\
+            \mathbf{y}_k     = \mathbf{C}\mathbf{x}_k + \mathbf{D}\mathbf{u}_k + \mathbf{c}_2 \\
         \end{align*}
 
     where :math:`\mathbf{x}` and :math:`\mathbf{u}` are state and input of the current
@@ -334,7 +334,7 @@ class LTI(System):
         ...
         >>> state = torch.randn(Bd, Sd, device=device)
         >>> input = torch.randn(Bd, Id, device=device)
-        >>> lti(state, input)
+        >>> state, observation = lti(state, input)
         tensor([[[-8.5639,  0.0523, -0.2576]],
                 [[ 4.1013, -1.5452, -0.0233]]]), 
         tensor([[[-3.5780, -2.2970, -2.9314]], 
@@ -362,6 +362,13 @@ class LTI(System):
     def forward(self, state, input):
         r'''
         Perform one step advance for the LTI system.
+
+        Args:
+            state (:obj:`Tensor`): The state (:math:`\mathbf{x}`) of the system 
+            input (:obj:`Tensor`): The input (:math:`\mathbf{u}`) of the system.
+
+        Returns:
+            ``tuple`` of Tensor: The state and observation of the system in next time step.
         '''
         return super().forward(state, input)
 
@@ -370,81 +377,31 @@ class LTI(System):
         Perform one step of LTI state transition.
 
         .. math::
-            \mathbf{z} = \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1
+            \mathbf{x}_{k+1} = \mathbf{A}\mathbf{x}_k + \mathbf{B}\mathbf{u}_k + \mathbf{c}_1
+
+        Args:
+            state (:obj:`Tensor`): The state (:math:`\mathbf{x}`) of the system 
+            input (:obj:`Tensor`): The input (:math:`\mathbf{u}`) of the system.
+
+        Returns:
+            ``Tensor``: The state the system in next time step.
         '''
-        return pp.bmv(self.A, state) + pp.bmv(self.B, input) + self.c1
+        z = pp.bmv(self.A, state) + pp.bmv(self.B, input)
+        return z if self.c1 is None else z + self.c1
 
     def observation(self, state, input, t=None):
         r'''
-        Return the observation of LTI system at current time step.
+        Return the observation of LTI system.
 
         .. math::
-            \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}\mathbf{u} + \mathbf{c}_2
+            \mathbf{y}_k = \mathbf{C}\mathbf{x}_k + \mathbf{D}\mathbf{u}_k + \mathbf{c}_2
+
+        Args:
+            state (:obj:`Tensor`): The state (:math:`\mathbf{x}`) of the system 
+            input (:obj:`Tensor`): The input (:math:`\mathbf{u}`) of the system.
+
+        Returns:
+            ``Tensor``: The observation of the system in next time step.
         '''
-        return pp.bmv(self.C, state) + pp.bmv(self.D, input) + self.c2
-
-    @property
-    def A(self):
-        r'''
-        System state matrix :obj:`A`
-        '''
-        return self._A
-
-    @A.setter
-    def A(self, A):
-        self._A = A
-
-    @property
-    def B(self):
-        r'''
-        System input matrix :obj:`B`
-        '''
-        return self._B
-
-    @B.setter
-    def B(self, B):
-        self._B = B
-
-    @property
-    def C(self):
-        r'''
-        System output matrix :obj:`C`
-        '''
-        return self._C
-
-    @C.setter
-    def C(self, C):
-        self._C = C
-
-    @property
-    def D(self):
-        r'''
-        System observation matrix :obj:`D`
-        '''
-        return self._D
-
-    @D.setter
-    def D(self, D):
-        self._D = D
-
-    @property
-    def c1(self):
-        r'''
-        Constant input :obj:`c1`
-        '''
-        return self._c1
-
-    @c1.setter
-    def c1(self, c1):
-        self._c1 = c1
-
-    @property
-    def c2(self):
-        r'''
-        Constant output :obj:`c2`
-        '''
-        return self._c2
-
-    @c2.setter
-    def c2(self, c2):
-        self._c2 = c2
+        y = pp.bmv(self.C, state) + pp.bmv(self.D, input)
+        return y if self.c2 is None else y + self.c2
