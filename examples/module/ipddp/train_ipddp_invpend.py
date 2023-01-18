@@ -9,13 +9,9 @@ import shutil
 import pickle as pkl
 import argparse
 import setproctitle
-# import matplotlib.pyplot as plt
-
-# import setGPU
-
 
 def main():
-    torch.set_default_dtype(torch.float64) # this seems very important!!
+    torch.set_default_dtype(torch.float64)
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_state', type=int, default=2)
     parser.add_argument('--n_input', type=int, default=1)
@@ -96,7 +92,6 @@ def main():
         _ipddp = ddpOptimizer(sys_, stage_cost, terminal_cost, lincon, 
                                 n_state, n_input, gx.shape[0], 
                                 N, init_traj) 
-        # x_pred, u_pred, objs_pred = _lqr2.forward(x_init, expert['Q'], expert['p'])
         _fp, _, _ = _ipddp.forward()
         x_pred, u_pred = _fp.x, _fp.u
         print('x_pred solved')
@@ -105,16 +100,12 @@ def main():
         ipddp = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, 
                                 n_state, n_input, gx.shape[0], 
                                 N, init_traj) 
-
-        # x_true, u_true, objs_true = _ipddp.optimizer()
         fp, _, _ = ipddp.optimizer()
-        # fp, _, _ = ipddp.forward()
         x_true, u_true = fp.x, fp.u
         print('x_true solved')
-        # print('true pred', u_true, u_pred)
+
         traj_loss = 1e4*(torch.mean((u_true - u_pred)**2) + \
                     torch.mean((x_true - x_pred)**2))
-        # traj_loss = torch.mean((x_true - x_pred)**2)
         return traj_loss
 
     # opt = optim.RMSprop([param], lr=1e-2)
@@ -124,7 +115,6 @@ def main():
     for i in range(50):
 
         t1 = time.time()
-        # x_init = torch.randn(n_batch,n_state).to(device)
         traj_loss = get_loss(param)
         opt.zero_grad()
         t2 = time.time()
@@ -147,26 +137,10 @@ def main():
 
         plot_interval = 1
         if i % plot_interval == 0:
-            # print('entered')
-            # os.system('.\plot.py "{}" &'.format(args.save))
             print(param, expert['param'])
         print('{:04d}: traj_loss: {:.4f} model_loss: {:.4f}'.format(
             i, traj_loss.item(), model_loss.item()))
-
-        # print("backward_time = ", backward_time)
-        # print("overall_time = ", overall_time)
     
-    # fig = plt.figure()
-    # ax = fig.add_subplot(1, 1, 1)
-    # ax.plot(np.log10(error_trace), linewidth=4, label='error')
-    # ax.set_facecolor('#E6E6E6')
-    # ax.set_xlabel('Iteration $k$')
-    # ax.set_ylabel(r'$e_{\theta}$')
-    # ax.set_title('Estimation error')
-    # ax.grid()
-    # ax.legend()
-    # ax.set_position(pos=[0.13,0.20,0.85,0.70])
-    # plt.show()
     print( args.save)
     os.system('python .\plot.py "{}" &'.format(args.save))
 if __name__=='__main__':

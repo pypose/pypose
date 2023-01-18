@@ -38,8 +38,6 @@ class fwdPass:
 
         # initilize all the variables used in the forward pass
         # defined in dynamics function
-        # self.x = torch.zeros(self.N+1, 1, self.n_state)
-        # self.u = torch.zeros(self.N,   1, self.n_input)
         self.x = init_traj['state']
         self.u = init_traj['input']
         self.c = torch.zeros(self.N, self.n_cons, 1)
@@ -47,17 +45,19 @@ class fwdPass:
         self.s = 0.1*torch.ones(self.N, self.n_cons, 1)
         self.mu = self.y*self.s
 
+        # terms related with terminal cost
         self.p = torch.Tensor([0.0])
         self.px = torch.zeros(1, self.n_state)
         self.pxx = torch.eye(self.n_state, self.n_state)
 
+        # terms related with system dynamics
         self.fx = torch.zeros(self.N, self.n_state, self.n_state)
         self.fu = torch.zeros(self.N, self.n_state, self.n_input)
-
         self.fxx = torch.zeros(self.N, self.n_state, self.n_state, self.n_state)
         self.fxu = torch.zeros(self.N, self.n_state, self.n_state, self.n_input)
         self.fuu = torch.zeros(self.N, self.n_state, self.n_input, self.n_input)
 
+        # terms related with stage cost
         self.q = torch.zeros(self.N, 1)
         self.qx = torch.zeros(self.N, self.n_state, 1)
         self.qu = torch.zeros(self.N, self.n_input, 1)
@@ -65,20 +65,19 @@ class fwdPass:
         self.qxu = torch.zeros(self.N, self.n_state, self.n_input)
         self.quu = torch.zeros(self.N, self.n_input, self.n_input)
 
+        # terms related with constraint
         self.cx = torch.zeros(self.N, self.n_cons, self.n_state)
         self.cu = torch.zeros(self.N, self.n_cons, self.n_input)
 
         self.filter = torch.Tensor([[torch.inf], [0.]])
-
         self.err = 0.
         self.logcost = 0.
         self.step = 0
         self.failed = False
         self.stepsize = 1.0
-
         self.reg_exp_base = 1.6
 
-    def computenextx(self, x, u): # seems to be embedded in system
+    def computenextx(self, x, u):
         return self.f_fn(x, u)[0]
 
     def computec(self, x, u):
@@ -96,14 +95,14 @@ class fwdPass:
         self.computeqrelated()
         self.computecrelated()
 
-    def computeprelated(self):
+    def computeprelated(self): # terms related to the terminal cost
         self.p = self.computep(self.x[-1])
         self.p_fn.set_refpoint(state=self.x[-1], input=self.u[-1])
-        self.px = self.p_fn.cx.mT # use mT here s.t. cx property is consistent with dynamics implementation
+        self.px = self.p_fn.cx.mT
         self.pxx = self.p_fn.cxx.squeeze(0).squeeze(1)
         return 
 
-    def computefrelated(self):
+    def computefrelated(self): # terms related with system dynamics
         for i in range(self.N):
             self.f_fn.set_refpoint(state=self.x[i], input=self.u[i])
             self.fx[i] = self.f_fn.A.squeeze(0).squeeze(1)
@@ -112,17 +111,17 @@ class fwdPass:
             self.fxu[i] = self.f_fn.fxu.squeeze(0).squeeze(1).squeeze(2)
             self.fuu[i] = self.f_fn.fuu.squeeze(0).squeeze(1).squeeze(2)
 
-    def computeqrelated(self):
+    def computeqrelated(self): # terms related with stage cost
         for i in range(self.N):
             self.q[i] = self.q_fn(self.x[i], self.u[i])
             self.q_fn.set_refpoint(state=self.x[i], input=self.u[i])
             self.qx[i] = self.q_fn.cx.mT
             self.qu[i] = self.q_fn.cu.mT
-            self.qxx[i] = self.q_fn.cxx #.squeeze(0).squeeze(1) # squeezed inside cxx definition
-            self.qxu[i] = self.q_fn.cxu #.squeeze(0).squeeze(1)
-            self.quu[i] = self.q_fn.cuu #.squeeze(0).squeeze(1)
+            self.qxx[i] = self.q_fn.cxx # squeezed inside cxx definition
+            self.qxu[i] = self.q_fn.cxu 
+            self.quu[i] = self.q_fn.cuu
 
-    def computecrelated(self):
+    def computecrelated(self): # terms related with constraints
         for i in range(self.N):
             self.c[i] = self.computec(self.x[i], self.u[i])
             self.c_fn.set_refpoint(state=self.x[i], input=self.u[i])
@@ -261,7 +260,6 @@ class ddpOptimizer:
             Qxu = qxu[i] + fxiVxx.matmul(fu[i])  + torch.tensordot(Vx.mT,fxu[i],dims=1).squeeze(0)
             Quu = quu[i] + fu[i].mT.matmul(Vxx).matmul(fu[i])  + torch.tensordot(Vx.mT,fuu[i],dims=1).squeeze(0)  # (5c-5e)
             Quu = 0.5 * (Quu + Quu.mT)
-            # todo S = s[i].asDiagonal();
             Quu_reg = Quu + quu[i] * (pow(fp.reg_exp_base, bp.reg) - 1.)
 
             if (alg.infeas): #  start from infeasible/feasible trajs.
@@ -424,7 +422,6 @@ class ddpOptimizer:
                 cost = qnew.sum() + fp.computep(xnew[-1])
                 costq = qnew.sum()
 
-                # logcost = copy.deepcopy(cost)
                 logcost = cost.detach()
                 err = torch.Tensor([0.])          
                 if (alg.infeas):
@@ -478,13 +475,6 @@ class ddpOptimizer:
         self.bp.resetreg()
 
         for iter in range(self.alg.maxiter):
-            # self.fp.x = detach_maybe(self.fp.x)
-            # self.fp.u = detach_maybe(self.fp.u)
-            # self.fp.c = detach_maybe(self.fp.c)
-            # self.fp.y = detach_maybe(self.fp.y)
-            # self.fp.s = detach_maybe(self.fp.s)
-            # self.fp.mu = detach_maybe(self.fp.mu)
-
             while True: 
                 self.backwardpass()
                 if ~self.bp.failed: 
@@ -519,18 +509,14 @@ class ddpOptimizer:
         with torch.no_grad():
             fp_best,bp_best,alg_best = self.optimizer()
 
-        with torch.autograd.set_detect_anomaly(True):
+        with torch.autograd.set_detect_anomaly(True): # for debug
             self.fp = fp_best
             self.bp = bp_best
             self.alg = alg_best
             self.fp.initialroll()
             self.backwardpass_simplified()
             self.forwardpass_simplified()
-        # contruct a computation graph
-        # todo: backwardpass once and forwardpass once, no regularization, no if_else, no algParam
-        # self.backwardpass_simplified()
-        # self.forwardpass_simplified()
-        # todo: how to possibly reuse the backwardpass forwardpass code?
+            # todo: how to possibly reuse the backwardpass forwardpass code?
         return self.fp, self.bp, self.alg
         
     def backwardpass_simplified(self):
@@ -549,10 +535,6 @@ class ddpOptimizer:
             fx,fu,fxx,fxu,fuu = fp.fx, fp.fu, fp.fxx, fp.fxu, fp.fuu
             qx,qu,qxx,qxu,quu = fp.qx, fp.qu, fp.qxx, fp.qxu, fp.quu   
             cx, cu = fp.cx, fp.cu
-        # print('x',x) 
-        # print('Vx',fp.px) # need keep the graph?
-        # print('cx', cx)
-        # exit()
 
         # backward recursions, similar to iLQR backward recursion, but more variables involved
         for i in range(self.N-1, -1, -1):
@@ -564,7 +546,6 @@ class ddpOptimizer:
             Qxu = qxu[i] + fxiVxx.matmul(fu[i])  + torch.tensordot(Vx.mT,fxu[i],dims=1).squeeze(0)
             Quu = quu[i] + fu[i].mT.matmul(Vxx).matmul(fu[i])  + torch.tensordot(Vx.mT,fuu[i],dims=1).squeeze(0)  # (5c-5e)
             Quu = 0.5 * (Quu + Quu.mT)
-            # todo S = s[i].asDiagonal();
             Quu_reg = Quu
 
             r = s[i] *  c[i] + alg.mu
@@ -630,8 +611,3 @@ class ddpOptimizer:
 
         self.fp = fp
         self.bp = bp
-
-def detach_maybe(x):
-    if x is None:
-        return None
-    return x if not x.requires_grad else x.detach()

@@ -15,10 +15,8 @@ class InvPend(System):
         self.gravity = gravity
 
     def state_transition(self, state, input, t=None):
-        # x, xDot = state
         force = input.squeeze()
         _dstate = torch.stack((state[0,1], force+self.gravity/self.length[0]*torch.sin(state[0,0].clone())))
-        # _dstate = torch.stack((state[0,1], force+state[0,0]))
         return state + torch.mul(_dstate, self.tau)
 
     def observation(self, state, input, t=None):
@@ -34,17 +32,15 @@ if __name__ == "__main__":
     state = torch.tensor([[-1., 0.]])
 
     # Create dynamics solver object
-    sys = InvPend(dt)    # Calculate trajectory
+    sys = InvPend(dt) 
     n_state = 2
     n_input = 1 
-    # Calculate trajectory
     state_all =      torch.zeros(N+1, 1, n_state)
     input_all = 0.02*torch.ones(N,    1, n_input)
     init_traj = {'state': state_all, 
                  'input': input_all}
     state_all[0] = state
  
-
     # Create cost object
     Q = dt*torch.eye(n_state, n_state)
     R = dt*torch.eye(n_input, n_input)
