@@ -1642,23 +1642,26 @@ def Log(input):
 
         If :math:`\|\boldsymbol{\nu}_i\| > \text{eps}`:
 
-            .. math::
-                \mathbf{y}_i = 
-                    \left\{
-                        \begin{array}{ll} 
-                            2\frac{\mathrm{arctan}(\|\boldsymbol{\nu}_i\|/w_i)}{\|
-                            \boldsymbol{\nu}_i\|}\boldsymbol{\nu}_i, 
-                                \quad \|w_i\| > \text{eps}, \\
-                            \mathrm{sign}(w_i) \frac{\pi}{\|\boldsymbol{\nu}_i\|}
-                                \boldsymbol{\nu}_i, \quad \|w_i\| \leq \text{eps},
-                        \end{array}
-                    \right.
+        .. math::
+            \mathbf{y}_i = 
+                \left\{
+                    \begin{array}{ll} 
+                        2\frac{\mathrm{arctan}(\|\boldsymbol{\nu}_i\|/w_i)}{\|
+                        \boldsymbol{\nu}_i\|}\boldsymbol{\nu}_i, 
+                            \quad \|w_i\| > \text{eps}, \\
+                        \mathrm{pm}(w_i) \frac{\pi}{\|\boldsymbol{\nu}_i\|}
+                            \boldsymbol{\nu}_i, \quad \|w_i\| \leq \text{eps},
+                    \end{array}
+                \right.
 
         otherwise:
 
         .. math::
             \mathbf{y}_i = 2\left( \frac{1}{w_i} - 
                 \frac{\|\boldsymbol{\nu}_i\|^2}{3w_i^3}\right)\boldsymbol{\nu}_i.
+        
+        where :math:`\mathrm{pm}` is the plus or minus (:math:`\pm`) operator
+        (refer to :meth:`pm`).
 
     * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`SE3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`SE3`):

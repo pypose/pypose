@@ -4,7 +4,7 @@ import torch, warnings
 from torch import nn, linalg
 from .operation import broadcast_inputs
 from .basics import cumops_, cummul_, cumprod_
-from .basics import vec2skew, cumops, cummul, cumprod
+from .basics import vec2skew, cumops, cummul, cumprod, pm
 from torch.utils._pytree import tree_map, tree_flatten
 from .operation import SO3_Log, SE3_Log, RxSO3_Log, Sim3_Log
 from .operation import so3_Exp, se3_Exp, rxso3_Exp, sim3_Exp
@@ -810,13 +810,6 @@ class LieTensor(torch.Tensor):
           - :meth:`rxso3`
 
     Note:
-        In most of the cases, Lie Group should be used. Lie Algebra is used only
-        when it needs to be optimized by back-propagation via gradients: in this
-        case, LieTensor is taken as :meth:`pypose.Parameter` in a module, which follows
-        PyTorch traditions.
-
-
-    Note:
         Two attributes :obj:`shape` and :obj:`lshape` are available for LieTensor.
         The only differece is the :obj:`lshape` hides the last dimension of :obj:`shape`,
         since :obj:`lshape` takes the data in the last dimension as a single :obj:`ltype` item.
@@ -878,6 +871,12 @@ class LieTensor(torch.Tensor):
             so3Type LieTensor:
             tensor([[-1.5948,  0.3113, -0.9807]], device='cuda:0', dtype=torch.float64,
                 grad_fn=<AliasBackward0>)
+
+    Note:
+        In most of the cases, Lie Group is expected to be used, therefore we only provide
+        `converting functions <https://pypose.org/docs/main/convert/>`_ between Lie Groups
+        and other data structures, e.g., transformation matrix, Euler angle, etc. The users
+        can convert data between Lie Group and Lie algebra with :obj:`Exp` and :obj:`Log`.
     """
     def __init__(self, *data, ltype:LieType):
         assert self.shape[-1:] == ltype.dimension, 'The last dimension of a LieTensor has to be ' \
@@ -1089,6 +1088,34 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.scale(self)
 
+    def euler(self, eps=2e-4) -> torch.Tensor:
+        r'''
+        See :meth:`pypose.euler`
+        '''
+        data = self.rotation().tensor()
+        x, y = data[..., 0], data[..., 1]
+        z, w = data[..., 2], data[..., 3]
+        xx, yy, zz, ww = x*x, y*y, z*z, w*w
+
+        t0 = 2 * (w * x + y * z)
+        t1 = (ww + zz) - (xx + yy)
+        t2 = 2 * (w * y - z * x) / (xx + yy + zz + ww)
+        t3 = 2 * (w * z + x * y)
+        t4 = (ww + xx) - (yy + zz)
+
+        # sigularity when pitch angle ~ +/-pi/2
+        roll1 = torch.atan2(t0, t1)
+        roll2 = torch.zeros_like(t0)
+        flag = t2.abs() < 1. - eps
+        yaw1 = torch.atan2(t3, t4)
+        yaw2 = -2 * pm(t2) * torch.atan2(x, w)
+        
+        roll = torch.where(flag, roll1, roll2)
+        pitch = torch.asin(t2.clamp(-1, 1))
+        yaw = torch.where(flag, yaw1, yaw2)
+
+        return torch.stack([roll, pitch, yaw], dim=-1)
+
     def identity_(self):
         r'''
         Inplace set the LieTensor to identity.
@@ -1117,7 +1144,7 @@ class LieTensor(torch.Tensor):
         r"""
         See :func:`pypose.cumops`
         """
-        return self.ltype.cumops(self, other, dim, ops)
+        return self.ltype.cumops(self, dim, ops)
 
     def cummul(self, dim):
         r"""
@@ -1135,7 +1162,7 @@ class LieTensor(torch.Tensor):
         r"""
         Inplace version of :func:`pypose.cumops`
         """
-        return self.ltype.cumops_(self, other, dim, ops)
+        return self.ltype.cumops_(self, dim, ops)
 
     def cummul_(self, dim):
         r"""
