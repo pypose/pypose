@@ -1,18 +1,14 @@
-import torch as torch
-import time
+import torch
 import torch.nn as nn
-import pypose as pp
+from ..basics import bmv, bvmv
 
 
-class DPLQR(nn.Module):
+class LQR(nn.Module):
     r'''
-    Discrete-time finite-horizon Linear Quadratic Regulator (LQR)
+    Linear Quadratic Regulator (LQR) with Dynamic Programming.
 
     Args:
-        n_state (int): Parameter that determines the dimension of the state.
-        n_ctrl (int): Parameter that determines the dimension of the input.
-        T (int): Total time steps.
-        system (instance): The system sent to LQR to affine state-transition dynamics.
+        system (instance): The system to be soved by LQR.
 
     LQR finds the optimal nominal trajectory :math:`\mathbf{\tau}_{1:T}^*` = 
     :math:`\begin{Bmatrix} \mathbf{x}_t, \mathbf{u}_t \end{Bmatrix}_{1:T}` 
@@ -44,22 +40,22 @@ class DPLQR(nn.Module):
 
     Example:
         >>> n_batch = 2
-        >>> n_state, n_ctrl = 4, 3
-        >>> n_sc = n_state + n_ctrl
+        >>> ns, nc = 4, 3
+        >>> n_sc = ns + nc
         >>> T = 5
         >>> Q = torch.randn(n_batch, T, n_sc, n_sc)
         >>> Q = torch.matmul(Q.mT, Q)
         >>> p = torch.randn(n_batch, T, n_sc)
-        >>> A = torch.tile(torch.eye(n_state) + 0.2 * torch.randn(n_state, n_state), (n_batch, 1, 1))
-        >>> B = torch.randn(n_batch, n_state, n_ctrl)
-        >>> C = torch.tile(torch.eye(n_state), (n_batch, 1, 1))
-        >>> D = torch.tile(torch.zeros(n_state, n_ctrl), (n_batch, 1, 1))
-        >>> c1 = torch.tile(torch.randn(n_state), (n_batch, 1))
-        >>> c2 = torch.tile(torch.zeros(n_state), (n_batch, 1))
-        >>> x_init = torch.randn(n_batch, n_state)
+        >>> A = torch.tile(torch.eye(ns) + 0.2 * torch.randn(ns, ns), (n_batch, 1, 1))
+        >>> B = torch.randn(n_batch, ns, nc)
+        >>> C = torch.tile(torch.eye(ns), (n_batch, 1, 1))
+        >>> D = torch.tile(torch.zeros(ns, nc), (n_batch, 1, 1))
+        >>> c1 = torch.tile(torch.randn(ns), (n_batch, 1))
+        >>> c2 = torch.tile(torch.zeros(ns), (n_batch, 1))
+        >>> x_init = torch.randn(n_batch, ns)
         >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
-        >>> LQRDP = pp.module.DPLQR(lti)
-        >>> x_lqr, u_lqr, objs_lqr, tau = LQRDP.forward(x_init, Q, p)
+        >>> lqr = pp.module.LQR(lti)
+        >>> x_lqr, u_lqr, objs_lqr, tau = lqr(x_init, Q, p)
         >>> print(x_lqr)
         >>> print(u_lqr)
         tensor([[[-0.5453, -0.5922, -1.2467,  0.8291],
@@ -83,155 +79,69 @@ class DPLQR(nn.Module):
                 [[ 4.9618,  6.6287, -7.5575],
                  [ 0.3090, -3.1843,  0.7678]]] 
     '''
-
-
     def __init__(self, system):
-        super(DPLQR, self).__init__()
-
+        super().__init__()
         self.system = system
-        #self.time = system.systime
-            
 
-    def forward(self, x_init, Q, p):
+    def forward(self, x, Q, p):
         r'''
         Perform one step advance for the LQR problem.
         '''
+        K, k = self.lqr_backward(Q, p)
+        x, u, cost = self.lqr_forward(x, Q, p, K, k)
+        return x, u, cost
 
-        Ks, ks = self.lqr_backward(Q, p)
-        new_x, new_u, objs, tau = self.lqr_forward(x_init, Q, p, Ks, ks)
-        return new_x, new_u, objs, tau
-
-    
     def lqr_backward(self, Q, p):
         r'''
         The backward recursion of the dynamic programming to solve LQR.
-
-        Args:
-            Q (:obj:`Tensor`): The matrix of quadratic parameter.
-            p (:obj:`Tensor`): The constant vector of quadratic parameter.
-
-        Returns:
-            Tuple of Tensor: The status feedback controller :math:`\mathbf{K}_s` and 
-            :math:`\mathbf{k}_s` at all steps.
         '''
+        # Q: (B*, T, N, N), p: (B*, T, N), where B* can be any batch dimensions, e.g., (2, 3)
+        assert Q.shape[:-1] == p.shape and Q.size(-1) == Q.size(-2), "Shape not compatible."
+        B, T = p.shape[:-2], p.size(-2)
+        ns, nc = self.system.B.size(-2), self.system.B.size(-1)
+        K = torch.zeros(B + (T, nc, ns), dtype=p.dtype, device=p.device)
+        k = torch.zeros(B + (T, nc), dtype=p.dtype, device=p.device)
 
-        T = Q.size(-3)
-        Ks = []
-        ks = []
-        Vtp1 = vtp1 = None
-        n_state = self.system.B.size(-2)
-        n_ctrl = self.system.B.size(-1)
-        
         for t in range(T-1, -1, -1): 
-            pt = p[:,t,:]
-            pt = pt.unsqueeze(1)
-
-            if self.system.c1.ndim ==3:
-                c1 = self.system.c1[:,t,:]
-                c1 = c1.unsqueeze(1)
-            elif self.system.c1.ndim == 2:
-                c1 = self.system.c1.unsqueeze(1)
-            elif self.system.c1.ndim == 1:
-                c1 = self.system.c1.unsqueeze(0)
-
-            if self.system.A.ndim == 4:
-                A = self.system.A[:,t,:,:]
-                B = self.system.B[:,t,:,:]
-                F = torch.cat((A, B), axis = 2)
-            elif self.system.A.ndim == 3:
-                F = torch.cat((self.system.A, self.system.B), axis = 2)
-            elif self.system.A.ndim == 2:
-                F = torch.cat((self.system.A, self.system.B), dim = 1)
-
-            if t == T-1:
-                Qt = Q[:,t,:,:]
-                qt = pt.mT
+            if t == T - 1:
+                Qt = Q[...,t,:,:]
+                qt = p[...,t,:]
             else:
-                Ft = F
-                Ft_T = Ft.mT
-                Qt = Q[:,t,:,:] + Ft_T @ Vtp1 @ Ft
-                if self.system.c1 is None or self.system.c1.numel() == 0:
-                    qt = pt.mT + Ft_T @ vtp1
-                else:
-                    ft = c1.mT
-                    qt = pt.mT + Ft_T @ Vtp1 @ ft + Ft_T @ vtp1
-            
-            Qt_xx = Qt[:, :n_state, :n_state]
-            Qt_xu = Qt[:, :n_state, n_state:]
-            Qt_ux = Qt[:, n_state:, :n_state]
-            Qt_uu = Qt[:, n_state:, n_state:]
-            qt_x = qt[:, :n_state, :]
-            qt_u = qt[:, n_state:, :]
+                self.system.set_refpoint(t=t)
+                F = torch.cat((self.system.A, self.system.B), dim=-1)
+                Qt = Q[...,t,:,:] + F.mT @ V @ F
+                qt = p[...,t,:] + bmv(F.mT, v)
+                if self.system.c1 is not None:
+                    qt = qt + bmv(F.mT @ V, self.system.c1)
 
-            if n_ctrl == 1:
-                Kt = -(1./Qt_uu)*Qt_ux
-                kt = -(1./Qt_uu)*qt_u
-            else:
-                Qt_uu_inv = [torch.linalg.pinv(Qt_uu[i]) for i in range(Qt_uu.shape[0])]
-                Qt_uu_inv = torch.stack(Qt_uu_inv)
-                Kt = -Qt_uu_inv.bmm(Qt_ux)
-                kt = -Qt_uu_inv @ qt_u
+            Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
+            Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
+            qx, qu = qt[..., :ns], qt[..., ns:]
+            Quu_inv = torch.linalg.pinv(Quu)
 
-            Kt_T = Kt.mT
+            K[...,t,:,:] = Kt = - Quu_inv @ Qux
+            k[...,t,:] = kt = - bmv(Quu_inv, qu)
+            V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
+            v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
 
-            Ks.append(Kt)
-            ks.append(kt)
+        return K, k
 
-            Vtp1 = Qt_xx + Qt_xu @ Kt + Kt_T @ Qt_ux + Kt_T @ Qt_uu @ Kt
-            vtp1 = qt_x + Qt_xu @ kt + Kt_T @ qt_u + Kt_T @ Qt_uu @ kt
-
-        return Ks, ks
-
-    def lqr_forward(self, x_init, Q, p, Ks, ks):
+    def lqr_forward(self, x_init, Q, p, K, k):
         r'''
         The forward recursion of the dynamic programming to solve LQR.
-
-        .. math::
-            \mathbf{u}_t = \mathbf{K}_t\mathbf{x}_t + \mathbf{k}_t
-
-        Args:
-            Q (:obj:`Tensor`): The matrix of quadratic parameter.
-            p (:obj:`Tensor`): The constant of quadratic parameter.
-            Ks (:obj:`Tensor`): The matrix of status feedback controller at all steps.
-            ks (:obj:`Tensor`): The constant of status feedback controller at all steps.
-
-        Returns:
-            Tuple of Tensor: The state of the dynamical system :math:`\mathbf{x}`, 
-            the input to the dynamical system :math:`\mathbf{u}`,
-            the costs to the dynamical system :math:`\mathbf{c}`, 
-            and the optimal nominal trajectory :math:`\mathbf{\tau}` to the dynamical system.
         '''
-
-        T = Q.size(-3)
-        new_u = []
-        new_x = [x_init]
-        objs = []
-        tau = []
-        ks = ks
-        Ks = Ks
-
+        assert x_init.device == Q.device == p.device == K.device == k.device
+        assert x_init.dtype == Q.dtype == p.dtype == K.dtype == k.dtype
+        B, T, nc = p.shape[:-2], p.size(-2), self.system.B.size(-1)
+        u = torch.zeros(B + (T, nc), dtype=p.dtype, device=p.device)
+        cost = torch.zeros(B, dtype=p.dtype, device=p.device)
+        x = x_init.repeat(B + (T+1, 1))
 
         for t in range(T):
-            t_rev = T-1-t
-            Kt = Ks[t_rev]
-            kt = ks[t_rev]
-            new_xt = new_x[t]
-            new_ut = pp.bmv(Kt, new_xt) + kt.mT.squeeze()
-            new_u.append(new_ut)
+            Kt, xt, kt = K[...,t,:,:], x[...,t,:], k[...,t,:]
+            u[..., t, :] = ut = bmv(Kt, xt) + kt
+            xut = torch.cat((xt, ut), dim=-1)
+            x[...,t+1,:] = self.system(xt, ut)[0]
+            cost = cost + 0.5 * bvmv(xut, Q[...,t,:,:], xut) + (xut * p[...,t,:]).sum(-1)
 
-            new_xut = torch.cat((new_xt, new_ut), dim=1)
-            if t < T-1:
-                new_xtp1, y_system = self.system(new_xt, new_ut)
-                new_x.append(new_xtp1)
-
-            obj = 0.5 * new_xut @ Q[:,t,:,:] @ new_xut.mT + new_xut @ p[:,t,:].mT
-            objs.append(obj)
-
-            tau.append(new_xut)
-            
-
-        new_u = torch.stack(new_u)
-        new_x = torch.stack(new_x)
-        objs = torch.stack(objs) 
-
-        return new_x, new_u, objs, tau
+        return x[...,0:,:], u, cost

@@ -7,15 +7,16 @@ class TestKalman:
 
     def test_kalman(self):
 
-        class NTI(pp.module.System):
+        class NTI(pp.module.NTI):
             def __init__(self):
                 super().__init__()
 
-            def state_transition(self, state, input, t=None):
+            def state_transition(self, state, input):
                 return state.cos() + input
 
-            def observation(self, state, input, t):
+            def observation(self, state, input):
                 return state.sin() + input
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = NTI().to(device)
         ekf = pp.module.EKF(model).to(device)
