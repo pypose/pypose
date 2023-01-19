@@ -232,29 +232,29 @@ class LTV(LTI):
     Discrete-time Linear Time-Variant (LTV) system.
     
     Args:
-        A (:obj:`Tensor`): The state matrix of LTI system.
-        B (:obj:`Tensor`): The input matrix of LTI system.
-        C (:obj:`Tensor`): The output matrix of LTI system.
-        D (:obj:`Tensor`): The observation matrix of LTI system,
-        c1 (:obj:`Tensor`, optional): The constant input of LTI system. Default: ``None``
-        c2 (:obj:`Tensor`, optional): The constant output of LTI system. Default: ``None``
+        A (:obj:`Tensor`, optional): The stacked state matrix of LTI system. Default: ``None``
+        B (:obj:`Tensor`, optional): The stacked input matrix of LTI system. Default: ``None``
+        C (:obj:`Tensor`, optional): The stacked output matrix of LTI system. Default: ``None``
+        D (:obj:`Tensor`, optional): The stacked observation matrix of LTI system. Default: ``None``
+        c1 (:obj:`Tensor`, optional): The stacked constant input of LTI system. Default: ``None``
+        c2 (:obj:`Tensor`, optional): The stacked constant output of LTI system. Default: ``None``
 
-    A linear time-invariant lumped system can be described by state-space equation of the form:
+    A linear time-variant lumped system can be described by state-space equation of the form:
 
     .. math::
         \begin{align*}
-            \mathbf{x}_{k+1} = \mathbf{A}\mathbf{x}_k + \mathbf{B}\mathbf{u}_k + \mathbf{c}_1 \\
-            \mathbf{y}_k     = \mathbf{C}\mathbf{x}_k + \mathbf{D}\mathbf{u}_k + \mathbf{c}_2 \\
+          \mathbf{x}_{k+1} = \mathbf{A}_k\mathbf{x}_k + \mathbf{B}\mathbf{u}_k + \mathbf{c}^1_k \\
+          \mathbf{y}_k     = \mathbf{C}_k\mathbf{x}_k + \mathbf{D}\mathbf{u}_k + \mathbf{c}^2_k \\
         \end{align*}
 
-    where :math:`\mathbf{x}` and :math:`\mathbf{u}` are state and input of the current
-    timestamp of LTI system.
+    where :math:`\mathbf{x}_k` and :math:`\mathbf{u}_k` are state and input at the
+    timestamp :math:`k` of LTI system.
 
     Note:
         The :obj:`forward` method implicitly increments the time step via :obj:`forward_hook`.
         :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity
         such as time-varying system. One can directly access the current system time via the
-        property :obj:`systime`.
+        property :obj:`systime` or :obj:`_t`.
 
     Note:
         The variables including state and input are row vectors, which is the last dimension of
@@ -263,29 +263,73 @@ class LTV(LTI):
         they can be multiplied for each channel.
 
     Example:
-        >>> # Batch, State, Input, Observe Dimension
-        >>> Bd, Sd, Id, Od = 2, 3, 2, 2
-        >>> # Linear System Matrices
-        >>> device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        >>> A = torch.randn(Bd, Sd, Sd)
-        >>> B = torch.randn(Bd, Sd, Id)
-        >>> C = torch.randn(Bd, Od, Sd)
-        >>> D = torch.randn(Bd, Od, Id)
-        >>> c1 = torch.randn(Bd, Sd)
-        >>> c2 = torch.randn(Bd, Od)
-        ...
-        >>> lti = pp.module.LTI(A, B, C, D, c1, c2).to(device)
-        ...
-        >>> state = torch.randn(Bd, Sd, device=device)
-        >>> input = torch.randn(Bd, Id, device=device)
-        >>> state, observation = lti(state, input)
-        tensor([[[-8.5639,  0.0523, -0.2576]],
-                [[ 4.1013, -1.5452, -0.0233]]]), 
-        tensor([[[-3.5780, -2.2970, -2.9314]], 
-                [[-0.4358,  1.7306,  2.7514]]]))
+        A periodic linear time variant system.
 
-    Note:
-        In this general example, all variables are in a batch. User definable as appropriate.
+        >>> n_batch, n_state, n_ctrl, T = 2, 4, 3, 5
+        >>> n_sc = n_state + n_ctrl
+        >>> A = torch.randn(n_batch, T, n_state, n_state)
+        >>> B = torch.randn(n_batch, T, n_state, n_ctrl)
+        >>> C = torch.tile(torch.eye(n_state), (n_batch, T, 1, 1))
+        >>> D = torch.tile(torch.zeros(n_state, n_ctrl), (n_batch, T, 1, 1))
+        >>> x = torch.randn(n_state)
+        >>> u = torch.randn(T, n_ctrl)
+        ... 
+        >>> class MyLTV(pp.module.LTV):
+        ...     def __init__(self, A, B, C, D, T):
+        ...         super().__init__(A, B, C, D)
+        ...         self.T = T
+        ... 
+        ...     @property
+        ...     def A(self):
+        ...         return self._A[...,self._t % self.T,:,:]
+        ... 
+        ...     @property
+        ...     def B(self):
+        ...         return self._B[...,self._t % self.T,:,:]
+        ... 
+        ...     @property
+        ...     def C(self):
+        ...         return self._C[...,self._t % self.T,:,:]
+        ... 
+        ...     @property
+        ...     def D(self):
+        ...         return self._D[...,self._t % self.T,:,:]
+        ... 
+        >>> ltv = MyLTV(A, B, C, D, T)
+        >>> for t in range(T):
+        ...     x, y = ltv(x, u[t])
+
+        One may also generate the system matrices with the time variable :obj:`_t`.
+
+        >>> n_batch, n_state, n_ctrl, T = 2, 4, 3, 5
+        >>> n_sc = n_state + n_ctrl
+        >>> x = torch.randn(n_state)
+        >>> u = torch.randn(T, n_ctrl)
+        ... 
+        >>> class MyLTV(pp.module.LTV):
+        ...     def __init__(self, A, B, C, D, T):
+        ...         super().__init__(A, B, C, D)
+        ...         self.T = T
+        ... 
+        ...     @property
+        ...     def A(self):
+        ...         return torch.eye(4, 4) * self._t.cos()
+        ... 
+        ...     @property
+        ...     def B(self):
+        ...         return torch.eye(4, 3) * self._t.sin()
+        ... 
+        ...     @property
+        ...     def C(self):
+        ...         return torch.eye(4, 4) * self._t.tan()
+        ... 
+        ...     @property
+        ...     def D(self):
+        ...         return torch.eye(4, 3)
+        ... 
+        >>> ltv = MyLTV()
+        >>> for t in range(T):
+        ...     x, y = ltv(x, u[t])
 
     Note:
         More practical examples can be found at `examples/module/dynamics
@@ -343,6 +387,91 @@ class LTV(LTI):
 
 
 class NTI(System):
+    r'''
+    The non-linear discrete-time invariant (NTI) system dynamics model.
+    
+    The state transision function :math:`\mathbf{f}` and observation function
+    :math:`\mathbf{g}` are given by:
+
+    .. math::
+        \begin{aligned}
+            \mathbf{x}_{k+1} &= \mathbf{f}(\mathbf{x}_k, \mathbf{u}_k), \\
+            \mathbf{y}_{k}   &= \mathbf{g}(\mathbf{x}_k, \mathbf{u}_k), 
+        \end{aligned}
+
+    where :math:`k`, :math:`\mathbf{x}`, :math:`\mathbf{u}`, :math:`\mathbf{y}` are the time
+    step, state(s), input(s), and observation(s), respectively.
+
+    Note:
+        To use the class, users need to inherit this class and define methods
+        :obj:`state_transition` and :obj:`observation`, which are automatically called by
+        internal :obj:`forward` method.
+        The system timestamp (starting from **0**) is also self-added automatically once
+        the :obj:`forward` method is called.
+
+    Note:
+
+        This class provides automatic **linearlization** at a reference point
+        :math:`\chi^*=(\mathbf{x}^*, \mathbf{u}^*)` along a trajectory.
+        One can directly call those linearized system matrices as properties including
+        :obj:`A`, :obj:`B`, :obj:`C`, :obj:`D`, :obj:`c1`, and :obj:`c2`, after calling
+        a method :obj:`set_refpoint`.
+
+        Consider a point
+        :math:`\chi=(\mathbf{x}^*+\delta\mathbf{x}, \mathbf{u}^*+\delta\mathbf{u})` near
+        :math:`\chi^*`. We have
+
+        .. math::
+            \begin{aligned}
+            \mathbf{f}(\mathbf{x}, \mathbf{u}) &\approx \mathbf{f}(\mathbf{x}^*, 
+                \mathbf{u}^*) +  \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}}
+                \right|_{\chi^*} \delta \mathbf{x} + \left. \frac{\partial \mathbf{f}} 
+                {\partial \mathbf{u}} \right|_{\chi^*} \delta \mathbf{u} \\
+            &= \mathbf{f}(\mathbf{x}^*, \mathbf{u}^*) + \mathbf{A}(\mathbf{x} 
+                - \mathbf{x}^*) + \mathbf{B}(\mathbf{u}-\mathbf{u}^*) \\
+            &= \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1
+            \end{aligned}
+
+        and
+
+        .. math::
+            \mathbf{g}(\mathbf{x}, \mathbf{u}) \approx \mathbf{C}\mathbf{x} \
+                        + \mathbf{D}\mathbf{u} + \mathbf{c}_2
+
+        The notion of linearization is slightly different from that in dynamical system
+        theory. First, the linearization can be done for arbitrary point(s), not limit to
+        the equilibrium point(s), and therefore the extra constant terms :math:`\mathbf{c}_1`
+        and :math:`\mathbf{c}_2` are produced. Second, the linearized equations are represented
+        by the full states and inputs: :math:`\mathbf{x}` and :math:`\mathbf{u}`, rather than 
+        the perturbation format: :math:`\delta \mathbf{x}` and :math:`\delta \mathbf{u}`
+        so that the model is consistent with, e.g., the LTI model and the iterative LQR
+        solver. More details go to :meth:`LTI`.
+
+    Example:
+
+        A simple nonlinear time-invarant system.
+
+        >>> import torch, pypose as pp
+        ... 
+        >>> class MyNTI(pp.module.NTI):
+        ...     def __init__(self):
+        ...         super().__init__()
+        ... 
+        ...     def state_transition(self, state, input):
+        ...         return state.cos() + input.sin()
+        ... 
+        ...     def observation(self, state, input):
+        ...         return state
+        ... 
+        >>> lti = MyNTI()
+        >>> current, input = torch.randn(3), torch.randn(3)
+        >>> next, observation = lti(current, input)
+
+    Note:
+        For generating one trajecotry given a series of inputs, advanced use of
+        linearization, and more practical examples can be found at `examples/module/dynamics
+        <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
+    '''
     def __init__(self):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
@@ -457,7 +586,7 @@ class NTI(System):
 
 class NTV(NTI):
     r'''
-    The base class of a general discrete-time system dynamics model.
+    The non-linear discrete-time variant (NTV) system dynamics model.
     
     The state transision function :math:`\mathbf{f}` and observation function
     :math:`\mathbf{g}` are given by:
@@ -518,13 +647,14 @@ class NTV(NTI):
 
     Example:
 
-        A simple linear time-varying system.  Here we show an example for advancing one
-        time step of the system at a given time step and computing the linearization.
+        A simple linear time-varying system, but defined via NTV. Here we show an example
+        for advancing one time step of the system at a given time step and computing the
+        linearization.
 
         >>> import math, torch
         >>> import pypose as pp
         ... 
-        >>> class Floquet(pp.module.System):
+        >>> class Floquet(pp.module.NTV):
         ...     def __init__(self):
         ...         super().__init__()
         ... 
