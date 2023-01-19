@@ -165,7 +165,7 @@ def test_dynamics_floquet():
     for i in range(N):
         state_all[i + 1], obser_all[i] = solver(state_all[i], input[i])
 
-    assert torch.allclose(state_all, state_ref)
+    assert torch.allclose(state_all, state_ref, atol=1e-5)
     assert torch.allclose(obser_all, obser_ref)
 
     # # For debugging

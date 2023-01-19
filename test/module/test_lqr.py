@@ -3,7 +3,7 @@ import torch, pypose as pp
 
 class TestLQR:
 
-    def test_lqr_linear(self, device):
+    def test_lqr_linear(self, device='cpu'):
 
         n_batch, T = 2, 5
         n_state, n_ctrl = 4, 3
@@ -31,7 +31,7 @@ class TestLQR:
         print("Done")
 
 
-    def test_lqr_ltv_random(self, device):
+    def test_lqr_ltv_random(self, device='cpu'):
 
         torch.manual_seed(1)
         n_batch, n_state, n_ctrl, T = 2, 4, 3, 5
@@ -42,37 +42,33 @@ class TestLQR:
         p = torch.randn(n_batch, T, n_sc, device=device)
         x_init = torch.randn(n_batch, n_state, device=device)
 
+        A = torch.randn(n_batch, T, n_state, n_state, device=device)
+        B = torch.randn(n_batch, T, n_state, n_ctrl, device=device)
+        C = torch.tile(torch.eye(n_state, device=device), (n_batch, T, 1, 1))
+        D = torch.tile(torch.zeros(n_state, n_ctrl, device=device), (n_batch, T, 1, 1))
 
         class MyLTV(pp.module.LTV):
         
-            def __init__(self):
-                super().__init__()
+            def __init__(self, A, B, C, D):
+                super().__init__(A, B, C, D)
 
             @property
             def A(self):
-                return torch.randn(n_batch, n_state, n_state, device=device)
+                return self._A[...,self._t,:,:]
 
             @property
             def B(self):
-                return torch.randn(n_batch, n_state, n_ctrl, device=device)
+                return self._B[...,self._t,:,:]
 
             @property
             def C(self):
-                return torch.tile(torch.eye(n_state, device=device), (n_batch, 1, 1))
+                return self._C[...,self._t,:,:]
         
             @property
             def D(self):
-                return torch.tile(torch.zeros(n_state, n_ctrl, device=device), (n_batch, 1, 1))
+                return self._D[...,self._t,:,:]
 
-            @property
-            def c1(self):
-                return torch.randn(n_batch, n_state, device=device)
-
-            @property
-            def c2(self):
-                return torch.tile(torch.zeros(n_state, device=device), (n_batch, 1))
-
-        ltv = MyLTV()
+        ltv = MyLTV(A, B, C, D)
         lqr  = pp.module.LQR(ltv)
         x, u, cost = lqr(x_init, Q, p)
 
