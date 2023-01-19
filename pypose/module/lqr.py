@@ -141,6 +141,7 @@ class LQR(nn.Module):
             Kt, xt, kt = K[...,t,:,:], x[...,t,:], k[...,t,:]
             u[..., t, :] = ut = bmv(Kt, xt) + kt
             xut = torch.cat((xt, ut), dim=-1)
+            self.system.set_refpoint(t=t)
             x[...,t+1,:] = self.system(xt, ut)[0]
             cost = cost + 0.5 * bvmv(xut, Q[...,t,:,:], xut) + (xut * p[...,t,:]).sum(-1)
 
