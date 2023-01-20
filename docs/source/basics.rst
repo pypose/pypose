@@ -11,6 +11,8 @@ Basics
     add
     add_
     mul
+    bmv
+    pm
     Exp
     Log
     Inv

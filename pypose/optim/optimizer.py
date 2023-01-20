@@ -27,7 +27,7 @@ class RobustModel(nn.Module):
     Then model regression becomes minimizing the output of the standardized model.
     This class is used during optimization but is not designed to expose to PyPose users.
     '''
-    def __init__(self, model, kernel=None, weight=None, auto=False):
+    def __init__(self, model, kernel=None, auto=False):
         super().__init__()
         self.model = model
         self.kernel = Trivial() if kernel is None else kernel
@@ -35,20 +35,9 @@ class RobustModel(nn.Module):
         if auto:
             self.register_forward_hook(self.kernel_forward)
 
-        if weight is not None:
-            weight = self.validate(weight)
-            self.register_buffer('weight', weight)
-
-    @torch.no_grad()
-    def validate(self, weight):
-        weight, info = cholesky_ex(weight, upper=True)
-        assert not torch.any(torch.isnan(weight)), \
-            'Cholesky decomposition failed. Weight is not positive-definite!'
-        return weight
-
-    def forward(self, input, target, weight=None):
+    def forward(self, input, target):
         output = self.model_forward(input)
-        return self.residual(output, target, weight)
+        return self.residual(output, target)
 
     def model_forward(self, input):
         if isinstance(input, tuple):
@@ -56,15 +45,8 @@ class RobustModel(nn.Module):
         else:
             return self.model(input)
 
-    def residual(self, output, target, weight=None):
-        error = (output if target is None else output - target)
-        if weight is not None:
-            residual = bmv(self.validate(weight), error)
-        elif hasattr(self, 'weight'):
-            residual = bmv(self.weight, error)
-        else:
-            residual = error
-        return residual
+    def residual(self, output, target):
+        return output if target is None else output - target
 
     def kernel_forward(self, module, input, output):
         # eps is to prevent grad of sqrt() from being inf
@@ -72,9 +54,9 @@ class RobustModel(nn.Module):
         eps = finfo(output.dtype).eps
         return self.kernel(output.square().sum(-1)).clamp(min=eps).sqrt()
 
-    def loss(self, input, target, weight=None):
+    def loss(self, input, target):
         output = self.model_forward(input)
-        residual = self.residual(output, target, weight)
+        residual = self.residual(output, target)
         return self.kernel(residual.square().sum(-1)).sum()
 
 
@@ -116,13 +98,10 @@ class GaussNewton(_Optimizer):
                 \bm{x}~(\text{input}), \bm{y}~(\text{target}), \rho~(\text{kernel})              \\
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
-            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial } {\partial \bm{\theta}_{t-1}}}
-                          \left(\sqrt{\mathbf{W}}\bm{f}\right)~(\sqrt{\cdot}
-                          \text{is the Cholesky decomposition})                                  \\
-            &\hspace{5mm} \mathbf{R} = \sqrt{\mathbf{W}}
-                        (\bm{f(\bm{\theta}_{t-1}, \bm{x})}-\bm{y})                               \\
+            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f} } {\partial \bm{\theta}_{t-1}}}             \\
+            &\hspace{5mm} \mathbf{R} = \bm{f(\bm{\theta}_{t-1}, \bm{x})}-\bm{y}                  \\
             &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
-            &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{J}, -\mathbf{R})                 \\
+            &\hspace{5mm} \bm{\delta} = \mathrm{solver}(\mathbf{W}\mathbf{J}, -\mathbf{W}\mathbf{R})                 \\
             &\hspace{5mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}               \\
             &\rule{113mm}{0.4pt}                                                          \\[-1.ex]
             &\bf{return} \:  \theta_t                                                     \\[-1.ex]
@@ -188,12 +167,13 @@ class GaussNewton(_Optimizer):
         self.jackwargs = {'vectorize': vectorize, 'flatten': True}
         if kernel is not None and corrector is None:
             # auto diff of robust model will be computed
-            self.model = RobustModel(model, kernel, weight=weight, auto=True)
+            self.model = RobustModel(model, kernel, auto=True)
             self.corrector = Trivial()
         else:
             # manually Jacobian correction will be computed
-            self.model = RobustModel(model, kernel, weight=weight, auto=False)
+            self.model = RobustModel(model, kernel, auto=False)
             self.corrector = Trivial() if corrector is None else corrector
+        self.weight = weight
 
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
@@ -251,14 +231,18 @@ class GaussNewton(_Optimizer):
             Early Stopping with error: 5.21540641784668e-07
         '''
         for pg in self.param_groups:
-            R = self.model(input, target, weight)
-            J = modjac(self.model, input=(input, target, weight), **self.jackwargs)
+            weight = self.weight if weight is None else weight
+            R = self.model(input, target)
+            J = modjac(self.model, input=(input, target), **self.jackwargs)
             R, J = self.corrector(R = R, J = J)
-            D = self.solver(A = J, b = -R.view(-1, 1))
+            A, b = J.T.reshape((-1,) + R.shape), R
+            if weight is not None:
+                A, b = (weight @ A.unsqueeze(-1)).squeeze(-1), (weight @ b.unsqueeze(-1)).squeeze(-1)
+            D = self.solver(A = A.reshape(A.shape[0], -1).T, b = -b.view(-1, 1))
             self.last = self.loss if hasattr(self, 'loss') \
-                        else self.model.loss(input, target, weight)
+                        else self.model.loss(input, target)
             self.update_parameter(params = pg['params'], step = D)
-            self.loss = self.model.loss(input, target, weight)
+            self.loss = self.model.loss(input, target)
         return self.loss
 
 
@@ -288,18 +272,15 @@ class LevenbergMarquardt(_Optimizer):
                            \epsilon_{l}~(\text{max})                                             \\
             &\rule{113mm}{0.4pt}                                                                 \\
             &\textbf{for} \: t=1 \: \textbf{to} \: \ldots \: \textbf{do}                         \\
-            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial } {\partial \bm{\theta}_{t-1}}}
-                          \left(\sqrt{\mathbf{W}}\bm{f}\right)~(\sqrt{\cdot}
-                          \text{is the Cholesky decomposition})                                  \\
-            &\hspace{5mm} \mathbf{A} \leftarrow (\mathbf{J}^T \mathbf{J})
+            &\hspace{5mm} \mathbf{J} \leftarrow {\dfrac {\partial \bm{f}} {\partial \bm{\theta}_{t-1}}}       \\
+            &\hspace{5mm} \mathbf{A} \leftarrow (\mathbf{J}^T \mathbf{W} \mathbf{J})
                                      .\mathrm{diagnal\_clamp(\epsilon_{s}, \epsilon_{l})}        \\
-            &\hspace{5mm} \mathbf{R} = \sqrt{\mathbf{W}}
-                        (\bm{f(\bm{\theta}_{t-1}, \bm{x})}-\bm{y})                               \\
+            &\hspace{5mm} \mathbf{R} = \bm{f(\bm{\theta}_{t-1}, \bm{x})}-\bm{y}                               \\
             &\hspace{5mm} \mathbf{R}, \mathbf{J}=\mathrm{corrector}(\rho, \mathbf{R}, \mathbf{J})\\
             &\hspace{5mm} \textbf{while}~\text{first iteration}~\textbf{or}~
                                          \text{loss not decreasing}                              \\
             &\hspace{10mm} \mathbf{A} \leftarrow \mathbf{A} + \lambda \mathrm{diag}(\mathbf{A})  \\
-            &\hspace{10mm} \bm{\delta} = \mathrm{solver}(\mathbf{A}, -\mathbf{J}^T\mathbf{R})    \\
+            &\hspace{10mm} \bm{\delta} = \mathrm{solver}(\mathbf{A}, -\mathbf{J}^T \mathbf{W} \mathbf{R})     \\
             &\hspace{10mm} \lambda \leftarrow \mathrm{strategy}(\lambda,\text{model information})\\
             &\hspace{10mm} \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} + \bm{\delta}              \\
             &\hspace{10mm} \textbf{if}~\text{loss not decreasing}~\textbf{and}~
@@ -377,12 +358,13 @@ class LevenbergMarquardt(_Optimizer):
         self.reject, self.reject_count = reject, 0
         if kernel is not None and corrector is None:
             # auto diff of robust model will be computed
-            self.model = RobustModel(model, kernel, weight, auto=True)
+            self.model = RobustModel(model, kernel, auto=True)
             self.corrector = Trivial()
         else:
             # manually Jacobian correction will be computed
-            self.model = RobustModel(model, kernel, weight, auto=False)
+            self.model = RobustModel(model, kernel, auto=False)
             self.corrector = Trivial() if corrector is None else corrector
+        self.weight = weight
 
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
@@ -430,7 +412,8 @@ class LevenbergMarquardt(_Optimizer):
             ...
             >>> posinv = PoseInv(2, 2)
             >>> input = pp.randn_SE3(2, 2)
-            >>> optimizer = pp.optim.LM(posinv, damping=1e-6)
+            >>> strategy = pp.optim.strategy.Adaptive(damping=1e-6)
+            >>> optimizer = pp.optim.LM(posinv, strategy=strategy)
             ...
             >>> for idx in range(10):
             ...     loss = optimizer.step(input)
@@ -451,22 +434,27 @@ class LevenbergMarquardt(_Optimizer):
             <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.    
         '''
         for pg in self.param_groups:
-            R = self.model(input, target, weight)
-            J = modjac(self.model, input=(input, target, weight), **self.jackwargs)
+            weight = self.weight if weight is None else weight
+            R = self.model(input, target)
+            J = modjac(self.model, input=(input, target), **self.jackwargs)
             R, J = self.corrector(R = R, J = J)
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
-                                    else self.model.loss(input, target, weight)
-            A, self.reject_count = J.T @ J, 0
+                                    else self.model.loss(input, target)
+            J_T = J.T.reshape((-1,) + R.shape)
+            if weight is not None:
+                J_T = (J_T.unsqueeze(-2) @ weight).squeeze(-2)
+            J_T = J_T.reshape(J_T.shape[0], -1)
+            A, self.reject_count = J_T @ J, 0
             A.diagonal().clamp_(pg['min'], pg['max'])
             while self.last <= self.loss:
                 A.diagonal().add_(A.diagonal() * pg['damping'])
                 try:
-                    D = self.solver(A = A, b = -J.T @ R.view(-1, 1))
+                    D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
                 except Exception as e:
                     print(e, "\nLinear solver failed. Breaking optimization step...")
                     break
                 self.update_parameter(pg['params'], D)
-                self.loss = self.model.loss(input, target, weight)
+                self.loss = self.model.loss(input, target)
                 self.strategy.update(pg, last=self.last, loss=self.loss, J=J, D=D, R=R.view(-1, 1))
                 if self.last < self.loss and self.reject_count < self.reject: # reject step
                     self.update_parameter(params = pg['params'], step = -D)
