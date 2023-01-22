@@ -491,3 +491,28 @@ def cumprod(input, dim, left = True):
         return cumops(input, dim, lambda a, b : a @ b)
     else:
         return cumops(input, dim, lambda a, b : b @ a)
+
+
+def pm(input, *, out=None):
+    r'''
+    Returns plus or minus (:math:`\pm`) states for tensor.
+
+    Args:
+        input (:obj:`Tensor`): the input tensor.
+    
+    Return:
+        :obj:`Tensor`: the output tensor contains only :math:`-1` or :math:`+1`.
+
+    Note:
+        The :meth:`pm` function is different from :meth:`torch.sign`, which returns
+        :math:`0` for zero inputs, it will return :math:`+1` if an input element is zero.
+
+    Example:
+        >>> pp.pm(torch.tensor([0.1, 0, -0.2]))
+        tensor([ 1.,  1., -1.])
+        >>> pp.pm(torch.tensor([0.1, 0, -0.2], dtype=torch.float64))
+        tensor([ 1.,  1., -1.], dtype=torch.float64)
+    '''
+    out = torch.sign(input, out=None)
+    out[out==0] = 1
+    return out

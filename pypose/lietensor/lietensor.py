@@ -4,7 +4,7 @@ import torch, warnings
 from torch import nn, linalg
 from .operation import broadcast_inputs
 from .basics import cumops_, cummul_, cumprod_
-from .basics import vec2skew, cumops, cummul, cumprod
+from .basics import vec2skew, cumops, cummul, cumprod, pm
 from torch.utils._pytree import tree_map, tree_flatten
 from .operation import SO3_Log, SE3_Log, RxSO3_Log, Sim3_Log
 from .operation import so3_Exp, se3_Exp, rxso3_Exp, sim3_Exp
@@ -1103,12 +1103,15 @@ class LieTensor(torch.Tensor):
         t3 = 2 * (w * z + x * y)
         t4 = (ww + xx) - (yy + zz)
 
-        roll = torch.atan2(t0, t1)
-        pitch = torch.asin(t2.clamp(-1, 1))
         # sigularity when pitch angle ~ +/-pi/2
-        flag = -1. + eps < t2 < 1. - eps
+        roll1 = torch.atan2(t0, t1)
+        roll2 = torch.zeros_like(t0)
+        flag = t2.abs() < 1. - eps
         yaw1 = torch.atan2(t3, t4)
-        yaw2 = -2 * torch.sign(t2) * torch.atan2(x, w)
+        yaw2 = -2 * pm(t2) * torch.atan2(x, w)
+        
+        roll = torch.where(flag, roll1, roll2)
+        pitch = torch.asin(t2.clamp(-1, 1))
         yaw = torch.where(flag, yaw1, yaw2)
 
         return torch.stack([roll, pitch, yaw], dim=-1)

@@ -13,6 +13,7 @@ Basics
     mul
     bmv
     msqrt
+    pm
     Exp
     Log
     Inv
