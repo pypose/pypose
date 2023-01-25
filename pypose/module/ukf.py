@@ -34,13 +34,13 @@ class UKF(EKF):
       .. math::
           \begin{aligned}
               & \mathbf{x}^{\left ( i \right ) } = \mathbf{x}^{+} +
-                  \mathbf{\check{x}}^{\left(i \right)}, & \quad i=-n,...,n\\
-              & \mathbf{\check{x}}^{\left (i \right)} = -\left(\sqrt{(n+\kappa)P} \right)_{i}^{T},
-               & \quad i=-n, ..., -1 \\
+                  \mathbf{\check{x}}^{\left(i \right)}, & \quad i=0,...,2n\\
               & \mathbf{\check{x}}^{\left (i \right)} = \mathbf{0}, & \quad i=0 \\
-              & \mathbf{\check{x}}^{\left(i \right)} = \left(\sqrt{(n+\kappa)P} \right)_{i}^{T},
-               & \quad i=1, ..., n \\
-          \end{aligned}
+              & \mathbf{\check{x}}^{\left (i \right)} = \left(\sqrt{(n+\kappa)P} \right)_{i}^{T},
+               & \quad i= 1, ..., n \\
+              & \mathbf{\check{x}}^{\left(i \right)} = -\left(\sqrt{(n+\kappa)P} \right)_{i}^{T},
+                   & \quad i=n+1, ..., 2n \\
+         \end{aligned}
 
     where :math:`\left(\sqrt{(n+\kappa)P}\right) _{i}` is the :math:`i`-th row of
     :math:`\left(\sqrt{(n+\kappa)P}\right)` and :math:`n` is the dimension of state :math:`\mathbf{x}`.
@@ -50,18 +50,18 @@ class UKF(EKF):
       .. math::
           \begin{aligned}
               &W^{(0)} = \frac{\kappa}{n+\kappa}, & \quad i = 0\\
-              &W^{(i)} = \frac{1}{2(n+\kappa)}, & \quad i = -n,...,-1,1,...n\\
+              &W^{(i)} = \frac{1}{2(n+\kappa)}, & \quad i = 1,...,2n\\
           \end{aligned}
 
     2. Priori State Estimation.
 
       .. math::
-           \mathbf{x}^{-} = \sum_{i=-n}^{n} W^{(i)} f(\mathbf{x}^{(i)}, \mathbf{u}, t)
+           \mathbf{x}^{-} = \sum_{i=0}^{2n} W^{(i)} f(\mathbf{x}^{(i)}, \mathbf{u}, t)
 
     3. Priori Covariance.
 
       .. math::
-          \mathbf{P}^{-} = \sum_{i=-n}^{n} W^{(i)}
+          \mathbf{P}^{-} = \sum_{i=0}^{2n} W^{(i)}
               \left(\mathbf{x}^{(i)} - \mathbf{x}^{-} \right)
               \left(\mathbf{x}^{(i)} - \mathbf{x}^- \right)^T + \mathbf{Q}
 
@@ -70,21 +70,21 @@ class UKF(EKF):
       .. math::
           \begin{aligned}
               & \mathbf{y}^{(i)} = g \left( \mathbf{x}^{(i)}, \mathbf{u}, t \right),
-                  & \quad i = 1, \cdots, 2n \\
-              & \bar{\mathbf{y}} = \sum_{i=-n}^{n} W^{(i)} \mathbf{y}^{(i)}
+                  & \quad i = 0, \cdots, 2n \\
+              & \bar{\mathbf{y}} = \sum_{i=0}^{2n} W^{(i)} \mathbf{y}^{(i)}
           \end{aligned}
 
     5. Observational Covariance.
 
       .. math::
-          \mathbf{P}_{y} = \sum_{i=-n}^{n} W^{(i)}
+          \mathbf{P}_{y} = \sum_{i=0}^{2n} W^{(i)}
               \left(\mathbf{y}^{(i)} - \bar{\mathbf{y}} \right)
               \left( \mathbf{y}^{(i)} - \bar{\mathbf{y}} \right)^T + \mathbf{R}
 
     6. Priori and Observation Covariance:
 
       .. math::
-          \mathbf{P}_{xy} = \sum_{i=-n}^{n} W^{(i)}
+          \mathbf{P}_{xy} = \sum_{i=0}^{2n} W^{(i)}
               \left( \mathbf{x}^{(i)} - \mathbf{x}^- \right)
               \left( \mathbf{y}^{(i)} - \bar{\mathbf{y}} \right)^T
 
@@ -155,9 +155,9 @@ class UKF(EKF):
           <https://onlinelibrary.wiley.com/doi/epdf/10.1002/0470045345.fmatter>`_,
           Cleveland State University, 2006
     '''
-    def __init__(self, model, Q=None, R=None, msqrt=None, weight_method='weight'):
+
+    def __init__(self, model, Q=None, R=None, msqrt=None):
         super().__init__(model, Q, R)
-        self.weight_method = weight_method
         self.msqrt = torch.linalg.cholesky if msqrt is None else msqrt
 
     def forward(self, x, y, u, P, Q=None, R=None, t=None, k=None):
