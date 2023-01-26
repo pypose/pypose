@@ -409,7 +409,7 @@ def test_abs():
 def test_mm():
     print()
 
-    i = [[0, 0, 1, 2],[0, 1, 1, 2]]
+    i = [[0, 0, 1, 2],[0, 2, 1, 2]]
     v = torch.arange(16).view((-1, 2, 2)).to(dtype=torch.float32)
     x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
 
@@ -428,6 +428,7 @@ def test_mm():
     
     # Compute the true multiplication result.
     xh = hybrid_2_coo(x._s)
+    print(f'xh = \n{xh.to_dense()}')
     yh0 = xh @ xh
     
     # Convert our result.
