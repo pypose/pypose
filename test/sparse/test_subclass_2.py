@@ -2,6 +2,18 @@
 import torch
 from torch.utils._pytree import tree_map, tree_flatten
 
+def hybrid_2_coo(hybrid):
+    # Get the block structure.
+    t_dim, b_dim = hybrid.shape[:2], hybrid.shape[2:]
+    assert len(b_dim) == 2, f'hybrid.shape = {hybrid.shape}. '
+    
+    coo_dim = [ t_dim[0]*b_dim[0], t_dim[1]*b_dim[1] ]
+    
+    n_elems_in_block = b_dim[0] * b_dim[1]
+    
+    # Get the original indices.
+    indices_ori = hybrid.indices()
+
 class SBTOperation(object):
     def __init__(self, func_name):
         super().__init__()
@@ -54,6 +66,18 @@ class SBTProxyNoOp(SBTOperation):
 class SBTProxySameOperationAsStorage(SBTOperation):
     def __init__(self, func_name):
         super().__init__(func_name)
+
+    # NOTE: For test use.
+    def storage_pre(self, func, types, args=(), kwargs={}):
+        s_array = []
+        p_array = []
+        for arg in args:
+            # TODO: Convert the sparse hybrid Tensor _s to sparse coo tensor.
+            s_array.append( arg._s if isinstance(arg, SparseBlockTensor) else arg )
+            
+            # Do nothing about the proxy Tensor.
+            p_array.append( arg._p if isinstance(arg, SparseBlockTensor) else arg )
+        return s_array, p_array
 
     def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
         # This only gets called when the operation on sbt._s returns sparse Tensor.
@@ -173,7 +197,7 @@ def sparse_block_tensor(indices, values, size=None, dtype=None, device=None, req
         size=(*size, *block_shape), 
         dtype=dtype, 
         device=device, 
-        requires_grad=requires_grad )
+        requires_grad=requires_grad ).coalesce()
     
     proxy = torch.sparse_coo_tensor(
         indices,
@@ -181,7 +205,7 @@ def sparse_block_tensor(indices, values, size=None, dtype=None, device=None, req
         size=size,
         dtype=dtype,
         device=device,
-        requires_grad=False )
+        requires_grad=False ).coalesce()
     
     x = SparseBlockTensor()
     x._s = storage # s for storage.
@@ -223,7 +247,7 @@ def test_mm():
     print(f'x._s = \n{x._s}')
     print(f'x._p = \n{x._p}')
     
-    m = x._s @ x._s
+    m = x._p @ x._p
     print(f'm = \n{m}')
     
     y = x @ x
