@@ -112,7 +112,7 @@ if __name__ == "__main__":
 
     k = args.k
     device = args.device
-    filter_model_name = args.model_name
+    filter_model_name = args.filter_model_name
     T, N, M = 30, 3, 2  # steps, state dim, input dim
     q, r, p = 0.2, 0.2, 5  # covariance of transition noise, observation noise, and estimation
     bicycle = Bicycle()
