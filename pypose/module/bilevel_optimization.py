@@ -7,10 +7,11 @@ class someModel(torch.nn.Module):
 class LowOptimization(torch.nn.Module):
     def __init__(self, model, constraints, solver, etc.):
         super.__init__()
+        self.parameters = model.parameters
 
     def func(self):
         def forward(self) -> tuple(tau, mu):
-            result = self.solver.solve(model, constraints)
+            result = self.solver.solve(self.model, self.constraints)
             self.constrains = result.constraints
             return result.optimized_parameters
         
@@ -20,6 +21,7 @@ class LowOptimization(torch.nn.Module):
 class HighOptimization(torch.nn.Module):
     def __init__(self, low_optimizer, torch.optim.optimizer, etc):
         super.__init__()
+        self.parameters = low_optimizer.parameters
 
     def forward(self):
         tau, mu = low_optimizer.forward()
