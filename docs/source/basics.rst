@@ -12,7 +12,6 @@ Basics
     add_
     mul
     bmv
-    msqrt
     pm
     Exp
     Log
