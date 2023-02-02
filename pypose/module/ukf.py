@@ -189,15 +189,15 @@ class UKF(EKF):
         xs = self.model.state_transition(xs, u, t)
         xe = (w * xs).sum(dim=-2)
         ex = xe - xs
-        P = self.conv(ex, ex, w, Q)
+        P = self.compute_cov(ex, ex, w, Q)
 
         xs, w = self.sigma_weight_points(xe, P, k)
         ys = self.model.observation(xs, u, t)
         ye = (w * ys).sum(dim=-2)
         ey = ye - ys
-        Py = self.conv(ey, ey, w, R)
+        Py = self.compute_cov(ey, ey, w, R)
 
-        Pxy = self.conv(ex, ey, w)
+        Pxy = self.compute_cov(ex, ey, w)
         K = Pxy @ pinv(Py)
         x = xe + bmv(K, y - ye)
         P = P - K @ Py @ K.mT
@@ -225,7 +225,7 @@ class UKF(EKF):
         w = torch.cat((we, wr, wr), dim=-1)
         return p, w.unsqueeze(-1)
 
-    def conv(self, a, b, w, Q=0):
+    def compute_cov(self, a, b, w, Q=0):
         '''Compute covariance of two set of variables.'''
         a, b = a.unsqueeze(-1), b.unsqueeze(-1)
         return Q + (w.unsqueeze(-1) * a @ b.mT).sum(dim=-3)
