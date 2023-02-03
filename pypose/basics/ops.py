@@ -1,6 +1,7 @@
 import torch
 from .. import LieTensor
 
+
 def bmv(input, vec, *, out=None):
     r'''
     Performs batched matrix-vector product.
@@ -8,7 +9,7 @@ def bmv(input, vec, *, out=None):
     Args:
         input (:obj:`Tensor`): matrices to be multiplied.
         vec (:obj:`Tensor`): vectors to be multiplied.
-    
+
     Return:
         out (:obj:`Tensor`): the output tensor.
 

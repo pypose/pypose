@@ -129,23 +129,25 @@ class EKF(nn.Module):
         self.set_uncertainty(Q=Q, R=R)
         self.model = model
 
-    def forward(self, x, y, u, P, Q=None, R=None):
+    def forward(self, x, y, u, P, Q=None, R=None, t=None):
         r'''
         Performs one step estimation.
 
         Args:
-            x (:obj:`Tensor`): estimated system state of previous step
-            y (:obj:`Tensor`): system observation at current step (measurement)
-            u (:obj:`Tensor`): system input at current step
-            P (:obj:`Tensor`): state estimation covariance of previous step
-            Q (:obj:`Tensor`, optional): covariance of system transition model
-            R (:obj:`Tensor`, optional): covariance of system observation model
+            x (:obj:`Tensor`): estimated system state of previous step.
+            y (:obj:`Tensor`): system observation at current step (measurement).
+            u (:obj:`Tensor`): system input at current step.
+            P (:obj:`Tensor`): state estimation covariance of previous step.
+            Q (:obj:`Tensor`, optional): covariance of system transition model. Default: ``None``
+            R (:obj:`Tensor`, optional): covariance of system observation model. Default: ``None``
+            t (:obj:`Tensor`, optional): timestep of system (only for time variant system).
+                Default: ``None``
 
         Return:
             list of :obj:`Tensor`: posteriori state and covariance estimation
         '''
         # Upper cases are matrices, lower cases are vectors
-        self.model.set_refpoint(state=x, input=u)
+        self.model.set_refpoint(state=x, input=u, t=t)
         I = torch.eye(P.shape[-1], device=P.device, dtype=P.dtype)
         A, B = self.model.A, self.model.B
         C, D = self.model.C, self.model.D
