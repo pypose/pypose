@@ -13,5 +13,6 @@ Modules
    module.NTI
    module.NTV
    module.EKF
+   module.UKF
    module.LQR
    module.IMUPreintegrator

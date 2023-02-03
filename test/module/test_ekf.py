@@ -3,9 +3,9 @@ import pypose as pp
 import torch as torch
 
 
-class TestKalman:
+class TestEKF:
 
-    def test_kalman(self):
+    def test_ekf(self):
 
         class NTI(pp.module.NTI):
             def __init__(self):
@@ -43,5 +43,5 @@ class TestKalman:
 
 
 if __name__ == '__main__':
-    test = TestKalman()
-    test.test_kalman()
+    test = TestEKF()
+    test.test_ekf()
