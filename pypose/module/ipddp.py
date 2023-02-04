@@ -188,7 +188,7 @@ class bwdPass:
 class ddpOptimizer:
     r'''
     The class of ipddp optimizer
-    iterates between forwardpass and backwardpass to get a final trajectory
+    iterates between forwardpass and backwardpass to get a final trajectory 
     '''
     def __init__(self, sys=None, stage_cost=None, terminal_cost=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=None, init_traj=None):
         r'''
