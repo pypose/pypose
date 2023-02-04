@@ -1,6 +1,6 @@
-from pypose.module.cost import Cost
 import torch as torch
 import matplotlib.pyplot as plt
+from pypose.module.cost import Cost
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class nnCost(Cost):
@@ -14,9 +14,7 @@ class nnCost(Cost):
             torch.nn.Linear(hiddenSize[1], 1))
     
     def cost(self, state, input):
-        print(self.net(state))
-        exit()
-        return self.net(state)**2 + self.net(input)**2
+        return self.net(state)**2 + input**2
     
 
 def createTimePlot(x, y, figname="Un-named plot", title=None, xlabel=None, ylabel=None):
@@ -29,7 +27,7 @@ def createTimePlot(x, y, figname="Un-named plot", title=None, xlabel=None, ylabe
 
 if __name__ == "__main__":
     #  state and input
-    state = torch.randn(2, 1, 3)
+    state = torch.randn(3, 2)
 
     input = torch.tensor([1.])
 

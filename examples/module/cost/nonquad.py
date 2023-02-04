@@ -1,5 +1,5 @@
-from pypose.module.cost import Cost
 import torch as torch
+from pypose.module.cost import Cost
 
 # Create class for non-quadratic cost
 class NonQuadCost(Cost):

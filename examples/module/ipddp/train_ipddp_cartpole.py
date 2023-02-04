@@ -1,18 +1,18 @@
-import torch
-import torch.optim as optim
-from pypose.module.ipddp import ddpOptimizer
-import pypose as pp
-import time
 import os
+import sys
+import time
+import torch
 import shutil
-import pickle as pkl
 import argparse
 import setproctitle
-import sys
-sys.path.append("..")
-from dynamics.cartpole import CartPole
+import pypose as pp
+import pickle as pkl
 from torch import nn
-# import setGPU
+import torch.optim as optim
+sys.path.append("..") # executing in the ipddp folder
+from dynamics.cartpole import CartPole
+from pypose.module.ipddp import ddpOptimizer
+
 
 class CartPoleRevised(CartPole):
     def __init__(self, dt, length, cartmass, polemass, gravity):

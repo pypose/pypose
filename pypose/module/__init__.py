@@ -1,12 +1,7 @@
 
 from .kalman import EKF
+from .cost import Cost, QuadCost
 from .dynamics import System, LTI
+from .constraint import Constraint, LinCon
 from .imu_preintegrator import IMUPreintegrator
-from .cost import Cost
-from .cost import QuadCost
-from .constraint import Constraint
-from .constraint import LinCon
-from .ipddp import algParam
-from .ipddp import fwdPass
-from .ipddp import bwdPass
-from .ipddp import ddpOptimizer
+from .ipddp import algParam, fwdPass, bwdPass, ddpOptimizer

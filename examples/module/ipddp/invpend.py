@@ -1,6 +1,6 @@
+import pypose as pp
 import torch as torch
 import torch.nn as nn
-import pypose as pp
 from pypose.module.dynamics import System
 from pypose.module.ipddp import ddpOptimizer
 

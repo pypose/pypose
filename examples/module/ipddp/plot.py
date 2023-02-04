@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
-
-import argparse
-import glob
-import json
 import os
-
+import json
+import glob
+import argparse
 import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-plt.style.use('bmh')
-
 import numpy as np
-
 import pandas as pd
+import matplotlib.pyplot as plt
 
+plt.style.use('bmh')
+matplotlib.use('Agg')
 
 def main():
     parser = argparse.ArgumentParser()

@@ -1,14 +1,14 @@
-import torch
-import torch.optim as optim
-from pypose.module.ipddp import ddpOptimizer
-from invpend import InvPend
-import pypose as pp
-import time
 import os
+import time
+import torch
 import shutil
-import pickle as pkl
 import argparse
 import setproctitle
+import pypose as pp
+import pickle as pkl
+import torch.optim as optim
+from invpend import InvPend
+from pypose.module.ipddp import ddpOptimizer
 
 def main():
     torch.set_default_dtype(torch.float64)

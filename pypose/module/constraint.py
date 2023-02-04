@@ -1,9 +1,6 @@
 import torch as torch
 import torch.nn as nn
-import pypose as pp
 from torch.autograd.functional import jacobian
-from torch.autograd import grad
-
 
 class Constraint(nn.Module):
     r'''
@@ -103,7 +100,6 @@ class Constraint(nn.Module):
         # Potential performance loss here - self.A and self.B involves jacobian eval
         return self._ref_c - self._ref_state.matmul(self.gx.mT) - self._ref_input.matmul(self.gu.mT)
 
-
 class LinCon(Constraint):
     r'''
     Linear constraint.
@@ -198,12 +194,3 @@ class LinCon(Constraint):
     def g(self, g):
         self._g = g
 
-if __name__ == "__main__":
-        gx = torch.randn(2, 3)
-        gu = torch.randn(2, 2)
-        g = torch.randn(2, 1)
-        state = torch.randn(1, 3)
-        input = torch.randn(1, 2)
-        lincon = pp.module.LinCon(gx,gu,g)
-        print(lincon(state, input))
-        print(lincon.gx)
