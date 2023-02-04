@@ -11,5 +11,6 @@ Modules
    module.LTI
    module.EKF
    module.UKF
+   module.PF
    module.IMUPreintegrator
    
