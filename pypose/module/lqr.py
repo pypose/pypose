@@ -7,25 +7,27 @@ class LQR(nn.Module):
     r'''
     Linear Quadratic Regulator (LQR) with Dynamic Programming.
 
-    Args:
-        system (instance): The system to be soved by LQR.
-
     LQR finds the optimal nominal trajectory :math:`\mathbf{\tau}_{1:T}^*` = 
     :math:`\begin{Bmatrix} \mathbf{x}_t, \mathbf{u}_t \end{Bmatrix}_{1:T}` 
-    of the optimization problem
+    of the optimization problem.
+
     .. math::
-        \begin{aligned}
+        \begin{align*}
             \mathbf{\tau}_{1:T}^* = \mathop{\arg\min}\limits_{\tau_{1:T}} \sum\limits_t\frac{1}{2}
             \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t \\
             \mathrm{s.t.} \quad \mathbf{x}_1 = \mathbf{x}_{init}, 
             \ \mathbf{x}_{t+1} = \mathbf{F}_t\mathbf{\tau}_t + \mathbf{f}_t \\
-        \end{aligned}
+        \end{align*}
     where :math:`\mathbf{\tau}` = :math:`\begin{bmatrix} \mathbf{x} \\ \mathbf{u} \end{bmatrix}`, 
     :math:`\mathbf{F}` = :math:`\begin{bmatrix} \mathbf{A} & \mathbf{B} \end{bmatrix}`, 
     :math:`\mathbf{f}` = :math:`\mathbf{c}_1`.
+
     From a policy learning perspective, this can be interpreted as a module with unknown parameters
     :math:`\begin{Bmatrix} \mathbf{Q}, \mathbf{p}, \mathbf{F}, \mathbf{f} \end{Bmatrix}`, 
     which can be integrated into a larger end-to-end learning system.
+
+    Args:
+        system (instance): The system to be soved by LQR.
 
     Note:
         Here, we consider the system sent to LQR as a linear system in each small horizon. 
@@ -59,19 +61,16 @@ class LQR(nn.Module):
                       [ 1.2138, -0.7161,  0.2954, -0.6819],
                       [ 1.4840, -1.1249, -1.0302,  0.9805],
                       [-0.3477, -1.7063,  4.6494,  2.6780]],
-
                      [[-0.9744,  0.4976,  0.0603, -0.5258],
                       [-0.6356,  0.0539,  0.7264, -0.5048],
                       [-0.2275, -0.1649,  0.3872, -0.4614],
                       [ 0.2697, -0.3576,  0.0999, -0.4594],
                       [ 0.3916, -2.0832,  0.0701, -0.5407]]])
-        
         u =  tensor([[[ 1.0405,  0.1586, -0.1282],
                       [-1.4845, -0.5745,  0.2523],
                       [-0.6322, -0.3281, -0.3620],
                       [-1.6768,  2.4054, -0.1047],
                       [-1.7948,  3.5269,  9.0703]],
-
                      [[-0.1795,  0.9153,  1.7066],
                       [ 0.0814,  0.4004,  0.7114],
                       [ 0.0435,  0.5782,  1.0127],
@@ -94,22 +93,24 @@ class LQR(nn.Module):
     def lqr_backward(self, Q, p):
         r'''
         The backward recursion of the dynamic programming to solve LQR.
-        for :math:`\t` = :math:`\T` to 1:
+
+        for :math:`t` = :math:`T` to 1:
+
         .. math::
-            \begin{aligned}
-                \mathbf{Q}_t = \mathbf{C}_t + \mathbf{F}_t^\top\mathbf{V}_t+1\mathbf{F}_t \\
-                \mathbf{q}_t = \mathbf{c}_t + \mathbf{F}_t^\top\mathbf{V}_t+1\mathbf{f}_t + \mathbf{F}_t^\top\mathbf{v}_t+1 \\
-                \mathbf{K}_t = -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} \\
-                \mathbf{k}_t = -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{q}_{\mathbf{u}_t} \\
-                \mathbf{V}_t = \mathbf{Q}_{\mathbf{x}_t, \mathbf{x}_t} + 
-                \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{K}_t + 
-                \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} + 
-                \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{K}_t \\
-                \mathbf{v}_t = \mathbf{q}_{\mathbf{x}_t} + 
-                \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{k}_t + 
-                \mathbf{K}_t^\top\mathbf{q}_{\mathbf{u}_t} + 
-                \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{k}_t \\
-            \end{aligned}
+            \begin{align*}
+                \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t \\
+                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{f}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1} \\
+                \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} \\
+                \mathbf{k}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{q}_{\mathbf{u}_t} \\
+                \mathbf{V}_t &= \mathbf{Q}_{\mathbf{x}_t, \mathbf{x}_t} 
+                    + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{K}_t 
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} 
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{K}_t \\
+                \mathbf{v}_t &= \mathbf{q}_{\mathbf{x}_t} 
+                    + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{k}_t 
+                    + \mathbf{K}_t^\top\mathbf{q}_{\mathbf{u}_t} 
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{k}_t \\
+            \end{align*}
         
         Args:
             Q (:obj:`Tensor`): The matrix of quadratic parameter.
@@ -152,12 +153,14 @@ class LQR(nn.Module):
     def lqr_forward(self, x_init, Q, p, K, k):
         r'''
         The forward recursion of the dynamic programming to solve LQR.
-        for :math:`\t` = 1 to :math:`\T`:
+
+        for :math:`t` = 1 to :math:`T`:
+
         .. math::
-            \begin{aligned}
-                \mathbf{u}_t = \mathbf{K}_t\mathbf{x}_t + \mathbf{k}_t \\
-                \mathbf{x}_t+1 = f \left( \mathbf{x}_t, \mathbf{u}_t \right) \\
-            \end{aligned}
+            \begin{align*}
+                \mathbf{u}_t &= \mathbf{K}_t\mathbf{x}_t + \mathbf{k}_t \\
+                \mathbf{x}_{t+1} &= f \left( \mathbf{x}_t, \mathbf{u}_t \right) \\
+            \end{align*}
         where :math:`f \left( \mathbf{x}_t, \mathbf{u}_t \right)` represents the system dynamics.
 
         Args:
