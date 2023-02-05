@@ -1,6 +1,4 @@
 import torch
-from ..basics import bmv
-from torch.linalg import pinv
 from pypose.module import EKF
 
 
@@ -49,40 +47,15 @@ class PF(EKF):
     where :math:`\mathbf{u}_{k}` is noise vector is randomly generated on the basis of the known
     pdf of :math:`\mathbf{u}`.
 
-    3. Priori Covariance Propagation.
-
-        .. math::
-            \mathbf{P}^{-}_{k} = \mathbf{A}\mathbf{P}_{k}\mathbf{A}^{T} + \mathbf{Q}
-
-    4. Update Kalman Gain
+    3. Relative Likelihood.
 
         .. math::
             \begin{aligned}
-                \mathbf{C} _{k} = \frac{∂\mathbf{g} }{∂\mathbf{x} }|_{x=\mathbf{x}^{-}_{k}} \\
-                \mathbf{K}_{k} = \mathbf{P}\mathbf{C}^{T}_{k}
-                (\mathbf{C}_{k}\mathbf{P} \mathbf{C}^{T}_{k} + \mathbf{R})^{-1}
-            \end{aligned}
-
-    5. Posteriori State Estimation.
-
-        .. math::
-            \mathbf{x_{k}}^{+} = \mathbf{x}^{-} + \mathbf{K}\left(\mathbf{y} -
-            \mathbf{g}(\mathbf{x}_{k},\mathbf{u}_{k},t)\right)
-
-    6. Posteriori Covariance Estimation.
-
-        .. math::
-            \mathbf{P_{k}} = (\mathbf{I} - \mathbf{K}_{k}\mathbf{C}_{k}) \mathbf{P}^{-}_{k}
-
-    7. Relative Likelihood
-
-        .. math::
-            \begin{aligned}
-                \mathbf{q}  = \mathbf{p} (\mathbf{y} |\mathbf{x}^{+}_{k}) \\
+                \mathbf{q}  = \mathbf{p} (\mathbf{y} |\mathbf{x}^{-}_{k}) \\
                 \mathbf{q}_{i} = \frac{\mathbf{q}_{i}}{\sum_{j=1}^{N}\mathbf{q}_{j}}
             \end{aligned}
 
-    8. Resample Particles
+    4. Resample Particles.
 
         .. math::
             \begin{aligned}
@@ -101,7 +74,7 @@ class PF(EKF):
                 &\rule{113mm}{0.4pt}                                                 \\[-1.ex]
             \end{aligned}
 
-    9. Refine Posteriori And Covariances
+    5. Refine Posteriori And Covariances.
 
         .. math::
             \begin{aligned}
@@ -139,43 +112,36 @@ class PF(EKF):
         '''
         # Upper cases are matrices, lower cases are vectors
         self.model.set_refpoint(state=x, input=u, t=t)
-        A, B = self.model.A, self.model.B
-        C, D = self.model.C, self.model.D
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
-
         xp = self.generate_particle(x, P)
-        x = self.model.state_transition(xp, u, t)  # 1. System transition
-        ye = self.model.observation(x, u)
-        P = A @ P @ A.mT + Q  # 2. Covariance predict
-        # self.model.set_refpoint(state=x, input=u, t=t)
-        # C1 = self.model.C   #not work
-        K = P @ C.mT @ pinv(C @ P @ C.mT + R)  # 3. Kalman gain
-        e = y - ye  # predicted observation error
-        x = x + bmv(K, e)  # 4. Posteriori state
+        x = self.model.state_transition(xp, u, t)
+        ye = self.model.observation(x, u, t)
 
         # resample
-        q = self.relative_likelihood(ye, y, R)
+        q = self.relative_likelihood(y, ye, R)
         xr = self.resample_particles(q, x)
 
         # update state and  Posteriori covariance
         x = xr.mean(dim=0)
         ex = xr - x
         P = self.compute_cov(ex, ex) / (self.particle_number - 1)
+
         return x, P
 
     def generate_particle(self, x, P):
         r'''
         Randomly generate particles
         '''
-        xp = torch.distributions.MultivariateNormal(x, P).sample((self.particle_number,))
+        xp = torch.distributions.MultivariateNormal(x, P).sample(
+            (self.particle_number,)) + torch.rand(1)
         return xp
 
-    def relative_likelihood(self, ye, y, R):
+    def relative_likelihood(self, y, ye, R):
         r'''
         Compute the relative likelihood
         '''
-        q = torch.distributions.MultivariateNormal(y, R).log_prob(ye).exp() + 1.e-2
+        q = torch.distributions.MultivariateNormal(y, R).log_prob(ye).exp() + 1e-10
         q = q / torch.sum(q)
         return q
 
