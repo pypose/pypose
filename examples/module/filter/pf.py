@@ -5,7 +5,7 @@ from bicycle import Bicycle, bicycle_plot
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PF Example')
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
-    parser.add_argument("--N", type=int, default=1000, help='The number of particle.')
+    parser.add_argument("--N", type=int, default=2000, help='The number of particle.')
     args = parser.parse_args()
 
     T, N, M = 30, 3, 2  # steps, state dim, input dim

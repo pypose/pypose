@@ -1,4 +1,5 @@
 import torch
+from torch.linalg import cholesky
 from pypose.module import EKF
 
 
@@ -79,7 +80,7 @@ class PF(EKF):
         .. math::
             \begin{aligned}
                \mathbf{x}^{+} =\frac{1}{N}  \sum_{i=1}^{n}\mathbf{sample}_{i}   \\
-               P^{+} = \frac{1}{N-1} \sum_{i=1}^{N} (\mathbf{sample}_{i}-\mathbf{x}^{+})(
+               P^{+} = \frac{1}{N} \sum_{i=1}^{N} (\mathbf{sample}_{i}-\mathbf{x}^{+})(
                \mathbf{sample}_{i}-\mathbf{x}^{+})^{T}
             \end{aligned}
 
@@ -114,18 +115,19 @@ class PF(EKF):
         self.model.set_refpoint(state=x, input=u, t=t)
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
-        xp = self.generate_particle(x, P)
-        x = self.model.state_transition(xp, u, t)
-        ye = self.model.observation(x, u, t)
 
-        # resample
+        xp = self.generate_particle(x, P)
+        xp = self.model.state_transition(xp, u, t)
+        ye = self.model.observation(xp, u, t)
         q = self.relative_likelihood(y, ye, R)
-        xr = self.resample_particles(q, x)
+        # resample
+        xr = self.resample_particles(q, xp)
 
         # update state and  Posteriori covariance
         x = xr.mean(dim=0)
         ex = xr - x
-        P = self.compute_cov(ex, ex) / (self.particle_number - 1)
+        weight = torch.tensor([1 / self.particle_number])
+        P = self.compute_cov(ex, ex, weight, Q)
 
         return x, P
 
@@ -134,14 +136,15 @@ class PF(EKF):
         Randomly generate particles
         '''
         xp = torch.distributions.MultivariateNormal(x, P).sample(
-            (self.particle_number,)) + torch.rand(1)
+            (self.particle_number,))
         return xp
 
     def relative_likelihood(self, y, ye, R):
         r'''
         Compute the relative likelihood
         '''
-        q = torch.distributions.MultivariateNormal(y, R).log_prob(ye).exp() + 1e-10
+        q = torch.distributions.MultivariateNormal(y, R).log_prob(ye).exp() + torch.Tensor(
+            [1.e-500])  # avoid round-off to zero
         q = q / torch.sum(q)
         return q
 
@@ -151,9 +154,10 @@ class PF(EKF):
         '''
         r = torch.rand(self.particle_number, device=x.device)
         cumsumq = torch.cumsum(q, dim=0)
+        cumsumq[-1] = 1.0
         return x[torch.searchsorted(cumsumq, r)]
 
-    def compute_cov(self, a, b, Q=0):
+    def compute_cov(self, a, b, w, Q=0):
         '''Compute covariance of two set of variables.'''
         a, b = a.unsqueeze(-1), b.unsqueeze(-1)
-        return Q + (a @ b.mT).sum(dim=-3)
+        return Q + (w.unsqueeze(-1) * a @ b.mT).sum(dim=-3)
