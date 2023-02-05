@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from ..basics import bmv, bvmv
-import time
 
 
 class LQR(nn.Module):
@@ -172,7 +171,7 @@ class LQR(nn.Module):
             the input to the dynamical system :math:`\mathbf{u}`,
             and the costs to the dynamical system :math:`\mathbf{c}`.
         '''
-        t1 = time.time()
+
         assert x_init.device == Q.device == p.device == K.device == k.device
         assert x_init.dtype == Q.dtype == p.dtype == K.dtype == k.dtype
         B, T, ns, nc = p.shape[:-2], p.size(-2), self.system.B.size(-2), self.system.B.size(-1)
@@ -188,8 +187,5 @@ class LQR(nn.Module):
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = self.system(xt, ut)[0]
             cost = cost + 0.5 * bvmv(xut, Q[...,t,:,:], xut) + (xut * p[...,t,:]).sum(-1)
-
-        t2 = time.time()
-        print(t2-t1)
 
         return x[...,0:-1,:], u, cost
