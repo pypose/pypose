@@ -96,7 +96,7 @@ class PF(EKF):
         super().__init__(model, Q, R)
         self.particle_number = 1000 if particle_number is None else particle_number
 
-    def forward(self, x, y, u, P, Q=None, R=None, t=None):
+    def forward(self, x, y, u, P, Q=None, R=None, t=None, conv_weight=None):
         r'''
         Performs one step estimation.
 
@@ -112,24 +112,30 @@ class PF(EKF):
             list of :obj:`Tensor`: posteriori state and covariance estimation
         '''
         # Upper cases are matrices, lower cases are vectors
-        self.model.set_refpoint(state=x, input=u, t=t)
+
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
-
-        xp = self.generate_particle(x, P)
-        xp = self.model.state_transition(xp, u, t)
-        ye = self.model.observation(xp, u, t)
+        conv_weight = 2 if conv_weight is None else conv_weight
+        self.model.set_refpoint(state=x, input=u, t=t)
+        xp = self.generate_particle(x, conv_weight * P)
+        xs = self.model.state_transition(xp, u, t)
+        ye = self.model.observation(xs, u, t)
         q = self.relative_likelihood(y, ye, R)
-        # resample
-        xr = self.resample_particles(q, xp)
-
-        # update state and  Posteriori covariance
+        xr = self.resample_particles(q, xs)
         x = xr.mean(dim=0)
         ex = xr - x
         weight = torch.tensor([1 / self.particle_number])
         P = self.compute_cov(ex, ex, weight, Q)
 
         return x, P
+
+    def roughening(self, x, k=0.1):
+        a, b = x.max(dim=0).values, x.min(dim=0).values
+        c = (a.unsqueeze(-1) - b.expand(len(b), len(b))).max(dim=-1).values
+        N = torch.tensor([self.particle_number])
+        sigma = k * c * N.pow(-1 / len(b)) + torch.tensor([1.e-30])
+        return torch.distributions.normal.Normal(0, sigma).sample(
+            (self.particle_number,))
 
     def generate_particle(self, x, P):
         r'''
@@ -139,12 +145,17 @@ class PF(EKF):
             (self.particle_number,))
         return xp
 
+    def smooth_likelihood(self, q, a=1.1):
+        r'''
+        smooth relative likelihood
+        '''
+        return ((a - 1) * q + q.mean(dim=0)) / a
+
     def relative_likelihood(self, y, ye, R):
         r'''
         Compute the relative likelihood
         '''
-        q = torch.distributions.MultivariateNormal(y, R).log_prob(ye).exp() + torch.Tensor(
-            [1.e-500])  # avoid round-off to zero
+        q = torch.distributions.MultivariateNormal(ye, R).log_prob(y).exp()
         q = q / torch.sum(q)
         return q
 
@@ -156,6 +167,15 @@ class PF(EKF):
         cumsumq = torch.cumsum(q, dim=0)
         cumsumq[-1] = 1.0
         return x[torch.searchsorted(cumsumq, r)]
+
+    def neff(self, weights):
+        return 1. / torch.sum(torch.dot(weights, weights))
+
+    def systematic_resample(self, q, x):
+        N = self.particle_number
+        positions = (torch.rand(1) + torch.arange(N)) / N
+        cumsumq = torch.cumsum(q, dim=0)
+        return x[torch.searchsorted(cumsumq, positions)]
 
     def compute_cov(self, a, b, w, Q=0):
         '''Compute covariance of two set of variables.'''
