@@ -4,10 +4,9 @@
 
 ## 1.1 Build docs locally
 
-1. Sphinx docs come with a makefile build system. To preview, build PyPose locally and
+1. Sphinx docs come with a makefile build system. To build PyPose documentation locally, run the following commands. Note that if you are on a clean (newly installed) Ubuntu, you may need to run `sudo apt install build-essential` before the following commands, but it is not needed for MacOS.
 
 ```bash
-sudo apt install build-essential
 pip install -r requirements/dev.txt
 cd docs
 make html
@@ -16,7 +15,7 @@ make html
 2. Then open the generated HTML page: `docs/build/html/index.html`.
 
 3. To clean and rebuild the doc:
-```
+```bash
 make clean
 ```
 
