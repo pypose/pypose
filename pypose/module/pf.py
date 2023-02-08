@@ -1,5 +1,4 @@
 import torch
-from torch.linalg import cholesky
 from pypose.module import EKF
 
 
@@ -33,12 +32,12 @@ class PF(EKF):
 
         .. math::
             \begin{aligned}
-                \mathbf{x} _{k} = \mathbf{p} (\mathbf{x} ,N) \quad k=1,...,N \\
+                \mathbf{x} _{k} = \mathbf{p} (\mathbf{x},n*\mathbf{P}_{k},N) \quad k=1,...,N \\
                 \mathbf{P} _{k} = \mathbf{P} \quad k=1,...,N
             \end{aligned}
 
     where :math:`N` is the number of Particles and :math:`\mathbf{p}` is the probability
-    density function.
+    density function, n is the dimension of state.
 
     2. Priori State Estimation.
 
@@ -78,14 +77,57 @@ class PF(EKF):
     5. Refine Posteriori And Covariances.
 
         .. math::
+
             \begin{aligned}
-               \mathbf{x}^{+} =\frac{1}{N}  \sum_{i=1}^{n}\mathbf{sample}_{i}   \\
-               P^{+} = \frac{1}{N} \sum_{i=1}^{N} (\mathbf{sample}_{i}-\mathbf{x}^{+})(
-               \mathbf{sample}_{i}-\mathbf{x}^{+})^{T}
+                \mathbf{x}^{+} =\frac{1}{N}  \sum_{i=1}^{n}\mathbf{sample}_{i}   \\
+                P^{+} = \frac{1}{N} \sum_{i=1}^{N} (\mathbf{sample}_{i}-\mathbf{x}^{+})
+                (\mathbf{sample}_{i}-\mathbf{x}^{+})^{T}
             \end{aligned}
 
+    Example:
+        1. Define a Nonlinear Time Invariant (NTI) system model
+
+        >>> import torch, pypose as pp
+        >>> class NTI(pp.module.System):
+        ...     def __init__(self):
+        ...         super().__init__()
+        ...
+        ...     def state_transition(self, state, input, t=None):
+        ...         return state.cos() + input
+        ...
+        ...     def observation(self, state, input, t):
+        ...         return state.sin() + input
+
+        2. Create a model and filter
+
+        >>> model = NTI()
+        >>> pf = pp.module.PF(model)
+
+        3. Prepare data
+
+        >>> T, N = 5, 2 # steps, state dim
+        >>> states = torch.zeros(T, N)
+        >>> inputs = torch.randn(T, N)
+        >>> observ = torch.zeros(T, N)
+        >>> # std of transition, observation, and estimation
+        >>> q, r, p = 0.1, 0.1, 10
+        >>> Q = torch.eye(N) * q**2
+        >>> R = torch.eye(N) * r**2
+        >>> P = torch.eye(N).repeat(T, 1, 1) * p**2
+        >>> estim = torch.randn(T, N) * p
+
+        4. Perform PF prediction. Note that estimation error becomes smaller with more steps.
+
+        >>> for i in range(T - 1):
+        ...     w = q * torch.randn(N) # transition noise
+        ...     v = r * torch.randn(N) # observation noise
+        ...     states[i+1], observ[i] = model(states[i] + w, inputs[i])
+        ...     estim[i+1], P[i+1] = pf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
+        ... print('Est error:', (states - estim).norm(dim=-1))
+        Est error: tensor([5.3627, 0.5640, 0.0953, 0.0447, 0.0936])
+
     Note:
-        Implementation is based on Section 15.3 of this book
+        Implementation is based on Section 15.2 of this book
 
         * Dan Simon, `Optimal State Estimation: Kalman, H∞, and Nonlinear Approaches
           <https://onlinelibrary.wiley.com/doi/epdf/10.1002/0470045345.fmatter>`_,
@@ -115,27 +157,21 @@ class PF(EKF):
 
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
-        conv_weight = 2 if conv_weight is None else conv_weight
+        conv_weight = len(x) if conv_weight is None else conv_weight
         self.model.set_refpoint(state=x, input=u, t=t)
+
         xp = self.generate_particle(x, conv_weight * P)
         xs = self.model.state_transition(xp, u, t)
         ye = self.model.observation(xs, u, t)
         q = self.relative_likelihood(y, ye, R)
         xr = self.resample_particles(q, xs)
+
         x = xr.mean(dim=0)
         ex = xr - x
         weight = torch.tensor([1 / self.particle_number])
         P = self.compute_cov(ex, ex, weight, Q)
 
         return x, P
-
-    def roughening(self, x, k=0.1):
-        a, b = x.max(dim=0).values, x.min(dim=0).values
-        c = (a.unsqueeze(-1) - b.expand(len(b), len(b))).max(dim=-1).values
-        N = torch.tensor([self.particle_number])
-        sigma = k * c * N.pow(-1 / len(b)) + torch.tensor([1.e-30])
-        return torch.distributions.normal.Normal(0, sigma).sample(
-            (self.particle_number,))
 
     def generate_particle(self, x, P):
         r'''
@@ -144,12 +180,6 @@ class PF(EKF):
         xp = torch.distributions.MultivariateNormal(x, P).sample(
             (self.particle_number,))
         return xp
-
-    def smooth_likelihood(self, q, a=1.1):
-        r'''
-        smooth relative likelihood
-        '''
-        return ((a - 1) * q + q.mean(dim=0)) / a
 
     def relative_likelihood(self, y, ye, R):
         r'''
@@ -167,15 +197,6 @@ class PF(EKF):
         cumsumq = torch.cumsum(q, dim=0)
         cumsumq[-1] = 1.0
         return x[torch.searchsorted(cumsumq, r)]
-
-    def neff(self, weights):
-        return 1. / torch.sum(torch.dot(weights, weights))
-
-    def systematic_resample(self, q, x):
-        N = self.particle_number
-        positions = (torch.rand(1) + torch.arange(N)) / N
-        cumsumq = torch.cumsum(q, dim=0)
-        return x[torch.searchsorted(cumsumq, positions)]
 
     def compute_cov(self, a, b, w, Q=0):
         '''Compute covariance of two set of variables.'''
