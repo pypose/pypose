@@ -30,11 +30,7 @@ class LQR(nn.Module):
         system (instance): The system to be soved by LQR.
 
     Note:
-        Here, we consider the system sent to LQR as a linear system in each small horizon. 
-        There are many ways of solving the LQR problem, such as solving Riccati equation, 
-        dynamic programming (DP), etc. Here, we implement the DP method.
-        
-        For more details about mathematical process, please refer to 
+        The implementation is based on pp.24-32 of the slides: 
         http://rll.berkeley.edu/deeprlcourse/f17docs/lecture_8_model_based_planning.pdf
 
     Example:
@@ -182,13 +178,14 @@ class LQR(nn.Module):
         cost = torch.zeros(B, dtype=p.dtype, device=p.device)
         x = torch.zeros(B + (T+1, ns), dtype=p.dtype, device=p.device)
         x[..., 0, :] = x_init
+        xt = x_init
 
         self.system.set_refpoint(t=0)
         for t in range(T):
-            Kt, xt, kt = K[...,t,:,:], x[...,t,:], k[...,t,:]
+            Kt, kt = K[...,t,:,:], k[...,t,:]
             u[..., t, :] = ut = bmv(Kt, xt) + kt
             xut = torch.cat((xt, ut), dim=-1)
-            x[...,t+1,:] = self.system(xt, ut)[0]
+            x[...,t+1,:] = xt = self.system(xt, ut)[0]
             cost = cost + 0.5 * bvmv(xut, Q[...,t,:,:], xut) + (xut * p[...,t,:]).sum(-1)
 
         return x[...,0:-1,:], u, cost
