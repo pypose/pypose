@@ -4,7 +4,8 @@ import torch, pypose as pp
 class TestLQR:
 
     def test_lqr_linear(self, device='cpu'):
-
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
         # The reference data
         x_ref = torch.tensor([
             [[-2.6332834362983704e-01, -3.4662923216819763e-01, 2.3803155422210693e+00, -4.2298097163438797e-02],
@@ -36,7 +37,6 @@ class TestLQR:
         n_batch, T = 2, 5
         n_state, n_ctrl = 4, 3
         n_sc = n_state + n_ctrl
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         Q = torch.randn(n_batch, T, n_sc, n_sc, device=device)
         Q = torch.matmul(Q.mT, Q)
