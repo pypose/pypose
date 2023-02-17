@@ -44,11 +44,11 @@ class ICP(nn.Module):
         Transfers the transR and transT into SE3 Lie tensor
 
         Args:
-            transR:
-            transT:
+            transR: the rotation matrix 3x3
+            transT: the translation matrix 3x1
 
         Returns:
-            LieTensor SE3
+            transformation matrix LieTensor SE3
         '''
 
         temp_transT = transT.reshape([3, 1])
