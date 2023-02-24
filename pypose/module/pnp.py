@@ -4,20 +4,21 @@ class EPnP():
     '''
     EPnP Solver - a non-iterative O(n) solution to the PnP problem.
 
-    Args:
-        objPts: Vectors fo the reference points in the world coordinate.
-        imgPts: Vectors of the projection of the reference points. 
-        camMat: Camera intrinsic matrix.
-        distCoeff: Distortion matrix.
-
-    Returns:
-        Rt: Transform matrix include the rotation and the translation [R|t].
-
     Author:
         Yi Du
     '''
 
     def __init__(self, objPts=None, imgPts=None, camMat=None, distCoeff=None):
+        '''
+        Args:
+            objPts: Vectors fo the reference points in the world coordinate.
+            imgPts: Vectors of the projection of the reference points. 
+            camMat: Camera intrinsic matrix.
+            distCoeff: Distortion matrix.
+
+        Returns:
+            Rt: Transform matrix include the rotation and the translation [R|t].
+        '''
         # TODO: Ensure objPts / imgPts take in batched inputs
         self.objPts = objPts.reshape((objPts.shape[0], 3, 1))
         self.imgPts = imgPts.reshape((objPts.shape[0], 2, 1))
@@ -26,11 +27,11 @@ class EPnP():
         self.n = len(self.objPts) # Number of points
 
     def forward(self):
+        # TODO: Modify this to handle obj pts and img pts inputs
         raise NotImplementedError
 
 
     def main_EPnP(self):
-
         # Select four control points and calculate alpha
         self.contPts_w = self.select_control_points() # Select 4 control points (in the world coordinate)
         self.Alpha = self.compute_alphas()
