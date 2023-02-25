@@ -1,4 +1,7 @@
 import torch
+import functorch
+from functools import partial
+from functorch import vmap
 
 class EPnP():
     '''
@@ -8,7 +11,7 @@ class EPnP():
         Yi Du
     '''
 
-    def __init__(self, objPts=None, imgPts=None, camMat=None, distCoeff=None):
+    def __init__(self, distCoeff=None):
         '''
         Args:
             objPts: Vectors fo the reference points in the world coordinate.
@@ -20,20 +23,15 @@ class EPnP():
             Rt: Transform matrix include the rotation and the translation [R|t].
         '''
         # TODO: Ensure objPts / imgPts take in batched inputs
-        self.objPts = objPts.reshape((objPts.shape[0], 3, 1))
-        self.imgPts = imgPts.reshape((objPts.shape[0], 2, 1))
-        self.camMat = camMat
         self.disCoeff = distCoeff
-        self.n = len(self.objPts) # Number of points
 
-    def forward(self):
+    def forward(self, objPts, imgPts, camMat):
         # TODO: Modify this to handle obj pts and img pts inputs
-        raise NotImplementedError
-
+        contPts_w = self.select_control_points(objPts) # Select 4 control points (in the world coordinate)
+        return
 
     def main_EPnP(self):
         # Select four control points and calculate alpha
-        self.contPts_w = self.select_control_points() # Select 4 control points (in the world coordinate)
         self.Alpha = self.compute_alphas()
 
         # Using camera projection equation for all the points pairs to get the matrix M  
@@ -103,19 +101,28 @@ class EPnP():
             
         return error_best, Rt_best, contPts_c_best, objPts_c_best
         
-    def select_control_points(self):
-        # Select the center of the mass to be the first control point
-        contPts_w_1 = np.mean(self.objPts, axis=0).reshape((1, 3))
-        center_objPts = np.tile(contPts_w_1, (self.n, 1))
+    def select_control_points(self, objPts):
+        """
+        Inputs are batched, with first dimension being the batch size.
+        """
+        # Select the center of mass to be the first control point
+        center = objPts.mean(axis=1)
         
-        # Use the first control point and PCA to select the other three control points
-        objPts_w_cent = self.objPts.reshape((self.n, 3)) - center_objPts
-        u, s, vh = np.linalg.svd(np.matmul(objPts_w_cent.T, objPts_w_cent), full_matrices=True)
-        contPts_w_2 = contPts_w_1 + np.sqrt(s[0])*vh[0]
-        contPts_w_3 = contPts_w_1 + np.sqrt(s[1])*vh[1]
-        contPts_w_4 = contPts_w_1 + np.sqrt(s[2])*vh[2]
+        # Use distance to center to select the other three control points
+        # svd
+        objPts_w_cent = objPts - center.unsqueeze(1)  # center the object points, 1 is for boardcasting
 
-        return np.array([contPts_w_1, contPts_w_2, contPts_w_3, contPts_w_4]).reshape(4, 3)
+        full_svd = vmap(partial(torch.linalg.svd, full_matrices=True))
+        u, s, vh = full_svd(torch.bmm(objPts_w_cent.transpose(-1, -2), objPts_w_cent))
+
+        # produce points TODO: change to batch implementation
+        res = []
+        res.append(center)
+        for i in range(3):
+            another_pt = center + torch.sqrt(s[:, i])*vh[:, i]
+            res.append(another_pt)
+
+        return torch.stack(res, dim=1)
         
     def compute_alphas(self):
         # Construct matrix for alpha calculation
@@ -376,5 +383,3 @@ class EPnP():
         error = np.sum(error, axis=0) / self.n
 
         return error[0]
-
-   
