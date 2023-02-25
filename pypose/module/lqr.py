@@ -20,7 +20,12 @@ class LQR(nn.Module):
         \end{align*}
     where :math:`\mathbf{\tau}` = :math:`\begin{bmatrix} \mathbf{x} \\ \mathbf{u} \end{bmatrix}`, 
     :math:`\mathbf{F}` = :math:`\begin{bmatrix} \mathbf{A} & \mathbf{B} \end{bmatrix}`, 
-    :math:`\mathbf{f}` = :math:`\mathbf{c}_1`.
+    :math:`\mathbf{f}` = :math:`\mathbf{c}_1`. 
+    :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state and input of the system; 
+    :math:`\mathbf{A}`, :math:`\mathbf{B}` are the state matrix and input matrix of the linear system; 
+    :math:`\mathbf{c}_1` is the constant input of the linear system; 
+    :math:`\mathbf{Q}` is the weight matrix of the quadratic term; 
+    :math:`\mathbf{p}` is the weight vector of the first-order term.
 
     From a policy learning perspective, this can be interpreted as a module with unknown parameters
     :math:`\begin{Bmatrix} \mathbf{Q}, \mathbf{p}, \mathbf{F}, \mathbf{f} \end{Bmatrix}`, 
@@ -48,9 +53,8 @@ class LQR(nn.Module):
         >>> c2 = torch.tile(torch.zeros(n_state), (n_batch, 1))
         >>> x_init = torch.randn(n_batch, n_state)
         >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
-        >>> LQR = pp.module.LQR(lti)
-        >>> x, u, cost = LQR(x_init, Q, p)
-        >>> print("x = ", x)
+        >>> LQR = pp.module.LQR(lti, Q, p, T, n_batch=n_batch)
+        >>> x, u, cost = LQR(x_init)
         >>> print("u = ", u)
         x =  tensor([[[-0.2633, -0.3466,  2.3803, -0.0423],
                       [ 0.1849, -1.3884,  1.0898, -1.6229],
@@ -74,19 +78,33 @@ class LQR(nn.Module):
                       [-0.0728,  0.7290, -0.3117]]])
 
     '''
-    def __init__(self, system):
+    def __init__(self, system, Q, p, T, n_batch=1):
         super().__init__()
         self.system = system
+        self.Q, self.p, self.T = Q, p, T
+        self.n_batch = n_batch
+        
+        if self.Q.ndim == 2:
+            self.Q = torch.tile(self.Q, (self.n_batch, self.T, 1, 1))
 
-    def forward(self, x, Q, p):
+        if self.p.ndim == 1:
+            self.p = torch.tile(self.p, (self.n_batch, self.T, 1))
+
+        # Q: (B*, T, N, N), p: (B*, T, N), where B* can be any batch dimensions, e.g., (2, 3)
+        assert self.Q.shape[:-1] == self.p.shape and self.Q.size(-1) == self.Q.size(-2), "Shape not compatible."
+        assert self.Q.ndim == 4 or self.p.ndim == 3, "Shape not compatible."
+        assert self.Q.device == self.p.device
+        assert self.Q.dtype == self.p.dtype
+
+    def forward(self, x_init):
         r'''
         Perform one step advance for the LQR problem.
         '''
-        K, k = self.lqr_backward(Q, p)
-        x, u, cost = self.lqr_forward(x, Q, p, K, k)
+        K, k = self.lqr_backward()
+        x, u, cost = self.lqr_forward(x_init, K, k)
         return x, u, cost
 
-    def lqr_backward(self, Q, p):
+    def lqr_backward(self):
         r'''
         The backward recursion of the dynamic programming to solve LQR.
 
@@ -95,8 +113,10 @@ class LQR(nn.Module):
         .. math::
             \begin{align*}
                 \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t \\
-                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{f}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1} \\
-                \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} \\
+                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{f}_t + 
+                \mathbf{F}_t^\top\mathbf{v}_{t+1} \\
+                \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{Q}_{\mathbf{u}_t, 
+                \mathbf{x}_t} \\
                 \mathbf{k}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{q}_{\mathbf{u}_t} \\
                 \mathbf{V}_t &= \mathbf{Q}_{\mathbf{x}_t, \mathbf{x}_t} 
                     + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{K}_t 
@@ -109,29 +129,26 @@ class LQR(nn.Module):
             \end{align*}
         
         Args:
-            Q (:obj:`Tensor`): The matrix of quadratic parameter.
-            p (:obj:`Tensor`): The constant vector of quadratic parameter.
+            Q (:obj:`Tensor`): The weight matrix of the quadratic term.
+            p (:obj:`Tensor`): The weight vector of the first-order term.
 
         Returns:
-            Tuple of Tensor: The status feedback controller :math:`\mathbf{K}` and 
-            :math:`\mathbf{k}` at all steps.
+            Tuple of Tensor: The state feedback controller :math:`\mathbf{K}` and 
+            :math:`\mathbf{k}` gain of all steps.
         '''
-        # Q: (B*, T, N, N), p: (B*, T, N), where B* can be any batch dimensions, e.g., (2, 3)
-        assert Q.shape[:-1] == p.shape and Q.size(-1) == Q.size(-2), "Shape not compatible."
-        B, T = p.shape[:-2], p.size(-2) 
         ns, nc = self.system.B.size(-2), self.system.B.size(-1)
-        K = torch.zeros(B + (T, nc, ns), dtype=p.dtype, device=p.device)
-        k = torch.zeros(B + (T, nc), dtype=p.dtype, device=p.device)
+        K = torch.zeros((self.n_batch, self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
+        k = torch.zeros((self.n_batch, self.T, nc), dtype=self.p.dtype, device=self.p.device)
 
-        for t in range(T-1, -1, -1): 
-            if t == T - 1:
-                Qt = Q[...,t,:,:]
-                qt = p[...,t,:]
+        for t in range(self.T-1, -1, -1): 
+            if t == self.T - 1:
+                Qt = self.Q[...,t,:,:]
+                qt = self.p[...,t,:]
             else:
                 self.system.set_refpoint(t=t)
                 F = torch.cat((self.system.A, self.system.B), dim=-1)
-                Qt = Q[...,t,:,:] + F.mT @ V @ F
-                qt = p[...,t,:] + bmv(F.mT, v)
+                Qt = self.Q[...,t,:,:] + F.mT @ V @ F
+                qt = self.p[...,t,:] + bmv(F.mT, v)
                 if self.system.c1 is not None:
                     qt = qt + bmv(F.mT @ V, self.system.c1)
 
@@ -144,9 +161,10 @@ class LQR(nn.Module):
             k[...,t,:] = kt = - bmv(Quu_inv, qu)
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
             v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
+            
         return K, k
 
-    def lqr_forward(self, x_init, Q, p, K, k):
+    def lqr_forward(self, x_init, K, k):
         r'''
         The forward recursion of the dynamic programming to solve LQR.
 
@@ -157,7 +175,15 @@ class LQR(nn.Module):
                 \mathbf{u}_t &= \mathbf{K}_t\mathbf{x}_t + \mathbf{k}_t \\
                 \mathbf{x}_{t+1} &= f \left( \mathbf{x}_t, \mathbf{u}_t \right) \\
             \end{align*}
-        where :math:`f \left( \mathbf{x}_t, \mathbf{u}_t \right)` represents the system dynamics.
+        where :math:`f \left( \mathbf{x}_t, \mathbf{u}_t \right)` represents the discrete-time 
+        system dynamics.
+
+        Based on these, we can calculate the quadratic costs of the system over the time horizon:
+
+        .. math::
+            \mathbf{c} \left( \mathbf{\tau}_t \right) = \frac{1}{2}
+            \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t
+        where :math:`\mathbf{\tau}` = :math:`\begin{bmatrix} \mathbf{x} \\ \mathbf{u} \end{bmatrix}`.
 
         Args:
             Q (:obj:`Tensor`): The matrix of quadratic parameter.
@@ -166,26 +192,26 @@ class LQR(nn.Module):
             k (:obj:`Tensor`): The constant of status feedback controller at all steps.
 
         Returns:
-            Tuple of Tensor: The state of the dynamical system :math:`\mathbf{x}`, 
-            the input to the dynamical system :math:`\mathbf{u}`,
-            and the costs to the dynamical system :math:`\mathbf{c}`.
+            Tuple of Tensor: The solved state sequence of the dynamical system over the the time horizon 
+            :math:`\mathbf{x}`, the solved input sequence of the dynamical system over the the time horizon 
+            :math:`\mathbf{u}`, and the quadratic costs of the system over the time horizon :math:`\mathbf{c}`.
         '''
 
-        assert x_init.device == Q.device == p.device == K.device == k.device
-        assert x_init.dtype == Q.dtype == p.dtype == K.dtype == k.dtype
-        B, T, ns, nc = p.shape[:-2], p.size(-2), self.system.B.size(-2), self.system.B.size(-1)
-        u = torch.zeros(B + (T, nc), dtype=p.dtype, device=p.device)
-        cost = torch.zeros(B, dtype=p.dtype, device=p.device)
-        x = torch.zeros(B + (T+1, ns), dtype=p.dtype, device=p.device)
+        assert x_init.device == K.device == k.device
+        assert x_init.dtype == K.dtype == k.dtype
+        ns, nc = self.system.B.size(-2), self.system.B.size(-1)
+        u = torch.zeros((self.n_batch, self.T, nc), dtype=self.p.dtype, device=self.p.device)
+        cost = torch.zeros((self.n_batch), dtype=self.p.dtype, device=self.p.device)
+        x = torch.zeros((self.n_batch, self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
         x[..., 0, :] = x_init
         xt = x_init
 
         self.system.set_refpoint(t=0)
-        for t in range(T):
+        for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]
             u[..., t, :] = ut = bmv(Kt, xt) + kt
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
-            cost = cost + 0.5 * bvmv(xut, Q[...,t,:,:], xut) + (xut * p[...,t,:]).sum(-1)
+            cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
 
         return x[...,0:-1,:], u, cost
