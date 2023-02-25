@@ -28,11 +28,11 @@ class EPnP():
     def forward(self, objPts, imgPts, camMat):
         # TODO: Modify this to handle obj pts and img pts inputs
         contPts_w = self.select_control_points(objPts) # Select 4 control points (in the world coordinate)
+        Alpha = self.compute_alphas(objPts, contPts_w)
         return
 
     def main_EPnP(self):
         # Select four control points and calculate alpha
-        self.Alpha = self.compute_alphas()
 
         # Using camera projection equation for all the points pairs to get the matrix M  
         A, Alpha = self.camMat, self.Alpha
@@ -103,7 +103,11 @@ class EPnP():
         
     def select_control_points(self, objPts):
         """
-        Inputs are batched, with first dimension being the batch size.
+        Select four control points, used to express world coordinates of the object points
+        Args:
+            objPts: 3D object points, shape (batch_size, n, 3)
+        Returns:
+            control points, shape (batch_size, 4, 3)
         """
         # Select the center of mass to be the first control point
         center = objPts.mean(axis=1)
@@ -124,20 +128,34 @@ class EPnP():
 
         return torch.stack(res, dim=1)
         
-    def compute_alphas(self):
-        # Construct matrix for alpha calculation
-        objPts_w = np.array(self.objPts).transpose()[0]
-        mat_objPts_w = np.concatenate((objPts_w, np.array([np.ones((self.n))])), axis=0)
-        contPts_w = self.contPts_w.transpose()
-        mat_contPts_w = np.concatenate((contPts_w, np.array([np.ones((4))])), axis=0)
-        
-        # Calculate Alpha
-        Alpha = np.matmul(np.linalg.inv(mat_contPts_w), mat_objPts_w) # simple method
-        Alpha = Alpha.transpose()
-        # Alpha = solve(mat_contPts_w, mat_objPts_w) # General method
-        # Alpha = Alpha.transpose()
-        
-        return Alpha
+    def compute_alphas(self, objPts, contPts_w, linear_least_square=False):
+        """Given the object points and the control points in the world coordinate, compute the alphas, which are the coefficients corresponded of control points.
+        Inputs are batched, with first dimension being the batch size. Check equation 1 in paper for more details.
+        Args:
+            objPts (torch.Tensor): object points in the world coordinate, shape (batch_size, num_pts, 3)
+            contPts_w (torch.Tensor): control points in the world coordinate, shape (batch_size, 4, 3)
+            linear_least_square (bool, optional): whether to use linear least square method to compute alphas. Defaults to False.
+        Returns:
+            torch.Tensor: alphas, shape (batch_size, num_pts, 4)
+        """
+        batch_size = objPts.shape[0]
+        num_pts = objPts.shape[1]
+        batched_ones = torch.ones((batch_size, num_pts, 1), dtype=objPts.dtype, device=objPts.device)
+        # concatenate object points with ones
+        objPts = torch.cat((objPts, batched_ones), dim=-1)
+        # concatenate control points with ones
+        batched_ones = torch.ones((batch_size, 4, 1), dtype=contPts_w.dtype, device=contPts_w.device)
+        contPts_w = torch.cat((contPts_w, batched_ones), dim=-1)
+
+        if linear_least_square:
+            NotImplementedError("Linear least square method is not implemented yet.")
+            # Calculate Alpha TODO: CHECK if logic is correct, or change to general method
+            alpha = torch.bmm(torch.linalg.inv(contPts_w), objPts) # simple method
+            alpha = alpha.transpose()
+        else:
+            alpha = torch.linalg.solve(contPts_w, objPts, left=False) # General method
+            
+        return alpha
     
     def compute_L6_10_mat_mat(self, V_M):
         L = np.zeros((6, 10))
