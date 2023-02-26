@@ -38,14 +38,8 @@ class EPnP():
         # Using camera projection equation for all the points pairs to get the matrix M
         m = self.build_m(imgPts, alpha, intrinsics)
 
-        # find null space of M
-        eigenvalues, eigenvectors = vmap(torch.linalg.eig)(torch.bmm(m.transpose(1, 2), m))
-        # take the real part
-        eigenvalues = eigenvalues.real
-        eigenvectors = eigenvectors.real
-        # sort by eigenvalues TODO: check if this is batch compatible
-        idx = eigenvalues.argsort()
-        v_mat = eigenvectors[:, :, idx[:, :4]]  # Pick up the four eigen vectors with the smallest four eigen values
+        kernel_m = self.calculate_kernel(m)
+
 
         return
     def main_EPnP(self):
@@ -104,7 +98,8 @@ class EPnP():
 
         return error_best, Rt_best, contPts_c_best, objPts_c_best
 
-    def select_control_points(self, objPts):
+    @staticmethod
+    def select_control_points(objPts):
         """
         Select four control points, used to express world coordinates of the object points
         Args:
@@ -131,7 +126,8 @@ class EPnP():
 
         return torch.stack(res, dim=1)
 
-    def compute_alphas(self, objPts, contPts_w, linear_least_square=False):
+    @staticmethod
+    def compute_alphas(objPts, contPts_w, linear_least_square=False):
         """Given the object points and the control points in the world coordinate, compute the alphas, which are the coefficients corresponded of control points.
         Inputs are batched, with first dimension being the batch size. Check equation 1 in paper for more details.
         Args:
@@ -195,6 +191,27 @@ class EPnP():
         # match dimension of m with paper, with shape (batch_size, num_pts * 2, 12)
         m = m.reshape(batch_size, num_pts * 2, 12)
         return m
+
+    @staticmethod
+    def calculate_kernel(m, top=4):
+        """Given the m matrix, compute the kernel of it.
+        Inputs are batched, with first dimension being the batch size.
+        Args:
+            m (torch.Tensor): m, shape (batch_size, num_pts * 2, 12)
+            top (int, optional): number of top eigen vectors to take. Defaults to 4.
+        Returns:
+            torch.Tensor: kernel, shape (batch_size, 12, top)
+        """
+        # find null space of M
+        eigenvalues, eigenvectors = vmap(torch.linalg.eig)(torch.bmm(m.transpose(1, 2), m))
+        # take the real part
+        eigenvalues = eigenvalues.real
+        eigenvectors = eigenvectors.real
+        # sort by eigenvalues (ascending)
+        eig_indices = eigenvalues.argsort()
+        # take the first 4 eigenvectors, shape (batch_size, 12, 4)
+        kernel_bases = torch.gather(eigenvectors, 2, eig_indices[:, :top].unsqueeze(1).tile(1, 12, 1))
+        return kernel_bases
 
     def compute_L6_10_mat_mat(self, V_M):
         L = np.zeros((6, 10))
