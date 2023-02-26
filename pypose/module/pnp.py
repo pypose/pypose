@@ -40,8 +40,10 @@ class EPnP():
 
         kernel_m = self.calculate_kernel(m)
         # dim(kernel_space) = 1
-        self.compute_norm_sign_scaling_factor(kernel_m[:, :, 0], contPts_w, alpha, objPts)
-
+        contPts_c, objPts_c, sc = self.compute_norm_sign_scaling_factor(kernel_m[:, :, 0], contPts_w, alpha, objPts)
+        r, t = self.get_rotation_translation(objPts, objPts_c)
+        Rt = torch.cat((r, t.unsqueeze(-1)), dim=-1)
+        error = self.reprojection_error(objPts, imgPts, intrinsics, Rt)
         return
     def main_EPnP(self):
 
@@ -247,6 +249,9 @@ class EPnP():
 
         return L
 
+    def calculate_betas(self):
+        pass
+
     def diffDim_calculation(self, N, v_mat, L6_10_mat):
         # Calculate rho - the right hand side of the equation (consist of ||c_i^w - c_j^w||^2: c is the control point in the world coordinate)
         rho = []
@@ -302,8 +307,8 @@ class EPnP():
             beta = [beta4, beta3, beta2, beta1]
 
         # Get the rotation and the translation
-        R, T = self.ICP_getRotT(self.objPts, Xc)
-        Rt = np.concatenate((R.reshape((3, 3)), T.reshape((3, 1))), axis=1)
+        R, T = self.get_rotation_translation(self.objPts, Xc)
+        Rt = torch.cat((R, T), dim=1)
         error = self.reprojection_error(self.objPts, self.imgPts, Rt)
 
         return error, Rt, contPts_c, Xc, sc, beta
@@ -368,7 +373,7 @@ class EPnP():
         contPts_c = contPts_c * s_contPts_w * s_contPts_c
 
         Xc_opt = np.matmul(self.Alpha, contPts_c)
-        R_opt, T_opt = self.ICP_getRotT(self.objPts, Xc_opt)
+        R_opt, T_opt = self.get_rotation_translation(self.objPts, Xc_opt)
         Rt_opt = np.concatenate((R_opt.reshape((3, 3)), T_opt.reshape((3, 1))), axis=1)
         err_opt = self.reprojection_error(self.objPts, self.imgPts, Rt_opt)
 
@@ -429,38 +434,59 @@ class EPnP():
 
     # endregion
 
-    def ICP_getRotT(self, objpts_w, objpts_c):
-        # Find the center points for the reference points in the world coordinates and the camera coordinates respectively
-        objpts_w_cent = np.tile(np.mean(objpts_w, axis=0).reshape((1, 3)), (self.n, 1))
-        objPts_c_cent = np.tile(np.mean(objpts_c, axis=0).reshape((1, 3)), (self.n, 1))
-
-        # Get the centered points by minus the center points
-        objpts_w = objpts_w.reshape((self.n, 3)) - objpts_w_cent
-        objpts_c = objpts_c.reshape((self.n, 3)) - objPts_c_cent
+    @staticmethod
+    def get_rotation_translation(objpts_w, objpts_c):
+        """
+        Get the rotation matrix and translation vector based on the object points in world coordinate and camera coordinate.
+        Args:
+            objpts_w: The object points in world coordinate. The shape is (B, N, 3).
+            objpts_c: The object points in camera coordinate. The shape is (B, N, 3).
+        Returns:
+            R: The rotation matrix. The shape is (B, 3, 3).
+            T: The translation vector. The shape is (B, 3).
+        """
+        # Get the centered points
+        center_w = objpts_w.mean(dim=1, keepdim=True)
+        objpts_w = objpts_w - center_w
+        center_c = objpts_c.mean(dim=1, keepdim=True)
+        objpts_c = objpts_c - center_c
 
         # Calculate the rotation matrix
-        M = np.matmul(objpts_c.transpose(), objpts_w)
-        U, S, V = np.linalg.svd(M)
-        R = np.matmul(U, V)
+        M = torch.bmm(objpts_c.transpose(dim0=-1, dim1=-2), objpts_w)
+        U, S, V = vmap(torch.svd)(M)
+        R = torch.bmm(U, V)
 
-        # When the result matrix's determinate value is negative then make it positive to make sure R is a rotation matrix
-        if np.linalg.det(R) < 0:
-            R = - R
+        # if det(R) < 0, make it positive
+        negate_mask = torch.linalg.det(R) < 0
+        R[negate_mask] = -R[negate_mask]
 
         # Calculate the translation vector based on the rotation matrix and the equation
-        T = objPts_c_cent[0].transpose() - np.matmul(R, objpts_w_cent[0].transpose())
+        T = center_c.transpose(dim0=-1, dim1=-2) - torch.bmm(R, center_w.transpose(dim0=-1, dim1=-2))
+        T = T.squeeze(dim=-1)
 
         return R, T
 
-    def reprojection_error(self, objPts_w, imgPts, Rt):
-        P = np.matmul(self.camMat[:, :3], Rt)
-        objPts_w_ex = np.concatenate((objPts_w.reshape((self.n, 3)), np.array([np.ones((self.n))]).T), axis=1)
+    def reprojection_error(self, objPts_w, imgPts, camMat, Rt):
+        """
+        Calculate the reprojection error.
+        Args:
+            objPts_w: The object points in world coordinate. The shape is (B, N, 3).
+            imgPts: The image points. The shape is (B, N, 2).
+            camMat: The camera matrix. The shape is (B, 3, 3).
+            Rt: The rotation matrix and translation vector. The shape is (B, 3, 4).
+        Returns:
+            error: The reprojection error. The shape is (B, ).
+        """
+        P = torch.bmm(camMat[:, :, :3], Rt)
+        # concat 1 to the last column of objPts_w
+        objPts_w_ex = torch.cat((objPts_w, torch.ones_like(objPts_w[:, :, :1])), dim=-1)
+        # Calculate the image points
+        imgRep = torch.bmm(P, objPts_w_ex.transpose(dim0=-1, dim1=-2)).transpose(dim0=-1, dim1=-2)
 
-        imgRep = np.matmul(P, objPts_w_ex.T).T
-        imgRep[:, 0] = imgRep[:, 0] / imgRep[:, 2]
-        imgRep[:, 1] = imgRep[:, 1] / imgRep[:, 2]
-        error = np.sqrt((imgPts[:, 0] - imgRep[:, 0].reshape((self.n, 1))) ** 2 + (
-                    imgPts[:, 1] - imgRep[:, 1].reshape((self.n, 1))) ** 2)
-        error = np.sum(error, axis=0) / self.n
+        # Normalize the image points
+        imgRep = imgRep[:, :, :2] / imgRep[:, :, 2:]
 
-        return error[0]
+        error = torch.linalg.norm(imgRep - imgPts, dim=-1)
+        error = torch.sum(error, dim=-1)
+
+        return error
