@@ -21,10 +21,11 @@ def load_data(path):
     for key in keys:
         res[key] = torch.stack(res[key])
         res[key] = res[key].squeeze(-1)
-        res[key] = res[key].unsqueeze(0)
+        # make a copy of the data for batch size of 2
+        res[key] = res[key].unsqueeze(0)[[0, 0,]]
         
-    res['camMat'] = res['camMat'].unsqueeze(0)
-    res['Rt'] = res['Rt'].unsqueeze(0)
+    res['camMat'] = res['camMat'].unsqueeze(0)[[0, 0,]]
+    res['Rt'] = res['Rt'].unsqueeze(0)[[0, 0,]]
     return res
 
 class TestEPnP:

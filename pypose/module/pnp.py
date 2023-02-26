@@ -126,7 +126,7 @@ class EPnP():
         res = []
         res.append(center)
         for i in range(3):
-            another_pt = center + torch.sqrt(s[:, i]) * vh[:, i]
+            another_pt = center + torch.sqrt(s[:, i, None]) * vh[:, i]
             res.append(another_pt)
 
         return torch.stack(res, dim=1)
@@ -174,7 +174,7 @@ class EPnP():
         num_pts = imgPts.shape[1]
 
         # extract elements of the intrinsic matrix in batch
-        fu, fv, u0, v0 = intrinsics[:, 0, 0], intrinsics[:, 1, 1], intrinsics[:, 0, 2], intrinsics[:, 1, 2]
+        fu, fv, u0, v0 = intrinsics[:, 0, 0, None], intrinsics[:, 1, 1, None], intrinsics[:, 0, 2, None], intrinsics[:, 1, 2, None]
         # extract elements of the image points in batch
         ui, vi = imgPts[:, :, 0], imgPts[:, :, 1]
         # extract elements of the alphas in batch
