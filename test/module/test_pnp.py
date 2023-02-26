@@ -24,7 +24,7 @@ def load_data(path):
         # make a copy of the data for batch size of 2
         res[key] = res[key].unsqueeze(0)[[0, 0,]]
         
-    res['camMat'] = res['camMat'].unsqueeze(0)[[0, 0,]]
+    res['camMat'] = res['camMat'].unsqueeze(0)[[0, 0,]].to(res['objPts'])
     res['Rt'] = res['Rt'].unsqueeze(0)[[0, 0,]]
     return res
 
@@ -45,7 +45,8 @@ class TestEPnP:
         test_mat_url = 'https://github.com/cvlab-epfl/EPnP/raw/master/matlab/data/input_data_noise.mat'
         tmp_path = '/tmp/pypose_test/input_data_noise.mat'
         os.makedirs(os.path.dirname(tmp_path), exist_ok=True)
-        urllib.request.urlretrieve(test_mat_url, tmp_path)
+        if not os.path.exists(tmp_path):
+            urllib.request.urlretrieve(test_mat_url, tmp_path)
         assert os.path.exists(tmp_path), 'download testing mat failed'
         data = load_data(tmp_path)
 
