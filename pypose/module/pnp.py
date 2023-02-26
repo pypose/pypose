@@ -39,7 +39,8 @@ class EPnP():
         m = self.build_m(imgPts, alpha, intrinsics)
 
         kernel_m = self.calculate_kernel(m)
-
+        # dim(kernel_space) = 1
+        self.compute_norm_sign_scaling_factor(kernel_m[:, :, 0], contPts_w, alpha, objPts)
 
         return
     def main_EPnP(self):
@@ -157,7 +158,8 @@ class EPnP():
         return alpha
 
     def build_m(self, imgPts, alpha, intrinsics):
-        """Given the image points, alphas and intrinsics, compute the m matrix, which is the matrix of the coefficients of the image points.
+        """Given the image points, alphas and intrinsics, compute the m matrix, which is the matrix of the coefficients
+        of the image points. Check equation 7 in paper for more details.
         Inputs are batched, with first dimension being the batch size.
         Args:
             imgPts (torch.Tensor): image points, shape (batch_size, num_pts, 2)
@@ -194,7 +196,7 @@ class EPnP():
 
     @staticmethod
     def calculate_kernel(m, top=4):
-        """Given the m matrix, compute the kernel of it.
+        """Given the m matrix, compute the kernel of it. Check equation 8 in paper for more details.
         Inputs are batched, with first dimension being the batch size.
         Args:
             m (torch.Tensor): m, shape (batch_size, num_pts * 2, 12)
@@ -211,6 +213,7 @@ class EPnP():
         eig_indices = eigenvalues.argsort()
         # take the first 4 eigenvectors, shape (batch_size, 12, 4)
         kernel_bases = torch.gather(eigenvectors, 2, eig_indices[:, :top].unsqueeze(1).tile(1, 12, 1))
+
         return kernel_bases
 
     def compute_L6_10_mat_mat(self, V_M):
@@ -305,44 +308,46 @@ class EPnP():
 
         return error, Rt, contPts_c, Xc, sc, beta
 
-    def compute_norm_sign_scaling_factor(self, Xc):
-        contPts_c = []
-
-        for i in range(4):
-            contPts_c.append(Xc[(3 * i): (3 * (i + 1))])
-
+    def compute_norm_sign_scaling_factor(self, Xc, contPts_w, alphas, objPts):
+        """Compute the scaling factor and the sign of the scaling factor
+        Args:
+            Xc (torch.tensor): the control points in the camera coordinates
+            contPts_w (torch.tensor): the control points in the world coordinates
+            alphas (torch.tensor): the weights of the control points to recover the object points
+            objPts (torch.tensor): the object points in the world coordinates
+        Returns:
+            contPts_c (torch.tensor): the control points in the camera coordinates
+            objPts_c (torch.tensor): the object points in the camera coordinates
+            sc (torch.tensor): the scaling factor
+        """
         # Calculate the control points and object points in the camera coordinates
-        contPts_c = np.array(contPts_c).reshape((4, 3))
-        objPts_c = np.matmul(self.Alpha, contPts_c)
+        contPts_c = Xc.reshape((Xc.shape[0], 4, 3))
+        objPts_c = torch.bmm(alphas, contPts_c)
 
         # Calculate the distance of the reference points in the world coordinates
-        centr_w = np.mean(self.objPts, axis=0)
-        centroid_w = np.tile(centr_w.reshape((1, 3)), (self.n, 1))
-        objPts_w_centered = self.objPts.reshape((self.n, 3)) - centroid_w
-        dist_w = np.sqrt(np.sum(objPts_w_centered ** 2, axis=1))
+        objPts_w_centered = objPts - objPts.mean(dim=1, keepdim=True)
+        dist_w = torch.linalg.norm(objPts_w_centered, dim=2)
 
         # Calculate the distance of the reference points in the camera coordinates
-        centr_c = np.mean(np.array(objPts_c), axis=0)
-        centroid_c = np.tile(centr_c.reshape((1, 3)), (self.n, 1))
-        objPts_c_centered = objPts_c.reshape((self.n, 3)) - centroid_c
-        dist_c = np.sqrt(np.sum(objPts_c_centered ** 2, axis=1))
+        objPts_c_centered = objPts_c - objPts_c.mean(dim=1, keepdim=True)
+        dist_c = torch.linalg.norm(objPts_c_centered, dim=2)
 
         # calculate the scaling factors
         # print(contPts_c)
-        sc_1 = np.matmul(dist_c.transpose(), dist_c) ** -1
-        sc_2 = np.matmul(dist_c.transpose(), dist_w)
-        sc = sc_1 * sc_2
+        sc_1 = torch.bmm(dist_c.unsqueeze(1), dist_c.unsqueeze(2))
+        sc_2 = torch.bmm(dist_c.unsqueeze(1), dist_w.unsqueeze(2))
+        sc = 1 / sc_1 * sc_2
 
         # Update the control points and the object points in the camera coordinates based on the scaling factors
-        contPts_c *= sc
-        objPts_c = np.matmul(self.Alpha, contPts_c)
+        contPts_c = contPts_c * sc
+        objPts_c = torch.matmul(alphas, contPts_c)
 
-        # Update the control points and the object points in the camera coordinates based on the sign    
-        for x in objPts_c:
-            if x[-1] < 0:
-                objPts_c *= -1
-                contPts_c *= -1
-
+        # Update the control points and the object points in the camera coordinates based on the sign
+        neg_z_mask = torch.any(objPts_c[:, :, 2] < 0, dim=-1)  # (N, )
+        negate_switch = torch.ones((objPts.shape[0], ), dtype=objPts.dtype, device=objPts.device)
+        negate_switch[neg_z_mask] = negate_switch[neg_z_mask] * -1
+        objPts_c = objPts_c * negate_switch.unsqueeze(1).unsqueeze(1)
+        sc = sc * negate_switch
         return contPts_c, objPts_c, sc
 
     # region "Gauss-Newton OPtimization Block"
