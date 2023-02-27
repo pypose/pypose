@@ -30,9 +30,12 @@ class EPnP():
         # TODO: Ensure objPts / imgPts take in batched inputs
         self.disCoeff = distCoeff
 
-    def forward(self, objPts, imgPts, intrinsics):
-        # Select four control points and calculate alpha
-        contPts_w = self.select_control_points(objPts)  # Select 4 control points (in the world coordinate)
+    def forward(self, objPts, imgPts, intrinsics, naive_ctrl_pts=False):
+        # Select four control points and calculate alpha (in the world coordinate)
+        if naive_ctrl_pts:
+            contPts_w = self.naive_control_points(objPts)
+        else:
+            contPts_w = self.select_control_points(objPts)
         alpha = self.compute_alphas(objPts, contPts_w)
 
         # Using camera projection equation for all the points pairs to get the matrix M
@@ -44,7 +47,8 @@ class EPnP():
         r, t = self.get_rotation_translation(objPts, objPts_c)
         Rt = torch.cat((r, t.unsqueeze(-1)), dim=-1)
         error = self.reprojection_error(objPts, imgPts, intrinsics, Rt)
-        return
+        return error
+
     def main_EPnP(self):
 
         fu, fv, u0, v0 = intrinsics[0, 0], intrinsics[1, 1], intrinsics[0, 2], intrinsics[
@@ -100,6 +104,22 @@ class EPnP():
             error_best, Rt_best, contPts_c_best, objPts_c_best = err_opt, Rt_opt, contPts_c_opt, objPts_c_opt
 
         return error_best, Rt_best, contPts_c_best, objPts_c_best
+
+    @staticmethod
+    def naive_control_points(objPts):
+        """
+        Select four control points, used to express world coordinates of the object points. This is a naive
+        implementation that corresponds to the original paper.
+        Args:
+            objPts: 3D object points, shape (batch_size, n, 3)
+        Returns:
+            control points, shape (batch_size, 4, 3)
+        """
+        control_pts = torch.eye(3, dtype=objPts.dtype, device=objPts.device)
+        # last control point is the origin
+        control_pts = torch.cat((control_pts, torch.zeros(1, 3, dtype=objPts.dtype, device=objPts.device)), dim=0)
+        control_pts = control_pts.unsqueeze(0).repeat(objPts.shape[0], 1, 1)
+        return control_pts
 
     @staticmethod
     def select_control_points(objPts):
@@ -174,7 +194,8 @@ class EPnP():
         num_pts = imgPts.shape[1]
 
         # extract elements of the intrinsic matrix in batch
-        fu, fv, u0, v0 = intrinsics[:, 0, 0, None], intrinsics[:, 1, 1, None], intrinsics[:, 0, 2, None], intrinsics[:, 1, 2, None]
+        fu, fv, u0, v0 = intrinsics[:, 0, 0, None], intrinsics[:, 1, 1, None], intrinsics[:, 0, 2, None], intrinsics[:,
+                                                                                                          1, 2, None]
         # extract elements of the image points in batch
         ui, vi = imgPts[:, :, 0], imgPts[:, :, 1]
         # extract elements of the alphas in batch
@@ -349,7 +370,7 @@ class EPnP():
 
         # Update the control points and the object points in the camera coordinates based on the sign
         neg_z_mask = torch.any(objPts_c[:, :, 2] < 0, dim=-1)  # (N, )
-        negate_switch = torch.ones((objPts.shape[0], ), dtype=objPts.dtype, device=objPts.device)
+        negate_switch = torch.ones((objPts.shape[0],), dtype=objPts.dtype, device=objPts.device)
         negate_switch[neg_z_mask] = negate_switch[neg_z_mask] * -1
         objPts_c = objPts_c * negate_switch.unsqueeze(1).unsqueeze(1)
         sc = sc * negate_switch
@@ -452,9 +473,10 @@ class EPnP():
         objpts_c = objpts_c - center_c
 
         # Calculate the rotation matrix
-        M = torch.bmm(objpts_c.transpose(dim0=-1, dim1=-2), objpts_w)
+        M = vmap(torch.bmm)(objpts_c[:, :, :, None], objpts_w[:, :, None, :])
+        M = M.sum(dim=1)  # along the point dimension
         U, S, V = vmap(torch.svd)(M)
-        R = torch.bmm(U, V)
+        R = torch.bmm(U, V.transpose(dim0=-1, dim1=-2))
 
         # if det(R) < 0, make it positive
         negate_mask = torch.linalg.det(R) < 0
@@ -466,7 +488,8 @@ class EPnP():
 
         return R, T
 
-    def reprojection_error(self, objPts_w, imgPts, camMat, Rt):
+    @staticmethod
+    def reprojection_error(objPts_w, imgPts, camMat, Rt):
         """
         Calculate the reprojection error.
         Args:
@@ -487,6 +510,6 @@ class EPnP():
         imgRep = imgRep[:, :, :2] / imgRep[:, :, 2:]
 
         error = torch.linalg.norm(imgRep - imgPts, dim=-1)
-        error = torch.sum(error, dim=-1)
+        error = torch.mean(error, dim=-1)
 
         return error
