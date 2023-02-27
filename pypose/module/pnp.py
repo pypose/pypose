@@ -47,6 +47,8 @@ class EPnP():
         r, t = self.get_rotation_translation(objPts, objPts_c)
         Rt = torch.cat((r, t.unsqueeze(-1)), dim=-1)
         error = self.reprojection_error(objPts, imgPts, intrinsics, Rt)
+
+        self.build_l(kernel_m)
         return error
 
     def main_EPnP(self):
@@ -179,7 +181,8 @@ class EPnP():
 
         return alpha
 
-    def build_m(self, imgPts, alpha, intrinsics):
+    @staticmethod
+    def build_m(imgPts, alpha, intrinsics):
         """Given the image points, alphas and intrinsics, compute the m matrix, which is the matrix of the coefficients
         of the image points. Check equation 7 in paper for more details.
         Inputs are batched, with first dimension being the batch size.
@@ -239,8 +242,45 @@ class EPnP():
 
         return kernel_bases
 
-    def compute_L6_10_mat_mat(self, V_M):
-        L = np.zeros((6, 10))
+    @staticmethod
+    def build_l(kernel_bases):
+        """Given the kernel of m, compute the L matrix. Check [source](https://github.com/cvlab-epfl/EPnP/blob/5abc3cfa76e8e92e5a8f4be0370bbe7da246065e/cpp/epnp.cpp#L478) for more details.
+        Inputs are batched, with first dimension being the batch size.
+        Args:
+            kernel_bases (torch.Tensor): kernel of m, shape (batch_size, 12, 4)
+        Returns:
+            torch.Tensor: L, shape (batch_size, 6, 10)
+        """
+        batch_size = kernel_bases.shape[0]
+        kernel_bases = kernel_bases.transpose(1, 2)  # shape (batch_size, 4, 12)
+        # calculate the pairwise distance matrix within bases
+        diff = kernel_bases.reshape(batch_size, 4, 1, 4, 3) - kernel_bases.reshape(batch_size, 4, 4, 1, 3)
+        diff = diff.flatten(start_dim=2, end_dim=3)  # shape (batch_size, 4, 16, 3)
+        # six_indices are (0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3) before flatten
+        # not going to hard code this, leave it for interpreter optimization
+        six_indices = [(0 * 4 + 1), (0 * 4 + 2), (0 * 4 + 3), (1 * 4 + 2), (1 * 4 + 3), (2 * 4 + 3)]
+        dv = diff[:, :, six_indices, :]  # shape (batch_size, 4, 6, 3)
+
+        ten_indices_pair = torch.tensor([(0, 0),
+                                           (0, 1), (1, 1),
+                                           (0, 2), (1, 2), (2, 2),
+                                           (0, 3), (1, 3), (2, 3), (3, 3)]).T
+        # equal mask [ True, False,  True, False, False,  True, False, False, False,  True]
+        multiply_mask = torch.tensor([1., 2., 1., 2., 2., 1., 2., 2., 2., 1.])
+
+        # generate l
+        dot_products = torch.sum(dv[:, ten_indices_pair[0], :, :] * dv[:, ten_indices_pair[1], :, :], dim=-1)
+        dot_products = dot_products * multiply_mask[None, :, None]
+        return dot_products.transpose(1, 2)  # shape (batch_size, 6, 10)
+
+    def _compute_L6_10_mat_mat(self, V_M):
+        """
+        Deprecated, use build_l instead. For debugging purpose.
+        To verify the correctness of build_l:
+        torch.sum(self.compute_L6_10_mat_mat(kernel_m[0][:, [3,2,1,0]]) - self.build_l(kernel_m[:, :, [3,2,1,0]])[0])
+        """
+
+        L = torch.zeros((6, 10))
 
         # Rearrange the eigen vectors of (M^T)M
         v = []
@@ -263,7 +303,7 @@ class EPnP():
         for i in range(6):
             j = 0
             for a, b in index:
-                L[i, j] = np.matmul(dv[a][i], dv[b][i].T)
+                L[i, j] = torch.matmul(dv[a][i], dv[b][i].T)
                 if a != b:
                     L[i, j] *= 2
                 j += 1
@@ -334,7 +374,8 @@ class EPnP():
 
         return error, Rt, contPts_c, Xc, sc, beta
 
-    def compute_norm_sign_scaling_factor(self, Xc, contPts_w, alphas, objPts):
+    @staticmethod
+    def compute_norm_sign_scaling_factor(Xc, contPts_w, alphas, objPts):
         """Compute the scaling factor and the sign of the scaling factor
         Args:
             Xc (torch.tensor): the control points in the camera coordinates
