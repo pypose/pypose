@@ -4,7 +4,7 @@ from functools import partial
 from functorch import vmap
 
 
-class EPnP():
+class EfficientPnP(torch.nn.Module):
     """
         EPnP Solver - a non-iterative O(n) solution to the PnP problem.
         as described in:
@@ -15,19 +15,23 @@ class EPnP():
         source: https://github.com/cvlab-epfl/EPnP
 
     """
+    six_indices_pair = torch.tensor([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)], device='cpu').T
+    six_indices = [(0 * 4 + 1), (0 * 4 + 2), (0 * 4 + 3), (1 * 4 + 2), (1 * 4 + 3), (2 * 4 + 3)]
+    ten_indices_pair = torch.tensor([(0, 0),
+                                     (0, 1), (1, 1),
+                                     (0, 2), (1, 2), (2, 2),
+                                     (0, 3), (1, 3), (2, 3), (3, 3)], device='cpu').T
+    # equal mask [ True, False,  True, False, False,  True, False, False, False,  True]
+    multiply_mask = torch.tensor([1., 2., 1., 2., 2., 1., 2., 2., 2., 1.], device='cpu')
 
     def __init__(self, distCoeff=None):
-        '''
+        """
         Args:
-            objPts: Vectors fo the reference points in the world coordinate.
-            imgPts: Vectors of the projection of the reference points. 
-            camMat: Camera intrinsic matrix.
             distCoeff: Distortion matrix.
 
         Returns:
             Rt: Transform matrix include the rotation and the translation [R|t].
-        '''
-        # TODO: Ensure objPts / imgPts take in batched inputs
+        """
         self.disCoeff = distCoeff
 
     def forward(self, objPts, imgPts, intrinsics, naive_ctrl_pts=False):
@@ -48,13 +52,10 @@ class EPnP():
         Rt = torch.cat((r, t.unsqueeze(-1)), dim=-1)
         error = self.reprojection_error(objPts, imgPts, intrinsics, Rt)
 
-        self.build_l(kernel_m)
+        l = self.build_l(kernel_m[:, :, [3,2,1,0]])
         return error
 
     def main_EPnP(self):
-
-        fu, fv, u0, v0 = intrinsics[0, 0], intrinsics[1, 1], intrinsics[0, 2], intrinsics[
-            1, 2]  # Elements of the intrinsic matrix
 
         # Calculate the eigenvectors of (M^T)M
         M_T_M = np.matmul(M.transpose(), M)
@@ -257,21 +258,23 @@ class EPnP():
         diff = kernel_bases.reshape(batch_size, 4, 1, 4, 3) - kernel_bases.reshape(batch_size, 4, 4, 1, 3)
         diff = diff.flatten(start_dim=2, end_dim=3)  # shape (batch_size, 4, 16, 3)
         # six_indices are (0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3) before flatten
-        # not going to hard code this, leave it for interpreter optimization
-        six_indices = [(0 * 4 + 1), (0 * 4 + 2), (0 * 4 + 3), (1 * 4 + 2), (1 * 4 + 3), (2 * 4 + 3)]
-        dv = diff[:, :, six_indices, :]  # shape (batch_size, 4, 6, 3)
-
-        ten_indices_pair = torch.tensor([(0, 0),
-                                           (0, 1), (1, 1),
-                                           (0, 2), (1, 2), (2, 2),
-                                           (0, 3), (1, 3), (2, 3), (3, 3)]).T
-        # equal mask [ True, False,  True, False, False,  True, False, False, False,  True]
-        multiply_mask = torch.tensor([1., 2., 1., 2., 2., 1., 2., 2., 2., 1.])
+        dv = diff[:, :, EfficientPnP.six_indices, :]  # shape (batch_size, 4, 6, 3)
 
         # generate l
-        dot_products = torch.sum(dv[:, ten_indices_pair[0], :, :] * dv[:, ten_indices_pair[1], :, :], dim=-1)
-        dot_products = dot_products * multiply_mask[None, :, None]
+        dot_products = torch.sum(dv[:, EfficientPnP.ten_indices_pair[0], :, :] * dv[:, EfficientPnP.ten_indices_pair[1], :, :], dim=-1)
+        dot_products = dot_products * EfficientPnP.multiply_mask[None, :, None]
         return dot_products.transpose(1, 2)  # shape (batch_size, 6, 10)
+
+    def build_rho(self, contPts_w):
+        """Given the coordinates of control points, compute the rho vector. Check [source](https://github.com/cvlab-epfl/EPnP/blob/5abc3cfa76e8e92e5a8f4be0370bbe7da246065e/cpp/epnp.cpp#L520) for more details.
+        Inputs are batched, with first dimension being the batch size.
+        Args:
+            contPts_w (torch.Tensor): coordinates of control points, shape (batch_size, 4, 3)
+        Returns:
+            torch.Tensor: rho, shape (batch_size, 6, 1)
+        """
+        dist = contPts_w[:, EfficientPnP.six_indices_pair[0], :] - contPts_w[:, EfficientPnP.six_indices_pair[1], :]
+        return torch.linalg.norm(dist, dim=-1)  # l2 norm
 
     def _compute_L6_10_mat_mat(self, V_M):
         """
@@ -310,8 +313,13 @@ class EPnP():
 
         return L
 
-    def calculate_betas(self):
-        pass
+    def calculate_betas(self, kernel, dim):
+        if dim == 1:
+            beta = torch.zeros(4)
+            beta[0] = 1
+        elif dim == 2:
+            # use 1st and 2nd eigen vector to calculate beta
+            beta = torch.zeros(4)
 
     def diffDim_calculation(self, N, v_mat, L6_10_mat):
         # Calculate rho - the right hand side of the equation (consist of ||c_i^w - c_j^w||^2: c is the control point in the world coordinate)
