@@ -51,10 +51,10 @@ class TestEPnP:
             ret, rvec, T = cv2.solvePnP(objPts, imgPts, camMat, distortion, flags=cv2.SOLVEPNP_EPNP)
             R, _ = cv2.Rodrigues(rvec)
             Rt = np.concatenate((R.reshape((3, 3)), T.reshape((3, 1))), axis=1)
-            error_cv = pp.module.EPnP.reprojection_error(torch.from_numpy(objPts[None]),
-                                                         torch.from_numpy(imgPts[None]),
-                                                         torch.from_numpy(camMat[None]),
-                                                         torch.from_numpy(Rt[None]))
+            error_cv = pp.module.EfficientPnP.reprojection_error(torch.from_numpy(objPts[None]),
+                                                                 torch.from_numpy(imgPts[None]),
+                                                                 torch.from_numpy(camMat[None]),
+                                                                 torch.from_numpy(Rt[None]))
             return error_cv
             pass
         # load epfl's mat file
@@ -67,7 +67,7 @@ class TestEPnP:
         data = load_data(tmp_path)
 
         # instantiate epnp
-        epnp = pp.module.EPnP()
+        epnp = pp.module.EfficientPnP()
         error = epnp.forward(data['objPts'], data['imgPts'], data['camMat'])
         error_EPnP_OpenCV = error_EPnP_OpenCV(data['objPts'][0].numpy(),
                                               data['imgPts'][0].numpy(),
