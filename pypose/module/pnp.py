@@ -32,9 +32,10 @@ class EfficientPnP(torch.nn.Module):
         Returns:
             Rt: Transform matrix include the rotation and the translation [R|t].
         """
+        super().__init__()
         self.disCoeff = distCoeff
 
-    def forward(self, objPts, imgPts, intrinsics, naive_ctrl_pts=False):
+    def forward(self, objPts, imgPts, intrinsics, naive_ctrl_pts=True):
         # Select four control points and calculate alpha (in the world coordinate)
         if naive_ctrl_pts:
             contPts_w = self.naive_control_points(objPts)
@@ -45,14 +46,19 @@ class EfficientPnP(torch.nn.Module):
         # Using camera projection equation for all the points pairs to get the matrix M
         m = self.build_m(imgPts, alpha, intrinsics)
 
-        kernel_m = self.calculate_kernel(m)
+        kernel_m = self.calculate_kernel(m)[:, :, [3,2,1,0]]  # to be consistent with the matlab code
         # dim(kernel_space) = 1
-        contPts_c, objPts_c, sc = self.compute_norm_sign_scaling_factor(kernel_m[:, :, 0], contPts_w, alpha, objPts)
+        contPts_c, objPts_c, sc = self.compute_norm_sign_scaling_factor(kernel_m[:, :, -1], contPts_w, alpha, objPts)
         r, t = self.get_rotation_translation(objPts, objPts_c)
+
         Rt = torch.cat((r, t.unsqueeze(-1)), dim=-1)
         error = self.reprojection_error(objPts, imgPts, intrinsics, Rt)
 
-        l = self.build_l(kernel_m[:, :, [3,2,1,0]])
+        l = self.build_l(kernel_m)
+        rho = self.build_rho(contPts_w)
+        beta2 = self.calculate_betas(kernel_m, 2, l, rho)
+        beta3 = self.calculate_betas(kernel_m, 3, l, rho)
+        beta4 = self.calculate_betas(kernel_m, 4, l, rho)
         return error
 
     def main_EPnP(self):
@@ -274,7 +280,7 @@ class EfficientPnP(torch.nn.Module):
             torch.Tensor: rho, shape (batch_size, 6, 1)
         """
         dist = contPts_w[:, EfficientPnP.six_indices_pair[0], :] - contPts_w[:, EfficientPnP.six_indices_pair[1], :]
-        return torch.linalg.norm(dist, dim=-1)  # l2 norm
+        return torch.sum(dist ** 2, dim=-1)  # l2 norm
 
     def _compute_L6_10_mat_mat(self, V_M):
         """
@@ -313,15 +319,41 @@ class EfficientPnP(torch.nn.Module):
 
         return L
 
-    def calculate_betas(self, kernel, dim):
+    def calculate_betas(self, kernel, dim, l, rho):
+
+        betas = torch.zeros(l.shape[0], 4)
         if dim == 1:
-            beta = torch.zeros(4)
-            beta[0] = 1
+            betas[:, -1] = 1
         elif dim == 2:
-            # use 1st and 2nd eigen vector to calculate beta
-            beta = torch.zeros(4)
+            l = l[:, :, (5, 8, 9)]  # matched with matlab code
+            betas_ = torch.bmm(torch.linalg.pinv(l), rho.unsqueeze(-1)).squeeze(-1)  # shape: (b, 3)
+            beta1 = torch.sqrt(torch.abs(betas_[:, 0]))
+            beta2 = torch.sqrt(torch.abs(betas_[:, 2])) * torch.sign(betas_[:, 1]) * torch.sign(betas_[:, 0])
+
+            betas = torch.stack([torch.zeros_like(beta1), torch.zeros_like(beta1), beta1, beta2], dim=-1)
+        elif dim == 3:
+            l = l[:, :, (2, 4, 7, 5, 8, 9)]  # matched with matlab code
+            betas_ = torch.linalg.solve(l, rho.unsqueeze(-1)).squeeze(-1)  # shape: (b, 6)
+            beta1 = torch.sqrt(torch.abs(betas_[:, 0]))
+            beta2 = torch.sqrt(torch.abs(betas_[:, 3])) * torch.sign(betas_[:, 1]) * torch.sign(betas_[:, 0])
+            beta3 = torch.sqrt(torch.abs(betas_[:, 5])) * torch.sign(betas_[:, 2]) * torch.sign(betas_[:, 0])
+
+            betas = torch.stack([torch.zeros_like(beta1), beta1, beta2, beta3], dim=-1)
+        elif dim == 4:
+            betas_ = torch.bmm(torch.linalg.pinv(l), rho.unsqueeze(-1)).squeeze(-1)  # shape: (b, 10)
+            beta4 = torch.sqrt(abs(betas_[:, 0]))
+            beta3 = torch.sqrt(abs(betas_[:, 2])) * torch.sign(betas_[:, 1]) * torch.sign(betas_[:, 0])
+            beta2 = torch.sqrt(abs(betas_[:, 5])) * torch.sign(betas_[:, 3]) * torch.sign(betas_[:, 0])
+            beta1 = torch.sqrt(abs(betas_[:, 9])) * torch.sign(betas_[:, 6]) * torch.sign(betas_[:, 0])
+
+            betas = torch.stack([beta1, beta2, beta3, beta4], dim=-1)
+
+        return betas
 
     def diffDim_calculation(self, N, v_mat, L6_10_mat):
+        """
+        Deprecated
+        """
         # Calculate rho - the right hand side of the equation (consist of ||c_i^w - c_j^w||^2: c is the control point in the world coordinate)
         rho = []
         for i in range(3):
