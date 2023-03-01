@@ -232,6 +232,9 @@ class TestCPnP:
         print("Official CPnP solution, rmse of R:", rmse_rot(solution['R'], gt_rot))
         print("Official CPnP solution, rmse of t:", rmse_t(solution['t'], gt_t))
 
+        print("Official CPnP solution w/ GN, rmse of R:", rmse_rot(solution['R_GN'], gt_rot))
+        print("Official CPnP solution w/ GN, rmse of t:", rmse_t(solution['t_GN'].squeeze(-1), gt_t))
+
 
 
 if __name__ == "__main__":
