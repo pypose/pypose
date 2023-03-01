@@ -31,8 +31,6 @@ def load_data(path):
     return res
 
 
-
-
 class TestEPnP:
     def test_epnp_5pts(self):
         # TODO: Implement this
@@ -43,20 +41,17 @@ class TestEPnP:
         return
 
     def test_epnp_random(self):
-        """
-        """
-
-        def error_EPnP_OpenCV(objPts, imgPts, camMat):
+        def solution_opencv(obj_pts, img_pts, intrinsics):
             distortion = None
-            ret, rvec, T = cv2.solvePnP(objPts, imgPts, camMat, distortion, flags=cv2.SOLVEPNP_EPNP)
-            R, _ = cv2.Rodrigues(rvec)
-            Rt = np.concatenate((R.reshape((3, 3)), T.reshape((3, 1))), axis=1)
-            error_cv = pp.module.EfficientPnP.reprojection_error(torch.from_numpy(objPts[None]),
-                                                                 torch.from_numpy(imgPts[None]),
-                                                                 torch.from_numpy(camMat[None]),
-                                                                 torch.from_numpy(Rt[None]))
-            return error_cv
-            pass
+            ret, rvec, t = cv2.solvePnP(obj_pts, img_pts, intrinsics, distortion, flags=cv2.SOLVEPNP_EPNP)
+            rot, _ = cv2.Rodrigues(rvec)
+            Rt = np.concatenate((rot.reshape((3, 3)), t.reshape((3, 1))), axis=1)
+            error = pp.module.EfficientPnP.reprojection_error(torch.from_numpy(obj_pts[None]),
+                                                              torch.from_numpy(img_pts[None]),
+                                                              torch.from_numpy(intrinsics[None]),
+                                                              torch.from_numpy(Rt[None]))
+            return dict(Rt=Rt, error=error, R=rot, T=t)
+
         # load epfl's mat file
         test_mat_url = 'https://github.com/cvlab-epfl/EPnP/raw/master/matlab/data/input_data_noise.mat'
         tmp_path = '/tmp/pypose_test/input_data_noise.mat'
@@ -68,11 +63,10 @@ class TestEPnP:
 
         # instantiate epnp
         epnp = pp.module.EfficientPnP()
-        error = epnp.forward(data['objPts'], data['imgPts'], data['camMat'])
-        error_EPnP_OpenCV = error_EPnP_OpenCV(data['objPts'][0].numpy(),
-                                              data['imgPts'][0].numpy(),
-                                              data['camMat'][0].numpy())
-        return
+        solution = epnp.forward(data['objPts'], data['imgPts'], data['camMat'])
+        solution_ref = solution_opencv(data['objPts'][0].numpy(),
+                                       data['imgPts'][0].numpy(),
+                                       data['camMat'][0].numpy())
 
 
 if __name__ == "__main__":
