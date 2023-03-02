@@ -33,9 +33,9 @@ def test_dynamics_cartpole():
     c2_ref = torch.zeros((4,), device=device)
 
     # The class
-    class CartPole(pp.module.NTI):
+    class CartPole(pp.module.NLS):
         def __init__(self):
-            super(CartPole, self).__init__()
+            super().__init__()
             self._tau = 0.01
             self._length = 1.5
             self._cartmass = 20.0
@@ -44,7 +44,7 @@ def test_dynamics_cartpole():
             self._polemassLength = self._polemass * self._length
             self._totalMass = self._cartmass + self._polemass
 
-        def state_transition(self, state, input):
+        def state_transition(self, state, input, t=None):
             x, xDot, theta, thetaDot = state
             force = input.squeeze()
             costheta = torch.cos(theta)
@@ -62,7 +62,7 @@ def test_dynamics_cartpole():
 
             return state + torch.mul(_dstate, self._tau)
 
-        def observation(self, state, input):
+        def observation(self, state, input, t=None):
             return state
 
     # Time and input
@@ -135,7 +135,7 @@ def test_dynamics_floquet():
     c1 = torch.zeros(2, device=device)
 
     # The class
-    class Floquet(pp.module.NTV):
+    class Floquet(pp.module.NLS):
         def __init__(self):
             super(Floquet, self).__init__()
 

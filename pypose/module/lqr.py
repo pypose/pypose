@@ -15,9 +15,10 @@ class LQR(nn.Module):
         \begin{align*}
             \mathbf{\tau}_{1:T}^* = \mathop{\arg\min}\limits_{\tau_{1:T}} \sum\limits_t\frac{1}{2}
             \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t \\
-            \mathrm{s.t.} \quad \mathbf{x}_1 = \mathbf{x}_{init}, 
-            \ \mathbf{x}_{t+1} = \mathbf{F}_t\mathbf{\tau}_t + \mathbf{f}_t \\
+            \mathrm{s.t.} \quad \mathbf{x}_1 = \mathbf{x}_{init}, \\
+            \mathbf{x}_{t+1} = \mathbf{F}_t\mathbf{\tau}_t + \mathbf{f}_t \\
         \end{align*}
+
     where :math:`\mathbf{\tau}` = :math:`\begin{bmatrix} \mathbf{x} \\ \mathbf{u} \end{bmatrix}`, 
     :math:`\mathbf{F}` = :math:`\begin{bmatrix} \mathbf{A} & \mathbf{B} \end{bmatrix}`, 
     :math:`\mathbf{f}` = :math:`\mathbf{c}_1`. 
@@ -76,7 +77,6 @@ class LQR(nn.Module):
                       [ 0.0435,  0.5782,  1.0127],
                       [-0.3017, -0.2897,  0.7251],
                       [-0.0728,  0.7290, -0.3117]]])
-
     '''
     def __init__(self, system, Q, p, T, n_batch=1):
         super().__init__()
@@ -127,7 +127,7 @@ class LQR(nn.Module):
                     + \mathbf{K}_t^\top\mathbf{q}_{\mathbf{u}_t} 
                     + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{k}_t \\
             \end{align*}
-        
+
         Args:
             Q (:obj:`Tensor`): The weight matrix of the quadratic term.
             p (:obj:`Tensor`): The weight vector of the first-order term.
@@ -175,6 +175,7 @@ class LQR(nn.Module):
                 \mathbf{u}_t &= \mathbf{K}_t\mathbf{x}_t + \mathbf{k}_t \\
                 \mathbf{x}_{t+1} &= f \left( \mathbf{x}_t, \mathbf{u}_t \right) \\
             \end{align*}
+
         where :math:`f \left( \mathbf{x}_t, \mathbf{u}_t \right)` represents the discrete-time 
         system dynamics.
 

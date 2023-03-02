@@ -10,8 +10,7 @@ Modules
    module.System
    module.LTI
    module.LTV
-   module.NTI
-   module.NTV
+   module.NLS
    module.EKF
    module.UKF
    module.LQR

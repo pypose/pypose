@@ -10,6 +10,31 @@ class System(nn.Module):
     '''
     def __init__(self):
         super().__init__()
+        self.register_buffer('_t',torch.tensor(0, dtype=torch.int64))
+        self.register_forward_hook(self.forward_hook)
+
+    def forward_hook(self, module, inputs, outputs):
+        r'''
+        Automatically advances the time step.
+        '''
+        self._t.add_(1)
+
+    def reset(self, t=0):
+        self._t.fill_(t)
+        return self
+
+    @property
+    def systime(self):
+        r'''
+            System time, automatically advanced by :obj:`forward_hook`.
+        '''
+        return self._t
+
+    @systime.setter
+    def systime(self, t):
+        if not isinstance(t, torch.Tensor):
+            t = torch.tensor(t)
+        self._t.copy_(t)
 
     def forward(self, state, input):
         r'''
@@ -337,31 +362,6 @@ class LTV(LTI):
     '''
     def __init__(self, A=None, B=None, C=None, D=None, c1=None, c2=None):
         super().__init__(A, B, C, D, c1, c2)
-        self.register_buffer('_t',torch.tensor(0, dtype=torch.int64))
-        self.register_forward_hook(self.forward_hook)
-
-    def forward_hook(self, module, inputs, outputs):
-        r'''
-        Automatically advances the time step.
-        '''
-        self._t.add_(1)
-
-    def reset(self, t=0):
-        self._t.fill_(t)
-        return self
-
-    @property
-    def systime(self):
-        r'''
-            System time, automatically advanced by :obj:`forward_hook`.
-        '''
-        return self._t
-
-    @systime.setter
-    def systime(self, t):
-        if not isinstance(t, torch.Tensor):
-            t = torch.tensor(t)
-        self._t.copy_(t)
 
     def set_refpoint(self, state=None, input=None, t=None):
         r'''
@@ -386,207 +386,9 @@ class LTV(LTI):
         return self
 
 
-class NTI(System):
+class NLS(System):
     r'''
-    The non-linear discrete-time invariant (NTI) system dynamics model.
-    
-    The state transision function :math:`\mathbf{f}` and observation function
-    :math:`\mathbf{g}` are given by:
-
-    .. math::
-        \begin{aligned}
-            \mathbf{x}_{k+1} &= \mathbf{f}(\mathbf{x}_k, \mathbf{u}_k), \\
-            \mathbf{y}_{k}   &= \mathbf{g}(\mathbf{x}_k, \mathbf{u}_k), 
-        \end{aligned}
-
-    where :math:`k`, :math:`\mathbf{x}`, :math:`\mathbf{u}`, :math:`\mathbf{y}` are the time
-    step, state(s), input(s), and observation(s), respectively.
-
-    Note:
-        To use the class, users need to inherit this class and define methods
-        :obj:`state_transition` and :obj:`observation`, which are automatically called by
-        internal :obj:`forward` method.
-        The system timestamp (starting from **0**) is also self-added automatically once
-        the :obj:`forward` method is called.
-
-    Note:
-
-        This class provides automatic **linearlization** at a reference point
-        :math:`\chi^*=(\mathbf{x}^*, \mathbf{u}^*)` along a trajectory.
-        One can directly call those linearized system matrices as properties including
-        :obj:`A`, :obj:`B`, :obj:`C`, :obj:`D`, :obj:`c1`, and :obj:`c2`, after calling
-        a method :obj:`set_refpoint`.
-
-        Consider a point
-        :math:`\chi=(\mathbf{x}^*+\delta\mathbf{x}, \mathbf{u}^*+\delta\mathbf{u})` near
-        :math:`\chi^*`. We have
-
-        .. math::
-            \begin{aligned}
-            \mathbf{f}(\mathbf{x}, \mathbf{u}) &\approx \mathbf{f}(\mathbf{x}^*, 
-                \mathbf{u}^*) +  \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}}
-                \right|_{\chi^*} \delta \mathbf{x} + \left. \frac{\partial \mathbf{f}} 
-                {\partial \mathbf{u}} \right|_{\chi^*} \delta \mathbf{u} \\
-            &= \mathbf{f}(\mathbf{x}^*, \mathbf{u}^*) + \mathbf{A}(\mathbf{x} 
-                - \mathbf{x}^*) + \mathbf{B}(\mathbf{u}-\mathbf{u}^*) \\
-            &= \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1
-            \end{aligned}
-
-        and
-
-        .. math::
-            \mathbf{g}(\mathbf{x}, \mathbf{u}) \approx \mathbf{C}\mathbf{x} \
-                        + \mathbf{D}\mathbf{u} + \mathbf{c}_2
-
-        The notion of linearization is slightly different from that in dynamical system
-        theory. First, the linearization can be done for arbitrary point(s), not limit to
-        the equilibrium point(s), and therefore the extra constant terms :math:`\mathbf{c}_1`
-        and :math:`\mathbf{c}_2` are produced. Second, the linearized equations are represented
-        by the full states and inputs: :math:`\mathbf{x}` and :math:`\mathbf{u}`, rather than 
-        the perturbation format: :math:`\delta \mathbf{x}` and :math:`\delta \mathbf{u}`
-        so that the model is consistent with, e.g., the LTI model and the iterative LQR
-        solver. More details go to :meth:`LTI`.
-
-    Example:
-
-        A simple nonlinear time-invarant system.
-
-        >>> import torch, pypose as pp
-        ... 
-        >>> class MyNTI(pp.module.NTI):
-        ...     def __init__(self):
-        ...         super().__init__()
-        ... 
-        ...     def state_transition(self, state, input):
-        ...         return state.cos() + input.sin()
-        ... 
-        ...     def observation(self, state, input):
-        ...         return state
-        ... 
-        >>> lti = MyNTI()
-        >>> current, input = torch.randn(3), torch.randn(3)
-        >>> next, observation = lti(current, input)
-
-    Note:
-        For generating one trajecotry given a series of inputs, advanced use of
-        linearization, and more practical examples can be found at `examples/module/dynamics
-        <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
-    '''
-    def __init__(self):
-        super().__init__()
-        self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
-
-    def forward(self, state, input):
-        r'''
-        Defines the computation performed at every call that advances the system by one time step.
-
-        Note:
-            To introduce noise in a model, redefine this method via
-            subclassing. See example in ``examples/module/ekf/tank_robot.py``.
-        '''
-        self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
-        state = self.state_transition(self.state, self.input)
-        obs = self.observation(self.state, self.input)
-        return state, obs
-
-    def set_refpoint(self, state=None, input=None, t=None):
-        r'''
-        Function to set the reference point for linearization.
-
-        Args: 
-            state (:obj:`Tensor`): The reference state of the dynamical system. If ``None``,
-                the the most recent state is taken. Default: ``None``.
-            input (:obj:`Tensor`): The reference input to the dynamical system. If ``None``,
-                the the most recent input is taken. Default: ``None``.
-            t (:obj:`Tensor`): The reference time step of the dynamical system. If ``None``,
-                the the most recent timestamp is taken. Default: ``None``.
-
-        Returns:
-            The ``self`` module.
-
-        Warning:
-            For nonlinear systems, the users have to call this function before getting the
-            linearized system.
-        '''
-        self._ref_state = self.state if state is None else torch.atleast_1d(state)
-        self._ref_input = self.input if input is None else torch.atleast_1d(input)
-        self._ref_f = self.state_transition(self._ref_state, self._ref_input)
-        self._ref_g = self.observation(self._ref_state, self._ref_input)
-        return self
-
-    @property
-    def A(self):
-        r'''
-        Linear/linearized system state matrix.
-
-        .. math::
-            \mathbf{A} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}} \right|_{\chi^*}
-        '''
-        func = lambda x: self.state_transition(x, self._ref_input)
-        return jacobian(func, self._ref_state, **self.jacargs)
-
-    @property
-    def B(self):
-        r'''
-        Linear/linearized system input matrix.
-
-        .. math::
-            \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
-        '''
-        func = lambda x: self.state_transition(self._ref_state, x)
-        return jacobian(func, self._ref_input, **self.jacargs)
-
-    @property
-    def C(self):
-        r'''
-        Linear/linearized system output matrix.
-
-        .. math::
-            \mathbf{C} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{x}} \right|_{\chi^*}
-        '''
-        func = lambda x: self.observation(x, self._ref_input)
-        return jacobian(func, self._ref_state, **self.jacargs)
- 
-    @property
-    def D(self):
-        r'''
-        Linear/Linearized system observation matrix.
-
-        .. math::
-            \mathbf{D} = \left. \frac{\partial \mathbf{g}}
-                                {\partial \mathbf{u}} \right|_{\chi^*}
-        '''
-        func = lambda x: self.observation(self._ref_state, x)
-        return jacobian(func, self._ref_input, **self.jacargs)
-
-    @property
-    def c1(self):
-        r'''
-        Constant term generated by state-transition.
-
-        .. math::
-            \mathbf{c}_1 = \mathbf{f}(\mathbf{x}^*, \mathbf{u}^*, t^*)
-                           - \mathbf{A}\mathbf{x}^* - \mathbf{B}\mathbf{u}^*
-        '''
-        # Potential performance loss here - self.A and self.B involves jacobian eval
-        return self._ref_f - pp.bmv(self.A, self._ref_state) - pp.bmv(self.B, self._ref_input)
-
-    @property
-    def c2(self):
-        r'''
-        Constant term generated by observation.
-
-        .. math::
-            \mathbf{c}_2 = \mathbf{g}(\mathbf{x}^*, \mathbf{u}^*, t^*)
-                           - \mathbf{C}\mathbf{x}^* - \mathbf{D}\mathbf{u}^*
-        '''
-        # Potential performance loss here - self.C and self.D involves jacobian eval
-        return self._ref_g - pp.bmv(self.C, self._ref_state) - pp.bmv(self.D, self._ref_input)
-
-
-class NTV(NTI):
-    r'''
-    The non-linear discrete-time variant (NTV) system dynamics model.
+    The non-linear system (NLS) dynamics model.
     
     The state transision function :math:`\mathbf{f}` and observation function
     :math:`\mathbf{g}` are given by:
@@ -647,14 +449,14 @@ class NTV(NTI):
 
     Example:
 
-        A simple linear time-varying system, but defined via NTV. Here we show an example
+        A simple linear time-varying system, but defined via NLS. Here we show an example
         for advancing one time step of the system at a given time step and computing the
         linearization.
 
         >>> import math, torch
         >>> import pypose as pp
         ... 
-        >>> class Floquet(pp.module.NTV):
+        >>> class Floquet(pp.module.NLS):
         ...     def __init__(self):
         ...         super().__init__()
         ... 
@@ -699,18 +501,7 @@ class NTV(NTI):
     '''
     def __init__(self):
         super().__init__()
-        self.register_buffer('_t',torch.zeros(1))
-        self.register_forward_hook(self.forward_hook)
-
-    def forward_hook(self, module, inputs, outputs):
-        r'''
-        Automatically advances the time step.
-        '''
-        self._t.add_(1)
-
-    def reset(self, t=0):
-        self._t.fill_(t)
-        return self
+        self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
 
     def forward(self, state, input):
         r'''
@@ -758,13 +549,6 @@ class NTV(NTI):
         return self
 
     @property
-    def systime(self):
-        r'''
-            System time, automatically advanced by :obj:`forward_hook`.
-        '''
-        return self._t
-
-    @property
     def A(self):
         r'''
         Linear/linearized system state matrix.
@@ -808,3 +592,27 @@ class NTV(NTI):
         '''
         func = lambda x: self.observation(self._ref_state, x, self._ref_t)
         return jacobian(func, self._ref_input, **self.jacargs)
+
+    @property
+    def c1(self):
+        r'''
+        Constant term generated by state-transition.
+
+        .. math::
+            \mathbf{c}_1 = \mathbf{f}(\mathbf{x}^*, \mathbf{u}^*, t^*)
+                           - \mathbf{A}\mathbf{x}^* - \mathbf{B}\mathbf{u}^*
+        '''
+        # Potential performance loss here - self.A and self.B involves jacobian eval
+        return self._ref_f - pp.bmv(self.A, self._ref_state) - pp.bmv(self.B, self._ref_input)
+
+    @property
+    def c2(self):
+        r'''
+        Constant term generated by observation.
+
+        .. math::
+            \mathbf{c}_2 = \mathbf{g}(\mathbf{x}^*, \mathbf{u}^*, t^*)
+                           - \mathbf{C}\mathbf{x}^* - \mathbf{D}\mathbf{u}^*
+        '''
+        # Potential performance loss here - self.C and self.D involves jacobian eval
+        return self._ref_g - pp.bmv(self.C, self._ref_state) - pp.bmv(self.D, self._ref_input)
