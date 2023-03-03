@@ -54,7 +54,7 @@ In subsequent development, if the master branch of the local repository is behin
 git pull upstream master
 ```
 
-#### 3. Commit the code and pass the unit test
+### 3. Commit the code and pass the unit test
 - The committed code should pass through the unit test
 
   ```shell
@@ -69,7 +69,7 @@ git pull upstream master
 
 - If the documents are modified/added, we should check the rendering result referring to [guidance](#Contributing to Documentation)
 
-#### 4. Push the code to remote
+### 4. Push the code to remote
 
 We could push the local commits to remote after passing through the check of unit test. You can associate the local branch with your remote branch by adding `-u` option.
 
@@ -79,7 +79,7 @@ git push -u origin {branch_name}
 
 This will allow you to use the `git push` command to push code directly next time, without having to specify a branch or the remote repository.
 
-#### 5. Create a Pull Request
+### 5. Create a Pull Request
 
 (1) Create a pull request in GitHub's Pull request interface
 
@@ -97,7 +97,7 @@ CI will run unit test for the posted Pull Request on different platforms (Linux,
 
 (3) If the Pull Request passes the CI, then you can wait for the review from other developers. You'll modify the code based on the reviewer's comments, and repeat the steps [3](#4-commit-the-code-and-pass-the-unit-test)-[4](#5-push-the-code-to-remote) until all reviewers approve it. Then, we will merge it ASAP.
 
-#### 7. Resolve conflicts
+### 6. Resolve conflicts
 
 If your local branch conflicts with the latest master branch of "upstream", you'll need to resolove them. There are two ways to do this:
 
