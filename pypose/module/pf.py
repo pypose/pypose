@@ -1,10 +1,12 @@
 import torch
 from pypose.module import EKF
+import torch.nn.functional as F
+from torch.distributions import MultivariateNormal
 
 
 class PF(EKF):
     r'''
-    Performs Batched Particle_Filters (PF).
+    Performs Batched Particle Filter (PF).
 
     Args:
         model (:obj:`System`): The system model to be estimated, a subclass of
@@ -13,7 +15,7 @@ class PF(EKF):
             Ignored if provided during each iteration. Default: ``None``
         R (:obj:`Tensor`, optional): The covariance matrices of system observation noise.
             Ignored if provided during each iteration. Default: ``None``
-        particle_number (:obj:`Int`, optional): The number of particle. Default: ``1000``
+        particles (:obj:`Int`, optional): The number of particle. Default: ``1000``
 
     A non-linear system can be described as
 
@@ -25,8 +27,8 @@ class PF(EKF):
             \quad \mathbf{v}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
         \end{aligned}
 
-    PF can be described as the following equations, where the subscript :math:`\cdot_{k}`
-    is omited for simplicity.
+    Particle filter can be described as the following equations, where the subscript
+    :math:`\cdot_{k}` is omited for simplicity.
 
     1. Generate Particles.
 
@@ -36,16 +38,16 @@ class PF(EKF):
                 \mathbf{P} _{k} = \mathbf{P} \quad k=1,...,N
             \end{aligned}
 
-    where :math:`N` is the number of Particles and :math:`\mathbf{p}` is the probability
-    density function, n is the dimension of state.
+       where :math:`N` is the number of Particles and :math:`\mathbf{p}` is the probability
+       density function (PDF), :math:`n` is the dimension of state.
 
     2. Priori State Estimation.
 
         .. math::
             \mathbf{x}^{-}_{k} = f(\mathbf{x}_{k}, \mathbf{u}_{k}, t)
 
-    where :math:`\mathbf{u}_{k}` is noise vector is randomly generated on the basis of the known
-    pdf of :math:`\mathbf{u}`.
+       where :math:`\mathbf{u}_{k}` is noise vector is randomly generated on the basis of the
+       known PDF of :math:`\mathbf{u}`.
 
     3. Relative Likelihood.
 
@@ -57,22 +59,22 @@ class PF(EKF):
 
     4. Resample Particles.
 
-        .. math::
-            \begin{aligned}
-                &\rule{113mm}{0.4pt}                                                  \\ \\
-                &\textbf{input}:\mathbf{x^{+}}({\tiny State} ) ,N( {\tiny number
-                \quad of\quad particle} ),\mathbf{q}({\tiny relative\quad likelihood} )   \\
-                &\rule{113mm}{0.4pt}\\
-                &\mathbf{sample} = [N] \\
-                &\textbf{for} \: i=1 \: \textbf{to} \: \textbf{N}                         \\
-                &\hspace{5mm} \mathbf{r}  = \mathbf{rand} (0,1)                           \\
-                &\hspace{5mm} \textbf{for} \: j=1 \: \textbf{to} \: \textbf{N}            \\
-                &\hspace{10mm} if \sum_{k=1}^{j}\mathbf{q} _{k}\ge r:                     \\
-                &\hspace{15mm} \mathbf{sample}_{i} = \mathbf{x}^{+}_{j}
-                &\rule{113mm}{0.4pt}                                                 \\[-1.ex]
-                &\bf{return} \:  \mathbf{sample}                                     \\[-1.ex]
-                &\rule{113mm}{0.4pt}                                                 \\[-1.ex]
-            \end{aligned}
+       .. math::
+           \begin{aligned}
+               &\rule{113mm}{0.4pt}                                                      \\
+               &\textbf{input}:\mathbf{x^{+}} (\text{State}), N (\text{number
+               of particle}), \mathbf{q} (\text{relative likelihood})                    \\
+               &\rule{113mm}{0.4pt}\\
+               &\mathbf{sample} = [N] \\
+               &\textbf{for} \: i=1 \: \textbf{to} \: \textbf{N}                         \\
+               &\hspace{5mm} \mathbf{r}  = \mathbf{rand} (0,1)                           \\
+               &\hspace{5mm} \textbf{for} \: j=1 \: \textbf{to} \: \textbf{N}            \\
+               &\hspace{10mm} if \sum_{k=1}^{j}\mathbf{q} _{k}\ge r:                     \\
+               &\hspace{15mm} \mathbf{sample}_{i} = \mathbf{x}^{+}_{j}                   \\
+               &\rule{113mm}{0.4pt}                                               \\[-1.ex]
+               &\bf{return} \:  \mathbf{sample}                                   \\[-1.ex]
+               &\rule{113mm}{0.4pt}                                               \\[-1.ex]
+           \end{aligned}
 
     5. Refine Posteriori And Covariances.
 
@@ -130,13 +132,13 @@ class PF(EKF):
         Implementation is based on Section 15.2 of this book
 
         * Dan Simon, `Optimal State Estimation: Kalman, H∞, and Nonlinear Approaches
-          <https://onlinelibrary.wiley.com/doi/epdf/10.1002/0470045345.fmatter>`_,
+          <https://onlinelibrary.wiley.com/doi/book/10.1002/0470045345>`_,
           Cleveland State University, 2006
     '''
 
-    def __init__(self, model, Q=None, R=None, particle_number=None):
+    def __init__(self, model, Q=None, R=None, particles=1000):
         super().__init__(model, Q, R)
-        self.particle_number = 1000 if particle_number is None else particle_number
+        self.particles = particles
 
     def forward(self, x, y, u, P, Q=None, R=None, t=None, conv_weight=None):
         r'''
@@ -160,7 +162,7 @@ class PF(EKF):
         conv_weight = len(x) if conv_weight is None else conv_weight
         self.model.set_refpoint(state=x, input=u, t=t)
 
-        xp = self.generate_particle(x, conv_weight * P)
+        xp = self.generate_particles(x, conv_weight * P)
         xs = self.model.state_transition(xp, u, t)
         ye = self.model.observation(xs, u, t)
         q = self.relative_likelihood(y, ye, R)
@@ -168,32 +170,30 @@ class PF(EKF):
 
         x = xr.mean(dim=0)
         ex = xr - x
-        weight = torch.tensor([1 / self.particle_number])
+        weight = torch.tensor([1 / self.particles])
         P = self.compute_cov(ex, ex, weight, Q)
 
         return x, P
 
-    def generate_particle(self, x, P):
+    def generate_particles(self, x, P):
         r'''
         Randomly generate particles
         '''
-        xp = torch.distributions.MultivariateNormal(x, P).sample(
-            (self.particle_number,))
-        return xp
+        m = MultivariateNormal(x, P)
+        return m.sample(torch.Size([self.particles]))
 
     def relative_likelihood(self, y, ye, R):
         r'''
         Compute the relative likelihood
         '''
-        q = torch.distributions.MultivariateNormal(ye, R).log_prob(y).exp()
-        q = q / torch.sum(q)
-        return q
+        q = MultivariateNormal(ye, R).log_prob(y).exp()
+        return F.normalize(q, p=1, dim=-1)
 
     def resample_particles(self, q, x):
         r'''
         Resample the set of a posteriori particles
         '''
-        r = torch.rand(self.particle_number, device=x.device)
+        r = torch.rand(self.particles, dtype=x.dtype, device=x.device)
         cumsumq = torch.cumsum(q, dim=0)
         cumsumq[-1] = 1.0
         return x[torch.searchsorted(cumsumq, r)]

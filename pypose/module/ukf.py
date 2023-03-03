@@ -152,7 +152,7 @@ class UKF(EKF):
         Implementation is based on Section 14.3 of this book
 
         * Dan Simon, `Optimal State Estimation: Kalman, H∞, and Nonlinear Approaches
-          <https://onlinelibrary.wiley.com/doi/epdf/10.1002/0470045345.fmatter>`_,
+          <https://onlinelibrary.wiley.com/doi/book/10.1002/0470045345>`_,
           Cleveland State University, 2006
     '''
 
