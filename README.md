@@ -108,10 +108,11 @@ pytest
 2. This example shows how to estimate batched inverse of transform by a second-order optimizer. Two usage options for a `scheduler` are provided, each of which can work independently.
 
 ```python
+>>> from torch import nn
 >>> import torch, pypose as pp
->>> from pp.optim import LM
->>> from pp.optim.strategy import Constant
->>> from pp.optim.scheduler import StopOnPlateau
+>>> from pypose.optim import LM
+>>> from pypose.optim.strategy import Constant
+>>> from pypose.optim.scheduler import StopOnPlateau
 
 >>> class InvNet(nn.Module):
 
