@@ -59,10 +59,7 @@ git pull upstream master
 
   ```shell
   # Pass all unit tests
-  pytest tests
-
-  # Pass the unit test of runner
-  pytest tests/test_runner/test_runner.py
+  pytest
   ```
 
   If the unit test fails for lack of dependencies, you can install the dependencies referring to the [guidance](#unit-test)
