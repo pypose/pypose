@@ -72,7 +72,7 @@ class TestLQR:
         print(A.shape, B.shape, C.shape, D.shape, c1.shape, c2.shape)
 
         lti = pp.module.LTI(A, B, C, D, c1, c2)
-        LQR = pp.module.LQR(lti, Q, p, T, n_batch=n_batch).to(device)
+        LQR = pp.module.LQR(lti, Q, p, T).to(device)
         x, u, cost = LQR(x_init)
         
         assert torch.allclose(x_ref, x, atol=1e-5)
@@ -87,8 +87,9 @@ class TestLQR:
         n_batch, T = 2, 5
         n_state, n_ctrl = 4, 3
 
-        Q = torch.eye(n_state + n_ctrl, device=device)
-        p = torch.tensor([-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54], device=device)
+        Q = torch.tile(torch.eye(n_state + n_ctrl, device=device), (n_batch, 1, 1))
+        p = torch.tensor([[-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54], 
+                          [-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54]], device=device)
         A = torch.tile(torch.eye(n_state, device=device), (n_batch, T, 1, 1))
         B = torch.zeros(n_batch, T, n_state, n_ctrl, device=device)
         C = torch.tile(torch.eye(n_state, device=device), (n_batch, T, 1, 1))
@@ -121,7 +122,7 @@ class TestLQR:
                 return self._D[...,self._t,:,:]
 
         ltv = MyLTV(A, B, C, D)
-        lqr  = pp.module.LQR(ltv, Q, p, T, n_batch=n_batch)
+        lqr  = pp.module.LQR(ltv, Q, p, T)
         x, u, cost = lqr(x_init)
 
         print("Done")

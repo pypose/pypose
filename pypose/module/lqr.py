@@ -54,7 +54,7 @@ class LQR(nn.Module):
         >>> c2 = torch.tile(torch.zeros(n_state), (n_batch, 1))
         >>> x_init = torch.randn(n_batch, n_state)
         >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
-        >>> LQR = pp.module.LQR(lti, Q, p, T, n_batch=n_batch)
+        >>> LQR = pp.module.LQR(lti, Q, p, T)
         >>> x, u, cost = LQR(x_init)
         >>> print("u = ", u)
         x =  tensor([[[-0.2633, -0.3466,  2.3803, -0.0423],
@@ -78,19 +78,17 @@ class LQR(nn.Module):
                       [-0.3017, -0.2897,  0.7251],
                       [-0.0728,  0.7290, -0.3117]]])
     '''
-    def __init__(self, system, Q, p, T, n_batch=1):
+    def __init__(self, system, Q, p, T):
         super().__init__()
         self.system = system
         self.Q, self.p, self.T = Q, p, T
-        self.n_batch = n_batch
         
-        if self.Q.ndim == 2:
-            self.Q = torch.tile(self.Q, (self.n_batch, self.T, 1, 1))
+        if self.Q.ndim == 3:
+            self.Q = torch.tile(self.Q.unsqueeze(-3), (1, self.T, 1, 1))
 
-        if self.p.ndim == 1:
-            self.p = torch.tile(self.p, (self.n_batch, self.T, 1))
+        if self.p.ndim == 2:
+            self.p = torch.tile(self.p.unsqueeze(-2), (1, self.T, 1))
 
-        # Q: (B*, T, N, N), p: (B*, T, N), where B* can be any batch dimensions, e.g., (2, 3)
         assert self.Q.shape[:-1] == self.p.shape and self.Q.size(-1) == self.Q.size(-2), "Shape not compatible."
         assert self.Q.ndim == 4 or self.p.ndim == 3, "Shape not compatible."
         assert self.Q.device == self.p.device
@@ -136,9 +134,11 @@ class LQR(nn.Module):
             Tuple of Tensor: The state feedback controller :math:`\mathbf{K}` and 
             :math:`\mathbf{k}` gain of all steps.
         '''
+        # Q: (B*, T, N, N), p: (B*, T, N), where B* can be any batch dimensions, e.g., (2, 3)
+        B = self.p.shape[:-2]
         ns, nc = self.system.B.size(-2), self.system.B.size(-1)
-        K = torch.zeros((self.n_batch, self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
-        k = torch.zeros((self.n_batch, self.T, nc), dtype=self.p.dtype, device=self.p.device)
+        K = torch.zeros(B + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
+        k = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
 
         for t in range(self.T-1, -1, -1): 
             if t == self.T - 1:
@@ -200,10 +200,12 @@ class LQR(nn.Module):
 
         assert x_init.device == K.device == k.device
         assert x_init.dtype == K.dtype == k.dtype
+        assert x_init.ndim == 2, "Shape not compatible."
+        B = self.p.shape[:-2]
         ns, nc = self.system.B.size(-2), self.system.B.size(-1)
-        u = torch.zeros((self.n_batch, self.T, nc), dtype=self.p.dtype, device=self.p.device)
-        cost = torch.zeros((self.n_batch), dtype=self.p.dtype, device=self.p.device)
-        x = torch.zeros((self.n_batch, self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
+        u = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
+        cost = torch.zeros(B, dtype=self.p.dtype, device=self.p.device)
+        x = torch.zeros(B + (self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
         x[..., 0, :] = x_init
         xt = x_init
 
