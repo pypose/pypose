@@ -40,12 +40,12 @@ class TrainMPC:
         assert expert_seed != args.seed
         torch.manual_seed(expert_seed)
 
-        Q = torch.tile(torch.eye(n_sc), (n_batch, T, 1, 1))
-        p = torch.tile(torch.randn(n_sc), (n_batch, T, 1))
-        C = torch.eye(n_state)
-        D = torch.zeros(n_state, n_ctrl)
-        c1 = torch.zeros(n_state)
-        c2 = torch.zeros(n_state)
+        Q = torch.tile(torch.eye(n_sc, device=device), (n_batch, T, 1, 1))
+        p = torch.tile(torch.randn(n_sc, device=device), (n_batch, T, 1))
+        C = torch.eye(n_state, device=device)
+        D = torch.zeros(n_state, n_ctrl, device=device)
+        c1 = torch.zeros(n_state, device=device)
+        c2 = torch.zeros(n_state, device=device)
 
         expert = dict(
             Q = torch.tile(torch.eye(n_sc, device=device), (n_batch, T, 1, 1)),
@@ -61,7 +61,7 @@ class TrainMPC:
         x_init = torch.randn(n_batch, n_state, device=device)
         lti = pp.module.LTI(expert['A'], expert['B'], C, D, c1, c2)
         mpc_expert = pp.module.MPC(lti, T, lqr_iter=1)
-        x_true, u_true, cost_true = mpc_expert.forward(x_init, expert['Q'], expert['p'], n_batch=n_batch)
+        x_true, u_true, cost_true = mpc_expert.forward(x_init, expert['Q'], expert['p'])
 
         torch.manual_seed(args.seed)
         A = (torch.eye(n_state, device=device) + 0.2 * torch.randn(n_state, n_state, device=device))\
@@ -80,7 +80,7 @@ class TrainMPC:
         def get_loss(x_init, _A, _B):
             lti_ = pp.module.LTI(_A, _B, C, D, c1, c2)
             mpc_agent = pp.module.MPC(lti_, T, lqr_iter=1)
-            x_pred, u_pred, cost_pred = mpc_agent.forward(x_init, expert['Q'], expert['p'], n_batch=n_batch)
+            x_pred, u_pred, cost_pred = mpc_agent.forward(x_init, expert['Q'], expert['p'])
 
             traj_loss = torch.mean((u_true - u_pred)**2) \
                 + torch.mean((x_true - x_pred)**2)
