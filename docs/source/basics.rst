@@ -12,6 +12,7 @@ Basics
     add_
     mul
     bmv
+    bvmv
     pm
     Exp
     Log
