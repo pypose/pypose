@@ -18,7 +18,9 @@ class _Scheduler(object):
     @property
     def continual(self):
         raise RuntimeError('Calling scheduler.continual is deprecated, '\
-                           'please call scheduler.iscontinual() instead.')
+                           'please call scheduler.iscontinual() instead. '\
+                           'We may allow scheduler.continual() in a future release. '\
+                           'This error msg will be removed as well.')
 
     def iscontinual(self):
         return self._continual
