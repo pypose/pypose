@@ -13,16 +13,15 @@ class _Scheduler(object):
 
         self.optimizer, self.verbose = optimizer, verbose
         self.max_steps, self.steps = max_steps, 0
-        self.continual = True
+        self._continual = True
 
     @property
     def continual(self):
-        return self._continual
+        raise RuntimeError('Calling scheduler.continual is deprecated, '\
+                           'please call scheduler.iscontinual() instead.')
 
-    @continual.setter
-    def continual(self, value):
-        assert isinstance(value, bool)
-        self._continual = value
+    def iscontinual(self):
+        return self._continual
 
     def state_dict(self):
         """Returns the state of the scheduler as a :class:`dict`.
@@ -95,7 +94,7 @@ class StopOnPlateau(_Scheduler):
             >>> scheduler = pp.optim.scheduler.StopOnPlateau(optimizer, steps=10, \
             >>>                     patience=3, decreasing=1e-3, verbose=True)
             ...
-            >>> while scheduler.continual:
+            >>> while scheduler.iscontinual():
             ...     loss = optimizer.step(input)
             ...     scheduler.step(loss)
             StopOnPlateau on step 0 Loss 9.337769e+01 --> Loss 3.502787e-05 (reduction/loss: 1.0000e+00).
@@ -116,7 +115,7 @@ class StopOnPlateau(_Scheduler):
         self.steps = self.steps + 1
 
         if self.steps >= self.max_steps:
-            self.continual = False
+            self._continual = False
             if self.verbose:
                 print("StopOnPlateau: Maximum steps reached, Quiting..")
 
@@ -126,13 +125,13 @@ class StopOnPlateau(_Scheduler):
             self.patience_count = 0
 
         if self.patience_count >= self.patience:
-            self.continual = False
+            self._continual = False
             if self.verbose:
                 print("StopOnPlateau: Maximum patience steps reached, Quiting..")
 
         if hasattr(self.optimizer, 'reject_count'):
             if self.optimizer.reject_count > 0:
-                self.continual = False
+                self._continual = False
                 if self.verbose:
                     print("StopOnPlateau: Maximum rejected steps reached, Quiting..")
 
@@ -176,6 +175,6 @@ class StopOnPlateau(_Scheduler):
             StopOnPlateau on step 3 Loss 1.525355e-13 --> Loss 6.769275e-14 (reduction/loss: 5.5622e-01).
             StopOnPlateau: Maximum patience steps reached, Quiting..
         '''
-        while self.continual:
+        while self.iscontinual():
             loss = self.optimizer.step(input, target, weight)
             self.step(loss)

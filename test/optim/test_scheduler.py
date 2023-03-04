@@ -47,7 +47,7 @@ class Timer:
 
 
 class TestScheduler:
-  
+
     def test_optim_scheduler(self):
 
         class PoseInv(nn.Module):
@@ -67,7 +67,7 @@ class TestScheduler:
         scheduler = pp.optim.scheduler.StopOnPlateau(optimizer, steps=100, \
                             patience=5, decreasing=1, verbose=True)
 
-        while scheduler.continual:
+        while scheduler.iscontinual():
             loss = optimizer.step(inputs)
             scheduler.step(loss)
 
