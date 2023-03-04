@@ -67,9 +67,20 @@ class TestScheduler:
         scheduler = pp.optim.scheduler.StopOnPlateau(optimizer, steps=100, \
                             patience=5, decreasing=1, verbose=True)
 
-        while scheduler.iscontinual():
+        while scheduler.continual():
             loss = optimizer.step(inputs)
             scheduler.step(loss)
+
+        # the following block should trigger a runtime error
+        runtime_error = False
+        try:
+            while scheduler.continual:
+                loss = optimizer.step(inputs)
+                scheduler.step(loss)
+        except RuntimeError:
+            runtime_error = True
+        assert runtime_error
+
 
 
     def test_optim_scheduler_optimize(self):

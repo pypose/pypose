@@ -3,6 +3,26 @@ from .optimizer import _Optimizer
 
 
 class _Scheduler(object):
+    class WrapperOfContinual:
+        """
+        This is a temporary workaround for triggering a warning when user use the
+        continual attribute of the scheduler. After PyPose 0.3.6 release, we change
+        scheduler.continual to scheduler.continual(). Without this wrapper,
+        the users can still call scheduler.continual, resulting in unexpected behavior.
+        This class is used to wrap the iscontinual function of the scheduler, and
+        prevent any unexpected consequences resulted from this API change.
+        """
+        def __init__(self, optimizer_obj):
+            self.optimizer_obj = optimizer_obj
+
+        def __call__(self):
+            return self.optimizer_obj.iscontinual()
+
+        def __bool__(self):
+            raise RuntimeError('Calling scheduler.continual is deprecated, '
+                               'please call scheduler.iscontinual() instead. '
+                               'We will continue using scheduler.continual() in future releases. '
+                               'This error msg will be removed as well.')
 
     def __init__(self, optimizer, max_steps, verbose=False):
 
@@ -14,13 +34,7 @@ class _Scheduler(object):
         self.optimizer, self.verbose = optimizer, verbose
         self.max_steps, self.steps = max_steps, 0
         self._continual = True
-
-    @property
-    def continual(self):
-        raise RuntimeError('Calling scheduler.continual is deprecated, '\
-                           'please call scheduler.iscontinual() instead. '\
-                           'We may allow scheduler.continual() in a future release. '\
-                           'This error msg will be removed as well.')
+        self.continual = self.WrapperOfContinual(self)
 
     def iscontinual(self):
         return self._continual
@@ -96,7 +110,7 @@ class StopOnPlateau(_Scheduler):
             >>> scheduler = pp.optim.scheduler.StopOnPlateau(optimizer, steps=10, \
             >>>                     patience=3, decreasing=1e-3, verbose=True)
             ...
-            >>> while scheduler.iscontinual():
+            >>> while scheduler.continual():
             ...     loss = optimizer.step(input)
             ...     scheduler.step(loss)
             StopOnPlateau on step 0 Loss 9.337769e+01 --> Loss 3.502787e-05 (reduction/loss: 1.0000e+00).
