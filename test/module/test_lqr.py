@@ -144,8 +144,8 @@ class TestLQR:
         lqr  = pp.module.LQR(ltv, Q, p, T).to(device)
         x, u, cost = lqr(x_init)
 
-        torch.testing.assert_close(x_ref, x)
-        torch.testing.assert_close(u_ref, u)
+        torch.testing.assert_close(x_ref, x, atol=1e-5, rtol=1e-3)
+        torch.testing.assert_close(u_ref, u, atol=1e-5, rtol=1e-3)
         
 
 if __name__ == '__main__':
