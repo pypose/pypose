@@ -18,17 +18,17 @@ class LQR(nn.Module):
     .. math::
         \begin{align*}
             \mathbf{x}_{t+1} &= \mathbf{A}_t\mathbf{x}_t + \mathbf{B}_t\mathbf{u}_t 
-                                                         + \mathbf{c}^{1}_t          \\
+                                                         + \mathbf{c}_{1t}          \\
             \mathbf{y}_t &= \mathbf{C}_t\mathbf{x}_t + \mathbf{D}_t\mathbf{u}_t
-                                                     + \mathbf{c}^{2}_t              \\
+                                                     + \mathbf{c}_{2t}              \\
         \end{align*}
 
     where :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state and input of the linear system; 
     :math:`\mathbf{y}` is the observation of the linear system; :math:`\mathbf{A}`,
     :math:`\mathbf{B}` are the state matrix and input matrix of the linear system;
     :math:`\mathbf{C}`, :math:`\mathbf{D}` are the output matrix and observation matrix of the
-    linear system; :math:`\mathbf{c}_1`, :math:`\mathbf{c}_2` are the constant input and constant
-    output of the linear system, and :math:`\cdot_{t}` is the time step.
+    linear system; :math:`\mathbf{c}_{1t}`, :math:`\mathbf{c}_{2t}` are the constant input and
+    constant output of the linear system, and :math:`t` is the time step.
 
     LQR finds the optimal nominal trajectory :math:`\mathbf{\tau}_{1:T}^*` = 
     :math:`\begin{Bmatrix} \mathbf{x}_t, \mathbf{u}_t \end{Bmatrix}_{1:T}` 
@@ -36,14 +36,15 @@ class LQR(nn.Module):
 
     .. math::
         \begin{align*}
-            \mathbf{\tau}_{1:T}^* = \mathop{\arg\min}\limits_{\tau_{1:T}} \sum\limits_t\frac{1}{2}
-            \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t \\
-            \mathrm{s.t.} \quad \mathbf{x}_1 = \mathbf{x}_{\text{init}}, \\
-            \mathbf{x}_{t+1} = \mathbf{F}_t\mathbf{\tau}_t + \mathbf{c}_{1t} \\
+          \mathbf{\tau}_{1:T}^* = \mathop{\arg\min}\limits_{\tau_{1:T}} \sum\limits_t\frac{1}{2}
+          \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t \\
+          \mathrm{s.t.} \quad \mathbf{x}_1 = \mathbf{x}_{\text{init}}, \\
+          \mathbf{x}_{t+1} = \mathbf{F}_t\mathbf{\tau}_t + \mathbf{c}_{1t} \\
         \end{align*}
 
-    where :math:`\mathbf{\tau}_t` = :math:`\begin{bmatrix} \mathbf{x}_t \\ \mathbf{u}_t \end{bmatrix}`, 
-    :math:`\mathbf{F}_t` = :math:`\begin{bmatrix} \mathbf{A}_t & \mathbf{B}_t \end{bmatrix}`.
+    where :math:`\mathbf{\tau}_t` = :math:`\begin{bmatrix} \mathbf{x}_t \\ \mathbf{u}_t
+    \end{bmatrix}`, :math:`\mathbf{F}_t` = :math:`\begin{bmatrix} \mathbf{A}_t & \mathbf{B}_t
+    \end{bmatrix}`.
 
     The LQR process can be summarised as a backward and a forward recursion.
 
@@ -54,19 +55,20 @@ class LQR(nn.Module):
         .. math::
             \begin{align*}
                 \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t \\
-                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{c}_{1t} + 
-                \mathbf{F}_t^\top\mathbf{v}_{t+1} \\
-                \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{Q}_{\mathbf{u}_t, 
-                \mathbf{x}_t} \\
-                \mathbf{k}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{q}_{\mathbf{u}_t} \\
+                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}
+                                        \mathbf{c}_{1t} + \mathbf{F}_t^\top\mathbf{v}_{t+1}  \\
+                \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1} 
+                                                     \mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} \\
+                \mathbf{k}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1} 
+                                                           \mathbf{q}_{\mathbf{u}_t}         \\
                 \mathbf{V}_t &= \mathbf{Q}_{\mathbf{x}_t, \mathbf{x}_t} 
                     + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{K}_t 
                     + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} 
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{K}_t \\
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{K}_t   \\
                 \mathbf{v}_t &= \mathbf{q}_{\mathbf{x}_t} 
                     + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{k}_t 
                     + \mathbf{K}_t^\top\mathbf{q}_{\mathbf{u}_t} 
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{k}_t \\
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{k}_t   \\
             \end{align*}
 
     - The forward recursion.
@@ -105,7 +107,8 @@ class LQR(nn.Module):
         >>> Q = torch.randn(n_batch, T, n_sc, n_sc)
         >>> Q = torch.matmul(Q.mT, Q)
         >>> p = torch.randn(n_batch, T, n_sc)
-        >>> A = torch.tile(torch.eye(n_state) + 0.2*torch.randn(n_state, n_state), (n_batch, 1, 1))
+        >>> r = 0.2 * torch.randn(n_state, n_state)
+        >>> A = torch.tile(torch.eye(n_state) + r, (n_batch, 1, 1))
         >>> B = torch.randn(n_batch, n_state, n_ctrl)
         >>> C = torch.tile(torch.eye(n_state), (n_batch, 1, 1))
         >>> D = torch.tile(torch.zeros(n_state, n_ctrl), (n_batch, 1, 1))
@@ -164,8 +167,8 @@ class LQR(nn.Module):
 
         Returns:
             List of :obj:`Tensor`: A list of tensors including the solved state sequence
-            :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the quadratic
-            costs :math:`\mathbf{c}` over the time horizon.
+            :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the associated
+            quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
         K, k = self.lqr_backward()
         x, u, cost = self.lqr_forward(x_init, K, k)
