@@ -89,10 +89,11 @@ class LQR(nn.Module):
         if self.p.ndim == 2:
             self.p = torch.tile(self.p.unsqueeze(-2), (1, self.T, 1))
 
-        assert self.Q.shape[:-1] == self.p.shape and self.Q.size(-1) == self.Q.size(-2), "Shape not compatible."
+        assert self.Q.shape[:-1] == self.p.shape, "Shape not compatible."
+        assert self.Q.size(-1) == self.Q.size(-2), "Shape not compatible."
         assert self.Q.ndim == 4 or self.p.ndim == 3, "Shape not compatible."
-        assert self.Q.device == self.p.device
-        assert self.Q.dtype == self.p.dtype
+        assert self.Q.device == self.p.device, "device not compatible."
+        assert self.Q.dtype == self.p.dtype, "tensor data type not compatible."
 
     def forward(self, x_init):
         r'''
