@@ -15,8 +15,8 @@ class _Scheduler(object):
         def __init__(self, optimizer_obj):
             self.optimizer_obj = optimizer_obj
 
-        def __call__(self):
-            return self.optimizer_obj.iscontinual()
+        def __call__(self, *args, **kwargs):
+            return self.optimizer_obj.iscontinual(*args, **kwargs)
 
         def __bool__(self):
             raise RuntimeError('Calling scheduler.continual is deprecated, '
