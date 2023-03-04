@@ -4,9 +4,8 @@ import torch, pypose as pp
 class TestLQR:
 
     def test_lqr_linear(self, device='cpu'):
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
- # The reference data
+
+        # The reference data
         x_ref = torch.tensor([
             [[ 1.5000000000000000e+00, -3.4000000357627869e-01, -2.1800000667572021e+00,  5.4000002145767212e-01],
              [ 7.0821952819824219e-01, -3.8224798440933228e-01,  1.2187952995300293e+00, -2.8270375728607178e-01],
@@ -69,20 +68,15 @@ class TestLQR:
         c2 = torch.zeros(n_batch, n_state, device=device)
         x_init = torch.tensor([[ 1.50, -0.34, -2.18,  0.54], [-1.05, -1.36,  0.43,  0.80]], device=device)
 
-        print(A.shape, B.shape, C.shape, D.shape, c1.shape, c2.shape)
-
-        lti = pp.module.LTI(A, B, C, D, c1, c2)
+        lti = pp.module.LTI(A, B, C, D, c1, c2).to(device)
         LQR = pp.module.LQR(lti, Q, p, T).to(device)
         x, u, cost = LQR(x_init)
-        
-        assert torch.allclose(x_ref, x, atol=1e-5)
-        assert torch.allclose(u_ref, u, atol=1e-5)
 
-        print("Done")
+        torch.testing.assert_close(x_ref, x)
+        torch.testing.assert_close(u_ref, u)
 
 
     def test_lqr_ltv_random(self, device='cpu'):
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         n_batch, T = 2, 5
         n_state, n_ctrl = 4, 3
@@ -94,11 +88,12 @@ class TestLQR:
         B = torch.zeros(n_batch, T, n_state, n_ctrl, device=device)
         C = torch.tile(torch.eye(n_state, device=device), (n_batch, T, 1, 1))
         D = torch.zeros(n_batch, T, n_state, n_ctrl, device=device)
-        x_init = torch.tensor([[ 1.50, -0.34, -2.18,  0.54], [-1.05, -1.36,  0.43,  0.80]], device=device)
+        x_init = torch.tensor([[ 1.50, -0.34, -2.18,  0.54],
+                               [-1.05, -1.36,  0.43,  0.80]], device=device)
 
         for t in range(T):
-            A[...,t,:,:] = (t+1)*torch.eye(n_state, device=device)
-            B[...,t,:,:] = (t+1)*torch.ones(n_state, n_ctrl, device=device)
+            A[...,t,:,:] = (t+1) * torch.eye(n_state, device=device)
+            B[...,t,:,:] = (t+1) * torch.ones(n_state, n_ctrl, device=device)
 
         class MyLTV(pp.module.LTV):
         
@@ -121,11 +116,9 @@ class TestLQR:
             def D(self):
                 return self._D[...,self._t,:,:]
 
-        ltv = MyLTV(A, B, C, D)
-        lqr  = pp.module.LQR(ltv, Q, p, T)
+        ltv = MyLTV(A, B, C, D).to(device)
+        lqr  = pp.module.LQR(ltv, Q, p, T).to(device)
         x, u, cost = lqr(x_init)
-
-        print("Done")
 
 
 if __name__ == '__main__':
