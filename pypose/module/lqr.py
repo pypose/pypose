@@ -7,9 +7,29 @@ class LQR(nn.Module):
     r'''
     Linear Quadratic Regulator (LQR) with Dynamic Programming.
 
+    Args:
+        system (:obj:`instance`): The system to be soved by LQR.
+        Q (:obj:`Tensor`): The weight matrix of the quadratic term.
+        p (:obj:`Tensor`): The weight vector of the first-order term.
+        T (:obj:`int`): Time steps of system.
+
+    A discrete-time linear system can be described as:
+
+    .. math::
+        \begin{align*}
+            \mathbf{x}_{k+1} &= \mathbf{A}\mathbf{x}_k + \mathbf{B}\mathbf{u}_k + \mathbf{c}_1 \\
+            \mathbf{y}_k &= \mathbf{C}\mathbf{x}_k + \mathbf{D}\mathbf{u}_k + \mathbf{c}_2 \\
+        \end{align*}
+
+    where :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state and input of the linear system; 
+    :math:`\mathbf{y}` is the observation of the linear system; 
+    :math:`\mathbf{A}`, :math:`\mathbf{B}` are the state matrix and input matrix of the linear system; 
+    :math:`\mathbf{C}`, :math:`\mathbf{D}` are the output matrix and observation matrix of the linear system;
+    :math:`\mathbf{c}_1`, :math:`\mathbf{c}_2` are the constant input and constant output of the linear system.
+
     LQR finds the optimal nominal trajectory :math:`\mathbf{\tau}_{1:T}^*` = 
     :math:`\begin{Bmatrix} \mathbf{x}_t, \mathbf{u}_t \end{Bmatrix}_{1:T}` 
-    of the optimization problem.
+    for the linear system of the optimization problem.
 
     .. math::
         \begin{align*}
@@ -18,22 +38,55 @@ class LQR(nn.Module):
             \mathrm{s.t.} \quad \mathbf{x}_1 = \mathbf{x}_{init}, \\
             \mathbf{x}_{t+1} = \mathbf{F}_t\mathbf{\tau}_t + \mathbf{f}_t \\
         \end{align*}
-
     where :math:`\mathbf{\tau}` = :math:`\begin{bmatrix} \mathbf{x} \\ \mathbf{u} \end{bmatrix}`, 
     :math:`\mathbf{F}` = :math:`\begin{bmatrix} \mathbf{A} & \mathbf{B} \end{bmatrix}`, 
     :math:`\mathbf{f}` = :math:`\mathbf{c}_1`. 
-    :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state and input of the system; 
-    :math:`\mathbf{A}`, :math:`\mathbf{B}` are the state matrix and input matrix of the linear system; 
-    :math:`\mathbf{c}_1` is the constant input of the linear system; 
-    :math:`\mathbf{Q}` is the weight matrix of the quadratic term; 
-    :math:`\mathbf{p}` is the weight vector of the first-order term.
-
+    
     From a policy learning perspective, this can be interpreted as a module with unknown parameters
     :math:`\begin{Bmatrix} \mathbf{Q}, \mathbf{p}, \mathbf{F}, \mathbf{f} \end{Bmatrix}`, 
     which can be integrated into a larger end-to-end learning system.
 
-    Args:
-        system (instance): The system to be soved by LQR.
+    The LQR process can be summarised as backward recursion and forward recursion.
+
+    1. The backward recursion of the dynamic programming to solve LQR.
+        
+        for :math:`t` = :math:`T` to 1:
+
+        .. math::
+            \begin{align*}
+                \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t \\
+                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{f}_t + 
+                \mathbf{F}_t^\top\mathbf{v}_{t+1} \\
+                \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{Q}_{\mathbf{u}_t, 
+                \mathbf{x}_t} \\
+                \mathbf{k}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{q}_{\mathbf{u}_t} \\
+                \mathbf{V}_t &= \mathbf{Q}_{\mathbf{x}_t, \mathbf{x}_t} 
+                    + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{K}_t 
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} 
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{K}_t \\
+                \mathbf{v}_t &= \mathbf{q}_{\mathbf{x}_t} 
+                    + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{k}_t 
+                    + \mathbf{K}_t^\top\mathbf{q}_{\mathbf{u}_t} 
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{k}_t \\
+            \end{align*}
+
+    2. The forward recursion of the dynamic programming to solve LQR.
+
+        for :math:`t` = 1 to :math:`T`:
+
+        .. math::
+            \begin{align*}
+                \mathbf{u}_t &= \mathbf{K}_t\mathbf{x}_t + \mathbf{k}_t \\
+                \mathbf{x}_{t+1} &= f \left( \mathbf{x}_t, \mathbf{u}_t \right) \\
+            \end{align*}
+    where :math:`f \left( \mathbf{x}_t, \mathbf{u}_t \right)` represents the discrete-time linear 
+    system dynamics.
+
+    Based on these, we can calculate the quadratic costs of the system over the time horizon:
+
+        .. math::
+            \mathbf{c} \left( \mathbf{\tau}_t \right) = \frac{1}{2}
+            \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t
 
     Note:
         The implementation is based on pp.24-32 of the slides: 
@@ -98,43 +151,22 @@ class LQR(nn.Module):
     def forward(self, x_init):
         r'''
         Perform one step advance for the LQR problem.
+
+        Args:
+            x_init (:obj:`Tensor`): The initial state of the system.
+
+        Returns:
+            List of :obj:`Tensor`: The solved state sequence of the dynamical system over the the time horizon 
+            :math:`\mathbf{x}`, the solved input sequence of the dynamical system over the the time horizon 
+            :math:`\mathbf{u}`, and the quadratic costs of the system over the time horizon :math:`\mathbf{c}`.
+
         '''
         K, k = self.lqr_backward()
         x, u, cost = self.lqr_forward(x_init, K, k)
         return x, u, cost
 
     def lqr_backward(self):
-        r'''
-        The backward recursion of the dynamic programming to solve LQR.
 
-        for :math:`t` = :math:`T` to 1:
-
-        .. math::
-            \begin{align*}
-                \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t \\
-                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{f}_t + 
-                \mathbf{F}_t^\top\mathbf{v}_{t+1} \\
-                \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{Q}_{\mathbf{u}_t, 
-                \mathbf{x}_t} \\
-                \mathbf{k}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{q}_{\mathbf{u}_t} \\
-                \mathbf{V}_t &= \mathbf{Q}_{\mathbf{x}_t, \mathbf{x}_t} 
-                    + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{K}_t 
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} 
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{K}_t \\
-                \mathbf{v}_t &= \mathbf{q}_{\mathbf{x}_t} 
-                    + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{k}_t 
-                    + \mathbf{K}_t^\top\mathbf{q}_{\mathbf{u}_t} 
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{k}_t \\
-            \end{align*}
-
-        Args:
-            Q (:obj:`Tensor`): The weight matrix of the quadratic term.
-            p (:obj:`Tensor`): The weight vector of the first-order term.
-
-        Returns:
-            Tuple of Tensor: The state feedback controller :math:`\mathbf{K}` and 
-            :math:`\mathbf{k}` gain of all steps.
-        '''
         # Q: (B*, T, N, N), p: (B*, T, N), where B* can be any batch dimensions, e.g., (2, 3)
         B = self.p.shape[:-2]
         ns, nc = self.system.B.size(-2), self.system.B.size(-1)
@@ -166,38 +198,6 @@ class LQR(nn.Module):
         return K, k
 
     def lqr_forward(self, x_init, K, k):
-        r'''
-        The forward recursion of the dynamic programming to solve LQR.
-
-        for :math:`t` = 1 to :math:`T`:
-
-        .. math::
-            \begin{align*}
-                \mathbf{u}_t &= \mathbf{K}_t\mathbf{x}_t + \mathbf{k}_t \\
-                \mathbf{x}_{t+1} &= f \left( \mathbf{x}_t, \mathbf{u}_t \right) \\
-            \end{align*}
-
-        where :math:`f \left( \mathbf{x}_t, \mathbf{u}_t \right)` represents the discrete-time 
-        system dynamics.
-
-        Based on these, we can calculate the quadratic costs of the system over the time horizon:
-
-        .. math::
-            \mathbf{c} \left( \mathbf{\tau}_t \right) = \frac{1}{2}
-            \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t
-        where :math:`\mathbf{\tau}` = :math:`\begin{bmatrix} \mathbf{x} \\ \mathbf{u} \end{bmatrix}`.
-
-        Args:
-            Q (:obj:`Tensor`): The matrix of quadratic parameter.
-            p (:obj:`Tensor`): The constant of quadratic parameter.
-            K (:obj:`Tensor`): The matrix of status feedback controller at all steps.
-            k (:obj:`Tensor`): The constant of status feedback controller at all steps.
-
-        Returns:
-            Tuple of Tensor: The solved state sequence of the dynamical system over the the time horizon 
-            :math:`\mathbf{x}`, the solved input sequence of the dynamical system over the the time horizon 
-            :math:`\mathbf{u}`, and the quadratic costs of the system over the time horizon :math:`\mathbf{c}`.
-        '''
 
         assert x_init.device == K.device == k.device
         assert x_init.dtype == K.dtype == k.dtype
