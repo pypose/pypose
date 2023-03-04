@@ -17,15 +17,16 @@ class LQR(nn.Module):
 
     .. math::
         \begin{align*}
-            \mathbf{x}_{k+1} &= \mathbf{A}\mathbf{x}_k + \mathbf{B}\mathbf{u}_k + \mathbf{c}_1 \\
-            \mathbf{y}_k &= \mathbf{C}\mathbf{x}_k + \mathbf{D}\mathbf{u}_k + \mathbf{c}_2 \\
+            \mathbf{x}_{t+1} &= \mathbf{A}_t\mathbf{x}_t + \mathbf{B}_t\mathbf{u}_t + \mathbf{c}_{1t} \\
+            \mathbf{y}_t &= \mathbf{C}_t\mathbf{x}_t + \mathbf{D}_t\mathbf{u}_t + \mathbf{c}_{2t} \\
         \end{align*}
 
     where :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state and input of the linear system; 
     :math:`\mathbf{y}` is the observation of the linear system; 
     :math:`\mathbf{A}`, :math:`\mathbf{B}` are the state matrix and input matrix of the linear system; 
     :math:`\mathbf{C}`, :math:`\mathbf{D}` are the output matrix and observation matrix of the linear system;
-    :math:`\mathbf{c}_1`, :math:`\mathbf{c}_2` are the constant input and constant output of the linear system.
+    :math:`\mathbf{c}`, :math:`\mathbf{c}` are the constant input and constant output of the linear system. 
+    The subscript :math:`\cdot_{t}` is omited for simplicity.
 
     LQR finds the optimal nominal trajectory :math:`\mathbf{\tau}_{1:T}^*` = 
     :math:`\begin{Bmatrix} \mathbf{x}_t, \mathbf{u}_t \end{Bmatrix}_{1:T}` 
@@ -36,11 +37,10 @@ class LQR(nn.Module):
             \mathbf{\tau}_{1:T}^* = \mathop{\arg\min}\limits_{\tau_{1:T}} \sum\limits_t\frac{1}{2}
             \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t \\
             \mathrm{s.t.} \quad \mathbf{x}_1 = \mathbf{x}_{init}, \\
-            \mathbf{x}_{t+1} = \mathbf{F}_t\mathbf{\tau}_t + \mathbf{f}_t \\
+            \mathbf{x}_{t+1} = \mathbf{F}_t\mathbf{\tau}_t + \mathbf{c}_{1t} \\
         \end{align*}
-    where :math:`\mathbf{\tau}` = :math:`\begin{bmatrix} \mathbf{x} \\ \mathbf{u} \end{bmatrix}`, 
-    :math:`\mathbf{F}` = :math:`\begin{bmatrix} \mathbf{A} & \mathbf{B} \end{bmatrix}`, 
-    :math:`\mathbf{f}` = :math:`\mathbf{c}_1`. 
+    where :math:`\mathbf{\tau}_t` = :math:`\begin{bmatrix} \mathbf{x}_t \\ \mathbf{u}_t \end{bmatrix}`, 
+    :math:`\mathbf{F}_t` = :math:`\begin{bmatrix} \mathbf{A}_t & \mathbf{B}_t \end{bmatrix}`.
     
     From a policy learning perspective, this can be interpreted as a module with unknown parameters
     :math:`\begin{Bmatrix} \mathbf{Q}, \mathbf{p}, \mathbf{F}, \mathbf{f} \end{Bmatrix}`, 
@@ -55,7 +55,7 @@ class LQR(nn.Module):
         .. math::
             \begin{align*}
                 \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t \\
-                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{f}_t + 
+                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{c}_{1t} + 
                 \mathbf{F}_t^\top\mathbf{v}_{t+1} \\
                 \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}\mathbf{Q}_{\mathbf{u}_t, 
                 \mathbf{x}_t} \\
@@ -77,16 +77,22 @@ class LQR(nn.Module):
         .. math::
             \begin{align*}
                 \mathbf{u}_t &= \mathbf{K}_t\mathbf{x}_t + \mathbf{k}_t \\
-                \mathbf{x}_{t+1} &= f \left( \mathbf{x}_t, \mathbf{u}_t \right) \\
+                \mathbf{x}_{t+1} &= \mathbf{A}_t\mathbf{x}_t + \mathbf{B}_t\mathbf{u}_t + \mathbf{c}_{1t} \\
             \end{align*}
-    where :math:`f \left( \mathbf{x}_t, \mathbf{u}_t \right)` represents the discrete-time linear 
-    system dynamics.
 
     Based on these, we can calculate the quadratic costs of the system over the time horizon:
 
         .. math::
             \mathbf{c} \left( \mathbf{\tau}_t \right) = \frac{1}{2}
             \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t
+
+    Note:
+        The discrete-time system to be solved by LQR could be both linear time-invariant (LTI) system and 
+        linear time-varying (LTV) system. For LTI system, :math:`\mathbf{A}_t` = :math:`\mathbf{A}`, 
+        :math:`\mathbf{B}_t` = :math:`\mathbf{B}`, :math:`\mathbf{C}_t` = :math:`\mathbf{C}`, 
+        :math:`\mathbf{D}_t` = :math:`\mathbf{D}`, :math:`\mathbf{c}_{1t}` = :math:`\mathbf{c}_{1}`, 
+        :math:`\mathbf{c}_{2t}` = :math:`\mathbf{c}_2`, :math:`{\forall}`:math:`t`; otherwise it is the LTV 
+        system.
 
     Note:
         The implementation is based on pp.24-32 of the slides: 
