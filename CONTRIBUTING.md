@@ -21,17 +21,27 @@ If you are posting a pull request for the first time, you should fork the PyPose
 Then, you can clone the repositories to local:
 
 ```shell
-git@github.com:{your_github_id}/pypose.git
+git clone https://github.com/{your_github_id}/pypose.git
+# or if you have set up the SSH-key based authentication, clone by:
+# git clone git@github.com:{your_github_id}/pypose.git
 ```
 
 After that, you should add official repository as the upstream repository
 
 ```bash
-git remote add upstream git@github.com:pypose/pypose.git
+git remote add upstream https://github.com/pypose/pypose.git
+# or the following if you have cloned using SSH-key based authentication
+# git remote add upstream git@github.com:pypose/pypose.git
 ```
 
-Check whether remote repository has been added successfully by `git remote -v`
-
+Check whether remote repository has been added successfully by `git remote -v`. The output should be like this:
+```bash
+origin	https://github.com/{your_github_id}/pypose.git (fetch)
+origin	https://github.com/{your_github_id}/pypose.git (push)
+upstream	https://github.com/pypose/pypose.git (fetch)
+upstream	https://github.com/pypose/pypose.git (push)
+```
+or
 ```bash
 origin	git@github.com:{your_github_id}/pypose.git (fetch)
 origin	git@github.com:{your_github_id}/pypose.git (push)
@@ -42,16 +52,16 @@ upstream	git@github.com:pypose/pypose.git (push)
 > Here's a brief introduction to origin and upstream. When we use "git clone", we create an "origin" remote by default, which points to the repository cloned from. In the above example, "origin" is your own forked repo. As for "upstream", we add it ourselves to point to the target repository, which is PyPose's official repo `pypose/pypose`. Of course, you could name it to any arbitrary name other than `upstream`. Usually, contributors will push the code to "origin". If the pushed code conflicts with the latest code in official("upstream"), the contributor should pull the latest code from upstream to resolve the conflicts, and then push to "origin" again. The posted Pull Request will be updated automatically.
 
 ### 2. Create a development branch
-After cloning a local copy of the repo, we should create a branch based on the master branch to develop the new feature or fix the bug. The proposed branch name is `username/pr_name`
+After cloning a local copy of the repo, we should create a branch based on the main branch to develop the new feature or fix the bug. The proposed branch name is `username/pr_name`
 
 ```shell
 git checkout -b {your_github_id}/{pr_name}
 ```
 
-In subsequent development, if the master branch of the local repository is behind the master branch of "upstream", we need to pull the upstream for synchronization, and then execute the above command:
+In subsequent development, if the main branch of the local repository is behind the main branch of "upstream", we need to pull the upstream for synchronization, and then execute the above command:
 
 ```shell
-git pull upstream master
+git pull upstream main
 ```
 
 ### 3. Commit the code and pass the unit test
@@ -62,9 +72,7 @@ git pull upstream master
   pytest
   ```
 
-  If the unit test fails for lack of dependencies, you can install the dependencies referring to the [guidance](#unit-test)
-
-- If the documents are modified/added, we should check the rendering result referring to [guidance](#Contributing to Documentation)
+- If the documents are modified/added, we should check the rendering result referring to [guidance](#documentation-rendering)
 
 ### 4. Push the code to remote
 
@@ -84,30 +92,30 @@ This will allow you to use the `git push` command to push code directly next tim
 
 **note**
 
-(a) The Pull Request description should contain the reason for the change, the content of the change, and the impact of the change, and be associated with the relevant Issue (see [documentation](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue)
+(a) The Pull Request description should contain the reason for the change, the content of the change, and the impact of the change, and be associated with the relevant Issue (see [documentation](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue))
 
 (b) Check whether the Pull Request pass through the CI
 
-TBD
+<img width="909" alt="image" src="https://user-images.githubusercontent.com/8695500/222796987-3f612b21-21c9-4bb4-b8ff-4b1ddccf115d.png">
 
-CI will run unit test for the posted Pull Request on different platforms (Linux, Window, Mac), based on different versions of Python, PyTorch, CUDA to make sure the code is correct. We can see the specific test information by clicking `Details` in the above image so that we can modify the code.
+CI will run unit test for the posted Pull Request in Linux environment. We can see the specific test information by clicking `Details` in the above image so that we can modify the code.
 
-(3) If the Pull Request passes the CI, then you can wait for the review from other developers. You'll modify the code based on the reviewer's comments, and repeat the steps [3](#4-commit-the-code-and-pass-the-unit-test)-[4](#5-push-the-code-to-remote) until all reviewers approve it. Then, we will merge it ASAP.
+(3) If the Pull Request passes the CI, then you can wait for the review from other developers. You'll modify the code based on the reviewer's comments, and repeat the steps [3](#3-commit-the-code-and-pass-the-unit-test)-[4](#4-push-the-code-to-remote) until all reviewers approve it. Then, we will merge it ASAP.
 
 ### 6. Resolve conflicts
 
-If your local branch conflicts with the latest master branch of "upstream", you'll need to resolove them. There are two ways to do this:
+If your local branch conflicts with the latest main branch of "upstream", you'll need to resolove them. There are two ways to do this:
 
 ```shell
 git fetch --all --prune
-git rebase upstream/master
+git rebase upstream/main
 ```
 
 or
 
 ```shell
 git fetch --all --prune
-git merge upstream/master
+git merge upstream/main
 ```
 
 If you are very good at handling conflicts, then you can use rebase to resolve conflicts, as this will keep your commit logs tidy. If you are not familiar with `rebase`, then you can use `merge` to resolve conflicts.
