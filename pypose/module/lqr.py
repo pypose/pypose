@@ -17,40 +17,39 @@ class LQR(nn.Module):
 
     .. math::
         \begin{align*}
-            \mathbf{x}_{t+1} &= \mathbf{A}_t\mathbf{x}_t + \mathbf{B}_t\mathbf{u}_t + \mathbf{c}_{1t} \\
-            \mathbf{y}_t &= \mathbf{C}_t\mathbf{x}_t + \mathbf{D}_t\mathbf{u}_t + \mathbf{c}_{2t} \\
+            \mathbf{x}_{t+1} &= \mathbf{A}_t\mathbf{x}_t + \mathbf{B}_t\mathbf{u}_t 
+                                                         + \mathbf{c}^{1}_t          \\
+            \mathbf{y}_t &= \mathbf{C}_t\mathbf{x}_t + \mathbf{D}_t\mathbf{u}_t
+                                                     + \mathbf{c}^{2}_t              \\
         \end{align*}
 
     where :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state and input of the linear system; 
-    :math:`\mathbf{y}` is the observation of the linear system; 
-    :math:`\mathbf{A}`, :math:`\mathbf{B}` are the state matrix and input matrix of the linear system; 
-    :math:`\mathbf{C}`, :math:`\mathbf{D}` are the output matrix and observation matrix of the linear system;
-    :math:`\mathbf{c}`, :math:`\mathbf{c}` are the constant input and constant output of the linear system. 
-    The subscript :math:`\cdot_{t}` is omited for simplicity.
+    :math:`\mathbf{y}` is the observation of the linear system; :math:`\mathbf{A}`,
+    :math:`\mathbf{B}` are the state matrix and input matrix of the linear system;
+    :math:`\mathbf{C}`, :math:`\mathbf{D}` are the output matrix and observation matrix of the
+    linear system; :math:`\mathbf{c}_1`, :math:`\mathbf{c}_2` are the constant input and constant
+    output of the linear system, and :math:`\cdot_{t}` is the time step.
 
     LQR finds the optimal nominal trajectory :math:`\mathbf{\tau}_{1:T}^*` = 
     :math:`\begin{Bmatrix} \mathbf{x}_t, \mathbf{u}_t \end{Bmatrix}_{1:T}` 
-    for the linear system of the optimization problem.
+    for the linear system of the optimization problem:
 
     .. math::
         \begin{align*}
             \mathbf{\tau}_{1:T}^* = \mathop{\arg\min}\limits_{\tau_{1:T}} \sum\limits_t\frac{1}{2}
             \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t \\
-            \mathrm{s.t.} \quad \mathbf{x}_1 = \mathbf{x}_{init}, \\
+            \mathrm{s.t.} \quad \mathbf{x}_1 = \mathbf{x}_{\text{init}}, \\
             \mathbf{x}_{t+1} = \mathbf{F}_t\mathbf{\tau}_t + \mathbf{c}_{1t} \\
         \end{align*}
+
     where :math:`\mathbf{\tau}_t` = :math:`\begin{bmatrix} \mathbf{x}_t \\ \mathbf{u}_t \end{bmatrix}`, 
     :math:`\mathbf{F}_t` = :math:`\begin{bmatrix} \mathbf{A}_t & \mathbf{B}_t \end{bmatrix}`.
-    
-    From a policy learning perspective, this can be interpreted as a module with unknown parameters
-    :math:`\begin{Bmatrix} \mathbf{Q}, \mathbf{p}, \mathbf{F}, \mathbf{f} \end{Bmatrix}`, 
-    which can be integrated into a larger end-to-end learning system.
 
-    The LQR process can be summarised as backward recursion and forward recursion.
+    The LQR process can be summarised as a backward and a forward recursion.
 
-    1. The backward recursion of the dynamic programming to solve LQR.
+    - The backward recursion.
         
-        for :math:`t` = :math:`T` to 1:
+      For :math:`t` = :math:`T` to 1:
 
         .. math::
             \begin{align*}
@@ -70,33 +69,34 @@ class LQR(nn.Module):
                     + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{k}_t \\
             \end{align*}
 
-    2. The forward recursion of the dynamic programming to solve LQR.
+    - The forward recursion.
 
-        for :math:`t` = 1 to :math:`T`:
+      For :math:`t` = 1 to :math:`T`:
 
         .. math::
             \begin{align*}
                 \mathbf{u}_t &= \mathbf{K}_t\mathbf{x}_t + \mathbf{k}_t \\
-                \mathbf{x}_{t+1} &= \mathbf{A}_t\mathbf{x}_t + \mathbf{B}_t\mathbf{u}_t + \mathbf{c}_{1t} \\
+                \mathbf{x}_{t+1} &= \mathbf{A}_t\mathbf{x}_t + \mathbf{B}_t\mathbf{u}_t 
+                                                             + \mathbf{c}_{1t} \\
             \end{align*}
 
-    Based on these, we can calculate the quadratic costs of the system over the time horizon:
+    Then quadratic costs of the system over the time horizon:
 
         .. math::
             \mathbf{c} \left( \mathbf{\tau}_t \right) = \frac{1}{2}
             \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t
 
     Note:
-        The discrete-time system to be solved by LQR could be both linear time-invariant (LTI) system and 
-        linear time-varying (LTV) system. For LTI system, :math:`\mathbf{A}_t` = :math:`\mathbf{A}`, 
-        :math:`\mathbf{B}_t` = :math:`\mathbf{B}`, :math:`\mathbf{C}_t` = :math:`\mathbf{C}`, 
-        :math:`\mathbf{D}_t` = :math:`\mathbf{D}`, :math:`\mathbf{c}_{1t}` = :math:`\mathbf{c}_{1}`, 
-        :math:`\mathbf{c}_{2t}` = :math:`\mathbf{c}_2`, :math:`{\forall}`:math:`t`; otherwise it is the LTV 
-        system.
+        The discrete-time system to be solved by LQR could be both either linear time-invariant
+        (:meth:`LTI`) system or linear time-varying (:meth:`LTV`) system.
+
+    From the learning perspective, this can be interpreted as a module with unknown parameters
+    :math:`\begin{Bmatrix} \mathbf{Q}, \mathbf{p}, \mathbf{F}, \mathbf{f} \end{Bmatrix}`, 
+    which can be integrated into a larger end-to-end learning system.
 
     Note:
-        The implementation is based on pp.24-32 of the slides: 
-        http://rll.berkeley.edu/deeprlcourse/f17docs/lecture_8_model_based_planning.pdf
+        The implementation is based on page 24-32 of `Optimal Control and Planning 
+        <http://rll.berkeley.edu/deeprlcourse/f17docs/lecture_8_model_based_planning.pdf>`_.
 
     Example:
         >>> n_batch, T = 2, 5
@@ -105,13 +105,14 @@ class LQR(nn.Module):
         >>> Q = torch.randn(n_batch, T, n_sc, n_sc)
         >>> Q = torch.matmul(Q.mT, Q)
         >>> p = torch.randn(n_batch, T, n_sc)
-        >>> A = torch.tile(torch.eye(n_state) + 0.2 * torch.randn(n_state, n_state), (n_batch, 1, 1))
+        >>> A = torch.tile(torch.eye(n_state) + 0.2*torch.randn(n_state, n_state), (n_batch, 1, 1))
         >>> B = torch.randn(n_batch, n_state, n_ctrl)
         >>> C = torch.tile(torch.eye(n_state), (n_batch, 1, 1))
         >>> D = torch.tile(torch.zeros(n_state, n_ctrl), (n_batch, 1, 1))
         >>> c1 = torch.tile(torch.randn(n_state), (n_batch, 1))
         >>> c2 = torch.tile(torch.zeros(n_state), (n_batch, 1))
         >>> x_init = torch.randn(n_batch, n_state)
+        >>> 
         >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
         >>> LQR = pp.module.LQR(lti, Q, p, T)
         >>> x, u, cost = LQR(x_init)
@@ -156,16 +157,15 @@ class LQR(nn.Module):
 
     def forward(self, x_init):
         r'''
-        Perform one step advance for the LQR problem.
+        Performs LQR for the linear system.
 
         Args:
             x_init (:obj:`Tensor`): The initial state of the system.
 
         Returns:
-            List of :obj:`Tensor`: The solved state sequence of the dynamical system over the the time horizon 
-            :math:`\mathbf{x}`, the solved input sequence of the dynamical system over the the time horizon 
-            :math:`\mathbf{u}`, and the quadratic costs of the system over the time horizon :math:`\mathbf{c}`.
-
+            List of :obj:`Tensor`: A list of tensors including the solved state sequence
+            :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the quadratic
+            costs :math:`\mathbf{c}` over the time horizon.
         '''
         K, k = self.lqr_backward()
         x, u, cost = self.lqr_forward(x_init, K, k)
