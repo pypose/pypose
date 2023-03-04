@@ -76,7 +76,7 @@ class TestLQR:
         torch.testing.assert_close(u_ref, u)
 
 
-    def test_lqr_ltv_random(self, device='cpu'):
+    def test_lqr_ltv(self, device='cpu'):
 
         n_batch, T = 2, 5
         n_state, n_ctrl = 4, 3
@@ -84,16 +84,13 @@ class TestLQR:
         Q = torch.tile(torch.eye(n_state + n_ctrl, device=device), (n_batch, 1, 1))
         p = torch.tensor([[-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54], 
                           [-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54]], device=device)
-        A = torch.tile(torch.eye(n_state, device=device), (n_batch, T, 1, 1))
-        B = torch.zeros(n_batch, T, n_state, n_ctrl, device=device)
+        rt = torch.arange(1, T+1).view(T, 1, 1)
+        A = rt * torch.tile(torch.eye(n_state, device=device), (n_batch, T, 1, 1))
+        B = rt * torch.ones(n_batch, T, n_state, n_ctrl, device=device)
         C = torch.tile(torch.eye(n_state, device=device), (n_batch, T, 1, 1))
         D = torch.zeros(n_batch, T, n_state, n_ctrl, device=device)
         x_init = torch.tensor([[ 1.50, -0.34, -2.18,  0.54],
                                [-1.05, -1.36,  0.43,  0.80]], device=device)
-
-        for t in range(T):
-            A[...,t,:,:] = (t+1) * torch.eye(n_state, device=device)
-            B[...,t,:,:] = (t+1) * torch.ones(n_state, n_ctrl, device=device)
 
         class MyLTV(pp.module.LTV):
         
@@ -125,4 +122,4 @@ if __name__ == '__main__':
     test = TestLQR()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     test.test_lqr_linear(device)
-    test.test_lqr_ltv_random(device)
+    test.test_lqr_ltv(device)
