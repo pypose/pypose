@@ -28,8 +28,7 @@ class LQR(nn.Module):
     :math:`\mathbf{B}` are the state matrix and input matrix of the linear system;
     :math:`\mathbf{C}`, :math:`\mathbf{D}` are the output matrix and observation matrix of the
     linear system; :math:`\mathbf{c}_{1}`, :math:`\mathbf{c}_{2}` are the constant input and
-    constant output of the linear system. 
-    The subscript :math:`\cdot_{t}` is omited for simplicity.
+    constant output of the linear system. The subscript :math:`\cdot_{t}` denotes the time step.
 
     LQR finds the optimal nominal trajectory :math:`\mathbf{\tau}_{1:T}^*` = 
     :math:`\begin{Bmatrix} \mathbf{x}_t, \mathbf{u}_t \end{Bmatrix}_{1:T}` 
