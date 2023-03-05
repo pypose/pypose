@@ -66,7 +66,7 @@ if __name__ == '__main__':
     pngname = os.path.join(args.save, args.dataname+'.png')
     axlim = plot_and_save(graph.nodes.translation(), pngname, args.dataname)
     ### the 1st implementation: for customization and easy to extend
-    while scheduler.iscontinual():
+    while scheduler.continual():
         loss = optimizer.step(input=(edges, poses), weight=infos)
         scheduler.step(loss)
 

@@ -3,26 +3,26 @@ from .optimizer import _Optimizer
 
 
 class _Scheduler(object):
-    class WrapperOfContinual:
+    class Continual:
         """
-        This is a temporary workaround for triggering a warning when user use the
-        continual attribute of the scheduler. After PyPose 0.3.6 release, we change
-        scheduler.continual to scheduler.continual(). Without this wrapper,
-        the users can still call scheduler.continual, resulting in unexpected behavior.
-        This class is used to wrap the iscontinual function of the scheduler, and
-        prevent any unexpected consequences resulted from this API change.
+        From PyPose v0.3.6, we change scheduler.continual to scheduler.continual().
+        This is a temporary workaround for triggering an error when users call continual
+        attribute of the scheduler. This wrapper will be removed in a future release.
         """
-        def __init__(self, optimizer_obj):
-            self.optimizer_obj = optimizer_obj
+        def __init__(self, optimizer):
+            self.optimizer = optimizer
 
         def __call__(self, *args, **kwargs):
-            return self.optimizer_obj.iscontinual(*args, **kwargs)
+            '''
+            Determining whether to stop an optimizer should be provided here.
+            This function is only for temporarailiy replacing Scheduler.continual().
+            '''
+            return self.optimizer._continual
 
         def __bool__(self):
             raise RuntimeError('Calling scheduler.continual is deprecated, '
-                               'please call scheduler.iscontinual() instead. '
-                               'We will continue using scheduler.continual() in future releases. '
-                               'This error msg will be removed as well.')
+                               'please call scheduler.continual() instead. '
+                               'This error msg will be removed in a future release.')
 
     def __init__(self, optimizer, max_steps, verbose=False):
 
@@ -33,11 +33,8 @@ class _Scheduler(object):
 
         self.optimizer, self.verbose = optimizer, verbose
         self.max_steps, self.steps = max_steps, 0
+        self.continual = self.Continual(self)
         self._continual = True
-        self.continual = self.WrapperOfContinual(self)
-
-    def iscontinual(self):
-        return self._continual
 
     def state_dict(self):
         """Returns the state of the scheduler as a :class:`dict`.
@@ -191,6 +188,6 @@ class StopOnPlateau(_Scheduler):
             StopOnPlateau on step 3 Loss 1.525355e-13 --> Loss 6.769275e-14 (reduction/loss: 5.5622e-01).
             StopOnPlateau: Maximum patience steps reached, Quiting..
         '''
-        while self.iscontinual():
+        while self.continual():
             loss = self.optimizer.step(input, target, weight)
             self.step(loss)
