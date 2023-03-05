@@ -7,6 +7,10 @@ from torch.autograd.functional import jacobian
 class System(nn.Module):
     r'''
     The base class for a system dynamics model.
+
+    In most of the cases, users only need to subclass a specific dynamic system,
+    such as linear time invariant system :meth:`LTI`, Linear Time-Variant :meth:`LTV`,
+    and a non-linear system :meth:`NLS`.
     '''
     def __init__(self):
         super().__init__()
@@ -26,6 +30,12 @@ class System(nn.Module):
     def forward(self, state, input):
         r'''
         Defines the computation performed at every call that advances the system by one time step.
+
+        Note:
+            The :obj:`forward` method implicitly increments the time step via :obj:`forward_hook`.
+            :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity
+            such as time-varying system. One can directly access the current system time via the
+            property :obj:`systime` or :obj:`_t`.
 
         Note:
             To introduce noise in a model, redefine this method via
