@@ -6,7 +6,7 @@ from matplotlib.patches import Ellipse
 from matplotlib.legend_handler import HandlerLine2D
 
 
-class Bicycle(pp.module.System):
+class Bicycle(pp.module.NLS):
     '''
     This is an implementation of the 2D Bicycle kinematic model,
     see: https://dingyan89.medium.com/simple-understanding-of-kinematic-bicycle-model
