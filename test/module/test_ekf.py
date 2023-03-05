@@ -3,19 +3,20 @@ import pypose as pp
 import torch as torch
 
 
-class TestKalman:
+class TestEKF:
 
-    def test_kalman(self):
+    def test_ekf(self):
 
-        class NTI(pp.module.System):
+        class NTI(pp.module.NLS):
             def __init__(self):
                 super().__init__()
 
             def state_transition(self, state, input, t=None):
                 return state.cos() + input
 
-            def observation(self, state, input, t):
+            def observation(self, state, input, t=None):
                 return state.sin() + input
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = NTI().to(device)
         ekf = pp.module.EKF(model).to(device)
@@ -42,5 +43,5 @@ class TestKalman:
 
 
 if __name__ == '__main__':
-    test = TestKalman()
-    test.test_kalman()
+    test = TestEKF()
+    test.test_ekf()
