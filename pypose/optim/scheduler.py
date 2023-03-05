@@ -17,7 +17,7 @@ class _Scheduler(object):
             Determining whether to stop an optimizer should be provided here.
             This function is only for temporarailiy replacing Scheduler.continual().
             '''
-            return self.optimizer._continual
+            return self.optimizer.iscontinual(*args, **kwargs)
 
         def __bool__(self):
             raise RuntimeError('Calling scheduler.continual is deprecated, '
@@ -35,6 +35,13 @@ class _Scheduler(object):
         self.max_steps, self.steps = max_steps, 0
         self.continual = self.Continual(self)
         self._continual = True
+
+    def iscontinual(self):
+        '''
+        This is a temporary function.
+        We will change to continual() in a future release.
+        '''
+        return self._continual
 
     def state_dict(self):
         """Returns the state of the scheduler as a :class:`dict`.
