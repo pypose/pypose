@@ -2,7 +2,7 @@ import torch, pypose as pp
 import matplotlib.pyplot as plt
 
 
-class NNDynamics(pp.module.NTI):
+class NNDynamics(pp.module.NLS):
     def __init__(self, hidden):
         super().__init__()
         self.net = torch.nn.Sequential(
@@ -12,10 +12,10 @@ class NNDynamics(pp.module.NTI):
             torch.nn.ReLU(),
             torch.nn.Linear(hidden[1], 2))
 
-    def state_transition(self, state, input):
+    def state_transition(self, state, input, t=None):
         return self.net(state) + input
 
-    def observation(self, state, input):
+    def observation(self, state, input, t=None):
         return state
 
 
