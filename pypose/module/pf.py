@@ -140,7 +140,7 @@ class PF(EKF):
         super().__init__(model, Q, R)
         self.particles = particles
 
-    def forward(self, x, y, u, P, Q=None, R=None, t=None, conv_weight=None):
+    def forward(self, x, y, u, P, Q=None, R=None, t=None, n=None):
         r'''
         Performs one step estimation.
 
@@ -151,6 +151,7 @@ class PF(EKF):
             P (:obj:`Tensor`): state estimation covariance of previous step
             Q (:obj:`Tensor`, optional): covariance of system transition model
             R (:obj:`Tensor`, optional): covariance of system observation model
+            n (:obj:`Tensor`, optional): covariance weight for randomly generate particles
 
         Return:
             list of :obj:`Tensor`: posteriori state and covariance estimation
@@ -159,10 +160,10 @@ class PF(EKF):
 
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
-        conv_weight = len(x) if conv_weight is None else conv_weight
+        n = x.size(-1) if n is None else n
         self.model.set_refpoint(state=x, input=u, t=t)
 
-        xp = self.generate_particles(x, conv_weight * P)
+        xp = self.generate_particles(x, n * P)
         xs = self.model.state_transition(xp, u, t)
         ye = self.model.observation(xs, u, t)
         q = self.relative_likelihood(y, ye, R)
@@ -178,6 +179,13 @@ class PF(EKF):
     def generate_particles(self, x, P):
         r'''
         Randomly generate particles
+
+        Args:
+            x (:obj:`Tensor`): estimated system state of previous step
+            P (:obj:`Tensor`): state estimation covariance of previous step
+
+        Return:
+            list of :obj:`Tensor`: particles
         '''
         m = MultivariateNormal(x, P)
         return m.sample(torch.Size([self.particles]))

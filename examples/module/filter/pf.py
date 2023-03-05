@@ -5,9 +5,9 @@ from bicycle import Bicycle, bicycle_plot
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PF Example')
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
-    parser.add_argument("--N", type=int, default=3000, help='The number of particle')
-    parser.add_argument('--conv_weight', type=int, default=None,
-                        help='covariance weight of particle')
+    parser.add_argument("--N", type=int, default=5000, help='The number of particle')
+    parser.add_argument('--n', type=int, default=None,
+                        help='covariance weight for randomly generate particles')
     args = parser.parse_args()
 
     T, N, M = 30, 3, 2  # steps, state dim, input dim
@@ -23,13 +23,13 @@ if __name__ == "__main__":
     R = torch.eye(N, device=args.device) * r ** 2  # covariance of observation
 
     bicycle = Bicycle()
-    filter = PF(bicycle, Q, R, particle_number=args.N).to(args.device)
+    filter = PF(bicycle, Q, R, particles=args.N).to(args.device)
 
     for i in range(T - 1):
         w = q * torch.randn(N, device=args.device)
         v = r * torch.randn(N, device=args.device)
         state[i + 1], obs[i] = bicycle(state[i] + w, input[i])  # model measurement
         est[i + 1], P[i + 1] = filter(est[i], obs[i] + v, input[i], P[i],
-                                      conv_weight=args.conv_weight)
+                                      n=args.n)
 
     bicycle_plot('PF', state, est, P)
