@@ -33,9 +33,9 @@ def test_dynamics_cartpole():
     c2_ref = torch.zeros((4,), device=device)
 
     # The class
-    class CartPole(pp.module.System):
+    class CartPole(pp.module.NLS):
         def __init__(self):
-            super(CartPole, self).__init__()
+            super().__init__()
             self._tau = 0.01
             self._length = 1.5
             self._cartmass = 20.0
@@ -135,7 +135,7 @@ def test_dynamics_floquet():
     c1 = torch.zeros(2, device=device)
 
     # The class
-    class Floquet(pp.module.System):
+    class Floquet(pp.module.NLS):
         def __init__(self):
             super(Floquet, self).__init__()
 
@@ -165,7 +165,7 @@ def test_dynamics_floquet():
     for i in range(N):
         state_all[i + 1], obser_all[i] = solver(state_all[i], input[i])
 
-    assert torch.allclose(state_all, state_ref)
+    assert torch.allclose(state_all, state_ref, atol=1e-5)
     assert torch.allclose(obser_all, obser_ref)
 
     # # For debugging

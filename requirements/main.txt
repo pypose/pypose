@@ -1,3 +1,2 @@
 pytest==7.1.2
-torch
-functorch
+torch==1.13.*

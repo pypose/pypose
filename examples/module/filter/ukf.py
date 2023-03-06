@@ -6,7 +6,7 @@ from bicycle import Bicycle, bicycle_plot
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='UKF Example')
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
-    parser.add_argument("--k", type=int, default=3, help='A integer parameter for \
+    parser.add_argument("--k", type=int, default=3, help='An integer parameter for \
         weighting the sigma points.')
     args = parser.parse_args()
 
