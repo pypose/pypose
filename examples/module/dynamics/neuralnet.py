@@ -1,9 +1,8 @@
-import torch as torch
+import torch, pypose as pp
 import matplotlib.pyplot as plt
-from pypose.module.dynamics import System
 
 
-class NNDynamics(System):
+class NNDynamics(pp.module.NLS):
     def __init__(self, hidden):
         super().__init__()
         self.net = torch.nn.Sequential(

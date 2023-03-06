@@ -1,12 +1,13 @@
 import torch, pypose as pp
 import math, matplotlib.pyplot as plt
-from pypose.module.dynamics import System
 
 
-# We consider a Floquet system, which is periodic and an example of time-varying systems
-class Floquet(System):
+class Floquet(pp.module.NLS):
+    '''
+    Floquet system is periodic and time-varying.
+    '''
     def __init__(self):
-        super(Floquet, self).__init__()
+        super().__init__()
 
     def state_transition(self, state, input, t):
         cc = (2 * math.pi * t / 100).cos()
