@@ -43,7 +43,7 @@ commands:
             # derived environment variables
             export CUDA_VERSION_SHORT=$(echo ${CUDA_VERSION} | sed -E 's/([0-9]+)\.([0-9]+).*/\1.\2/')
             apt-get update -y
-            DEBIAN_FRONTEND=noninteractive apt-get install -y wget curl git-all ninja-build
+            DEBIAN_FRONTEND=noninteractive apt-get install -y ninja-build make
   build_package: &build_package
     description: Build PyPose package of specified type
     parameters:
@@ -72,7 +72,7 @@ jobs:
   linux_build_wheel:
     <<: *build_binary_params
     docker:
-      - image: pytorch/pytorch:<< parameters.torch_version >>-cuda<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-runtime
+      - image: cimg/python:<< parameters.python_version >>
     resource_class: large
     steps:
       - setup_remote_docker:
@@ -90,7 +90,7 @@ jobs:
   build_docs:
     <<: *build_binary_params
     docker:
-      - image: pytorch/pytorch:<< parameters.torch_version >>-cuda<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-runtime
+      - image: cimg/python:<< parameters.python_version >>
     resource_class: medium
     steps:
       - setup_env
@@ -125,7 +125,7 @@ jobs:
   run_tests:
     <<: *build_binary_params
     docker:
-      - image: pytorch/pytorch:<< parameters.torch_version >>-cuda<< parameters.cuda_version >>-cudnn<< parameters.cudnn_version >>-runtime
+      - image: cimg/python:<< parameters.python_version >>
     resource_class: small
     steps:
       - setup_env
@@ -150,13 +150,16 @@ workflows:
   build:
     jobs:
       - linux_build_wheel:
-          cuda_version: "11.6"
+          cuda_version: "11.7"
           torch_version: "1.13.1"
+          python_version: "3.9"
       - build_docs:
           requires: [linux_build_wheel]
-          cuda_version: "11.6"
+          cuda_version: "11.7"
           torch_version: "1.13.1"
+          python_version: "3.9"
       - run_tests:
           requires: [linux_build_wheel]
-          cuda_version: "11.6"
+          cuda_version: "11.7"
           torch_version: "1.13.1"
+          python_version: "3.9"
