@@ -151,15 +151,15 @@ workflows:
     jobs:
       - linux_build_wheel:
           cuda_version: "11.7"
-          torch_version: "1.13.1"
+          torch_version: "1.13.*"
           python_version: "3.9"
       - build_docs:
           requires: [linux_build_wheel]
           cuda_version: "11.7"
-          torch_version: "1.13.1"
+          torch_version: "1.13.*"
           python_version: "3.9"
       - run_tests:
           requires: [linux_build_wheel]
           cuda_version: "11.7"
-          torch_version: "1.13.1"
+          torch_version: "1.13.*"
           python_version: "3.9"
