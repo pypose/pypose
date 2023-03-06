@@ -43,7 +43,7 @@ commands:
             # derived environment variables
             export CUDA_VERSION_SHORT=$(echo ${CUDA_VERSION} | sed -E 's/([0-9]+)\.([0-9]+).*/\1.\2/')
             apt-get update -y
-            DEBIAN_FRONTEND=noninteractive apt-get install -y ninja-build make
+            sudo apt-get install -y make
   build_package: &build_package
     description: Build PyPose package of specified type
     parameters:
