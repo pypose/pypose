@@ -27,19 +27,6 @@ class System(nn.Module):
         self._t.fill_(t)
         return self
 
-    @property
-    def systime(self):
-        r'''
-            System time, automatically advanced by :obj:`forward_hook`.
-        '''
-        return self._t
-
-    @systime.setter
-    def systime(self, t):
-        if not isinstance(t, torch.Tensor):
-            t = torch.tensor(t)
-        self._t.copy_(t)
-
     def forward(self, state, input):
         r'''
         Defines the computation performed at every call that advances the system by one time step.
@@ -113,6 +100,19 @@ class System(nn.Module):
             linearized system.
         '''
         return self
+
+    @property
+    def systime(self):
+        r'''
+            System time, automatically advanced by :obj:`forward_hook`.
+        '''
+        return self._t
+
+    @systime.setter
+    def systime(self, t):
+        if not isinstance(t, torch.Tensor):
+            t = torch.tensor(t)
+        self._t.copy_(t)
 
 
 class LTI(System):
@@ -398,7 +398,7 @@ class LTV(LTI):
 
 class NLS(System):
     r'''
-    The non-linear system (NLS) dynamics model.
+    Dynamics model for discrete-time non-linear system (NLS).
     
     The state transision function :math:`\mathbf{f}` and observation function
     :math:`\mathbf{g}` are given by:
@@ -449,13 +449,13 @@ class NLS(System):
                         + \mathbf{D}\mathbf{u} + \mathbf{c}_2
 
         The notion of linearization is slightly different from that in dynamical system
-        theory. First, the linearization can be done for arbitrary point(s), not limit to
-        the equilibrium point(s), and therefore the extra constant terms :math:`\mathbf{c}_1`
+        theory. First, the linearization can be done for arbitrary point(s), not limited to
+        the system's equilibrium point(s), and therefore the extra constant terms :math:`\mathbf{c}_1`
         and :math:`\mathbf{c}_2` are produced. Second, the linearized equations are represented
         by the full states and inputs: :math:`\mathbf{x}` and :math:`\mathbf{u}`, rather than 
         the perturbation format: :math:`\delta \mathbf{x}` and :math:`\delta \mathbf{u}`
         so that the model is consistent with, e.g., the LTI model and the iterative LQR
-        solver. More details go to :meth:`LTI`.
+        solver. For more details go to :meth:`LTI`.
 
     Example:
 
