@@ -37,14 +37,14 @@ def load_data():
 
 def rmse_rot(pred, gt):
     diff = pred - gt
-    f_norm = torch.norm(diff, dim=(1, 2))
+    f_norm = torch.norm(diff, dim=(-2, -1))
     return f_norm.mean()
 
 
 def rmse_t(pred, gt):
     diff = pred - gt
     norm = diff ** 2
-    norm = torch.sum(norm, dim=1)
+    norm = torch.sum(norm, dim=-1)
     return norm.mean()
 
 
@@ -89,13 +89,13 @@ class TestEPnP:
         data = load_data()
 
         # instantiate epnp
-        epnp = pp.module.EPnP(refinement_optimizer=False)
+        epnp = pp.module.EPnP(naive_ctrl_pts=False)
         solution = epnp.forward(data['objPts'], data['imgPts'], data['camMat'])
         solution_ref = solution_opencv(data['objPts'][0],
                                        data['imgPts'][0],
                                        data['camMat'][0])
-        gt_rot = data['Rt'][:, :3, :3]
-        gt_t = data['Rt'][:, :3, 3]
+        gt_rot = data['Rt'][..., :3, :3]
+        gt_t = data['Rt'][..., :3, 3]
 
         print("Pypose EPnP solution, rmse of R:", rmse_rot(solution['R'], gt_rot))
         print("Pypose EPnP solution, rmse of t:", rmse_t(solution['t'], gt_t))
