@@ -4,7 +4,7 @@ from functorch import vmap
 from pypose.optim import GaussNewton
 
 
-class EfficientPnP(torch.nn.Module):
+class EPnP(torch.nn.Module):
     """
         EPnP Solver - a non-iterative O(n) solution to the PnP problem.
         as described in:
@@ -15,13 +15,48 @@ class EfficientPnP(torch.nn.Module):
         source: https://github.com/cvlab-epfl/EPnP
 
         Args:
-            gauss_newton (bool): Use Gauss-Newton to refine the solution.
+            refinement_optimizer (bool): Use Gauss-Newton to refine the solution.
             naive_ctrl_pts (bool): Use naive control points selection method.
 
         Note:
             The Gauss-Newton optimization step isn't exactly consistent with the implementation in the original paper's
             implementation, but it relies on the same optimization objective function.
     """
+
+    class BetasOptimizationObjective(torch.nn.Module):
+        """
+        Optimize the betas according to the objectives in the paper.
+        For the details, please refer to equation 15.
+        """
+        def __init__(self, betas):
+            super().__init__()
+            self.betas = torch.nn.Parameter(betas)
+
+        def forward(self, ctrl_pts_w, kernel_bases):
+            """
+            Args:
+                ctrl_pts_w: The control points in world coordinate. The shape is (B, 4, 3).
+                kernel_bases: The kernel bases. The shape is (B, 16, 4).
+            Returns:
+                loss: The loss. The shape is (B, ).
+            """
+            batch_size = kernel_bases.shape[0]
+            # calculate the control points in camera coordinate
+            ctrl_pts_c = torch.bmm(kernel_bases, self.betas.unsqueeze(-1)).squeeze(-1)
+            diff_c = ctrl_pts_c.reshape(batch_size, 1, 4, 3) - ctrl_pts_c.reshape(batch_size, 4, 1, 3)
+            diff_c = diff_c.reshape(batch_size, 16, 3)
+            diff_c = torch.sum(diff_c ** 2, dim=-1)
+
+            # calculate the distance between control points in world coordinate
+            diff_w = ctrl_pts_w.reshape(batch_size, 1, 4, 3) - ctrl_pts_w.reshape(batch_size, 4, 1, 3)
+            diff_w = diff_w.reshape(batch_size, 16, 3)
+            diff_w = torch.sum(diff_w ** 2, dim=-1)
+
+            error = torch.abs(diff_w - diff_c)
+            error = torch.mean(error, dim=-1)
+
+            return error
+
     six_indices_pair = torch.tensor([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)], device='cpu').T
     six_indices = [(0 * 4 + 1), (0 * 4 + 2), (0 * 4 + 3), (1 * 4 + 2), (1 * 4 + 3), (2 * 4 + 3)]
     ten_indices_pair = torch.tensor([(0, 0),
@@ -31,10 +66,10 @@ class EfficientPnP(torch.nn.Module):
     # equal mask [ True, False,  True, False, False,  True, False, False, False,  True]
     multiply_mask = torch.tensor([1., 2., 1., 2., 2., 1., 2., 2., 2., 1.], device='cpu')
 
-    def __init__(self, gauss_newton=True, naive_ctrl_pts=False):
+    def __init__(self, naive_ctrl_pts=False, refinement_optimizer=True):
         super().__init__()
         self.naive_ctrl_pts = naive_ctrl_pts
-        self.gauss_newton = gauss_newton
+        self.refinement_optimizer = refinement_optimizer
 
     def forward(self, obj_pts, img_pts, intrinsics):
         """
@@ -43,7 +78,7 @@ class EfficientPnP(torch.nn.Module):
             img_pts (Tensor): 2D image points, which are the projection of object points, with shape (batch_size, n, 2)
             intrinsics (Tensor): camera intrinsics, shape (batch_size, 3, 3)
         Returns:
-            solutions (dict): a dict of solutions
+            lietensor.SE3Type: estimated pose for the camera
         """
         # Select four control points and calculate alpha (in the world coordinate)
         if self.naive_ctrl_pts:
@@ -79,7 +114,7 @@ class EfficientPnP(torch.nn.Module):
             solutions[key] = torch.gather(solutions[key], 1, best_idx_)
             solutions[key] = solutions[key].squeeze(1)
 
-        if self.gauss_newton:
+        if self.refinement_optimizer:
             self.guass_newton(solutions, kernel_m, ctrl_pts_w, alpha, obj_pts, img_pts, intrinsics)
         return solutions
 
@@ -116,7 +151,7 @@ class EfficientPnP(torch.nn.Module):
         Returns:
             None. This function will update the solutions in place.
         """
-        objective = BetasOptimizationObjective(solutions['beta'] * solutions['scale'].unsqueeze(-1))
+        objective = self.BetasOptimizationObjective(solutions['beta'] * solutions['scale'].unsqueeze(-1))
         gn = GaussNewton(objective)
         best_error = solutions['error']
         for i in range(10):
@@ -288,12 +323,12 @@ class EfficientPnP(torch.nn.Module):
         diff = kernel_bases.reshape(batch_size, 4, 1, 4, 3) - kernel_bases.reshape(batch_size, 4, 4, 1, 3)
         diff = diff.flatten(start_dim=2, end_dim=3)  # shape (batch_size, 4, 16, 3)
         # six_indices are (0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3) before flatten
-        dv = diff[:, :, EfficientPnP.six_indices, :]  # shape (batch_size, 4, 6, 3)
+        dv = diff[:, :, EPnP.six_indices, :]  # shape (batch_size, 4, 6, 3)
 
         # generate l
         dot_products = torch.sum(
-            dv[:, EfficientPnP.ten_indices_pair[0], :, :] * dv[:, EfficientPnP.ten_indices_pair[1], :, :], dim=-1)
-        dot_products = dot_products * EfficientPnP.multiply_mask[None, :, None]
+            dv[:, EPnP.ten_indices_pair[0], :, :] * dv[:, EPnP.ten_indices_pair[1], :, :], dim=-1)
+        dot_products = dot_products * EPnP.multiply_mask[None, :, None]
         return dot_products.transpose(1, 2)  # shape (batch_size, 6, 10)
 
     @staticmethod
@@ -307,7 +342,7 @@ class EfficientPnP(torch.nn.Module):
         Returns:
             torch.Tensor: rho, shape (batch_size, 6, 1)
         """
-        dist = cont_pts_w[:, EfficientPnP.six_indices_pair[0], :] - cont_pts_w[:, EfficientPnP.six_indices_pair[1], :]
+        dist = cont_pts_w[:, EPnP.six_indices_pair[0], :] - cont_pts_w[:, EPnP.six_indices_pair[1], :]
         return torch.sum(dist ** 2, dim=-1)  # l2 norm
 
     @staticmethod
@@ -449,35 +484,3 @@ class EfficientPnP(torch.nn.Module):
 
         return error
 
-
-class BetasOptimizationObjective(torch.nn.Module):
-    def __init__(self, betas):
-        super(BetasOptimizationObjective, self).__init__()
-        self.betas = torch.nn.Parameter(betas)
-
-    def forward(self, ctrl_pts_w, kernel_bases):
-        """
-        Optimize the betas according to the objectives in the paper.
-        For the details, please refer to equation 15.
-        Args:
-            ctrl_pts_w: The control points in world coordinate. The shape is (B, 4, 3).
-            kernel_bases: The kernel bases. The shape is (B, 16, 4).
-        Returns:
-            loss: The loss. The shape is (B, ).
-        """
-        batch_size = kernel_bases.shape[0]
-        # calculate the control points in camera coordinate
-        ctrl_pts_c = torch.bmm(kernel_bases, self.betas.unsqueeze(-1)).squeeze(-1)
-        diff_c = ctrl_pts_c.reshape(batch_size, 1, 4, 3) - ctrl_pts_c.reshape(batch_size, 4, 1, 3)
-        diff_c = diff_c.reshape(batch_size, 16, 3)
-        diff_c = torch.sum(diff_c ** 2, dim=-1)
-
-        # calculate the distance between control points in world coordinate
-        diff_w = ctrl_pts_w.reshape(batch_size, 1, 4, 3) - ctrl_pts_w.reshape(batch_size, 4, 1, 3)
-        diff_w = diff_w.reshape(batch_size, 16, 3)
-        diff_w = torch.sum(diff_w ** 2, dim=-1)
-
-        error = torch.abs(diff_w - diff_c)
-        error = torch.mean(error, dim=-1)
-
-        return error
