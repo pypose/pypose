@@ -2,7 +2,6 @@ import os
 import pypose as pp
 import torch
 import urllib
-import numpy as np
 
 import logging
 
@@ -60,21 +59,21 @@ class TestEPnP:
         def solution_opencv(obj_pts, img_pts, intrinsics):
             distortion = None
             # results given by cv2.solvePnP(obj_pts, img_pts, intrinsics, distortion, flags=cv2.SOLVEPNP_EPNP)
-            rvec = np.array([[-0.37279579],
+            rvec = torch.tensor([[-0.37279579],
                              [0.09247041],
                              [-0.82372009]])
-            t = np.array([[-0.07126862],
+            t = torch.tensor([[-0.07126862],
                           [-0.22845308],
                           [6.92614964]])
-            rot = np.array([[0.67947332, 0.69882627, 0.22351252],
+            rot = torch.tensor([[0.67947332, 0.69882627, 0.22351252],
                             [-0.73099025, 0.61862761, 0.28801584],
                             [0.06300202, -0.35908455, 0.93117615]])
-            Rt = np.concatenate((rot.reshape((3, 3)), t.reshape((3, 1))), axis=1)
+            Rt = torch.concatenate((rot.reshape((3, 3)), t.reshape((3, 1))), dim=1)
 
-            obj_pts = torch.from_numpy(obj_pts[None])
-            img_pts = torch.from_numpy(img_pts[None])
-            intrinsics = torch.from_numpy(intrinsics[None])
-            Rt = torch.from_numpy(Rt[None])
+            obj_pts = torch.from_numpy(obj_pts[None]).to(torch.float32)
+            img_pts = torch.from_numpy(img_pts[None]).to(torch.float32)
+            intrinsics = torch.from_numpy(intrinsics[None]).to(torch.float32)
+            Rt = Rt[None]
 
             rot = Rt[:, :3, :3][None]
             t = Rt[:, :3, 3][None]
