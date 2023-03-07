@@ -117,7 +117,7 @@ class TestEPnP:
 # paper link: https://arxiv.org/abs/2209.05824
 
 
-from numpy import linalg
+# from numpy import linalg
 # from scipy.linalg import expm, eigh, eig, svd
 
 #
