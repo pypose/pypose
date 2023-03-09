@@ -95,24 +95,44 @@ class PerspectiveCameras(CamerasBase):
     A class which stores a batch of parameters to generate a batch of
     transformation matrices using the multi-view geometry convention for
     perspective camera.
+
+    Args:
+        pose (LieTensor): A tensor of shape (B, *) where B is the batch size.
+        intrinsics (Optional): A projection matrix of shape (N, 3, 3)
+
+    Examples:
+        >>> import torch
+        >>> import pypose
+        >>> # create some random data
+        >>> R = torch.tensor([[ 0.70710678,  0., -0.70710678], [ 0. , 1., 0. ],[ 0.70710678, 0.,  0.70710678]])
+        >>> t = torch.tensor([0., -8., 0.])
+        >>> f = 2
+        >>> img_size = (7, 7)
+        >>> projection_matrix = torch.tensor([[f, 0, img_size[0] / 2,], [0, f, img_size[1] / 2,], [0, 0, 1, ]])
+        >>> pts_w = torch.tensor([[ 2.8284,  8.0000,  0.0000], [ 2.1213,  8.0000,  0.7071], [ 0.7071,  9.0000,  0.7071], [ 0.7071,  8.0000,  0.7071], [ 5.6569, 13.0000, -1.4142]])
+        >>> # instantiate the camera
+        >>> Rt = torch.cat((R, t.unsqueeze(-1)), dim=-1)
+        >>> camera = pypose.module.PerspectiveCameras(pose=pypose.mat2SE3(Rt), intrinsics=projection_matrix)
+        >>> # transform the points to image coordinates
+        >>> img_pts = camera.full_projection_transform(pts_w)
+        >>> img_pts
+        tensor([[5.5000, 3.5000],
+                [4.5000, 3.5000],
+                [3.5000, 5.5000],
+                [3.5000, 3.5000],
+                [6.8333, 6.8333]])
     """
 
     def __init__(
             self,
             pose: Optional[pypose.LieTensor] = None,
-            P: Optional[torch.Tensor] = None,
+            intrinsics: Optional[torch.Tensor] = None,
     ):
-        """
-
-        Args:
-            pose (LieTensor): A tensor of shape (B, *) where B is the batch size.
-            P (Optional): A projection matrix of shape (N, 3, 3)
-        """
         super().__init__(pose=pose)
-        if P is not None:
-            self.P = P
-        elif self.P is None:
-            self.P = torch.eye(3)
+        if intrinsics is not None:
+            self.intrinsics = intrinsics
+        elif self.intrinsics is None:
+            self.intrinsics = torch.eye(3)
 
     def projection_transform(self, points):
         """
@@ -122,7 +142,7 @@ class PerspectiveCameras(CamerasBase):
         Returns:
             points (torch.Tensor): A tensor of shape (B, N, 2) where B is the batch size.
         """
-        img_repj = torch.matmul(points, self.P.transpose(-2, -1))
+        img_repj = torch.matmul(points, self.intrinsics.transpose(-2, -1))
         return img_repj[..., :2] / img_repj[..., 2:]
 
     def is_perspective(self):

@@ -27,7 +27,7 @@ class EPnP(torch.nn.Module):
             >>> import torch
             >>> import pypose
             >>> # create some random data
-            >>> R = torch.tensor([[ 0.70710678,  0.        , -0.70710678,  0.        ], [ 0.        ,  1.        ,  0.        ,  0.        ],[ 0.70710678,  0.        ,  0.70710678,  0.        ],[ 0.        ,  0.        ,  0.        ,  1.        ]])
+            >>> R = torch.tensor([[ 0.70710678,  0., -0.70710678], [ 0. , 1., 0. ],[ 0.70710678, 0.,  0.70710678]])
             >>> t = torch.tensor([0., -8., 0.])
             >>> f = 2
             >>> img_size = (7, 7)
@@ -35,13 +35,22 @@ class EPnP(torch.nn.Module):
             >>> pts_c = torch.tensor([[2., 0., 2.], [1., 0., 2.], [0., 1., 1.], [0., 0., 1.], [5., 5., 3.]])
             >>> pixels = (pts_c @ projection_matrix.T)[:, :2] / (pts_c @ projection_matrix.T)[:, 2:]
             >>> pixels
+            tensor([[5.5000, 3.5000],
+                    [4.5000, 3.5000],
+                    [3.5000, 5.5000],
+                    [3.5000, 3.5000],
+                    [6.8333, 6.8333]])
             >>> pts_w = (pts_c - t) @ R[:3, :3]
             >>> # solve the PnP problem
             >>> epnp = pypose.module.EPnP()
             >>> # when input is not batched, remember to add a batch dimension
             >>> pose = epnp(pts_w[None], pixels[None], projection_matrix[None])
             >>> pose.rotation().matrix()  # the rotation matrix should be close to R
+            tensor([[[ 7.0713e-01, -5.2390e-06, -7.0708e-01],
+                     [-1.7946e-05,  1.0000e+00, -2.5357e-05],
+                     [ 7.0708e-01,  3.0620e-05,  7.0713e-01]]])
             >>> pose.translation()  # the translation vector should be close to t
+            tensor([[-2.3007e-05, -7.9999e+00, -2.0242e-04]])
 
     """
 
