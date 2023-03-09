@@ -2,7 +2,7 @@ import torch, pypose as pp
 import math, matplotlib.pyplot as plt
 
 
-class CartPole(pp.module.NTI):
+class CartPole(pp.module.NLS):
     def __init__(self, dt, length, cartmass, polemass, gravity):
         super().__init__()
         self.tau = dt
@@ -13,7 +13,7 @@ class CartPole(pp.module.NTI):
         self.polemassLength = self.polemass * self.length
         self.totalMass = self.cartmass + self.polemass
 
-    def state_transition(self, state, input):
+    def state_transition(self, state, input, t = None):
         x, xDot, theta, thetaDot = state
         force = input.squeeze()
         costheta = theta.cos()
@@ -30,7 +30,7 @@ class CartPole(pp.module.NTI):
 
         return state + _dstate * self.tau
 
-    def observation(self, state, input):
+    def observation(self, state, input, t = None):
         return state
 
 

@@ -2,7 +2,7 @@ import torch, pypose as pp
 import math, matplotlib.pyplot as plt
 
 
-class Floquet(pp.module.NTV):
+class Floquet(pp.module.NLS):
     '''
     Floquet system is periodic and time-varying.
     '''
