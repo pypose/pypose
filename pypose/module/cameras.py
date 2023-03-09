@@ -40,7 +40,7 @@ class CamerasBase(torch.nn.Module):
         Returns:
             A tensor of shape (B, 3) where B is the batch size.
         """
-        return pypose.Inv(self.pose)[..., :3]
+        return self.pose.Inv()[..., :3]
 
     def world_to_view_transform(self, points):
         """
@@ -91,7 +91,7 @@ class CamerasBase(torch.nn.Module):
 
 
 class PerspectiveCameras(CamerasBase):
-    """
+    r"""
     A class which stores a batch of parameters to generate a batch of
     transformation matrices using the multi-view geometry convention for
     perspective camera.
@@ -104,23 +104,21 @@ class PerspectiveCameras(CamerasBase):
         >>> import torch
         >>> import pypose
         >>> # create some random data
-        >>> R = torch.tensor([[ 0.70710678,  0., -0.70710678], [ 0. , 1., 0. ],[ 0.70710678, 0.,  0.70710678]])
-        >>> t = torch.tensor([0., -8., 0.])
+        >>> pose = pypose.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239])
         >>> f = 2
         >>> img_size = (7, 7)
         >>> projection_matrix = torch.tensor([[f, 0, img_size[0] / 2,], [0, f, img_size[1] / 2,], [0, 0, 1, ]])
         >>> pts_w = torch.tensor([[ 2.8284,  8.0000,  0.0000], [ 2.1213,  8.0000,  0.7071], [ 0.7071,  9.0000,  0.7071], [ 0.7071,  8.0000,  0.7071], [ 5.6569, 13.0000, -1.4142]])
         >>> # instantiate the camera
-        >>> Rt = torch.cat((R, t.unsqueeze(-1)), dim=-1)
-        >>> camera = pypose.module.PerspectiveCameras(pose=pypose.mat2SE3(Rt), intrinsics=projection_matrix)
+        >>> camera = pypose.module.PerspectiveCameras(pose=pose, intrinsics=projection_matrix)
         >>> # transform the points to image coordinates
         >>> img_pts = camera.full_projection_transform(pts_w)
         >>> img_pts
-        tensor([[5.5000, 3.5000],
-                [4.5000, 3.5000],
-                [3.5000, 5.5000],
-                [3.5000, 3.5000],
-                [6.8333, 6.8333]])
+        tensor([[5.4998, 3.5000],
+                [4.4999, 3.5000],
+                [3.4999, 5.5000],
+                [3.4999, 3.5000],
+                [6.8329, 6.8330]])
     """
 
     def __init__(
@@ -135,14 +133,14 @@ class PerspectiveCameras(CamerasBase):
             self.intrinsics = torch.eye(3)
 
     def projection_transform(self, points):
-        """
+        r"""
         Transform camera view coordinate points to pixel locations.
         Args:
             points (torch.Tensor): A tensor of shape (B, N, 3) where B is the batch size.
         Returns:
             points (torch.Tensor): A tensor of shape (B, N, 2) where B is the batch size.
         """
-        img_repj = torch.matmul(points, self.intrinsics.transpose(-2, -1))
+        img_repj = points.matmul(self.intrinsics.transpose(-2, -1))
         return img_repj[..., :2] / img_repj[..., 2:]
 
     def is_perspective(self):

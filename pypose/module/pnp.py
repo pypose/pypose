@@ -16,22 +16,22 @@ class EPnP(torch.nn.Module):
         source: https://github.com/cvlab-epfl/EPnP
 
         Args:
-            refinement_optimizer (Optional[torch.optim.Optimizer]): Optimizer class to refine the solution. Set to None
-            to disable refinement.
+            refinement_optimizer (Optional[torch.optim.Optimizer]): Optimizer class to refine the solution. Set to None to disable refinement.
             naive_ctrl_pts (bool): Use naive control points selection method.
 
         Note:
             The Gauss-Newton optimization step isn't exactly consistent with the implementation in the original paper's
             implementation, but it relies on the same optimization objective function.
+
         Examples:
             >>> import torch
             >>> import pypose
-            >>> # create some random data
-            >>> R = torch.tensor([[ 0.70710678,  0., -0.70710678], [ 0. , 1., 0. ],[ 0.70710678, 0.,  0.70710678]])
-            >>> t = torch.tensor([0., -8., 0.])
+            >>> # create some random test sample for a single camera
+            >>> pose = pypose.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239])
             >>> f = 2
             >>> img_size = (7, 7)
             >>> projection_matrix = torch.tensor([[f, 0, img_size[0] / 2,], [0, f, img_size[1] / 2,], [0, 0, 1, ]])
+            >>> # some random points in the view
             >>> pts_c = torch.tensor([[2., 0., 2.], [1., 0., 2.], [0., 1., 1.], [0., 0., 1.], [5., 5., 3.]])
             >>> pixels = (pts_c @ projection_matrix.T)[:, :2] / (pts_c @ projection_matrix.T)[:, 2:]
             >>> pixels
@@ -40,17 +40,17 @@ class EPnP(torch.nn.Module):
                     [3.5000, 5.5000],
                     [3.5000, 3.5000],
                     [6.8333, 6.8333]])
-            >>> pts_w = (pts_c - t) @ R[:3, :3]
+            >>> # transform the points to world coordinate
+            >>> # solve the PnP problem to find the camera pose
+            >>> pts_w = pose.Inv().Act(pts_c)
             >>> # solve the PnP problem
             >>> epnp = pypose.module.EPnP()
             >>> # when input is not batched, remember to add a batch dimension
             >>> pose = epnp(pts_w[None], pixels[None], projection_matrix[None])
-            >>> pose.rotation().matrix()  # the rotation matrix should be close to R
-            tensor([[[ 7.0713e-01, -5.2390e-06, -7.0708e-01],
-                     [-1.7946e-05,  1.0000e+00, -2.5357e-05],
-                     [ 7.0708e-01,  3.0620e-05,  7.0713e-01]]])
-            >>> pose.translation()  # the translation vector should be close to t
-            tensor([[-2.3007e-05, -7.9999e+00, -2.0242e-04]])
+            >>> pose
+            SE3Type LieTensor:
+            LieTensor([[ 5.4955e-05, -8.0000e+00, -2.7895e-05,  6.8488e-06, -3.8270e-01,
+                         3.2812e-06,  9.2387e-01]])
 
     """
 
@@ -70,7 +70,7 @@ class EPnP(torch.nn.Module):
                 ctrl_pts_w: The control points in world coordinate. The shape is (B, 4, 3).
                 kernel_bases: The kernel bases. The shape is (B, 16, 4).
             Returns:
-                loss: The loss. The shape is (B, ).
+                torch.Tensor: The loss. The shape is (B, ).
             """
             batch_shape = kernel_bases.shape[:-2]
             # calculate the control points in camera coordinate
@@ -203,6 +203,7 @@ class EPnP(torch.nn.Module):
         """
         Select four control points, used to express world coordinates of the object points. This is a naive
         implementation that corresponds to the original paper.
+
         Args:
             points: 3D object points, shape (..., n, 3)
         Returns:
@@ -219,6 +220,7 @@ class EPnP(torch.nn.Module):
     def select_control_points(points):
         """
         Select four control points, used to express world coordinates of the object points
+
         Args:
             points: 3D object points, shape (..., n, 3)
         Returns:
@@ -246,6 +248,7 @@ class EPnP(torch.nn.Module):
         which are a set of coefficients corresponded of control points for each object point. Check equation 1 in paper
         for more details.
         Inputs are batched.
+
         Args:
             points (torch.Tensor): object points in the world coordinate, shape (..., num_pts, 3)
             ctrl_pts_w (torch.Tensor): control points in the world coordinate, shape (..., 4, 3)
@@ -269,11 +272,12 @@ class EPnP(torch.nn.Module):
         """Given the image points, alphas and intrinsics, compute the m matrix, which is the matrix of the coefficients
         of the image points. Check equation 7 in paper for more details.
         Inputs are batched.
+
         Args:
             pixels (torch.Tensor): image points, shape (..., num_pts, 2)
             alpha (torch.Tensor): alphas, shape (..., num_pts, 4)
             intrinsics (torch.Tensor): intrinsics, shape (..., 3, 3)
-        return
+        Returns:
             torch.Tensor: m, shape (..., num_pts * 2, 12)
         """
         batch_shape = pixels.shape[:-2]
@@ -309,6 +313,7 @@ class EPnP(torch.nn.Module):
     def calculate_kernel(m, top=4):
         """Given the m matrix, compute the kernel of it. Check equation 8 in paper for more details.
         Inputs are batched.
+
         Args:
             m (torch.Tensor): m, shape (..., num_pts * 2, 12)
             top (int, optional): number of top eigen vectors to take. Defaults to 4.
@@ -333,6 +338,7 @@ class EPnP(torch.nn.Module):
         """Given the kernel of m, compute the L matrix. Check [source]
         (https://github.com/cvlab-epfl/EPnP/blob/5abc3cfa76e8e92e5a8f4be0370bbe7da246065e/cpp/epnp.cpp#L478)
         for more details. Inputs are batched.
+
         Args:
             kernel_bases (torch.Tensor): kernel of m, shape (..., 12, 4)
         Returns:
@@ -357,6 +363,7 @@ class EPnP(torch.nn.Module):
         (https://github.com/cvlab-epfl/EPnP/blob/5abc3cfa76e8e92e5a8f4be0370bbe7da246065e/cpp/epnp.cpp#L520)
         for more details.
         Inputs are batched.
+
         Args:
             cont_pts_w (torch.Tensor): coordinates of control points, shape (..., 4, 3)
         Returns:
@@ -369,6 +376,7 @@ class EPnP(torch.nn.Module):
     def calculate_betas(dim, l_mat, rho):
         """Given the L matrix and rho vector, compute the beta vector. Check equation 10 - 14 in paper for more details.
         Inputs are batched.
+
         Args:
             dim (int): dimension of the problem, 1, 2, or 3
             l_mat (torch.Tensor): L, shape (..., 6, 10)
@@ -408,6 +416,7 @@ class EPnP(torch.nn.Module):
     @staticmethod
     def compute_norm_sign_scaling_factor(xc, alphas, points):
         """Compute the scaling factor and the sign of the scaling factor
+
         Args:
             xc (torch.tensor): the (unscaled) control points in the camera coordinates, or the result from null space.
             alphas (torch.tensor): the weights of the control points to recover the object points
@@ -438,7 +447,7 @@ class EPnP(torch.nn.Module):
 
         # Update the control points and the object points in the camera coordinates based on the scaling factors
         ctrl_pts_c = ctrl_pts_c * sc
-        points_c = torch.matmul(alphas, ctrl_pts_c)
+        points_c = alphas.matmul(ctrl_pts_c)
 
         # Update the control points and the object points in the camera coordinates based on the sign
         neg_z_mask = torch.any(points_c[..., 2] < 0, dim=-1)  # (N, )
@@ -453,6 +462,7 @@ class EPnP(torch.nn.Module):
         """
         Get the rotation matrix and translation vector based on the object points in world coordinate and camera
         coordinate.
+
         Args:
             pts_w: The object points in world coordinate. The shape is (..., N, 3).
             pts_c: The object points in camera coordinate. The shape is (..., N, 3).
@@ -471,7 +481,7 @@ class EPnP(torch.nn.Module):
         m = m.sum(dim=1)  # along the point dimension
 
         u, s, vh = torch.svd(m)
-        rot = torch.matmul(u, vh.transpose(dim0=-1, dim1=-2))
+        rot = u.matmul(vh.transpose(dim0=-1, dim1=-2))
 
         # if det(R) < 0, make it positive
         negate_mask = torch.linalg.det(rot) < 0
