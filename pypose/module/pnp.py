@@ -1,7 +1,5 @@
 import torch
 import pypose
-from functorch import vmap
-from functools import partial
 from pypose.optim import GaussNewton
 
 
