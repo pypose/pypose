@@ -6,7 +6,7 @@ from pypose.optim import GaussNewton
 
 
 class EPnP(torch.nn.Module):
-    """
+    r"""
         EPnP Solver - a non-iterative O(n) solution to the PnP problem.
         as described in:
 
@@ -23,6 +23,26 @@ class EPnP(torch.nn.Module):
         Note:
             The Gauss-Newton optimization step isn't exactly consistent with the implementation in the original paper's
             implementation, but it relies on the same optimization objective function.
+        Examples:
+            >>> import torch
+            >>> import pypose
+            >>> # create some random data
+            >>> R = torch.tensor([[ 0.70710678,  0.        , -0.70710678,  0.        ], [ 0.        ,  1.        ,  0.        ,  0.        ],[ 0.70710678,  0.        ,  0.70710678,  0.        ],[ 0.        ,  0.        ,  0.        ,  1.        ]])
+            >>> t = torch.tensor([0., -8., 0.])
+            >>> f = 2
+            >>> img_size = (7, 7)
+            >>> projection_matrix = torch.tensor([[f, 0, img_size[0] / 2,], [0, f, img_size[1] / 2,], [0, 0, 1, ]])
+            >>> pts_c = torch.tensor([[2., 0., 2.], [1., 0., 2.], [0., 1., 1.], [0., 0., 1.], [5., 5., 3.]])
+            >>> pixels = (pts_c @ projection_matrix.T)[:, :2] / (pts_c @ projection_matrix.T)[:, 2:]
+            >>> pixels
+            >>> pts_w = (pts_c - t) @ R[:3, :3]
+            >>> # solve the PnP problem
+            >>> epnp = pypose.module.EPnP()
+            >>> # when input is not batched, remember to add a batch dimension
+            >>> pose = epnp(pts_w[None], pixels[None], projection_matrix[None])
+            >>> pose.rotation().matrix()  # the rotation matrix should be close to R
+            >>> pose.translation()  # the translation vector should be close to t
+
     """
 
     class BetasOptimizationObjective(torch.nn.Module):
@@ -72,43 +92,43 @@ class EPnP(torch.nn.Module):
                                                                (0, 1), (1, 1),
                                                                (0, 2), (1, 2), (2, 2),
                                                                (0, 3), (1, 3), (2, 3), (3, 3)]).T)
-        # equal mask [ True, False,  True, False, False,  True, False, False, False,  True]
+        # equal mask for above pairs [ True, False, True, False, False, True, False, False, False, True, ]
         self.register_buffer('multiply_mask', torch.tensor([1., 2., 1., 2., 2., 1., 2., 2., 2., 1.]))
 
-    def forward(self, obj_pts, img_pts, intrinsics):
+    def forward(self, points, pixels, intrinsics):
         """
         Args:
-            obj_pts (Tensor): 3D object points in the world coordinates, shape (batch_size, n, 3)
-            img_pts (Tensor): 2D image points, which are the projection of object points, with shape (batch_size, n, 2)
+            points (Tensor): 3D object points in the world coordinates, shape (batch_size, n, 3)
+            pixels (Tensor): 2D image points, which are the projection of object points, with shape (batch_size, n, 2)
             intrinsics (Tensor): camera intrinsics, shape (batch_size, 3, 3)
         Returns:
             lietensor.SE3Type: estimated pose for the camera
         """
         # shape checking
-        batch_shape = obj_pts.shape[:-2]
-        assert img_pts.shape[:-2] == batch_shape
+        batch_shape = points.shape[:-2]
+        assert pixels.shape[:-2] == batch_shape
         assert intrinsics.shape[:-2] == batch_shape
 
         # Select four control points and calculate alpha (in the world coordinate)
         if self.naive_ctrl_pts:
-            ctrl_pts_w = self.naive_control_points(obj_pts)
+            ctrl_pts_w = self.naive_control_points(points)
         else:
-            ctrl_pts_w = self.select_control_points(obj_pts)
-        alpha = self.compute_alphas(obj_pts, ctrl_pts_w)
+            ctrl_pts_w = self.select_control_points(points)
+        alpha = self.compute_alphas(points, ctrl_pts_w)
 
         # Using camera projection equation for all the points pairs to get the matrix M
-        m = self.build_m(img_pts, alpha, intrinsics)
+        m = self.build_m(pixels, alpha, intrinsics)
 
         kernel_m = self.calculate_kernel(m)[..., [3, 2, 1, 0]]  # to be consistent with the matlab code
 
         l_mat = self.build_l(kernel_m)
         rho = self.build_rho(ctrl_pts_w)
 
-        solution_keys = ['error', 'R', 't', 'ctrl_pts_c', 'obj_pts_c', 'beta', 'scale']
+        solution_keys = ['error', 'pose', 'ctrl_pts_c', 'points_c', 'beta', 'scale']
         solutions = {key: [] for key in solution_keys}
         for dim in range(1, 4):  # kernel space dimension of 4 is unstable
             beta = self.calculate_betas(dim, l_mat, rho)
-            solution = self.generate_solution(beta, kernel_m, alpha, obj_pts, img_pts, intrinsics)
+            solution = self.generate_solution(beta, kernel_m, alpha, points, pixels, intrinsics)
             for key in solution_keys:
                 solutions[key].append(solution[key])
 
@@ -124,39 +144,38 @@ class EPnP(torch.nn.Module):
             solutions[key] = solutions[key].squeeze(len(batch_shape))
 
         if self.refinement_optimizer is not None:
-            solutions = self.guass_newton(solutions, kernel_m, ctrl_pts_w, alpha, obj_pts, img_pts, intrinsics)
-        return solutions
+            solutions = self.optimization_step(solutions, kernel_m, ctrl_pts_w, alpha, points, pixels, intrinsics)
+        return solutions['pose']
 
-    def generate_solution(self, beta, kernel_m, alpha, obj_pts, img_pts, intrinsics, request_error=True):
+    def generate_solution(self, beta, kernel_m, alpha, points, pixels, intrinsics, request_error=True):
         solution = dict()
 
         ctrl_pts_c = pypose.bmv(kernel_m, beta)
-        ctrl_pts_c, obj_pts_c, sc = self.compute_norm_sign_scaling_factor(ctrl_pts_c, alpha, obj_pts)
-        r, t = self.get_rotation_translation(obj_pts, obj_pts_c)
+        ctrl_pts_c, points_c, sc = self.compute_norm_sign_scaling_factor(ctrl_pts_c, alpha, points)
+        pose = self.get_se3(points, points_c)
         if request_error:
-            rt = torch.cat((r, t.unsqueeze(-1)), dim=-1)
-            error = self.reprojection_error(obj_pts, img_pts, intrinsics, rt)
+            perspective_camera = pypose.module.PerspectiveCameras(pose, intrinsics)
+            error = perspective_camera.reprojection_error(points, pixels)
             solution['error'] = error
 
         # save the solution
-        solution['R'] = r
-        solution['t'] = t
+        solution['pose'] = pose
         solution['ctrl_pts_c'] = ctrl_pts_c
-        solution['obj_pts_c'] = obj_pts_c
+        solution['points_c'] = points_c
         solution['beta'] = beta
         solution['scale'] = sc
 
         return solution
 
-    def guass_newton(self, solutions, kernel_m, ctrl_pts_w, alpha, obj_pts, img_pts, intrinsics):
+    def optimization_step(self, solutions, kernel_m, ctrl_pts_w, alpha, points, pixels, intrinsics):
         """
         Args:
             solutions (dict): a dict of solutions
             kernel_m (Tensor): kernel matrix, shape (batch_size, n, 4)
             ctrl_pts_w (Tensor): control points in the world coordinate, shape (batch_size, 4, 3)
             alpha (Tensor): alpha, shape (batch_size, n, 4)
-            obj_pts (Tensor): 3D object points, shape (batch_size, n, 3)
-            img_pts (Tensor): 2D image points, shape (batch_size, n, 2)
+            points (Tensor): 3D object points, shape (batch_size, n, 3)
+            pixels (Tensor): 2D image points, shape (batch_size, n, 2)
             intrinsics (Tensor): camera intrinsics, shape (batch_size, 3, 3)
         Returns:
             None. This function will update the solutions in place.
@@ -167,45 +186,42 @@ class EPnP(torch.nn.Module):
         scheduler.optimize(input=(ctrl_pts_w, kernel_m))
         beta = objective.betas.data
 
-        solution = self.generate_solution(beta, kernel_m, alpha, obj_pts, img_pts, intrinsics, request_error=False)
+        solution = self.generate_solution(beta, kernel_m, alpha, points, pixels, intrinsics, request_error=False)
         return solution
 
     @staticmethod
-    def naive_control_points(obj_pts):
+    def naive_control_points(points):
         """
         Select four control points, used to express world coordinates of the object points. This is a naive
         implementation that corresponds to the original paper.
         Args:
-            obj_pts: 3D object points, shape (..., n, 3)
+            points: 3D object points, shape (..., n, 3)
         Returns:
             control points, shape (..., 4, 3)
         """
-        batch_shape = obj_pts.shape[:-2]
-        control_pts = torch.eye(3, dtype=obj_pts.dtype, device=obj_pts.device)
+        batch_shape = points.shape[:-2]
+        control_pts = torch.eye(3, dtype=points.dtype, device=points.device)
         # last control point is the origin
-        control_pts = torch.cat((control_pts, torch.zeros(1, 3, dtype=obj_pts.dtype, device=obj_pts.device)), dim=0)
+        control_pts = torch.cat((control_pts, torch.zeros(1, 3, dtype=points.dtype, device=points.device)), dim=0)
         control_pts = control_pts.reshape((1,) * len(batch_shape) + (4, 3)).repeat(*batch_shape, 1, 1)
         return control_pts
 
     @staticmethod
-    def select_control_points(obj_pts):
+    def select_control_points(points):
         """
         Select four control points, used to express world coordinates of the object points
         Args:
-            obj_pts: 3D object points, shape (..., n, 3)
+            points: 3D object points, shape (..., n, 3)
         Returns:
             control points, shape (..., 4, 3)
         """
         # Select the center of mass to be the first control point
-        center = obj_pts.mean(axis=-2)
+        center = points.mean(axis=-2)
 
         # Use distance to center to select the other three control points
         # svd
-        centered_obj_pts = obj_pts - center.unsqueeze(-2)  # center the object points, 1 is for broadcasting
-
-        # TODO: waiting for bsvd
-        full_svd = vmap(partial(torch.linalg.svd, full_matrices=True))
-        u, s, vh = full_svd(torch.bmm(centered_obj_pts.transpose(-1, -2), centered_obj_pts))
+        centered_points = points - center.unsqueeze(-2)  # center the object points, 1 is for broadcasting
+        u, s, vh = torch.linalg.svd(torch.bmm(centered_points.transpose(-1, -2), centered_points), full_matrices=True)
 
         # produce points TODO: change to batch implementation
         res = [center, ]
@@ -216,43 +232,43 @@ class EPnP(torch.nn.Module):
         return torch.stack(res, dim=-2)
 
     @staticmethod
-    def compute_alphas(obj_pts, ctrl_pts_w):
+    def compute_alphas(points, ctrl_pts_w):
         """Given the object points and the control points in the world coordinate, compute the alphas,
         which are a set of coefficients corresponded of control points for each object point. Check equation 1 in paper
         for more details.
         Inputs are batched.
         Args:
-            obj_pts (torch.Tensor): object points in the world coordinate, shape (..., num_pts, 3)
+            points (torch.Tensor): object points in the world coordinate, shape (..., num_pts, 3)
             ctrl_pts_w (torch.Tensor): control points in the world coordinate, shape (..., 4, 3)
         Returns:
             torch.Tensor: alphas, shape (..., num_pts, 4)
         """
-        batch_shape = obj_pts.shape[:-2]
-        num_pts = obj_pts.shape[1]
-        batched_ones = torch.ones((*batch_shape, num_pts, 1), dtype=obj_pts.dtype, device=obj_pts.device)
+        batch_shape = points.shape[:-2]
+        num_pts = points.shape[1]
+        batched_ones = torch.ones((*batch_shape, num_pts, 1), dtype=points.dtype, device=points.device)
         # concatenate object points with ones
-        obj_pts = torch.cat((obj_pts, batched_ones), dim=-1)
+        points = torch.cat((points, batched_ones), dim=-1)
         # concatenate control points with ones
         batched_ones = torch.ones((*batch_shape, 4, 1), dtype=ctrl_pts_w.dtype, device=ctrl_pts_w.device)
         ctrl_pts_w = torch.cat((ctrl_pts_w, batched_ones), dim=-1)
 
-        alpha = torch.linalg.solve(ctrl_pts_w, obj_pts, left=False)  # General method
+        alpha = torch.linalg.solve(ctrl_pts_w, points, left=False)  # General method
         return alpha
 
     @staticmethod
-    def build_m(img_pts, alpha, intrinsics):
+    def build_m(pixels, alpha, intrinsics):
         """Given the image points, alphas and intrinsics, compute the m matrix, which is the matrix of the coefficients
         of the image points. Check equation 7 in paper for more details.
         Inputs are batched.
         Args:
-            img_pts (torch.Tensor): image points, shape (..., num_pts, 2)
+            pixels (torch.Tensor): image points, shape (..., num_pts, 2)
             alpha (torch.Tensor): alphas, shape (..., num_pts, 4)
             intrinsics (torch.Tensor): intrinsics, shape (..., 3, 3)
         return
             torch.Tensor: m, shape (..., num_pts * 2, 12)
         """
-        batch_shape = img_pts.shape[:-2]
-        num_pts = img_pts.shape[-2]
+        batch_shape = pixels.shape[:-2]
+        num_pts = pixels.shape[-2]
 
         # extract elements of the intrinsic matrix in batch
         fu, fv, u0, v0 = (intrinsics[..., 0, 0, None],
@@ -260,7 +276,7 @@ class EPnP(torch.nn.Module):
                           intrinsics[..., 0, 2, None],
                           intrinsics[..., 1, 2, None])
         # extract elements of the image points in batch
-        ui, vi = img_pts[..., 0], img_pts[..., 1]
+        ui, vi = pixels[..., 0], pixels[..., 1]
         # extract elements of the alphas in batch
         a1, a2, a3, a4 = alpha[..., 0], alpha[..., 1], alpha[..., 2], alpha[..., 3]
         # build zero tensor, with a batch and point dimension
@@ -291,8 +307,8 @@ class EPnP(torch.nn.Module):
             torch.Tensor: kernel, shape (..., 12, top)
         """
         batch_shape = m.shape[:-2]
-        # find null space of M TODO: waiting for bsvd
-        eigenvalues, eigenvectors = vmap(torch.linalg.eig)(torch.matmul(m.transpose(-2, -1), m))
+        # find null space of M
+        eigenvalues, eigenvectors = torch.linalg.eig(torch.matmul(m.transpose(-2, -1), m))
         # take the real part
         eigenvalues = eigenvalues.real
         eigenvectors = eigenvectors.real
@@ -381,12 +397,12 @@ class EPnP(torch.nn.Module):
             return torch.stack([beta1, beta2, beta3, beta4], dim=-1)
 
     @staticmethod
-    def compute_norm_sign_scaling_factor(xc, alphas, obj_pts):
+    def compute_norm_sign_scaling_factor(xc, alphas, points):
         """Compute the scaling factor and the sign of the scaling factor
         Args:
             xc (torch.tensor): the (unscaled) control points in the camera coordinates, or the result from null space.
             alphas (torch.tensor): the weights of the control points to recover the object points
-            obj_pts (torch.tensor): the object points in the world coordinates
+            points (torch.tensor): the object points in the world coordinates
         Returns:
             contPts_c (torch.tensor): the control points in the camera coordinates
             objPts_c (torch.tensor): the object points in the camera coordinates
@@ -395,15 +411,15 @@ class EPnP(torch.nn.Module):
         batch_shape = xc.shape[:-1]
         # Calculate the control points and object points in the camera coordinates
         ctrl_pts_c = xc.reshape((*batch_shape, 4, 3))
-        obj_pts_c = torch.bmm(alphas, ctrl_pts_c)
+        points_c = torch.bmm(alphas, ctrl_pts_c)
 
         # Calculate the distance of the reference points in the world coordinates
-        obj_pts_w_centered = obj_pts - obj_pts.mean(dim=-2, keepdim=True)
-        dist_w = torch.linalg.norm(obj_pts_w_centered, dim=-1)
+        points_w_centered = points - points.mean(dim=-2, keepdim=True)
+        dist_w = torch.linalg.norm(points_w_centered, dim=-1)
 
         # Calculate the distance of the reference points in the camera coordinates
-        obj_pts_c_centered = obj_pts_c - obj_pts_c.mean(dim=-2, keepdim=True)
-        dist_c = torch.linalg.norm(obj_pts_c_centered, dim=-1)
+        points_c_centered = points_c - points_c.mean(dim=-2, keepdim=True)
+        dist_c = torch.linalg.norm(points_c_centered, dim=-1)
 
         # calculate the scaling factors
         # below are batched vector dot product
@@ -413,18 +429,18 @@ class EPnP(torch.nn.Module):
 
         # Update the control points and the object points in the camera coordinates based on the scaling factors
         ctrl_pts_c = ctrl_pts_c * sc
-        obj_pts_c = torch.matmul(alphas, ctrl_pts_c)
+        points_c = torch.matmul(alphas, ctrl_pts_c)
 
         # Update the control points and the object points in the camera coordinates based on the sign
-        neg_z_mask = torch.any(obj_pts_c[..., 2] < 0, dim=-1)  # (N, )
-        negate_switch = torch.ones((obj_pts.shape[0],), dtype=obj_pts.dtype, device=obj_pts.device)
+        neg_z_mask = torch.any(points_c[..., 2] < 0, dim=-1)  # (N, )
+        negate_switch = torch.ones((points.shape[0],), dtype=points.dtype, device=points.device)
         negate_switch[neg_z_mask] = negate_switch[neg_z_mask] * -1
-        obj_pts_c = obj_pts_c * negate_switch.reshape(*batch_shape, 1, 1)
+        points_c = points_c * negate_switch.reshape(*batch_shape, 1, 1)
         sc = sc[..., 0, 0] * negate_switch
-        return ctrl_pts_c, obj_pts_c, sc
+        return ctrl_pts_c, points_c, sc
 
     @staticmethod
-    def get_rotation_translation(pts_w, pts_c):
+    def get_se3(pts_w, pts_c):
         """
         Get the rotation matrix and translation vector based on the object points in world coordinate and camera
         coordinate.
@@ -444,9 +460,9 @@ class EPnP(torch.nn.Module):
         # Calculate the rotation matrix
         m = torch.matmul(pts_c[..., :, None], pts_w[..., None, :])
         m = m.sum(dim=1)  # along the point dimension
-        # TODO: waiting for bsvd
-        u, s, v = vmap(torch.svd)(m)
-        rot = torch.matmul(u, v.transpose(dim0=-1, dim1=-2))
+
+        u, s, vh = torch.svd(m)
+        rot = torch.matmul(u, vh.transpose(dim0=-1, dim1=-2))
 
         # if det(R) < 0, make it positive
         negate_mask = torch.linalg.det(rot) < 0
@@ -454,31 +470,8 @@ class EPnP(torch.nn.Module):
 
         # Calculate the translation vector based on the rotation matrix and the equation
         t = center_c - pypose.bmv(rot, center_w)
+        rt = torch.cat((rot, t.unsqueeze(-1)), dim=-1)
+        pose = pypose.mat2SE3(rt)
 
-        return rot, t
+        return pose
 
-    @staticmethod
-    def reprojection_error(pts_w, img_pts, intrinsics, rt):
-        """
-        Calculate the reprojection error.
-        Args:
-            pts_w: The object points in world coordinate. The shape is (..., N, 3).
-            img_pts: The image points. The shape is (..., N, 2).
-            intrinsics: The camera matrix. The shape is (..., 3, 3).
-            rt: The rotation matrix and translation vector. The shape is (..., 3, 4).
-        Returns:
-            error: The reprojection error. The shape is (..., ).
-        """
-        proj_mat = torch.bmm(intrinsics[..., :3], rt)
-        # concat 1 to the last column of objPts_w
-        obj_pts_w_ex = torch.cat((pts_w, torch.ones_like(pts_w[..., :1])), dim=-1)
-        # Calculate the image points
-        img_repj = torch.bmm(obj_pts_w_ex, proj_mat.transpose(dim0=-1, dim1=-2))
-
-        # Normalize the image points
-        img_repj = img_repj[..., :2] / img_repj[..., 2:]
-
-        error = torch.linalg.norm(img_repj - img_pts, dim=-1)
-        error = torch.mean(error, dim=-1)
-
-        return error

@@ -9,6 +9,33 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+
+def reprojection_error(pts_w, img_pts, intrinsics, rt):
+    """
+    Calculate the reprojection error.
+    Args:
+        pts_w: The object points in world coordinate. The shape is (..., N, 3).
+        img_pts: The image points. The shape is (..., N, 2).
+        intrinsics: The camera matrix. The shape is (..., 3, 3).
+        rt: The rotation matrix and translation vector. The shape is (..., 3, 4).
+    Returns:
+        error: The reprojection error. The shape is (..., ).
+    """
+    proj_mat = torch.bmm(intrinsics[..., :3], rt)
+    # concat 1 to the last column of objPts_w
+    obj_pts_w_ex = torch.cat((pts_w, torch.ones_like(pts_w[..., :1])), dim=-1)
+    # Calculate the image points
+    img_repj = torch.bmm(obj_pts_w_ex, proj_mat.transpose(dim0=-1, dim1=-2))
+
+    # Normalize the image points
+    img_repj = img_repj[..., :2] / img_repj[..., 2:]
+
+    error = torch.linalg.norm(img_repj - img_pts, dim=-1)
+    error = torch.mean(error, dim=-1)
+
+    return error
+
+
 def fetch_epfl_example():
     # load epfl's mat file
     test_mat_url = 'https://github.com/cvlab-epfl/EPnP/raw/master/matlab/data/input_data_noise.mat'
@@ -77,10 +104,10 @@ class TestEPnP:
             intrinsics = intrinsics[None].to(torch.float32)
             Rt = Rt[None]
 
-            rot = Rt[:, :3, :3][None]
-            t = Rt[:, :3, 3][None]
+            rot = Rt[:, :3, :3]
+            t = Rt[:, :3, 3]
 
-            error = pp.module.EPnP.reprojection_error(obj_pts,
+            error = reprojection_error(obj_pts,
                                                       img_pts,
                                                       intrinsics,
                                                       Rt, )
@@ -97,8 +124,8 @@ class TestEPnP:
         gt_rot = data['Rt'][..., :3, :3]
         gt_t = data['Rt'][..., :3, 3]
 
-        print("Pypose EPnP solution, rmse of R:", rmse_rot(solution['R'], gt_rot))
-        print("Pypose EPnP solution, rmse of t:", rmse_t(solution['t'], gt_t))
+        print("Pypose EPnP solution, rmse of R:", rmse_rot(solution.rotation().matrix(), gt_rot))
+        print("Pypose EPnP solution, rmse of t:", rmse_t(solution.translation(), gt_t))
 
         print("OpenCV EPnP solution, rmse of R:", rmse_rot(solution_ref['R'], gt_rot))
         print("OpenCV EPnP solution, rmse of t:", rmse_t(solution_ref['T'], gt_t))
