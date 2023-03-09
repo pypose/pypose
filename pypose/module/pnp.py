@@ -124,20 +124,21 @@ class EPnP(torch.nn.Module):
             solutions[key] = solutions[key].squeeze(len(batch_shape))
 
         if self.refinement_optimizer is not None:
-            self.guass_newton(solutions, kernel_m, ctrl_pts_w, alpha, obj_pts, img_pts, intrinsics)
+            solutions = self.guass_newton(solutions, kernel_m, ctrl_pts_w, alpha, obj_pts, img_pts, intrinsics)
         return solutions
 
-    def generate_solution(self, beta, kernel_m, alpha, obj_pts, img_pts, intrinsics):
+    def generate_solution(self, beta, kernel_m, alpha, obj_pts, img_pts, intrinsics, request_error=True):
         solution = dict()
 
         ctrl_pts_c = pypose.bmv(kernel_m, beta)
         ctrl_pts_c, obj_pts_c, sc = self.compute_norm_sign_scaling_factor(ctrl_pts_c, alpha, obj_pts)
         r, t = self.get_rotation_translation(obj_pts, obj_pts_c)
-        rt = torch.cat((r, t.unsqueeze(-1)), dim=-1)
-        error = self.reprojection_error(obj_pts, img_pts, intrinsics, rt)
+        if request_error:
+            rt = torch.cat((r, t.unsqueeze(-1)), dim=-1)
+            error = self.reprojection_error(obj_pts, img_pts, intrinsics, rt)
+            solution['error'] = error
 
         # save the solution
-        solution['error'] = error
         solution['R'] = r
         solution['t'] = t
         solution['ctrl_pts_c'] = ctrl_pts_c
@@ -162,29 +163,12 @@ class EPnP(torch.nn.Module):
         """
         objective = self.BetasOptimizationObjective(solutions['beta'] * solutions['scale'].unsqueeze(-1))
         gn = self.refinement_optimizer(objective)
-        best_error = solutions['error']
-        for i in range(10):
-            gn.step((ctrl_pts_w, kernel_m))
-            beta = objective.betas.data
+        scheduler = pypose.optim.scheduler.StopOnPlateau(gn, steps=10, patience=3, verbose=False)
+        scheduler.optimize(input=(ctrl_pts_w, kernel_m))
+        beta = objective.betas.data
 
-            solution = self.generate_solution(beta, kernel_m, alpha, obj_pts, img_pts, intrinsics)
-            # unpack solution
-            error = solution['error']
-            r = solution['R']
-            t = solution['t']
-            ctrl_pts_c = solution['ctrl_pts_c']
-            obj_pts_c = solution['obj_pts_c']
-            sc = solution['scale']
-
-            # update solutions
-            update_mask = error < best_error
-            solutions['error'][update_mask] = error[update_mask]
-            solutions['R'][update_mask] = r[update_mask]
-            solutions['t'][update_mask] = t[update_mask]
-            solutions['ctrl_pts_c'][update_mask] = ctrl_pts_c[update_mask]
-            solutions['obj_pts_c'][update_mask] = obj_pts_c[update_mask]
-            solutions['beta'][update_mask] = beta[update_mask]
-            solutions['scale'][update_mask] = sc[update_mask]
+        solution = self.generate_solution(beta, kernel_m, alpha, obj_pts, img_pts, intrinsics, request_error=False)
+        return solution
 
     @staticmethod
     def naive_control_points(obj_pts):
