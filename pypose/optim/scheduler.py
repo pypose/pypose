@@ -49,6 +49,7 @@ class StopOnPlateau(_Scheduler):
 
     Args:
         optimizer (Optimizer): Wrapped optimizer.
+        steps (int): Maximum number of interations optimizer will step.
         patience (int): Number of steps with no loss 'decreasing' is seen. For example, if
             ``patience = 2``, then it ignores the first 2 steps with no improvement, and stop
             the optimizer after the 3rd step if the loss has no decerasing. Default: 5.
