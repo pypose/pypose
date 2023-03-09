@@ -18,9 +18,9 @@ class CamerasBase(torch.nn.Module):
     CameraBase defines methods that are common to all camera models:
         - `camera_center` that returns the optical center of the camera in
             world coordinates
-        - `world_to_view_transform` which returns a 3D transform from
+        - `world2camera` which returns a 3D transform from
             world coordinates to the camera view coordinates (R, T)
-        - `full_projection_transform` which composes the projection
+        - `world2pixel` which composes the projection
             transform (P) with the world-to-view transform (R, T)
 
     Args:
@@ -40,10 +40,11 @@ class CamerasBase(torch.nn.Module):
         Returns:
             A tensor of shape (B, 3) where B is the batch size.
         """
-        return self.pose.Inv()[..., :3]
+        return self.pose.Inv().translation()
 
-    def world_to_view_transform(self, points):
+    def world2camera(self, points):
         """
+        a.k.a world to view transform.
         Take world coordinate points and transform them to camera view coordinate.
         Args:
             points (torch.Tensor): A tensor of shape (B, N, 3) where B is the batch size.
@@ -52,18 +53,20 @@ class CamerasBase(torch.nn.Module):
         """
         return pypose.Act(self.pose.unsqueeze(-2), points)
 
-    def full_projection_transform(self, points):
+    def world2pixel(self, points):
         """
+        a.k.a full projection transform.
         Composes the projection transform (P) with the world-to-view transform (R, T)
         Args:
             points (torch.Tensor): A tensor of shape (B, N, 3) where B is the batch size.
         Returns:
             points (torch.Tensor): A tensor of shape (B, N, 2) where B is the batch size.
         """
-        return self.projection_transform(self.world_to_view_transform(points))
+        return self.camera2pixel(self.world2camera(points))
 
-    def projection_transform(self, points):
+    def camera2pixel(self, points):
         """
+        a.k.a projection transform.
         Transform camera view coordinate points to pixel locations.
         Args:
             points (torch.Tensor): A tensor of shape (B, N, 3) where B is the batch size.
@@ -72,20 +75,20 @@ class CamerasBase(torch.nn.Module):
         """
         raise NotImplementedError
 
-    def reprojection_error(self, pts_w, img_pts):
+    def reprojection_error(self, points, pixels):
         """
         Calculate the reprojection error.
         Args:
-            pts_w: The object points in world coordinate. The shape is (..., N, 3).
-            img_pts: The image points. The shape is (..., N, 2).
+            points: The object points in world coordinate. The shape is (..., N, 3).
+            pixels: The image points. The shape is (..., N, 2).
         Returns:
             error: The reprojection error. The shape is (..., ).
         """
         # Calculate the image points
-        img_repj = self.full_projection_transform(pts_w)
+        img_repj = self.world2pixel(points)
 
-        error = torch.linalg.norm(img_repj - img_pts, dim=-1)
-        error = torch.mean(error, dim=-1)
+        error = torch.linalg.norm(img_repj - pixels, dim=-1)
+        error = error.mean(dim=-1)
 
         return error
 
@@ -112,7 +115,7 @@ class PerspectiveCameras(CamerasBase):
         >>> # instantiate the camera
         >>> camera = pypose.module.PerspectiveCameras(pose=pose, intrinsics=projection_matrix)
         >>> # transform the points to image coordinates
-        >>> img_pts = camera.full_projection_transform(pts_w)
+        >>> img_pts = camera.world2pixel(pts_w)
         >>> img_pts
         tensor([[5.4998, 3.5000],
                 [4.4999, 3.5000],
@@ -132,7 +135,7 @@ class PerspectiveCameras(CamerasBase):
         elif self.intrinsics is None:
             self.intrinsics = torch.eye(3)
 
-    def projection_transform(self, points):
+    def camera2pixel(self, points):
         r"""
         Transform camera view coordinate points to pixel locations.
         Args:
@@ -140,7 +143,7 @@ class PerspectiveCameras(CamerasBase):
         Returns:
             points (torch.Tensor): A tensor of shape (B, N, 2) where B is the batch size.
         """
-        img_repj = points.matmul(self.intrinsics.transpose(-2, -1))
+        img_repj = points.matmul(self.intrinsics.mT)
         return img_repj[..., :2] / img_repj[..., 2:]
 
     def is_perspective(self):

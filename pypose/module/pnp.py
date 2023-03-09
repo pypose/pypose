@@ -84,8 +84,7 @@ class EPnP(torch.nn.Module):
             diff_w = diff_w.reshape(*batch_shape, 16, 3)
             diff_w = torch.sum(diff_w ** 2, dim=-1)
 
-            error = torch.abs(diff_w - diff_c)
-            error = torch.mean(error, dim=-1)
+            error = (diff_w - diff_c).abs().mean(dim=-1)
 
             return error
 
@@ -232,7 +231,7 @@ class EPnP(torch.nn.Module):
         # Use distance to center to select the other three control points
         # svd
         centered_points = points - center.unsqueeze(-2)  # center the object points, 1 is for broadcasting
-        u, s, vh = torch.linalg.svd(torch.bmm(centered_points.transpose(-1, -2), centered_points), full_matrices=True)
+        u, s, vh = torch.linalg.svd(torch.bmm(centered_points.mT, centered_points), full_matrices=True)
 
         # produce points TODO: change to batch implementation
         res = [center, ]
@@ -322,7 +321,7 @@ class EPnP(torch.nn.Module):
         """
         batch_shape = m.shape[:-2]
         # find null space of M
-        eigenvalues, eigenvectors = torch.linalg.eig(torch.matmul(m.transpose(-2, -1), m))
+        eigenvalues, eigenvectors = torch.linalg.eig(torch.matmul(m.mT, m))
         # take the real part
         eigenvalues = eigenvalues.real
         eigenvectors = eigenvectors.real
@@ -345,7 +344,7 @@ class EPnP(torch.nn.Module):
             torch.Tensor: L, shape (..., 6, 10)
         """
         batch_shape = kernel_bases.shape[:-2]
-        kernel_bases = kernel_bases.transpose(-1, -2)  # shape (batch_shape, 4, 12)
+        kernel_bases = kernel_bases.mT  # shape (batch_shape, 4, 12)
         # calculate the pairwise distance matrix within bases
         diff = kernel_bases.reshape(*batch_shape, 4, 1, 4, 3) - kernel_bases.reshape(*batch_shape, 4, 4, 1, 3)
         diff = diff.flatten(start_dim=-3, end_dim=-2)  # shape (batch_shape, 4, 16, 3)
@@ -356,7 +355,7 @@ class EPnP(torch.nn.Module):
         dot_products = torch.sum(
             dv[..., self.ten_indices_pair[0], :, :] * dv[..., self.ten_indices_pair[1], :, :], dim=-1)
         dot_products = dot_products * self.multiply_mask.reshape((1,) * len(batch_shape) + (10, 1))
-        return dot_products.transpose(-1, -2)  # shape (batch_shape, 6, 10)
+        return dot_products.mT  # shape (batch_shape, 6, 10)
 
     def build_rho(self, cont_pts_w):
         """Given the coordinates of control points, compute the rho vector. Check [source]
@@ -481,7 +480,7 @@ class EPnP(torch.nn.Module):
         m = m.sum(dim=1)  # along the point dimension
 
         u, s, vh = torch.svd(m)
-        rot = u.matmul(vh.transpose(dim0=-1, dim1=-2))
+        rot = u.matmul(vh.mT)
 
         # if det(R) < 0, make it positive
         negate_mask = torch.linalg.det(rot) < 0
