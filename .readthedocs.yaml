@@ -28,3 +28,4 @@ python:
    install:
    - requirements: requirements/main.txt
    - requirements: requirements/dev.txt
+   
