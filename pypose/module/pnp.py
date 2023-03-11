@@ -85,7 +85,7 @@ class EPnP(torch.nn.Module):
     def __init__(self, naive_ctrl_pts=False, optimizer=GaussNewton):
         super().__init__()
         self.naive_ctrl_pts = naive_ctrl_pts
-        self.refinement_optimizer = optimizer
+        self.optimizer = optimizer
 
         self.register_buffer('six_indices', torch.tensor(
             [(0 * 4 + 1), (0 * 4 + 2), (0 * 4 + 3), (1 * 4 + 2), (1 * 4 + 3), (2 * 4 + 3)]))
@@ -145,7 +145,7 @@ class EPnP(torch.nn.Module):
             solutions[key] = torch.gather(solutions[key], len(batch_shape), best_idx_)
             solutions[key] = solutions[key].squeeze(len(batch_shape))
 
-        if self.refinement_optimizer is not None:
+        if self.optimizer is not None:
             solutions = self.optimization_step(solutions, kernel_m, ctrl_pts_w, alpha, points, pixels, intrinsics)
         return solutions['pose']
 
@@ -183,7 +183,7 @@ class EPnP(torch.nn.Module):
             None. This function will update the solutions in place.
         """
         objective = self.BetasOptimizationObjective(solutions['beta'] * solutions['scale'].unsqueeze(-1))
-        gn = self.refinement_optimizer(objective)
+        gn = self.optimizer(objective)
         scheduler = pypose.optim.scheduler.StopOnPlateau(gn, steps=10, patience=3, verbose=False)
         scheduler.optimize(input=(ctrl_pts_w, kernel_m))
         beta = objective.betas.data
