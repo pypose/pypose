@@ -1,7 +1,7 @@
+import torch
+import pypose as pp
+from torch import nn
 from typing import Optional
-
-import pypose
-import torch.nn
 
 
 class CamerasBase(torch.nn.Module):
@@ -30,9 +30,9 @@ class CamerasBase(torch.nn.Module):
     def __init__(self, pose=None, ):
         super().__init__()
         if pose is not None:
-            self.pose = pose
+            self.pose = pp.Parameter(pose)
         elif self.pose is None:
-            self.pose = pypose.identity_SE3()
+            self.pose = pp.Parameter(pp.identity_SE3())
 
     def get_camera_center(self):
         """
@@ -51,7 +51,7 @@ class CamerasBase(torch.nn.Module):
         Returns:
             points (torch.Tensor): A tensor of shape (B, N, 3) where B is the batch size.
         """
-        return pypose.Act(self.pose.unsqueeze(-2), points)
+        return self.pose.unsqueeze(-2) @ points
 
     def world2pixel(self, points):
         """
@@ -105,15 +105,19 @@ class PerspectiveCameras(CamerasBase):
 
     Examples:
         >>> import torch
-        >>> import pypose
+        >>> import pypose as pp
         >>> # create some random data
-        >>> pose = pypose.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239])
+        >>> pose = pp.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239])
         >>> f = 2
         >>> img_size = (7, 7)
         >>> projection_matrix = torch.tensor([[f, 0, img_size[0] / 2,], [0, f, img_size[1] / 2,], [0, 0, 1, ]])
-        >>> pts_w = torch.tensor([[ 2.8284,  8.0000,  0.0000], [ 2.1213,  8.0000,  0.7071], [ 0.7071,  9.0000,  0.7071], [ 0.7071,  8.0000,  0.7071], [ 5.6569, 13.0000, -1.4142]])
+        >>> pts_w = torch.tensor([[ 2.8284,  8.0000,  0.0000],
+        ...                       [ 2.1213,  8.0000,  0.7071],
+        ...                       [ 0.7071,  9.0000,  0.7071],
+        ...                       [ 0.7071,  8.0000,  0.7071],
+        ...                       [ 5.6569, 13.0000, -1.4142]])
         >>> # instantiate the camera
-        >>> camera = pypose.module.PerspectiveCameras(pose=pose, intrinsics=projection_matrix)
+        >>> camera = pp.module.PerspectiveCameras(pose=pose, intrinsics=projection_matrix)
         >>> # transform the points to image coordinates
         >>> img_pts = camera.world2pixel(pts_w)
         >>> img_pts
@@ -121,19 +125,19 @@ class PerspectiveCameras(CamerasBase):
                 [4.4999, 3.5000],
                 [3.4999, 5.5000],
                 [3.4999, 3.5000],
-                [6.8329, 6.8330]])
+                [6.8329, 6.8330]], grad_fn=<DivBackward0>)
     """
 
     def __init__(
             self,
-            pose: Optional[pypose.LieTensor] = None,
+            pose: Optional[pp.LieTensor] = None,
             intrinsics: Optional[torch.Tensor] = None,
     ):
         super().__init__(pose=pose)
         if intrinsics is not None:
-            self.intrinsics = intrinsics
+            self.intrinsics = nn.Parameter(intrinsics)
         elif self.intrinsics is None:
-            self.intrinsics = torch.eye(3)
+            self.intrinsics = nn.Parameter(torch.eye(3))
 
     def camera2pixel(self, points):
         r"""
@@ -143,8 +147,6 @@ class PerspectiveCameras(CamerasBase):
         Returns:
             points (torch.Tensor): A tensor of shape (B, N, 2) where B is the batch size.
         """
+        # this is equivalent to left multiplying the intrinsics to the points
         img_repj = points.matmul(self.intrinsics.mT)
         return img_repj[..., :2] / img_repj[..., 2:]
-
-    def is_perspective(self):
-        return True

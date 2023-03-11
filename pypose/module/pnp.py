@@ -6,20 +6,10 @@ from pypose.optim import GaussNewton
 class EPnP(torch.nn.Module):
     r"""
         EPnP Solver - a non-iterative O(n) solution to the PnP problem.
-        as described in:
-
-        Francesc Moreno-Noguer, Vincent Lepetit, Pascal Fua.
-        Accurate Non-Iterative O(n) Solution to the PnP Problem.
-        In Proceedings of ICCV, 2007.
-        source: https://github.com/cvlab-epfl/EPnP
 
         Args:
-            refinement_optimizer (Optional[torch.optim.Optimizer]): Optimizer class to refine the solution. Set to None to disable refinement.
-            naive_ctrl_pts (bool): Use naive control points selection method.
-
-        Note:
-            The Gauss-Newton optimization step isn't exactly consistent with the implementation in the original paper's
-            implementation, but it relies on the same optimization objective function.
+            optimizer (Optional[torch.optim.Optimizer]): Optimizer to refine the solution. Set to None to disable refinement.
+            naive_ctrl_pts (bool): Use naive control points selection method. Reco
 
         Examples:
             >>> import torch
@@ -49,6 +39,12 @@ class EPnP(torch.nn.Module):
             SE3Type LieTensor:
             LieTensor([[ 5.4955e-05, -8.0000e+00, -2.7895e-05,  6.8488e-06, -3.8270e-01,
                          3.2812e-06,  9.2387e-01]])
+
+        Note:
+            The implementation is based on the paper:
+            * Francesc Moreno-Noguer, Vincent Lepetit, and Pascal Fua, `Accurate Non-Iterative O(n) Solution to the PnP
+              Problem. <https://github.com/cvlab-epfl/EPnP>`_,
+              In Proceedings of ICCV, 2007.
 
     """
 
@@ -86,10 +82,10 @@ class EPnP(torch.nn.Module):
 
             return error
 
-    def __init__(self, naive_ctrl_pts=False, refinement_optimizer=GaussNewton):
+    def __init__(self, naive_ctrl_pts=False, optimizer=GaussNewton):
         super().__init__()
         self.naive_ctrl_pts = naive_ctrl_pts
-        self.refinement_optimizer = refinement_optimizer
+        self.refinement_optimizer = optimizer
 
         self.register_buffer('six_indices', torch.tensor(
             [(0 * 4 + 1), (0 * 4 + 2), (0 * 4 + 3), (1 * 4 + 2), (1 * 4 + 3), (2 * 4 + 3)]))
