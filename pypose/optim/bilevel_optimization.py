@@ -1,5 +1,7 @@
 import pypose as pp
+from pypose.optim.solver import Cholesky
 import torch
+
 
 class InnerModel(torch.nn.Module):
     r'''
@@ -9,7 +11,7 @@ class InnerModel(torch.nn.Module):
         super().__init__()
         
         # Define all parameters
-        self.param = torch.nn.parameter(some_param, requires_grad = True)
+        self.param = torch.nn.parameter(all_params_to_optimize, requires_grad = True)
     
     def forward(tau):
         r'''
@@ -17,6 +19,7 @@ class InnerModel(torch.nn.Module):
         '''
         raise NotImplementedError("User needs to implement function to return inner cost and constraint error.")
     
+
 class OuterModel(torch.nn.Module):
     r'''
     The base class for defining outer optimization.
@@ -32,19 +35,30 @@ class OuterModel(torch.nn.Module):
         '''
         raise NotImplementedError("User needs to implement function to return outer loss.")
 
+
 class BLO(pp.optim._Optimizer):
     r'''
     Optimizer for solving bi-level optimization problem.
     '''
-    def __init__(self, inner_optimizer) -> None:
+    def __init__(self, outer_model: torch.nn.Module, inner_optimizer: torch.optim,
+                 solver = None, ) -> None:
         super().__init__()
 
         self.inner_optimizer = inner_optimizer
         self.scheduler = pp.optim.scheduler.StopOnPlateau(inner_optimizer)
 
-        self.tau_star = None
-        self.mu_star = None
+        self.outer_model = outer_model
     
-    def step(self):
-        self.scheduler.optimizer()
-        self.tau_star, self.mu_star = self.inner_optimizer.tau, self.inner_optimizer.mu
+    @torch.no_grad()
+    def step(self, input, target = None, weight = None):
+        self.scheduler.optimize()
+        tau_star, mu_star = self.inner_optimizer.tau, self.inner_optimizer.mu
+        
+        # HOW TO GET JACOBIANS EFFICIENTLY
+
+        # COMPUTE AND SET GRADIENTS
+
+        # STEP THE OPTIMIZER
+
+        self.loss = self.outer_model.forward(tau_star, target)
+        return self.outer_model(self.tau_star)
