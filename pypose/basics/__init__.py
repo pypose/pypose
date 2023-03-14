@@ -1,2 +1,2 @@
 
-from .ops import bmv, bvmv
+from .ops import bvv, bmv, bvmv
