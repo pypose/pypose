@@ -1,5 +1,6 @@
 import torch
-from pypose.module import EKF
+from . import EKF
+from ..basics import bvv
 import torch.nn.functional as F
 from torch.distributions import MultivariateNormal
 
@@ -164,15 +165,13 @@ class PF(EKF):
         self.model.set_refpoint(state=x, input=u, t=t)
 
         xp = self.generate_particles(x, n * P)
-        xs = self.model.state_transition(xp, u, t)
-        ye = self.model.observation(xs, u, t)
+        xs, ye = self.model(xp, u)
         q = self.relative_likelihood(y, ye, R)
         xr = self.resample_particles(q, xs)
 
-        x = xr.mean(dim=0)
+        x = xr.mean(dim=-2)
         ex = xr - x
-        weight = torch.tensor([1 / self.particles])
-        P = self.compute_cov(ex, ex, weight, Q)
+        P = self.compute_cov(ex, ex, Q)
 
         return x, P
 
@@ -194,19 +193,16 @@ class PF(EKF):
         r'''
         Compute the relative likelihood
         '''
-        q = MultivariateNormal(ye, R).log_prob(y).exp()
-        return F.normalize(q, p=1, dim=-1)
+        return F.softmax(MultivariateNormal(ye, R).log_prob(y), dim=-1)
 
     def resample_particles(self, q, x):
         r'''
         Resample the set of a posteriori particles
         '''
         r = torch.rand(self.particles, dtype=x.dtype, device=x.device)
-        cumsumq = torch.cumsum(q, dim=0)
-        cumsumq[-1] = 1.0
+        cumsumq = torch.cumsum(q, dim=-1)
         return x[torch.searchsorted(cumsumq, r)]
 
-    def compute_cov(self, a, b, w, Q=0):
+    def compute_cov(self, a, b, Q=0):
         '''Compute covariance of two set of variables.'''
-        a, b = a.unsqueeze(-1), b.unsqueeze(-1)
-        return Q + (w.unsqueeze(-1) * a @ b.mT).sum(dim=-3)
+        return Q + bvv(a, b).mean(dim=-3)
