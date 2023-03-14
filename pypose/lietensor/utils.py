@@ -15,15 +15,21 @@ def _LieTensor_wrapper_add_docstr(wrapper: functools.partial, embedding_doc):
     wrapper.__doc__ = fr'''Alias of {type_name} type :obj:`LieTensor`.
 
     Args:
-        data (:obj:`Tensor`, or :obj:`list`, or ':obj:`int`...'): A
-            :obj:`Tensor` object, or constructing a :obj:`Tensor`
-            object from :obj:`list`, which defines tensor data (see below), or
-            from ':obj:`int`...', which defines tensor shape.
+        data (:obj:`Tensor`, or :obj:`list`): A :obj:`Tensor` object, or constructing
+            a :obj:`Tensor` object from :obj:`list`, which defines tensor data.
 
-            The shape of :obj:`Tensor` object must be ``(*, {type_dim})``,
-            where ``*`` is empty, one, or more batched dimensions (the
-            :obj:`~LieTensor.lshape` of this LieTensor), otherwise error will
-            be raised.
+        dtype (``torch.dtype``, optional): the desired data type of returned LieTensor.
+            Default: if ``None``, infers data type from data.
+
+        device (``torch.device``, optional): the device of the constructed LieTensor.
+            If ``None`` and data is a tensor then the device of data is used. If ``None``
+            and data is not a tensor then the result LieTensor is constructed on CPU.
+
+        requires_grad (``bool``, optional): If autograd should record operations on the
+            returned LieTensor. Default: ``False``.
+
+        pin_memory (``bool``, optional): If set, returned LieTensor would be allocated in
+            the pinned memory. Works only for CPU LieTensors. Default: ``False``.
 
     {embedding_doc}
 
@@ -31,11 +37,8 @@ def _LieTensor_wrapper_add_docstr(wrapper: functools.partial, embedding_doc):
     {type_dim} elements of the above embedding.
 
     Note:
-        It is not advised to construct {type_name} Tensors by specifying storage
-        sizes with ':obj:`int`...', which does not initialize data.
-
         Consider using :obj:`pypose.randn_{type_name}` or
-        :obj:`pypose.identity_{type_name}` instead.
+        :obj:`pypose.identity_{type_name}` instead to initialize data.
 
     See {', '.join([f':obj:`pypose.{m}`' for m in see_method])} for
     implementations of relevant operations.

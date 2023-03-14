@@ -1,6 +1,6 @@
 import collections
-import math, numbers
-import torch, warnings
+import warnings, numbers
+import torch, numpy as np 
 from torch import nn, linalg
 from .operation import broadcast_inputs
 from .basics import cumops_, cummul_, cumprod_
@@ -878,7 +878,7 @@ class LieTensor(torch.Tensor):
         and other data structures, e.g., transformation matrix, Euler angle, etc. The users
         can convert data between Lie Group and Lie algebra with :obj:`Exp` and :obj:`Log`.
     """
-    def __init__(self, *data, ltype:LieType):
+    def __init__(self, data, *, ltype:LieType, requires_grad=False, **kwargs):
         assert self.shape[-1:] == ltype.dimension, 'The last dimension of a LieTensor has to be ' \
             'corresponding to their LieType. More details go to {}. If this error happens in an ' \
             'optimization process, where LieType is not a necessary structure, we suggest to '    \
@@ -888,9 +888,13 @@ class LieTensor(torch.Tensor):
         self.ltype = ltype
 
     @staticmethod
-    def __new__(cls, *data, ltype):
-        tensor = data[0] if isinstance(data[0], torch.Tensor) else torch.Tensor(*data)
-        return torch.Tensor.as_subclass(tensor, LieTensor)
+    def __new__(cls, data, *, ltype, requires_grad=False, **kwargs):
+        if isinstance(data, (torch.Tensor, LieTensor)):
+            tensor = torch.Tensor(data)
+            return torch.Tensor.as_subclass(tensor, LieTensor)
+        else:
+            tensor = torch.tensor(data, **kwargs)
+            return torch.Tensor.as_subclass(tensor, LieTensor).requires_grad_(requires_grad)
 
     def __repr__(self):
         if hasattr(self, 'ltype'):
