@@ -1,6 +1,6 @@
-import torch as torch
-import torch.nn as nn
-import pypose as pp
+import torch
+from torch import nn
+from ..basics import bmv
 from torch.autograd.functional import jacobian
 
 
@@ -210,7 +210,7 @@ class LTI(System):
         Returns:
             ``Tensor``: The state the system in next time step.
         '''
-        z = pp.bmv(self.A, state) + pp.bmv(self.B, input)
+        z = bmv(self.A, state) + bmv(self.B, input)
         return z if self.c1 is None else z + self.c1
 
     def observation(self, state, input):
@@ -227,7 +227,7 @@ class LTI(System):
         Returns:
             ``Tensor``: The observation of the system in next time step.
         '''
-        y = pp.bmv(self.C, state) + pp.bmv(self.D, input)
+        y = bmv(self.C, state) + bmv(self.D, input)
         return y if self.c2 is None else y + self.c2
 
     @property
@@ -613,7 +613,7 @@ class NLS(System):
                            - \mathbf{A}\mathbf{x}^* - \mathbf{B}\mathbf{u}^*
         '''
         # Potential performance loss here - self.A and self.B involves jacobian eval
-        return self._ref_f - pp.bmv(self.A, self._ref_state) - pp.bmv(self.B, self._ref_input)
+        return self._ref_f - bmv(self.A, self._ref_state) - bmv(self.B, self._ref_input)
 
     @property
     def c2(self):
@@ -625,4 +625,4 @@ class NLS(System):
                            - \mathbf{C}\mathbf{x}^* - \mathbf{D}\mathbf{u}^*
         '''
         # Potential performance loss here - self.C and self.D involves jacobian eval
-        return self._ref_g - pp.bmv(self.C, self._ref_state) - pp.bmv(self.D, self._ref_input)
+        return self._ref_g - bmv(self.C, self._ref_state) - bmv(self.D, self._ref_input)
