@@ -1,6 +1,7 @@
 import torch
-import pypose as pp
 from torch import nn
+from .. import LieTensor, so3, SO3
+from .. import identity_SO3, vec2skew, cumprod
 
 
 class IMUPreintegrator(nn.Module):
@@ -87,7 +88,7 @@ class IMUPreintegrator(nn.Module):
         <https://github.com/pypose/pypose/tree/main/examples/module/imu>`_.
     '''
     def __init__(self, pos = torch.zeros(3),
-                       rot = pp.identity_SO3(),
+                       rot = identity_SO3(),
                        vel = torch.zeros(3),
                        gravity = 9.81007,
                        gyro_cov = (3.2e-3)**2,
@@ -121,7 +122,7 @@ class IMUPreintegrator(nn.Module):
                 obj = obj[None, None, ...]
         return obj
 
-    def forward(self, dt, gyro, acc, rot:pp.SO3=None, gyro_cov=None, acc_cov=None, init_state=None):
+    def forward(self, dt, gyro, acc, rot:SO3=None, gyro_cov=None, acc_cov=None, init_state=None):
         r"""
         Propagate IMU states from duration (:math:`\delta t`), angular rate
         (:math:`\omega`), linear acceleration (:math:`\mathbf{a}`) in body frame, as well as
@@ -290,7 +291,7 @@ class IMUPreintegrator(nn.Module):
             cov_input_state ={
                 'Rij': Rij.detach(),
                 'Rk': inte_state['w'].detach(),
-                'Ha': pp.vec2skew(inte_state['a'].detach()),
+                'Ha': vec2skew(inte_state['a'].detach()),
                 'dt': dt.detach() 
             }
             cov = self.propagate_cov(cov_input = cov_input_state, init_cov = init_cov,
@@ -307,7 +308,7 @@ class IMUPreintegrator(nn.Module):
 
         return {**predict, **cov}
 
-    def integrate(self, dt, gyro, acc, rot:pp.SO3=None, init_rot:pp.SO3=None):
+    def integrate(self, dt, gyro, acc, rot:SO3=None, init_rot:SO3=None):
         r"""
         Integrate the IMU sensor signals gyroscope (angular rate
         :math:`\omega`), linear acceleration (:math:`\mathbf{a}`) in body frame to
@@ -353,15 +354,15 @@ class IMUPreintegrator(nn.Module):
             signal dimension.
         """
         B, F = dt.shape[:2]
-        dr =  pp.so3(gyro*dt).Exp()
-        w = torch.cat([pp.identity_SO3(B, 1, dtype=dt.dtype, device=dt.device), dr], dim=1)
-        incre_r = pp.cumprod(w, dim = 1, left=False)
+        dr =  so3(gyro*dt).Exp()
+        w = torch.cat([identity_SO3(B, 1, dtype=dt.dtype, device=dt.device), dr], dim=1)
+        incre_r = cumprod(w, dim = 1, left=False)
 
-        if isinstance(rot, pp.LieTensor):
+        if isinstance(rot, LieTensor):
             a = acc - rot.Inv() @ self.gravity
         else:
             if init_rot is None:
-                init_rot = pp.identity_SO3(B, 1, dtype=dt.dtype, device=dt.device)
+                init_rot = identity_SO3(B, 1, dtype=dt.dtype, device=dt.device)
             inte_rot = init_rot * incre_r
             a = acc - inte_rot[:,1:,:].Inv() @ self.gravity
 
@@ -455,7 +456,7 @@ class IMUPreintegrator(nn.Module):
         B_cov = torch.einsum('...xy,...t -> ...xy', Bg @ Cg @ Bg.mT + Ba @ Ca @ Ba.mT, 1/cov_input['dt'])
         B_cov = torch.cat([init_cov[:,None,...], B_cov], dim=1)
 
-        A_left_cum = pp.cumprod(A.flip([1]), dim=1).flip([1]) # cum from An to I, then flip
+        A_left_cum = cumprod(A.flip([1]), dim=1).flip([1]) # cum from An to I, then flip
         A_right_cum = A_left_cum.mT
         cov = torch.sum(A_left_cum @ B_cov @ A_right_cum, dim=1)
         return {'cov': cov, 'Rij': cov_input['Rij'][..., -1:, :]}
