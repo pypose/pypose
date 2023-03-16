@@ -97,8 +97,8 @@ if __name__ == '__main__':
     parser.add_argument('--load_ckpt', default=False, action="store_true")
     args = parser.parse_args(); print(args)
 
-    train_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0], duration=10, mode='train')
-    test_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0],  duration=10, mode='test')
+    train_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0], duration=10, mode='train', download=True)
+    test_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0],  duration=10, mode='test', download=True)
     train_loader = Data.DataLoader(dataset=train_dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=True)
     test_loader = Data.DataLoader(dataset=test_dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=False)
 
