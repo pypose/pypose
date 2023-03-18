@@ -2,6 +2,31 @@ import torch
 from .. import LieTensor
 
 
+def bvv(lvec, rvec, *, out=None):
+    r'''
+    Performs batched vector-vector product, which results in matrices.
+
+    Args:
+        lvec (:obj:`Tensor`): left vectors to be multiplied.
+        rvec (:obj:`Tensor`): right vectors to be multiplied.
+
+    Return:
+        out (:obj:`Tensor`): the output tensor.
+
+    Note:
+        This function is broadcastable and supports batched product.
+
+    Example:
+        >>> lvec = torch.randn(2, 1, 3)
+        >>> rvec = torch.randn(1, 2, 2)
+        >>> out = pp.bvv(lvec, rvec)
+        >>> out.shape
+        torch.Size([2, 2, 3, 2])
+    '''
+    lvec, rvec = lvec.unsqueeze(-1), rvec.unsqueeze(-1)
+    return torch.matmul(lvec, rvec.mT, out=out)
+
+
 def bmv(mat, vec, *, out=None):
     r'''
     Performs batched matrix-vector product.
