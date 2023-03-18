@@ -11,7 +11,7 @@ class PF(EKF):
 
     Args:
         model (:obj:`System`): The system model to be estimated, a subclass of
-            :obj:`pypose.module.System`.
+            :obj:`pypose.module.NLS`.
         Q (:obj:`Tensor`, optional): The covariance matrices of system transition noise.
             Ignored if provided during each iteration. Default: ``None``
         R (:obj:`Tensor`, optional): The covariance matrices of system observation noise.
@@ -47,9 +47,6 @@ class PF(EKF):
         .. math::
             \mathbf{x}^{-}_{k} = f(\mathbf{x}_{k}, \mathbf{u}_{k}, t)
 
-       where :math:`\mathbf{u}_{k}` is noise vector is randomly generated on the basis of the
-       known PDF of :math:`\mathbf{u}`.
-
     3. Relative Likelihood.
 
         .. math::
@@ -60,38 +57,23 @@ class PF(EKF):
 
     4. Resample Particles.
 
-       .. math::
-           \begin{aligned}
-               &\rule{113mm}{0.4pt}                                                      \\
-               &\textbf{input}:\mathbf{x^{+}} (\text{State}), N (\text{number
-               of particle}), \mathbf{q} (\text{relative likelihood})                    \\
-               &\rule{113mm}{0.4pt}\\
-               &\mathbf{sample} = [N] \\
-               &\textbf{for} \: i=1 \: \textbf{to} \: \textbf{N}                         \\
-               &\hspace{5mm} \mathbf{r}  = \mathbf{rand} (0,1)                           \\
-               &\hspace{5mm} \textbf{for} \: j=1 \: \textbf{to} \: \textbf{N}            \\
-               &\hspace{10mm} if \sum_{k=1}^{j}\mathbf{q} _{k}\ge r:                     \\
-               &\hspace{15mm} \mathbf{sample}_{i} = \mathbf{x}^{+}_{j}                   \\
-               &\rule{113mm}{0.4pt}                                               \\[-1.ex]
-               &\bf{return} \:  \mathbf{sample}                                   \\[-1.ex]
-               &\rule{113mm}{0.4pt}                                               \\[-1.ex]
-           \end{aligned}
+        :math:`\mathbf{x}^{r-}_{i}` = :math:`\mathbf{x} ^{-}_{i}` with probability :math:`q_{i}`
+        and :math:`\mathbf{uniform} (0,1)(i=1,...,N)`
 
     5. Refine Posteriori And Covariances.
 
         .. math::
-
             \begin{aligned}
-                \mathbf{x}^{+} =\frac{1}{N}  \sum_{i=1}^{n}\mathbf{sample}_{i}   \\
-                P^{+} = \frac{1}{N} \sum_{i=1}^{N} (\mathbf{sample}_{i}-\mathbf{x}^{+})
-                (\mathbf{sample}_{i}-\mathbf{x}^{+})^{T}
+                \mathbf{x}^{+} =\frac{1}{N}  \sum_{i=1}^{n}\mathbf{x}^{r-}_{i}   \\
+                P^{+} = \sum_{i=1}^{N} (\mathbf{x}^{+} - \mathbf{x}^{r-}_{i})
+                (\mathbf{x}^{+} - \mathbf{x}^{r-}_{i})^{T} + \mathbf{Q}
             \end{aligned}
 
     Example:
-        1. Define a Nonlinear Time Invariant (NTI) system model
+        1. Define a discrete-time non-linear system (NLS) model
 
         >>> import torch, pypose as pp
-        >>> class NTI(pp.module.System):
+        >>> class NLS(pp.module.NLS):
         ...     def __init__(self):
         ...         super().__init__()
         ...
@@ -103,7 +85,7 @@ class PF(EKF):
 
         2. Create a model and filter
 
-        >>> model = NTI()
+        >>> model = NLS()
         >>> pf = pp.module.PF(model)
 
         3. Prepare data
@@ -127,7 +109,7 @@ class PF(EKF):
         ...     states[i+1], observ[i] = model(states[i] + w, inputs[i])
         ...     estim[i+1], P[i+1] = pf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
         ... print('Est error:', (states - estim).norm(dim=-1))
-        Est error: tensor([5.3627, 0.5640, 0.0953, 0.0447, 0.0936])
+        Est error: tensor([10.7083,  1.6012,  0.3339,  0.1723,  0.1107])
 
     Note:
         Implementation is based on Section 15.2 of this book
@@ -141,7 +123,7 @@ class PF(EKF):
         super().__init__(model, Q, R)
         self.particles = particles
 
-    def forward(self, x, y, u, P, Q=None, R=None, t=None, n=None):
+    def forward(self, x, y, u, P, Q=None, R=None, t=None):
         r'''
         Performs one step estimation.
 
@@ -152,18 +134,16 @@ class PF(EKF):
             P (:obj:`Tensor`): state estimation covariance of previous step
             Q (:obj:`Tensor`, optional): covariance of system transition model
             R (:obj:`Tensor`, optional): covariance of system observation model
-            n (:obj:`Tensor`, optional): covariance weight for randomly generate particles
 
         Return:
             list of :obj:`Tensor`: posteriori state and covariance estimation
         '''
         # Upper cases are matrices, lower cases are vectors
-
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
-        n = x.size(-1) if n is None else n
         self.model.set_refpoint(state=x, input=u, t=t)
 
+        n = x.size(-1)
         xp = self.generate_particles(x, n * P)
         xs, ye = self.model(xp, u)
         q = self.relative_likelihood(y, ye, R)

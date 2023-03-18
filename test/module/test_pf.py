@@ -5,7 +5,7 @@ import torch as torch
 class TestPF:
 
     def test_pf(self):
-        class NTI(pp.module.System):
+        class NLS(pp.module.NLS):
             def __init__(self):
                 super().__init__()
 
@@ -17,7 +17,7 @@ class TestPF:
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        model = NTI().to(device)
+        model = NLS().to(device)
         pf = pp.module.PF(model).to(device)
 
         T, N = 5, 2  # steps, state dim
