@@ -33,11 +33,11 @@ class PF(EKF):
 
     1. Generate Particles.
 
-        .. math::
-            \begin{aligned}
-                \mathbf{x} _{k} = \mathbf{p} (\mathbf{x},n*\mathbf{P}_{k},N) \quad k=1,...,N \\
-                \mathbf{P} _{k} = \mathbf{P} \quad k=1,...,N
-            \end{aligned}
+       .. math::
+           \begin{aligned}
+             &\mathbf{x}_{k}=\mathbf{p}(\mathbf{x},n\cdot\mathbf{P}_{k},N)&\quad k=1,...,N \\
+             &\mathbf{P}_{k}=\mathbf{P} &\quad k=1,...,N
+           \end{aligned}
 
        where :math:`N` is the number of Particles and :math:`\mathbf{p}` is the probability
        density function (PDF), :math:`n` is the dimension of state.
@@ -51,21 +51,25 @@ class PF(EKF):
 
         .. math::
             \begin{aligned}
-                \mathbf{q}  = \mathbf{p} (\mathbf{y} |\mathbf{x}^{-}_{k}) \\
-                \mathbf{q}_{i} = \frac{\mathbf{q}_{i}}{\sum_{j=1}^{N}\mathbf{q}_{j}}
+                & \mathbf{q} = \mathbf{p} (\mathbf{y} |\mathbf{x}^{-}_{k}) \\
+                & \mathbf{q}_{i} = \frac{\mathbf{q}_{i}}{\sum_{j=1}^{N}\mathbf{q}_{j}}
             \end{aligned}
 
     4. Resample Particles.
 
-        :math:`\mathbf{x}^{r-}_{i}` = :math:`\mathbf{x} ^{-}_{i}` with probability :math:`q_{i}`
-        and :math:`\mathbf{uniform} (0,1)(i=1,...,N)`
+       a. Generate random numbers :math:`r_i \sim U(0,1), i=1,\cdots,N`, where :math:`U`
+          is uniform distribution.
+
+       b. Find :math:`j` satisfying :math:`\sum_{m=1}^{j-1}q_m\leq r_i<\sum_{m=1}^{j}q_m`,
+          then new particle :math:`\mathbf{x}^{r-}_{i}` is set equal to old particle
+          :math:`\mathbf{x}^{-}_{j}`.
 
     5. Refine Posteriori And Covariances.
 
         .. math::
             \begin{aligned}
-                \mathbf{x}^{+} =\frac{1}{N}  \sum_{i=1}^{n}\mathbf{x}^{r-}_{i}   \\
-                P^{+} = \sum_{i=1}^{N} (\mathbf{x}^{+} - \mathbf{x}^{r-}_{i})
+                & \mathbf{x}^{+} =\frac{1}{N}  \sum_{i=1}^{n}\mathbf{x}^{r-}_{i}   \\
+                & P^{+} = \sum_{i=1}^{N} (\mathbf{x}^{+} - \mathbf{x}^{r-}_{i})
                 (\mathbf{x}^{+} - \mathbf{x}^{r-}_{i})^{T} + \mathbf{Q}
             \end{aligned}
 
@@ -128,12 +132,16 @@ class PF(EKF):
         Performs one step estimation.
 
         Args:
-            x (:obj:`Tensor`): estimated system state of previous step
-            y (:obj:`Tensor`): system observation at current step (measurement)
-            u (:obj:`Tensor`): system input at current step
-            P (:obj:`Tensor`): state estimation covariance of previous step
-            Q (:obj:`Tensor`, optional): covariance of system transition model
-            R (:obj:`Tensor`, optional): covariance of system observation model
+            x (:obj:`Tensor`): estimated system state of previous step.
+            y (:obj:`Tensor`): system observation at current step (measurement).
+            u (:obj:`Tensor`): system input at current step.
+            P (:obj:`Tensor`): state estimation covariance of previous step.
+            Q (:obj:`Tensor`, optional): covariance of system transition model.
+                Default: ``None``.
+            R (:obj:`Tensor`, optional): covariance of system observation model.
+                Default: ``None``.
+            t (:obj:`int`, optional): set system timestamp for estimation.
+                If ``None``, current system time is used. Default: ``None``.
 
         Return:
             list of :obj:`Tensor`: posteriori state and covariance estimation
