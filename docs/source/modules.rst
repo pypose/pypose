@@ -13,6 +13,7 @@ Modules
    module.NLS
    module.EKF
    module.UKF
+   module.PF
    module.LQR
    module.IMUPreintegrator
    module.EPnP

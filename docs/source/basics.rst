@@ -11,6 +11,7 @@ Basics
     add
     add_
     mul
+    bvv
     bmv
     bvmv
     pm

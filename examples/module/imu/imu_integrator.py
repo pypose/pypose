@@ -42,7 +42,7 @@ if __name__ == '__main__':
     torch.set_default_tensor_type(torch.DoubleTensor)
 
     for drive in args.datadrive:
-        dataset = KITTI_IMU(args.dataroot, args.dataname, drive, duration=args.step_size, step_size=args.step_size, mode='evaluate')
+        dataset = KITTI_IMU(args.dataroot, args.dataname, drive, duration=args.step_size, step_size=args.step_size, mode='evaluate', download=True)
         loader = Data.DataLoader(dataset=dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=False)
         init = dataset.get_init_value()
         integrator = pp.module.IMUPreintegrator(init['pos'], init['rot'], init['vel'], reset=False).to(args.device)

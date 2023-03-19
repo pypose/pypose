@@ -10,7 +10,7 @@ class UKF(EKF):
 
     Args:
         model (:obj:`System`): The system model to be estimated, a subclass of
-            :obj:`pypose.module.System`.
+            :obj:`pypose.module.NLS`.
         Q (:obj:`Tensor`, optional): The covariance matrices of system transition noise.
             Ignored if provided during each iteration. Default: ``None``
         R (:obj:`Tensor`, optional): The covariance matrices of system observation noise.
@@ -107,10 +107,10 @@ class UKF(EKF):
     posteriori estimation, respectively.
 
     Example:
-        1. Define a Nonlinear Time Invariant (NTI) system model
+        1. Define a discrete-time non-linear system (NLS) model
 
         >>> import torch, pypose as pp
-        >>> class NTI(pp.module.System):
+        >>> class NLS(pp.module.NLS):
         ...     def __init__(self):
         ...         super().__init__()
         ...
@@ -122,7 +122,7 @@ class UKF(EKF):
 
         2. Create a model and filter
 
-        >>> model = NTI()
+        >>> model = NLS()
         >>> ukf = pp.module.UKF(model)
 
         3. Prepare data
@@ -152,7 +152,7 @@ class UKF(EKF):
         Implementation is based on Section 14.3 of this book
 
         * Dan Simon, `Optimal State Estimation: Kalman, H∞, and Nonlinear Approaches
-          <https://onlinelibrary.wiley.com/doi/epdf/10.1002/0470045345.fmatter>`_,
+          <https://onlinelibrary.wiley.com/doi/book/10.1002/0470045345>`_,
           Cleveland State University, 2006
     '''
 
