@@ -1,6 +1,6 @@
 import torch
 from .. import mat2SE3
-from ..basics import bmv
+from .. import bmv
 from ..optim import LM, GN
 from .cameras import PerspectiveCameras
 from ..optim.scheduler import StopOnPlateau
