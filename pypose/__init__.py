@@ -14,4 +14,3 @@ from .lietensor import gradcheck, gradgradcheck
 from .lietensor.function import *
 from . import module, optim
 from .basics import *
-from .basics.function import *

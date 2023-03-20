@@ -7,74 +7,19 @@ from .cameras import PerspectiveCameras
 from ..optim.scheduler import StopOnPlateau
 
 
-class EPnP(torch.nn.Module):
-    r"""
-        EPnP Solver - a non-iterative O(n) solution to the PnP problem.
-
-        Args:
-            optimizer (Optional[torch.optim.Optimizer]): Optimizer to refine the solution.
-                Set to ``None`` to disable refinement.
-            naive (bool): Use naive control points selection method, otherwise use SVD
-                decomposition method to select. Default: ``False``.
-
-        Examples:
-            >>> import torch, pypose as pp
-            >>> # create some random test sample for a single camera
-            >>> pose = pp.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239])
-            >>> f, img_size = 2, (7, 7)
-            >>> projection_matrix = torch.tensor([[f, 0, img_size[0] / 2],
-            ...                                   [0, f, img_size[1] / 2],
-            ...                                   [0, 0, 1              ]])
-            >>> # some random points in the view
-            >>> pts_c = torch.tensor([[2., 0., 2.],
-            ...                       [1., 0., 2.],
-            ...                       [0., 1., 1.],
-            ...                       [0., 0., 1.],
-            ...                       [5., 5., 3.]])
-            >>> pixels = (pts_c @ projection_matrix.T)[:, :2] / (pts_c @ projection_matrix.T)[:, 2:]
-            >>> pixels
-            tensor([[5.5000, 3.5000],
-                    [4.5000, 3.5000],
-                    [3.5000, 5.5000],
-                    [3.5000, 3.5000],
-                    [6.8333, 6.8333]])
-            >>> # transform the points to world coordinate
-            >>> # solve the PnP problem to find the camera pose
-            >>> pts_w = pose.Inv().Act(pts_c)
-            >>> # solve the PnP problem
-            >>> epnp = pp.module.EPnP()
-            >>> # when input is not batched, remember to add a batch dimension
-            >>> pose = epnp(pts_w[None], pixels[None], projection_matrix[None])
-            >>> pose
-            SE3Type LieTensor:
-            LieTensor([[ 5.4955e-05, -8.0000e+00, -2.7895e-05,  6.8488e-06, -3.8270e-01,
-                         3.2812e-06,  9.2387e-01]])
-
-        Note:
-            The implementation is based on the paper:
-            * Francesc Moreno-Noguer, Vincent Lepetit, and Pascal Fua, `Accurate
-              Non-Iterative O(n) Solution to the PnP Problem.
-              <https://github.com/cvlab-epfl/EPnP>`_, In Proceedings of ICCV, 2007.
-    """
-
-    class BetasOptimizationObjective(torch.nn.Module):
-        """
-        Optimize the betas according to the objectives in the paper.
-        For the details, please refer to equation 15.
-        """
-
+class BetasOptimizationObjective(torch.nn.Module):
+        # Optimize the betas according to the objectives in the paper.
+        # For the details, please refer to equation 15.
         def __init__(self, betas):
             super().__init__()
             self.betas = torch.nn.Parameter(betas)
 
         def forward(self, ctrl_pts_w, kernel_bases):
-            """
-            Args:
-                ctrl_pts_w: The control points in world coordinate. The shape is (B, 4, 3).
-                kernel_bases: The kernel bases. The shape is (B, 16, 4).
-            Returns:
-                torch.Tensor: The loss. The shape is (B, ).
-            """
+            # Args:
+            #     ctrl_pts_w: The control points in world coordinate. The shape is (B, 4, 3).
+            #     kernel_bases: The kernel bases. The shape is (B, 16, 4).
+            # Returns:
+            #     torch.Tensor: The loss. The shape is (B, ).
             batch_shape = kernel_bases.shape[:-2]
             # calculate the control points in camera coordinate
             ctrl_pts_c = bmv(kernel_bases, self.betas)
@@ -91,6 +36,57 @@ class EPnP(torch.nn.Module):
 
             return error
 
+
+class EPnP(torch.nn.Module):
+    r"""
+    EPnP Solver - a non-iterative O(n) solution to the PnP problem.
+
+    Args:
+        optimizer (Optional[torch.optim.Optimizer]): Optimizer to refine the solution.
+            Set to ``None`` to disable refinement.
+        naive (bool): Use naive control points selection method, otherwise use SVD
+            decomposition method to select. Default: ``False``.
+
+    Examples:
+        >>> import torch, pypose as pp
+        >>> # create some random test sample for a single camera
+        >>> pose = pp.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239])
+        >>> f, img_size = 2, (7, 7)
+        >>> projection_matrix = torch.tensor([[f, 0, img_size[0] / 2],
+        ...                                   [0, f, img_size[1] / 2],
+        ...                                   [0, 0, 1              ]])
+        >>> # some random points in the view
+        >>> pts_c = torch.tensor([[2., 0., 2.],
+        ...                       [1., 0., 2.],
+        ...                       [0., 1., 1.],
+        ...                       [0., 0., 1.],
+        ...                       [5., 5., 3.]])
+        >>> pixels = (pts_c @ projection_matrix.T)[:, :2] / (pts_c @ projection_matrix.T)[:, 2:]
+        >>> pixels
+        tensor([[5.5000, 3.5000],
+                [4.5000, 3.5000],
+                [3.5000, 5.5000],
+                [3.5000, 3.5000],
+                [6.8333, 6.8333]])
+        >>> # transform the points to world coordinate
+        >>> # solve the PnP problem to find the camera pose
+        >>> pts_w = pose.Inv().Act(pts_c)
+        >>> # solve the PnP problem
+        >>> epnp = pp.module.EPnP()
+        >>> # when input is not batched, remember to add a batch dimension
+        >>> pose = epnp(pts_w[None], pixels[None], projection_matrix[None])
+        >>> pose
+        SE3Type LieTensor:
+        LieTensor([[ 5.4955e-05, -8.0000e+00, -2.7895e-05,  6.8488e-06, -3.8270e-01,
+                        3.2812e-06,  9.2387e-01]])
+
+    Note:
+        The implementation is based on the paper
+
+        * Francesc Moreno-Noguer, Vincent Lepetit, and Pascal Fua, `Accurate
+          Non-Iterative O(n) Solution to the PnP Problem
+          <https://github.com/cvlab-epfl/EPnP>`_, In Proceedings of ICCV, 2007.
+    """
     def __init__(self, naive=False, optimizer=GN):
         super().__init__()
         self.naive = naive
@@ -126,7 +122,7 @@ class EPnP(torch.nn.Module):
         alpha = self.compute_alphas(points, bases)
         m = self.build_m(pixels, alpha, intrinsics)
 
-        kernel_m = self.calculate_kernel(m)[..., [3, 2, 1, 0]]  # to be consistent with the matlab code
+        kernel_m = self.calculate_kernel(m) # [..., [3, 2, 1, 0]]  # to be consistent with the matlab code
 
         l_mat = self.build_l(kernel_m)
         rho = self.build_rho(bases)
@@ -187,7 +183,7 @@ class EPnP(torch.nn.Module):
         Returns:
             None. This function will update the solutions in place.
         """
-        objective = self.BetasOptimizationObjective(solutions['beta'] * solutions['scale'].unsqueeze(-1))
+        objective = BetasOptimizationObjective(solutions['beta'] * solutions['scale'].unsqueeze(-1))
         gn = self.optimizer(objective)
         scheduler = StopOnPlateau(gn, steps=10, patience=3, verbose=False)
         scheduler.optimize(input=(ctrl_pts_w, kernel_m))
