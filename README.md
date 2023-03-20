@@ -28,7 +28,7 @@ Deep learning has had remarkable success in robotic perception, but its data-cen
 - [`LevenbergMarquardt`](https://pypose.org/docs/main/generated/pypose.optim.LevenbergMarquardt/)
 - ......
 
-Want more features? [Create an issue here](https://github.com/pypose/pypose/issues) to requst new features.
+Want more features? [Create an issue here](https://github.com/pypose/pypose/issues) to request new features.
 
 ##### PyPose is highly efficient and supports parallel computing for Jacobian of Lie group and Lie algebra. See following comparison.
 
@@ -81,7 +81,7 @@ pytest
 
 1. The following code sample shows how to rotate random points and compute the gradient of batched rotation.
 
-```python
+```doctest
 >>> import torch, pypose as pp
 
 >>> # A random so(3) LieTensor
@@ -107,7 +107,7 @@ pytest
 
 2. This example shows how to estimate batched inverse of transform by a second-order optimizer. Two usage options for a `scheduler` are provided, each of which can work independently.
 
-```python
+```doctest
 >>> from torch import nn
 >>> import torch, pypose as pp
 >>> from pypose.optim import LM
