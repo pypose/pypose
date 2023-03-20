@@ -1,7 +1,8 @@
 import torch
-from .. import mat2SE3, bmv
-from ..optim import LM, GN
+from .. import bmv
+from .. import mat2SE3
 from ..basics import cart2homo
+from ..optim import LM, GN
 from .cameras import PerspectiveCameras
 from ..optim.scheduler import StopOnPlateau
 
@@ -123,8 +124,6 @@ class EPnP(torch.nn.Module):
         # Select naive and calculate alpha in the world coordinate
         bases = self.naive_basis(points) if self.naive else self.svd_basis(points)
         alpha = self.compute_alphas(points, bases)
-
-        # Using camera projection equation for all the points pairs to get the matrix M
         m = self.build_m(pixels, alpha, intrinsics)
 
         kernel_m = self.calculate_kernel(m)[..., [3, 2, 1, 0]]  # to be consistent with the matlab code
@@ -216,86 +215,51 @@ class EPnP(torch.nn.Module):
 
     @staticmethod
     def compute_alphas(points, bases):
-        """Given the object points and the control points in the world coordinate, compute the alphas,
-        which are a set of coefficients corresponded of control points for each object point. Check equation 1 in paper
-        for more details.
-        Inputs are batched.
-
-        Args:
-            points (torch.Tensor): object points in the world coordinate, shape (..., num_pts, 3)
-            ctrl_pts_w (torch.Tensor): control points in the world coordinate, shape (..., 4, 3)
-        Returns:
-            torch.Tensor: alphas, shape (..., num_pts, 4)
-        """
+        # Compute the coordinates of points with respect to the bases.
+        # Check equation 1 in paper for more details.
+        # Args:
+        #     points (torch.Tensor) (..., num_pts, 3)
+        #     bases (torch.Tensor) (..., 4, 3)
+        # Returns:
+        #     torch.Tensor (..., num_pts, 4)
         points, bases = cart2homo(points), cart2homo(bases)
-        return torch.linalg.solve(bases, points, left=False)
+        return torch.linalg.solve(A=bases, B=points, left=False)
 
     @staticmethod
     def build_m(pixels, alpha, intrinsics):
-        """Given the image points, alphas and intrinsics, compute the m matrix, which is the matrix of the coefficients
-        of the image points. Check equation 7 in paper for more details.
-        Inputs are batched.
-
-        Args:
-            pixels (torch.Tensor): image points, shape (..., num_pts, 2)
-            alpha (torch.Tensor): alphas, shape (..., num_pts, 4)
-            intrinsics (torch.Tensor): intrinsics, shape (..., 3, 3)
-        Returns:
-            torch.Tensor: m, shape (..., num_pts * 2, 12)
-        """
-        batch_shape = pixels.shape[:-2]
-        num_pts = pixels.shape[-2]
-
-        # extract elements of the intrinsic matrix in batch
-        fu, fv, u0, v0 = (intrinsics[..., 0, 0, None],
-                          intrinsics[..., 1, 1, None],
-                          intrinsics[..., 0, 2, None],
-                          intrinsics[..., 1, 2, None])
-        # extract elements of the image points in batch
-        ui, vi = pixels[..., 0], pixels[..., 1]
-        # extract elements of the alphas in batch
-        a1, a2, a3, a4 = alpha[..., 0], alpha[..., 1], alpha[..., 2], alpha[..., 3]
-        # build zero tensor, with a batch and point dimension
-        zeros = torch.zeros_like(a1)
-        # build by order the last dimension of m, shape (batch_size, num_pts, 24)
-        m_ = [a1 * fu, zeros, a1 * (u0 - ui),
-              a2 * fu, zeros, a2 * (u0 - ui),
-              a3 * fu, zeros, a3 * (u0 - ui),
-              a4 * fu, zeros, a4 * (u0 - ui),
-              zeros, a1 * fv, a1 * (v0 - vi),
-              zeros, a2 * fv, a2 * (v0 - vi),
-              zeros, a3 * fv, a3 * (v0 - vi),
-              zeros, a4 * fv, a4 * (v0 - vi)]
-        m = torch.stack(m_, dim=-1)
-
-        # match dimension of m with paper, with shape (batch_size, num_pts * 2, 12)
-        m = m.reshape(*batch_shape, num_pts * 2, 12)
-        return m
+        # Construct M matrix. Check equation 7 in paper for more details.
+        # Args:
+        #     pixels (torch.Tensor): (..., point, 2)
+        #     alpha (torch.Tensor): (..., point, 4)
+        #     intrinsics (torch.Tensor): (..., 3, 3)
+        # Returns:
+        #     torch.Tensor: (..., point * 2, 12)
+        batch, point = pixels.shape[:-2], pixels.shape[-2]
+        u, v = pixels[..., 0], pixels[..., 1]
+        fu, u0 = intrinsics[..., 0, 0, None], intrinsics[..., 0, 2, None]
+        fv, v0 = intrinsics[..., 1, 1, None], intrinsics[..., 1, 2, None]
+        a0, a1, a2, a3 = alpha[..., 0], alpha[..., 1], alpha[..., 2], alpha[..., 3]
+        O = torch.zeros_like(a1)
+        M = torch.stack([a0 * fu, O, a0 * (u0 - u),
+                         a1 * fu, O, a1 * (u0 - u),
+                         a2 * fu, O, a2 * (u0 - u),
+                         a3 * fu, O, a3 * (u0 - u),
+                         O, a0 * fv, a0 * (v0 - v),
+                         O, a1 * fv, a1 * (v0 - v),
+                         O, a2 * fv, a2 * (v0 - v),
+                         O, a3 * fv, a3 * (v0 - v)], dim=-1) # (batch, point, 24)
+        return M.reshape(*batch, point * 2, 12)
 
     @staticmethod
-    def calculate_kernel(m, top=4):
-        """Given the m matrix, compute the kernel of it. Check equation 8 in paper for more details.
-        Inputs are batched.
-
-        Args:
-            m (torch.Tensor): m, shape (..., num_pts * 2, 12)
-            top (int, optional): number of top eigen vectors to take. Defaults to 4.
-        Returns:
-            torch.Tensor: kernel, shape (..., 12, top)
-        """
-        batch_shape = m.shape[:-2]
-        # find null space of M
-        eigenvalues, eigenvectors = torch.linalg.eig(torch.matmul(m.mT, m))
-        # take the real part
-        eigenvalues = eigenvalues.real
-        eigenvectors = eigenvectors.real
-        # sort by eigenvalues (ascending)
-        eig_indices = eigenvalues.argsort()
-        # take the first 4 eigenvectors, shape (batch_size, 12, 4)
-        kernel_bases = torch.gather(eigenvectors, -1,
-                                    eig_indices[..., :top].unsqueeze(-2).tile((1,) * len(batch_shape) + (12, 1)))
-
-        return kernel_bases
+    def calculate_kernel(M, least=4):
+        # Given M matrix, find eigenvectors with the least eigenvalues.
+        # Check equation 8 in paper for more details.
+        batch = M.shape[:-2] # M is (..., point * 2, 12)
+        eigenvalues, eigenvectors = torch.linalg.eig(M.mT @ M)
+        eigenvalues, eigenvectors = eigenvalues.real, eigenvectors.real
+        index = eigenvalues.argsort(descending=False)[..., :least] # (batch, 4)
+        index = index.unsqueeze(-2).tile((1,) * len(batch) + (12, 1)) # (batch, 12, 4)
+        return torch.gather(eigenvectors, dim=-1, index=index) # (batch, 12, 4)
 
     def build_l(self, kernel_bases):
         """Given the kernel of m, compute the L matrix. Check [source]

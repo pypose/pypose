@@ -1,6 +1,7 @@
 import torch
 from .ops import pm
 
+
 def cart2homo(coordinates:torch.Tensor):
     r'''
     Converts batched Cartesian coordinates to Homogeneous coordinates
@@ -30,7 +31,7 @@ def cart2homo(coordinates:torch.Tensor):
     return torch.cat([coordinates, ones], dim=-1)
 
 
-def homo2cart(coordinates:torch.Tensor, eps=1e-12):
+def homo2cart(coordinates:torch.Tensor):
     r'''
     Converts batched Homogeneous coordinates to Cartesian coordinates
     by divising the last row.
@@ -49,6 +50,7 @@ def homo2cart(coordinates:torch.Tensor, eps=1e-12):
         tensor([[ -1.0179,  -2.1215,  -1.0385],
                 [-11.2982,   3.5974,  -8.9636]])
     '''
-    denum = coordinates[...,-1:].abs().clamp_(min=eps)
-    denum = pm(coordinates) * denum
+    tiny = torch.finfo(coordinates.dtype).tiny
+    denum = coordinates[..., -1:].abs().clamp_(min=tiny)
+    denum = pm(coordinates[..., -1:]) * denum
     return coordinates[...,:-1] / denum

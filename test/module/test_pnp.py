@@ -90,7 +90,7 @@ class TestEPnP:
 
         # instantiate epnp
         epnp = pp.module.EPnP(naive=False)
-        solution = epnp.forward(data['objPts'], data['imgPts'], data['camMat'])
+        solution = epnp(data['objPts'], data['imgPts'], data['camMat'])
         solution_ref = solution_opencv(data['objPts'][0],
                                        data['imgPts'][0],
                                        data['camMat'][0])
