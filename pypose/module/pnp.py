@@ -23,14 +23,14 @@ class EPnP(torch.nn.Module):
             >>> pose = pp.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239])
             >>> f, img_size = 2, (7, 7)
             >>> projection_matrix = torch.tensor([[f, 0, img_size[0] / 2],
-                                                  [0, f, img_size[1] / 2],
-                                                  [0, 0, 1              ]])
+            ...                                   [0, f, img_size[1] / 2],
+            ...                                   [0, 0, 1              ]])
             >>> # some random points in the view
             >>> pts_c = torch.tensor([[2., 0., 2.],
-                                      [1., 0., 2.],
-                                      [0., 1., 1.],
-                                      [0., 0., 1.],
-                                      [5., 5., 3.]])
+            ...                       [1., 0., 2.],
+            ...                       [0., 1., 1.],
+            ...                       [0., 0., 1.],
+            ...                       [5., 5., 3.]])
             >>> pixels = (pts_c @ projection_matrix.T)[:, :2] / (pts_c @ projection_matrix.T)[:, 2:]
             >>> pixels
             tensor([[5.5000, 3.5000],
@@ -52,9 +52,9 @@ class EPnP(torch.nn.Module):
 
         Note:
             The implementation is based on the paper:
-            * Francesc Moreno-Noguer, Vincent Lepetit, and Pascal Fua, `Accurate
-              Non-Iterative O(n) Solution to the PnP Problem.
-              <https://github.com/cvlab-epfl/EPnP>`_, In Proceedings of ICCV, 2007.
+            * Francesc Moreno-Noguer, Vincent Lepetit, and Pascal Fua, `Accurate Non-Iterative O(n) Solution to the PnP
+              Problem. <https://github.com/cvlab-epfl/EPnP>`_,
+              In Proceedings of ICCV, 2007.
     """
 
     class BetasOptimizationObjective(torch.nn.Module):
