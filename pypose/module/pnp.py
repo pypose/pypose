@@ -217,11 +217,6 @@ class EPnP(torch.nn.Module):
     def compute_alphas(points, bases):
         # Compute the coordinates of points with respect to the bases.
         # Check equation 1 in paper for more details.
-        # Args:
-        #     points (torch.Tensor) (..., num_pts, 3)
-        #     bases (torch.Tensor) (..., 4, 3)
-        # Returns:
-        #     torch.Tensor (..., num_pts, 4)
         points, bases = cart2homo(points), cart2homo(bases)
         return torch.linalg.solve(A=bases, B=points, left=False)
 
