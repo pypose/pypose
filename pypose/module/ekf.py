@@ -1,6 +1,6 @@
 import torch
+from .. import bmv
 from torch import nn
-from ..basics import bmv
 from torch.linalg import pinv
 
 

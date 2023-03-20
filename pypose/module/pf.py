@@ -1,6 +1,6 @@
 import torch
 from . import EKF
-from ..basics import bvv
+from .. import bmv, bvv
 import torch.nn.functional as F
 from torch.distributions import MultivariateNormal
 

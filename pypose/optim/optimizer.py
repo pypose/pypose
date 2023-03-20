@@ -1,5 +1,5 @@
-import torch, warnings
-from ..basics import bmv
+import torch
+from .. import bmv
 from torch import nn, finfo
 from .functional import modjac
 from .strategy import TrustRegion
