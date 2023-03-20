@@ -1,6 +1,6 @@
 import torch
+from .. import bmv
 from .ekf import EKF
-from ..basics import bmv
 from torch.linalg import pinv
 
 

@@ -1,2 +1,2 @@
 
-from .ops import bvv, bmv, bvmv
+from .ops import pm,  cumops, cummul, cumprod, cumops_, cummul_, cumprod_
