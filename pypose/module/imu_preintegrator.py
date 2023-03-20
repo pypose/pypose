@@ -1,7 +1,8 @@
 import torch
 from torch import nn
+from ..basics import cumprod
 from .. import LieTensor, so3, SO3
-from .. import identity_SO3, vec2skew, cumprod
+from .. import identity_SO3, vec2skew
 
 
 class IMUPreintegrator(nn.Module):

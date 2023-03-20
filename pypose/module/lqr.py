@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from ..basics import bmv, bvmv
+from .. import bmv, bvmv
 
 
 class LQR(nn.Module):
