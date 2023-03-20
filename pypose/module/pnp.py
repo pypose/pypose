@@ -8,33 +8,31 @@ from ..optim.scheduler import StopOnPlateau
 
 
 class BetasOptimizationObjective(torch.nn.Module):
-        # Optimize the betas according to the objectives in the paper.
-        # For the details, please refer to equation 15.
-        def __init__(self, betas):
-            super().__init__()
-            self.betas = torch.nn.Parameter(betas)
+    # Optimize the betas according to the objectives in the paper.
+    # For the details, please refer to equation 15.
+    def __init__(self, betas):
+        super().__init__()
+        self.betas = torch.nn.Parameter(betas)
 
-        def forward(self, ctrl_pts_w, kernel_bases):
-            # Args:
-            #     ctrl_pts_w: The control points in world coordinate. The shape is (B, 4, 3).
-            #     kernel_bases: The kernel bases. The shape is (B, 16, 4).
-            # Returns:
-            #     torch.Tensor: The loss. The shape is (B, ).
-            batch_shape = kernel_bases.shape[:-2]
-            # calculate the control points in camera coordinate
-            ctrl_pts_c = bmv(kernel_bases, self.betas)
-            diff_c = ctrl_pts_c.reshape(*batch_shape, 1, 4, 3) - ctrl_pts_c.reshape(*batch_shape, 4, 1, 3)
-            diff_c = diff_c.reshape(*batch_shape, 16, 3)
-            diff_c = torch.sum(diff_c ** 2, dim=-1)
+    def forward(self, ctrl_pts_w, kernel_bases):
+        # Args:
+        #     ctrl_pts_w: The control points in world coordinate. The shape is (B, 4, 3).
+        #     kernel_bases: The kernel bases. The shape is (B, 16, 4).
+        # Returns:
+        #     torch.Tensor: The loss. The shape is (B, ).
+        batch_shape = kernel_bases.shape[:-2]
+        # calculate the control points in camera coordinate
+        ctrl_pts_c = bmv(kernel_bases, self.betas)
+        diff_c = ctrl_pts_c.reshape(*batch_shape, 1, 4, 3) - ctrl_pts_c.reshape(*batch_shape, 4, 1, 3)
+        diff_c = diff_c.reshape(*batch_shape, 48)
+        # diff_c = torch.sum(diff_c ** 2, dim=-1)
 
-            # calculate the distance between control points in world coordinate
-            diff_w = ctrl_pts_w.reshape(*batch_shape, 1, 4, 3) - ctrl_pts_w.reshape(*batch_shape, 4, 1, 3)
-            diff_w = diff_w.reshape(*batch_shape, 16, 3)
-            diff_w = torch.sum(diff_w ** 2, dim=-1)
+        # calculate the distance between control points in world coordinate
+        diff_w = ctrl_pts_w.reshape(*batch_shape, 1, 4, 3) - ctrl_pts_w.reshape(*batch_shape, 4, 1, 3)
+        diff_w = diff_w.reshape(*batch_shape, 48)
+        # diff_w = torch.sum(diff_w ** 2, dim=-1)
 
-            error = (diff_w - diff_c).abs().mean(dim=-1)
-
-            return error
+        return diff_w - diff_c
 
 
 class EPnP(torch.nn.Module):
@@ -52,16 +50,16 @@ class EPnP(torch.nn.Module):
         >>> # create some random test sample for a single camera
         >>> pose = pp.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239])
         >>> f, img_size = 2, (7, 7)
-        >>> projection_matrix = torch.tensor([[f, 0, img_size[0] / 2],
-        ...                                   [0, f, img_size[1] / 2],
-        ...                                   [0, 0, 1              ]])
+        >>> projection = torch.tensor([[f, 0, img_size[0] / 2],
+        ...                            [0, f, img_size[1] / 2],
+        ...                            [0, 0, 1              ]])
         >>> # some random points in the view
         >>> pts_c = torch.tensor([[2., 0., 2.],
         ...                       [1., 0., 2.],
         ...                       [0., 1., 1.],
         ...                       [0., 0., 1.],
         ...                       [5., 5., 3.]])
-        >>> pixels = (pts_c @ projection_matrix.T)[:, :2] / (pts_c @ projection_matrix.T)[:, 2:]
+        >>> pixels = (pts_c @ projection.T)[:, :2] / (pts_c @ projection.T)[:, 2:]
         >>> pixels
         tensor([[5.5000, 3.5000],
                 [4.5000, 3.5000],
@@ -74,7 +72,7 @@ class EPnP(torch.nn.Module):
         >>> # solve the PnP problem
         >>> epnp = pp.module.EPnP()
         >>> # when input is not batched, remember to add a batch dimension
-        >>> pose = epnp(pts_w[None], pixels[None], projection_matrix[None])
+        >>> pose = epnp(pts_w[None], pixels[None], projection[None])
         >>> pose
         SE3Type LieTensor:
         LieTensor([[ 5.4955e-05, -8.0000e+00, -2.7895e-05,  6.8488e-06, -3.8270e-01,
@@ -347,7 +345,7 @@ class EPnP(torch.nn.Module):
         batch_shape = xc.shape[:-1]
         # Calculate the control points and object points in the camera coordinates
         ctrl_pts_c = xc.reshape((*batch_shape, 4, 3))
-        points_c = torch.bmm(alphas, ctrl_pts_c)
+        points_c = alphas @ ctrl_pts_c
 
         # Calculate the distance of the reference points in the world coordinates
         points_w_centered = points - points.mean(dim=-2, keepdim=True)
