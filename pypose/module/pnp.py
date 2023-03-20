@@ -52,9 +52,9 @@ class EPnP(torch.nn.Module):
 
         Note:
             The implementation is based on the paper:
-            * Francesc Moreno-Noguer, Vincent Lepetit, and Pascal Fua, `Accurate Non-Iterative O(n) Solution to the PnP
-              Problem. <https://github.com/cvlab-epfl/EPnP>`_,
-              In Proceedings of ICCV, 2007.
+            * Francesc Moreno-Noguer, Vincent Lepetit, and Pascal Fua, `Accurate
+              Non-Iterative O(n) Solution to the PnP Problem.
+              <https://github.com/cvlab-epfl/EPnP>`_, In Proceedings of ICCV, 2007.
     """
 
     class BetasOptimizationObjective(torch.nn.Module):
