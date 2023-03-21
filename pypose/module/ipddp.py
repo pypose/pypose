@@ -1,5 +1,6 @@
 import time
 import torch as torch
+from ..basics import bmv, bvmv
 
 class algParam:
     r'''
@@ -505,16 +506,15 @@ class ddpOptimizer:
             self.bp = bp_best
             self.alg = alg_best
             self.fp.initialroll()
-            self.backwardpass_simplified()
-            self.forwardpass_simplified()
-            # todo: how to possibly reuse the backwardpass forwardpass code?
-        return self.fp, self.bp, self.alg
-        
-    def backwardpass_simplified(self):
+            x_init = self.fp.x[0]
+            Ks, ks, Ku, ku = self.ipddp_backward(mu)
+            x, u, cost, cons = self.ipddp_forward(x_init, Ks, ks, Ku, ku)
+        return x, u, cost, cons
+
+    def prepare(self):
         fp = self.fp
         bp = self.bp
         alg = self.alg
-
         self.n_state = fp.n_state
         self.n_input = fp.n_input
         self.N = fp.N
@@ -527,78 +527,83 @@ class ddpOptimizer:
             qx,qu,qxx,qxu,quu = fp.qx, fp.qu, fp.qxx, fp.qxu, fp.quu   
             cx, cu = fp.cx, fp.cu
 
-        # backward recursions, similar to iLQR backward recursion, but more variables involved
-        for i in range(self.N-1, -1, -1):
-            Qx = qx[i] + cx[i].mT.matmul(s[i]) + fx[i].mT.matmul(Vx)
-            Qu = qu[i] + cu[i].mT.matmul(s[i]) + fu[i].mT.matmul(Vx) # (5b)
+    def ipddp_backward(self, mu):
+        # Q: (B*, T, N, N), p: (B*, T, N), where B* can be any batch dimensions, e.g., (2, 3)
+        B = self.p.shape[:-2]
+        ns, nc = self.system.B.size(-2), self.system.B.size(-1)
+        ncons = self.constraint.cu.size(-1) # todo: change
+        Ku = torch.zeros(B + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
+        ku = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
+        Ks = torch.zeros(B + (self.T, nc, ncons), dtype=self.p.dtype, device=self.p.device)
+        ks = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
+        
+        s, c = 0 #todo: prepare s
+        for t in range(self.T-1, -1, -1): 
+            if t == self.T - 1:
+                Qt = self.Q[...,t,:,:]
+                qt = self.p[...,t,:]
+            else:
+                self.system.set_refpoint(t=t)
+                F = torch.cat((self.system.A, self.system.B), dim=-1)
+                G = torch.cat((self.constraint.cx, self.constraint.cu), dim=-1) # todo: change
+                Qt = self.Q[...,t,:,:] + F.mT @ V @ F
+                qt = self.p[...,t,:] + bmv(F.mT, v) + bmv(G.mT, self.s[...,t,:])
+                if self.system.c1 is not None:
+                    qt = qt + bmv(F.mT @ V, self.system.c1)
+                if self.constraint.c1 is not None: #todo: attribute
+                    qt = qt + 0 # bmv(F.mT @ V, self.system.c1) # todo: which term
+                # additional processing for ipddp
+                r = self.s[...,t,:] *  self.c[...,t,:] + mu
+                cinv = 1. /  self.c[...,t,:]
+                tempv1 = self.s[...,t,:] * cinv
+                SCinv = torch.diag_embed(tempv1.squeeze())
+                SCinvcui = SCinv.matmul(cu[t]) # todo define cu cx
+                SCinvcxi = SCinv.matmul(cx[t])
+                cuitSCinvcui = cu[i].mT.matmul(SCinvcui)
+                tempv2 = cinv * r 
+                qx -= cx[t].mT.matmul(tempv2)           
+                qu -= cu[t].mT.matmul(tempv2) # todo: bind   
+                Qxx -= cx[i].mT.matmul(SCinvcxi)
+                Qxu -= 0 # todo: implement          
+                Qux -= cu[t].mT.matmul(SCinvcxi)
+                Quu -= cuitSCinvcui #todo bind
 
-            fxiVxx = fx[i].mT.matmul(Vxx)
-            Qxx = qxx[i] + fxiVxx.matmul(fx[i])  + torch.tensordot(Vx.mT,fxx[i],dims=1).squeeze(0)
-            Qxu = qxu[i] + fxiVxx.matmul(fu[i])  + torch.tensordot(Vx.mT,fxu[i],dims=1).squeeze(0)
-            Quu = quu[i] + fu[i].mT.matmul(Vxx).matmul(fu[i])  + torch.tensordot(Vx.mT,fuu[i],dims=1).squeeze(0)  # (5c-5e)
-            Quu = 0.5 * (Quu + Quu.mT)
-            Quu_reg = Quu
+            Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
+            Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
+            qx, qu = qt[..., :ns], qt[..., ns:]
 
-            r = s[i] *  c[i] + alg.mu
-            cinv = 1. / c[i]
-            tempv1 = s[i] * cinv
-            SCinv = torch.diag(tempv1.squeeze())
-            SCinvcui = SCinv.matmul(cu[i])
-            SCinvcxi = SCinv.matmul(cx[i])
-            cuitSCinvcui = cu[i].mT.matmul(SCinvcui)
+            Quu_inv = torch.linalg.pinv(Quu)
+            Ku[...,t,:,:] = Kut = - Quu_inv @ Qux
+            ku[...,t,:] = kut = - bmv(Quu_inv, qu)
+            Ks[...,t,:,:] = Kst = - SCinv.matmul(cx[t] + cu[t].matmul(Ku))
+            ks[...,t,:] = kst = - cinv * (r + s[t] * cuiku)
+
+            V = Qxx + Qxu @ Kut + Kut.mT @ Qux + Kut.mT @ Quu @ Kut
+            v = qx  + bmv(Qxu, kut) + bmv(Kut.mT, qu) + bmv(Kut.mT @ Quu, kut)
             
-            tempv2 = cinv * r
-            Qu -= cu[i].mT.matmul(tempv2) # (12b)            
-            tempQux = Qxu.mT - cu[i].mT.matmul(SCinvcxi)
-            temp = torch.hstack(( Qu, tempQux))
+        return Ks, ks, Ku, ku
 
-            kK = - torch.linalg.solve(Quu_reg - cuitSCinvcui, temp)
-            ku = torch.unsqueeze(kK[:,0],-1)
-            Ku = kK[:,1:]
+    def ipddp_forward(self, x_init, Ks, ks, Ku, ku):
+        assert x_init.device == Ku.device == ku.device
+        assert x_init.dtype == Ku.dtype == ku.dtype
+        assert x_init.ndim == 2, "Shape not compatible."
+        B = self.p.shape[:-2] # todo: change self.p
+        ns, nc = self.system.B.size(-2), self.system.B.size(-1)
+        ncons = self.constraint.cu.size(-1) # todo: change
+        u = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
+        cost = torch.zeros(B, dtype=self.p.dtype, device=self.p.device)
+        cons = torch.zeros(B + (self.T, ncons), dtype=self.p.dtype, device=self.p.device )
+        x = torch.zeros(B + (self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
+        x[..., 0, :] = x_init
+        xt = x_init
 
-            cuiku = cu[i].matmul(ku)
-            bp.ks[i] = - cinv * (r + s[i] * cuiku)
-            bp.Ks[i] = - SCinv.matmul(cx[i] + cu[i].matmul(Ku)) # (11) checked
-            bp.ky[i] = torch.zeros(c[i].shape[0], 1)
-            bp.Ky[i] = torch.zeros(c[i].shape[0], self.n_state)       
-            Quu = Quu - cuitSCinvcui # (12e)
-            Qxu = tempQux.mT # Qxu - cx[i].transpose() * SCinvcui; // (12d)
-            Qxx -= cx[i].mT.matmul(SCinvcxi) # (12c)
-            Qx -= cx[i].mT.matmul(tempv2) # (12a)
-        
-            QxuKu = Qxu.matmul(Ku)
-            KutQuu = Ku.mT.matmul(Quu)
-
-            Vx = Qx + Ku.mT.matmul(Qu) + KutQuu.matmul(ku) + Qxu.matmul(ku) # (btw 11-12)
-            Vxx = Qxx + QxuKu.mT + QxuKu + KutQuu.matmul(Ku) # (btw 11-12)
-            Vxx = 0.5 * ( Vxx + Vxx.mT) # for symmetry
-
-            bp.ku[i] = ku
-            bp.Ku[i] = Ku
-
-        self.fp = fp
-        self.bp = bp
-    
-    def forwardpass_simplified(self):
-        fp = self.fp
-        bp = self.bp
-
-        xold, uold, yold, sold, cold=fp.x, fp.u, fp.y, fp.s, fp.c
-        xnew, unew, ynew, snew, cnew=torch.zeros_like(fp.x), torch.zeros_like(fp.u), torch.zeros_like(fp.y), torch.zeros_like(fp.s), torch.zeros_like(fp.c)
-        cost = torch.Tensor([0.])
-        qnew = torch.zeros(self.N, 1)
-        # assume full step?
-        stepsize = 1.0
-        xnew[0] = xold[0] 
-        for i in range(self.N): # forward recuisions
-            snew[i] = sold[i] + stepsize*bp.ks[i]+bp.Ks[i].matmul((xnew[i]-xold[i]).mT)
-            unew[i] = uold[i] + (stepsize*bp.ku[i]+bp.Ku[i].matmul((xnew[i]-xold[i]).mT)).mT
-            cnew[i] = fp.computec(xnew[i], unew[i])
-            xnew[i+1] = fp.computenextx(xnew[i], unew[i])    
-            qnew[i] = fp.computeq(xnew[i], unew[i])
-        cost = qnew.sum() + fp.computep(xnew[-1])
-        
-        fp.x, fp.u, fp.y, fp.s, fp.c, fp.q = xnew, unew, ynew, snew, cnew, qnew 
-
-        self.fp = fp
-        self.bp = bp
+        self.system.set_refpoint(t=0)
+        for t in range(self.T):
+            Kut, kut = Ku[...,t,:,:], ku[...,t,:]
+            Kst, kst = Ks[...,t,:,:], ks[...,t,:]
+            u[..., t, :] = ut = bmv(Kut, xt) + kut + bmv(Kst, xt) + kst 
+            xut = torch.cat((xt, ut), dim=-1)
+            x[...,t+1,:] = xt = self.system(xt, ut)[0]
+            cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
+            cons[...,t, :] = self.c_fn(xt, ut).mT # todo: change    
+        return x[...,0:-1,:], u, cost, cons
