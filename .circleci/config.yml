@@ -101,7 +101,7 @@ jobs:
           name: Build PyPose documentation
           command: |
             pip install dist/pypose-*.whl
-            pip install -r requirements/dev.txt
+            pip install -r requirements/docs.txt
             cd docs
             make dirhtml
             tar -czvf build/docs.tar.gz build/dirhtml/*
@@ -136,7 +136,7 @@ jobs:
           name: Setup tests
           command: |
             pip install dist/pypose-*.whl
-            pip install -r requirements/main.txt
+            pip install -r requirements/test.txt
             mkdir pytest-results
             pytest --junitxml=pytest-results/junit.xml
       - store_test_results:
