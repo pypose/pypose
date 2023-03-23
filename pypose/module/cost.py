@@ -211,7 +211,7 @@ class Cost(nn.Module):
                            - \frac{1}{2} \mathbf{u}^{*\top}c_{\mathbf{uu}}\mathbf{u}^*
         '''
         # Potential performance loss here - involves jacobian eval
-        return self._ref_c - (self._ref_state * self.cx).sum(-1) - (self._ref_input * self.cu).sum(-1) \
+        return self._ref_c - pp.bdot(self._ref_state, self.cx) - pp.bdot(self._ref_input, self.cu) \
                            - 0.5 * pp.bvmv(self._ref_state, self.cxx, self._ref_state) \
                            - 0.5 * pp.bvmv(self._ref_state, self.cxu, self._ref_input) \
                            - 0.5 * pp.bvmv(self._ref_input, self.cux, self._ref_state) \

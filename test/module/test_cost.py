@@ -15,4 +15,4 @@ if __name__ == "__main__":
     quadcost.set_refpoint(state=state, input=input)
     print(quadcost.cx.size())
     print(quadcost.cxx.size())
-    print((state * torch.randn(n_batch,T,3)).sum(-1).shape)
+    print(pp.bdot(state, torch.randn(n_batch,T,3)).shape)
