@@ -130,7 +130,7 @@ If you are very good at handling conflicts, then you can use rebase to resolve c
 1. Sphinx docs come with a makefile build system. To build PyPose documentation locally, run the following commands. Note that if you are on a clean (newly installed) Ubuntu, you may need to run `sudo apt install build-essential` before the following commands, but it is not needed for MacOS.
 
 ```bash
-pip install -r requirements/dev.txt
+pip install -r requirements/docs.txt
 cd docs
 make html
 ```

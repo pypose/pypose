@@ -20,9 +20,6 @@ def find_version(file_path: str) -> str:
 VERSION = find_version("pypose/_version.py")
 
 
-# NOTE: PyPose MUST only require PyTorch
-requirements = ['torch==1.13.*', 'packaging']
-
 # open readme file and set long description
 with open("README.md", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -33,11 +30,11 @@ def load_requirements(filename: str):
         return [x.strip() for x in f.readlines() if "-r" != x[0:2]]
 
 
-requirements_extras = {"main":   load_requirements("requirements/main.txt"), 
-                       "dev": load_requirements("requirements/dev.txt")}
+requirements_extras = {
+    "runtime": load_requirements("requirements/runtime.txt"), 
+    "docs": load_requirements("requirements/docs.txt"),}
 
-requirements_extras["all"] = requirements_extras["main"] + requirements_extras["dev"]
-
+requirements_extras["all"] = list(set(sum(requirements_extras.values(), [])))
 
 if __name__ == '__main__':
     setup(
@@ -56,9 +53,9 @@ if __name__ == '__main__':
         setup_requires=['pytest-runner'],
         tests_require=['pytest'],
         packages=find_packages(exclude=('docs', 'test', 'examples')),
-        data_files=[('', ['requirements/main.txt', 'requirements/dev.txt'])],
+        data_files=[('', ['requirements/runtime.txt', 'requirements/docs.txt'])],
         zip_safe=True,
-        install_requires = requirements,
+        install_requires = load_requirements("requirements/runtime.txt"),
         extras_require = requirements_extras,
         keywords=['robotics', 'deep learning', 'pytorch'],
         project_urls={
