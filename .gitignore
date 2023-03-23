@@ -137,3 +137,8 @@ docs/source/generated
 # IDE config
 .idea/
 .vscode/
+
+# Example data
+examples/module/imu/2011_09_26.zip
+examples/module/imu/2011_09_26/*
+examples/module/imu/save/*
