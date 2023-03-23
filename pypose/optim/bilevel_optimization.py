@@ -1,5 +1,6 @@
 import pypose as pp
 from pypose.optim.solver import Cholesky
+from pypose.optim.functional import modjac
 import torch
 
 
@@ -48,6 +49,17 @@ class BLO(pp.optim._Optimizer):
         self.scheduler = pp.optim.scheduler.StopOnPlateau(inner_optimizer)
 
         self.outer_model = outer_model
+
+
+    ####
+    def _dLdTheta(self, input):
+        return modjac(outer_model, input)
+
+    def _dLdTauTheta(self, input):
+        return modjac(self._dGdTheta, input)
+
+    def 
+    ####
     
     @torch.no_grad()
     def step(self, input, target = None, weight = None):
