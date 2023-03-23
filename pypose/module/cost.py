@@ -1,3 +1,4 @@
+import pypose as pp
 import torch as torch
 import torch.nn as nn
 from torch.autograd.functional import jacobian
@@ -210,11 +211,11 @@ class Cost(nn.Module):
                            - \frac{1}{2} \mathbf{u}^{*\top}c_{\mathbf{uu}}\mathbf{u}^*
         '''
         # Potential performance loss here - involves jacobian eval
-        return self._ref_c - self._ref_state.matmul(self.cx.mT) - self._ref_input.matmul(self.cu.mT) \
-                           - 0.5 * self._ref_state.matmul(self.cxx).matmul(self._ref_state.mT) \
-                           - 0.5 * self._ref_state.matmul(self.cxu).matmul(self._ref_input.mT) \
-                           - 0.5 * self._ref_input.matmul(self.cux).matmul(self._ref_state.mT) \
-                           - 0.5 * self._ref_input.matmul(self.cuu).matmul(self._ref_input.mT)
+        return self._ref_c - (self._ref_state * self.cx).sum(-1) - (self._ref_input * self.cu).sum(-1) \
+                           - 0.5 * pp.bvmv(self._ref_state, self.cxx, self._ref_state) \
+                           - 0.5 * pp.bvmv(self._ref_state, self.cxu, self._ref_input) \
+                           - 0.5 * pp.bvmv(self._ref_input, self.cux, self._ref_state) \
+                           - 0.5 * pp.bvmv(self._ref_input, self.cuu, self._ref_input)  
 
 class QuadCost(Cost):
     r'''
@@ -244,8 +245,6 @@ class QuadCost(Cost):
     
     def __init__(self, Q, R, S, c=None):
         super(QuadCost, self).__init__()
-        assert Q.ndim in (2, 3), "Invalid cost state Matrices dimensions"
-        assert R.ndim in (2, 3), "Invalid cost input Matrices dimensions"
         assert Q.ndim == R.ndim == S.ndim, "Invalid System Matrices dimensions"
         self.Q, self.R, self.S, self.c = Q, R, S, c
         self.cxx, self.cuu, self.cxu = Q, R, S
@@ -268,11 +267,11 @@ class QuadCost(Cost):
                 +  \mathbf{u}^{\top}\mathbf{R}\mathbf{u}) + c \\
 
         '''
-        return (0.5 *  state.matmul(self.Q).matmul(state.mT) \
-                + 0.5 * state.matmul(self.S).matmul(input.mT) \
-                + 0.5 * input.matmul(self.S.mT).matmul(state.mT) \
-                + 0.5 * input.matmul(self.R).matmul(input.mT) \
-                + self.c).squeeze()
+        return (  0.5 * pp.bvmv(state, self.Q, state) \
+                + 0.5 * pp.bvmv(state, self.S, input) \
+                + 0.5 * pp.bvmv(input, self.S.mT, state) \
+                + 0.5 * pp.bvmv(input, self.R, input)
+                + self.c)
 
     # cx, cu cannot be defined via setter
 

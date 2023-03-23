@@ -89,8 +89,8 @@ class fwdPass:
         self.computecrelated()
 
     def computeprelated(self): # terms related to the terminal cost
-        self.p = self.computep(self.x[-1])
-        self.p_fn.set_refpoint(state=self.x[-1], input=self.u[-1])
+        self.p = self.computep(self.x[...,-1,:])
+        self.p_fn.set_refpoint(state=self.x[...,-1,:], input=self.u[...,-1,:])
         self.px = self.p_fn.cx.mT
         self.pxx = self.p_fn.cxx.squeeze(0).squeeze(1)
         return 
@@ -204,6 +204,7 @@ class ddpOptimizer(nn.Module):
         self.Q = Q
         self.p = p
         self.constraint_flag = True
+        self.contraction_flag = True
         self.W = torch.randn(2, 5, 6, 7) # todo:change
 
         # self.alg = algParam()
@@ -519,59 +520,51 @@ class ddpOptimizer(nn.Module):
             # self.fp.initialroll()
             # x_init = self.fp.x[0]
             self.prepare()
-            Ks, ks, Ku, ku = self.ipddp_backward(mu=1e-3)
-            x, u, cost, cons = self.ipddp_forward(x_init, Ks, ks, Ku, ku)
+            Ku, ku = self.ipddp_backward(mu=1e-3)
+            x, u, cost, cons = self.ipddp_forward(x_init, Ku, ku)
         return x, u, cost, cons
 
     def prepare(self):
-        # fp = self.fp  #todo: uncomment
-        # fp.computeall()
+        fp = self.fp  #todo: uncomment
+        fp.computeall()
         # self.c, self.s = fp.c, fp.s
         self.c = torch.randn(2, 5, 6)
         self.s = 0.01 * torch.ones_like(self.c) 
         with torch.no_grad(): # detach
+            self.Qxx_terminal[..., :,:] = 0 # todo: vstack fp.pxx
+            self.Qx_terminal[...,:,:] = 0   # todo: vstack fp.px
             for t in range(self.T-1, -1, -1): 
-                if t == self.T - 1:
-                    self.Q[...,t,:,:] = 0 # todo: vstack fp.pxx
-                    self.p[...,t,:] = 0   # todo: vstack fp.px
-                else:
-                    self.Q[...,t,:,:] = 0 # todo: vstack fp.qxx, fp.qxu, fp.quu 
-                    self.p[...,t,:] = 0 # todo: vstack fp.qx, fp.qu  
-                    self.W[...,t,:,:] = 0 # todo: vstack fp.cx, fp.cu
-                    # fx,fu,fxx,fxu,fuu = fp.fx, fp.fu, fp.fxx, fp.fxu, fp.fuu
+                self.Q[...,t,:,:] = 0 # todo: vstack fp.qxx, fp.qxu, fp.quu 
+                self.p[...,t,:] = 0 # todo: vstack fp.qx, fp.qu  
+                self.W[...,t,:,:] = 0 # todo: vstack fp.cx, fp.cu
+                # fx,fu,fxx,fxu,fuu = fp.fx, fp.fu, fp.fxx, fp.fxu, fp.fuu
+                self.F = 0 # todo concatenate A,B
+                self.G = 0 # todo second order dynamics
 
     def ipddp_backward(self, mu):
         # Q: (B*, T, N, N), p: (B*, T, N), where B* can be any batch dimensions, e.g., (2, 3)
         B = self.p.shape[:-2]
         ns, nc = self.system.B.size(-2), self.system.B.size(-1)
-        ncons = self.W.size(-2)
         Ku = torch.zeros(B + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
         ku = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
-        Ks = torch.zeros(B + (self.T, ncons, ns), dtype=self.p.dtype, device=self.p.device)
-        ks = torch.zeros(B + (self.T, ncons), dtype=self.p.dtype, device=self.p.device)
-        
+
+        V, v = self.Qx_terminal, self.Qxx_terminal
         for t in range(self.T-1, -1, -1): 
-            if t == self.T - 1:
-                Qt = self.Q[...,t,:,:]
-                qt = self.p[...,t,:]
-            else:
-                self.system.set_refpoint(t=t)
-                F = torch.cat((self.system.A, self.system.B), dim=-1)
-                Qt = self.Q[...,t,:,:] + F.mT @ V @ F
-                qt = self.p[...,t,:] + bmv(F.mT, v) 
-                if self.constraint_flag:
-                    Wt = self.W[...,t,:,:]
-                    st, ct = self.s[...,t,:], self.c[...,t,:] 
-                    r = st * ct + mu
-                    cinv = 1. / ct
-                    SCinv = torch.diag_embed(st * cinv)
-                    qt += bmv(Wt.mT, st) - bmv(Wt.mT, cinv * r)
-                    Qt += - Wt.mT @ SCinv @ Wt
-                if self.system.c1 is not None:
-                    qt = qt + bmv(F.mT @ V, self.system.c1)
-                if self.constraint.g is not None: #todo: attribute
-                    qt = qt + 0 # bmv(F.mT @ V, self.system.c1) # todo: which term
-                # todo: contraction term
+            Ft = self.F[...,t,:,:]
+            Qt = self.Q[...,t,:,:] + Ft.mT @ V @ Ft
+            qt = self.p[...,t,:] + bmv(Ft.mT, v) 
+            if self.contraction_flag:
+                Qt += torch.tensordot(v.mT, self.G[...,t,:,:,:], dims=-1) # todo :check
+            if self.constraint_flag:
+                Wt = self.W[...,t,:,:]
+                st, ct = self.s[...,t,:], self.c[...,t,:] 
+                r = st * ct + mu
+                cinv = 1. / ct
+                SCinv = torch.diag_embed(st * cinv)
+                Qt += - Wt.mT @ SCinv @ Wt
+                qt += bmv(Wt.mT, st) - bmv(Wt.mT, cinv * r)
+            # if self.system.c1 is not None: # tocheck
+            #     qt = qt + bmv(Ft.mT @ V, self.system.c1)
 
             Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
@@ -580,27 +573,20 @@ class ddpOptimizer(nn.Module):
             Quu_inv = torch.linalg.pinv(Quu)
             Ku[...,t,:,:] = Kut = - Quu_inv @ Qux
             ku[...,t,:] = kut = - bmv(Quu_inv, qu)
-            if t != self.T - 1 and self.constraint_flag: #todo: seems not use in forward
-                Cx, Cu = Wt[..., :ns], Wt[..., ns:] 
-                Ks[...,t,:,:] = - SCinv @ (Cx + Cu @ Kut) 
-                ks[...,t,:]  = - cinv * (r + st * bmv(Cu, kut))
 
-            # todo: check should start from T-2?
             V = Qxx + Qxu @ Kut + Kut.mT @ Qux + Kut.mT @ Quu @ Kut
             v = qx  + bmv(Qxu, kut) + bmv(Kut.mT, qu) + bmv(Kut.mT @ Quu, kut)
             
-        return Ks, ks, Ku, ku
+        return Ku, ku
 
-    def ipddp_forward(self, x_init, Ks, ks, Ku, ku):
+    def ipddp_forward(self, x_init, Ku, ku):
         assert x_init.device == Ku.device == ku.device
         assert x_init.dtype == Ku.dtype == ku.dtype
         assert x_init.ndim == 2, "Shape not compatible."
         B = self.p.shape[:-2]
         ns, nc = self.system.B.size(-2), self.system.B.size(-1)
-        ncons = self.W.size(-2)
         u = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
         cost = torch.zeros(B, dtype=self.p.dtype, device=self.p.device)
-        cons = torch.zeros(B + (self.T, ncons), dtype=self.p.dtype, device=self.p.device )
         x = torch.zeros(B + (self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
         x[..., 0, :] = x_init
         xt = x_init
@@ -612,5 +598,12 @@ class ddpOptimizer(nn.Module):
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
             cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
-        cons = self.constraint(x[...,0:-1,:], u)
-        return x[...,0:-1,:], u, cost, cons
+        
+        if self.constraint_flag:
+            ncons = self.W.size(-2)
+            cons = torch.zeros(B + (self.T, ncons), dtype=self.p.dtype, device=self.p.device )
+            cons = self.constraint(x[...,0:-1,:], u)
+            return x[...,0:-1,:], u, cost, cons
+        else: 
+            return x[...,0:-1,:], u, cost
+        

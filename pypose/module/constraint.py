@@ -1,3 +1,4 @@
+import pypose as pp
 import torch as torch
 import torch.nn as nn
 from torch.autograd.functional import jacobian
@@ -98,7 +99,7 @@ class Constraint(nn.Module):
                            - \mathbf{g}_{\mathbf{x}}\mathbf{x}^* - \mathbf{g}_{\mathbf{u}}\mathbf{u}^*
         '''
         # Potential performance loss here - self.A and self.B involves jacobian eval
-        return self._ref_c - self._ref_state.matmul(self.gx.mT) - self._ref_input.matmul(self.gu.mT)
+        return self._ref_c - pp.bmv(self.gx, self._ref_state) - pp.bmv(self.gu, self._ref_input)
 
 class LinCon(Constraint):
     r'''
@@ -136,7 +137,7 @@ class LinCon(Constraint):
     
     def __init__(self, gx, gu, g=None):
         super(LinCon, self).__init__()
-        assert gx.ndim in (2, 3), "Invalid constraint state coefficient dimensions" 
+        # assert gx.ndim in (2, 3), "Invalid constraint state coefficient dimensions" 
         assert gx.ndim == gu.ndim, "Invalid coefficient matrices dimensions"
         self.gx, self.gu, self.g = gx, gu, g
 
@@ -146,7 +147,7 @@ class LinCon(Constraint):
 
         '''
         if self.gx.ndim >= 3:
-            assert self.gx.ndim == state.ndim == input.ndim,  "Invalid coefficient matrices dimensions"
+            assert self.gx.ndim == (state.ndim+1) == (input.ndim+1),  "Invalid coefficient matrices dimensions"
 
         return super(LinCon, self).forward(state, input)
 
@@ -158,7 +159,7 @@ class LinCon(Constraint):
             \mathrm{cons} = \mathbf{g}_{\mathbf{x}}\mathbf{x} + \mathbf{g}_{\mathbf{u}}\mathbf{u} + \mathbf{g} \\
 
         '''
-        return state.matmul(self.gx.mT) + input.matmul(self.gu.mT) \
+        return pp.bmv(self.gx, state) + pp.bmv(self.gu, input) \
                         + self.g
 
     @property

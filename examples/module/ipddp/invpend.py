@@ -26,26 +26,29 @@ if __name__ == "__main__":
     torch.set_default_dtype(torch.float64)
     # Create parameters for inv pendulum trajectory
     dt = 0.05   # Delta t
-    N = 10    # Number of time steps
+    N = 5    # Number of time steps
 
     # Initial state
-    state = torch.tensor([[-1., 0.]])
+    state = torch.tensor([[-2.,0.],
+                          [-1., 0.],
+                          [-2.5, 1.]])
 
     # Create dynamics solver object
     sys = InvPend(dt) 
     n_state = 2
     n_input = 1 
-    state_all =      torch.zeros(N+1, 1, n_state)
-    input_all = 0.02*torch.ones(N,    1, n_input)
+    n_batch = 3
+    state_all =      torch.zeros(n_batch, N+1, n_state)
+    input_all = 0.02*torch.ones(n_batch,  N,   n_input)
     init_traj = {'state': state_all, 
                  'input': input_all}
-    state_all[0] = state
+    state_all[...,0,:] = state
  
     # Create cost object
-    Q = dt*torch.eye(n_state, n_state)
-    R = dt*torch.eye(n_input, n_input)
-    S = torch.zeros(n_state, n_input)
-    c = torch.zeros(1, 1)
+    Q = torch.tile(dt*torch.eye(n_state, n_state, device=device), (n_batch, 1, 1))
+    R = torch.tile(dt*torch.eye(n_input, n_input, device=device), (n_batch, 1, 1))
+    S = torch.tile(torch.zeros(n_state, n_input, device=device), (n_batch, 1, 1))
+    c = torch.tile(torch.zeros(1, 1, device=device), (n_batch, 1, 1))
     stage_cost = pp.module.QuadCost(Q, R, S, c)
     terminal_cost = pp.module.QuadCost(10./dt*Q, R, S, c)
 
