@@ -32,7 +32,6 @@ def load_requirements(filename: str):
 
 requirements_extras = {
     "runtime": load_requirements("requirements/runtime.txt"), 
-    "tests": load_requirements("requirements/test.txt"),
     "docs": load_requirements("requirements/docs.txt"),}
 
 requirements_extras["all"] = list(set(sum(requirements_extras.values(), [])))
@@ -53,7 +52,7 @@ if __name__ == '__main__':
         setup_requires=['pytest-runner'],
         tests_require=['pytest'],
         packages=find_packages(exclude=('docs', 'test', 'examples')),
-        data_files=[('', ['requirements/runtime.txt', 'requirements/test.txt', 'requirements/docs.txt'])],
+        data_files=[('', ['requirements/runtime.txt', 'requirements/docs.txt'])],
         zip_safe=True,
         install_requires = load_requirements("requirements/runtime.txt"),
         extras_require = requirements_extras,

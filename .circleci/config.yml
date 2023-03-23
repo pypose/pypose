@@ -136,7 +136,6 @@ jobs:
           name: Setup tests
           command: |
             pip install dist/pypose-*.whl
-            pip install -r requirements/test.txt
             mkdir pytest-results
             pytest --junitxml=pytest-results/junit.xml
       - store_test_results:

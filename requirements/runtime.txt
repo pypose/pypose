@@ -1,2 +1,2 @@
-numpy
+pytest==7.1.2
 torch==1.13.*
