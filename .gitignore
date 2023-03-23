@@ -127,7 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-.vscode
 
 # sphinx
 docs/source/generated
