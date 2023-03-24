@@ -1,6 +1,6 @@
 # Defining Dynamical Systems
 
-Examples for defining general time-discrete time-varying dynamical systems
+Examples for defining general discrete-time nonlinear dynamical systems
 
 ## Installation
 
@@ -12,7 +12,7 @@ Examples for defining general time-discrete time-varying dynamical systems
 
         python cartpole.py
 
-    + A Floquet system example, linear time-varying system
+    + A Floquet system example, nonlinear time-varying system
 
         python floquet.py
 

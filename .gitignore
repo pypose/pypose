@@ -127,7 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-.vscode
 
 # Visual Studio Code.
 *.code-workspace
@@ -137,8 +136,14 @@ docs/source/generated
 
 # Operating system
 .DS_Store
-examples/imu/2011*
-examples/imu/save
 
-# Temporary for removing folders.
+# IDE config
+.idea/
+.vscode/
+
+# Example data
+examples/module/imu/2011_09_26.zip
+examples/module/imu/2011_09_26/*
+examples/module/imu/save/*
+
 test/unit_tests/

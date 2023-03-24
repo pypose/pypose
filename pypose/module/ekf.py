@@ -1,6 +1,6 @@
 import torch
+from .. import bmv
 from torch import nn
-from ..basics import bmv
 from torch.linalg import pinv
 
 
@@ -10,7 +10,7 @@ class EKF(nn.Module):
 
     Args:
         model (:obj:`System`): The system model to be estimated, a subclass of
-            :obj:`pypose.module.System`.
+            :obj:`pypose.module.NLS`.
         Q (:obj:`Tensor`, optional): The covariance matrices of system transition noise.
             Ignored if provided during each iteration. Default: ``None``
         R (:obj:`Tensor`, optional): The covariance matrices of system observation noise.
@@ -70,10 +70,10 @@ class EKF(nn.Module):
     posteriori estimation, respectively.
 
     Example:
-        1. Define a Nonlinear Time Invariant (NTI) system model
+        1. Define a discrete-time non-linear system (NLS) model
 
         >>> import torch, pypose as pp
-        >>> class NTI(pp.module.System):
+        >>> class NLS(pp.module.NLS):
         ...     def __init__(self):
         ...         super().__init__()
         ...
@@ -85,7 +85,7 @@ class EKF(nn.Module):
 
         2. Create a model and filter
 
-        >>> model = NTI()
+        >>> model = NLS()
         >>> ekf = pp.module.EKF(model)
 
         3. Prepare data
@@ -114,14 +114,14 @@ class EKF(nn.Module):
     Warning:
         Don't introduce noise in ``System`` methods ``state_transition`` and ``observation``
         for filter testing, as those methods are used for automatically linearizing the system
-        by the parent class ``pypose.module.System``, unless your system model explicitly
+        by the parent class ``pypose.module.NLS``, unless your system model explicitly
         introduces noise.
 
     Note:
         Implementation is based on Section 5.1 of this book
 
         * Dan Simon, `Optimal State Estimation: Kalman, H∞, and Nonlinear Approaches
-          <https://onlinelibrary.wiley.com/doi/epdf/10.1002/0470045345.fmatter>`_,
+          <https://onlinelibrary.wiley.com/doi/book/10.1002/0470045345>`_,
           Cleveland State University, 2006
     '''
     def __init__(self, model, Q=None, R=None):
@@ -129,23 +129,25 @@ class EKF(nn.Module):
         self.set_uncertainty(Q=Q, R=R)
         self.model = model
 
-    def forward(self, x, y, u, P, Q=None, R=None):
+    def forward(self, x, y, u, P, Q=None, R=None, t=None):
         r'''
         Performs one step estimation.
 
         Args:
-            x (:obj:`Tensor`): estimated system state of previous step
-            y (:obj:`Tensor`): system observation at current step (measurement)
-            u (:obj:`Tensor`): system input at current step
-            P (:obj:`Tensor`): state estimation covariance of previous step
-            Q (:obj:`Tensor`, optional): covariance of system transition model
-            R (:obj:`Tensor`, optional): covariance of system observation model
+            x (:obj:`Tensor`): estimated system state of previous step.
+            y (:obj:`Tensor`): system observation at current step (measurement).
+            u (:obj:`Tensor`): system input at current step.
+            P (:obj:`Tensor`): state estimation covariance of previous step.
+            Q (:obj:`Tensor`, optional): covariance of system transition model. Default: ``None``
+            R (:obj:`Tensor`, optional): covariance of system observation model. Default: ``None``
+            t (:obj:`Tensor`, optional): timestep of system (only for time variant system).
+                Default: ``None``
 
         Return:
             list of :obj:`Tensor`: posteriori state and covariance estimation
         '''
         # Upper cases are matrices, lower cases are vectors
-        self.model.set_refpoint(state=x, input=u)
+        self.model.set_refpoint(state=x, input=u, t=t)
         I = torch.eye(P.shape[-1], device=P.device, dtype=P.dtype)
         A, B = self.model.A, self.model.B
         C, D = self.model.C, self.model.D

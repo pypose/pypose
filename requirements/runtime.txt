@@ -1,2 +1,2 @@
 pytest==7.1.2
-torch==1.13.1
+torch==2.0.*

@@ -6,12 +6,14 @@ Examples of IMU [preintegrating](./imu_integrator.py) and IMU [correction](./imu
 
     python -m pip install -U matplotlib
     pip install opencv-python
-    pip install pykitti
+    pip install pykitti tqdm
+    pip install torchvision
 
-## Prepare Dataset
+## Prepare Dataset (Optional)
 
-* Download KITTI IMU sample data [2011_09_26.zip](https://github.com/pypose/pypose/releases/download/v0.2.2/2011_09_26.zip).
-* Extract the file to any folder `DATAROOT`, so that it looks like:
+* The KITTI IMU sample data will be downloaded automatically.
+* Set dataset `download` option to `False` if you have other data in same format.
+  * In this case, the data in `DATAROOT` folder should look like:
 
         DATAROOT
             ├── 2011_09_26

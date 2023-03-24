@@ -20,9 +20,6 @@ def find_version(file_path: str) -> str:
 VERSION = find_version("pypose/_version.py")
 
 
-# NOTE: PyPose MUST only require PyTorch
-requirements = ['torch==1.13.*', 'packaging']
-
 # open readme file and set long description
 with open("README.md", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -33,11 +30,11 @@ def load_requirements(filename: str):
         return [x.strip() for x in f.readlines() if "-r" != x[0:2]]
 
 
-requirements_extras = {"main":   load_requirements("requirements/main.txt"), 
-                       "dev": load_requirements("requirements/dev.txt")}
+requirements_extras = {
+    "runtime": load_requirements("requirements/runtime.txt"), 
+    "docs": load_requirements("requirements/docs.txt"),}
 
-requirements_extras["all"] = requirements_extras["main"] + requirements_extras["dev"]
-
+requirements_extras["all"] = list(set(sum(requirements_extras.values(), [])))
 
 if __name__ == '__main__':
     setup(
@@ -47,7 +44,8 @@ if __name__ == '__main__':
         author_email = 'chenwang@dr.com',
         url = 'https://pypose.org',
         download_url = 'https://github.com/pypose/pypose',
-        license = 'BSD 4-Clause License',
+        license = 'Apache License 2.0',
+        license_files = ('LICENSE',),
         description = 'To connect classic robotics with modern learning methods.',
         long_description=long_description,
         long_description_content_type='text/markdown',
@@ -55,9 +53,9 @@ if __name__ == '__main__':
         setup_requires=['pytest-runner'],
         tests_require=['pytest'],
         packages=find_packages(exclude=('docs', 'test', 'examples')),
-        data_files=[('', ['requirements/main.txt', 'requirements/dev.txt'])],
+        data_files=[('', ['requirements/runtime.txt', 'requirements/docs.txt'])],
         zip_safe=True,
-        install_requires = requirements,
+        install_requires = load_requirements("requirements/runtime.txt"),
         extras_require = requirements_extras,
         keywords=['robotics', 'deep learning', 'pytorch'],
         project_urls={
@@ -71,7 +69,7 @@ if __name__ == '__main__':
             'Natural Language :: English',
             # How mature is this project? Common values are
             #   3 - Alpha, 4 - Beta, 5 - Production/Stable
-            'Development Status :: 3 - Alpha',
+            'Development Status :: 4 - Beta',
             # Indicate who your project is intended for
             'Intended Audience :: Developers',
             'Intended Audience :: Education',
@@ -79,7 +77,7 @@ if __name__ == '__main__':
             'Topic :: Software Development :: Libraries',
             'Topic :: Scientific/Engineering :: Artificial Intelligence',
             # Pick your license as you wish
-            'License :: OSI Approved :: BSD License',
+            'License :: OSI Approved :: Apache Software License',
             'Operating System :: OS Independent',
             # Specify the Python versions you support here. In particular, ensure
             # that you indicate whether you support Python 2, Python 3 or both.

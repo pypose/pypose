@@ -1,10 +1,6 @@
-import math, numbers
-import xdrlib
-import torch, warnings
-from torch import nn, linalg
-from torch.autograd import Function
-
-from .basics import vec2skew, cumops, cummul, cumprod, pm
+import torch
+from .basics import vec2skew
+from ..basics import pm, cumops, cummul, cumprod
 
 
 def so3_Jl(x):
