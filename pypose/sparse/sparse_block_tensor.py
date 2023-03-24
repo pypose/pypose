@@ -1,768 +1,444 @@
 
-from typing import List, Set, Dict, Tuple, Optional, Iterable, Union
-
-import re
-from numpy import block
-import numpy as np
-from scipy.sparse import bsr_matrix
-
-import cupy as cp
-import cupyx as cpx
-
 import torch
-from torch.utils.dlpack import ( to_dlpack, from_dlpack )
+from torch.utils._pytree import tree_map, tree_flatten
 
-# Globals.
-INDEX_TYPE = torch.int64
-FLOAT_TYPE = torch.float32
+def make_coo_indices_and_dims_from_hybrid(hybrid):
+    # Get the coalesced version such that we can operate on the indices.
+    hybrid = hybrid.coalesce()
+    
+    # The original tensor dimension and block dimension.
+    t_dim, b_dim = hybrid.shape[:2], hybrid.shape[2:]
+    assert len(b_dim) == 2, f'hybrid.shape = {hybrid.shape}. '
+    n_block = hybrid.values().shape[0]
+    n_block_elem = b_dim[0] * b_dim[1]
+    
+    # === Compose target coo indices. ===
+    indices_ori = hybrid.indices()
+    
+    # Index shift for every element in a block.
+    shift_row = torch.arange(b_dim[0], dtype=torch.int64, device=hybrid.device)
+    shift_col = torch.arange(b_dim[1], dtype=torch.int64, device=hybrid.device)    
+    index_shift_row, index_shift_col = torch.meshgrid( shift_row, shift_col, indexing='ij' )
+    
+    # Flatten the index shift.
+    index_shift_row = index_shift_row.contiguous().view((-1,)) # contiguous() is necessary.
+    index_shift_col = index_shift_col.contiguous().view((-1,))
+    index_shift = torch.stack( (index_shift_row, index_shift_col), dim=0 ) # 2 * n_block_elem
+    
+    # Repeat and shift the original indices.
+    indices_rp = indices_ori.repeat_interleave(n_block_elem, dim=1) # 2 * (n_block * n_block_elem)
+    indices_rp = indices_rp.view((2, n_block, n_block_elem)) # 2 * n_block * n_block_elem
+    indices_pm = indices_rp.permute(1, 0, 2) # n_block * 2 * n_block_elem
+    
+    index_scale = torch.Tensor([*b_dim]).to(dtype=torch.int64, device=hybrid.device)
+    index_scale = index_scale.view((1, 2, 1))
+    
+    indices_new = indices_pm * index_scale + index_shift # n_block * 2 * n_block_elem
+    indices_new = indices_new.permute((1, 0, 2)).view((2, -1)) # 2 * n_block * n_block_elem -> 2 * (n_block * n_block_elem)
+    
+    # === The dimension of the target coo matrix. ===
+    coo_dim = [ t_dim[0]*b_dim[0], t_dim[1]*b_dim[1] ]
+    
+    return indices_new, coo_dim
+
+def sparse_coo_2_hybrid_block_sequence(s, block_shape):
+    '''
+    s is a sparse COO tensor. Any non-zero element in s indicates a block of size block_shape.
+    This function returns a new sparse hybrid COO tensor, which has the same block structure as s.
+    Every block of the hybrid tensor has the block sequnce number as the value for all of its elements.
+    '''
+    
+    # Make sure we have ordered values.
+    s = s.coalesce()
+    
+    # Only use the sparse dimension.
+    t_dim = s.shape[:2]
+    
+    # Number of block and number of elements per block.
+    n_block = s.values().shape[0]
+    n_block_elem = block_shape[0] * block_shape[1]
+    
+    # Prepare the sequence number.
+    block_seq = torch.arange(n_block, dtype=torch.int64, device=s.device)
+    block_seq = block_seq.repeat_interleave(n_block_elem).view((n_block, *block_shape))
+    
+    return torch.sparse_coo_tensor( s.indices(), block_seq, size=(*t_dim, *block_shape) ).coalesce()
+
+def sparse_coo_2_hybrid_placeholder(s, block_shape, dtype, device):
+    '''
+    s is a sparse COO tensor. Any non-zero element in s indicates a block of size block_shape.
+    This function returns a new sparse hybrid COO tensor, which has the same block structure as s.
+    However, all the actual values of a block are zero.
+    '''
+    
+    # Make sure we have ordered values.
+    s = s.coalesce()
+    
+    # Only use the sparse dimension.
+    t_dim = s.shape[:2]
+    
+    # Number of block and number of elements per block.
+    n_block = s.values().shape[0]
+    n_block_elem = block_shape[0] * block_shape[1]
+    
+    all_zero = torch.zeros(n_block * n_block_elem, dtype=dtype, device=device)
+    all_zero = all_zero.view((n_block, *block_shape))
+    
+    return torch.sparse_coo_tensor( s.indices(), all_zero, size=(*t_dim, *block_shape) ).coalesce()
+
+def hybrid_2_coo(hybrid):
+    '''
+    Covnert a sparse hybrid COO tensor to a sparse COO tensor.
+    '''
+    hybrid = hybrid.coalesce()
+    indices_new, coo_dim = make_coo_indices_and_dims_from_hybrid(hybrid)
+    return torch.sparse_coo_tensor(indices_new, hybrid.values().view((-1,)), size=coo_dim)
+
+def coo_2_hybrid(coo, proxy):
+    '''
+    Convert a sparse COO tensor to a sparse hybrid COO tensor by referring to the proxy.
+    
+    A proxy is a sparse COO tensor. Any non-zero element in the proxy indicates a block.
+    '''
+    proxy = proxy.coalesce()
+    
+    # Figure out the shape of the target hybrid tensor.
+    t_dim = proxy.shape[:2]
+    assert coo.shape[0] % t_dim[0] == 0 and coo.shape[1] % t_dim[1] == 0, \
+        f'coo and t_dim are not compatible: coo.shape = {coo.shape}, t_dim = {t_dim}. '
+    b_dim = [ coo.shape[0] // t_dim[0], coo.shape[1] // t_dim[1] ]
+    
+    # Create a temporary sparse hybrid COO tensor to represent the block sequence.
+    block_seq = sparse_coo_2_hybrid_block_sequence(proxy, b_dim)
+    block_seq = hybrid_2_coo(block_seq).coalesce()
+    
+    # Create a temporary sparse hybrid COO tensor for the placeholders.
+    block_phd = sparse_coo_2_hybrid_placeholder(proxy, b_dim, dtype=coo.dtype, device=coo.device)
+    # PyTorch may has a bug here. If one of the tensors is coalesced, the the add operation will 
+    # result in a coalesced tensor, no matter whether the other tensor is coalesced or not.
+    # block_phd = hybrid_2_coo(block_phd).coalesce() 
+    block_phd = hybrid_2_coo(block_phd)
+    
+    # Force the input coo tensor to have the same struture as block_seq and block_phd.
+    coo = coo + block_phd
+    coo = coo.coalesce()
+    
+    # Compute the indices of every element of coo inside their own respective blocks.
+    b_dim_t = torch.Tensor([*b_dim]).to(dtype=torch.int64, device=coo.device).view((2, 1))
+    in_block_indices = coo.indices() % b_dim_t
+    
+    # Index into a temporary tensor.
+    n_block = proxy.values().shape[0]
+    blocks = torch.zeros( (n_block, *b_dim), dtype=coo.dtype, device=coo.device )
+    blocks[ block_seq.values(), in_block_indices[0], in_block_indices[1] ] = coo.values()
+
+    # Create the sparse hybrid COO tensor.
+    return torch.sparse_coo_tensor(proxy.indices(), blocks.view((n_block, *b_dim)), size=(*t_dim, *b_dim))
+
+class SBTOperation(object):
+    def __init__(self, func_name):
+        super().__init__()
+        self.func_name = func_name
+        
+    def storage_pre(self, func, types, args=(), kwargs={}):
+        return args, args
+    
+    def storage_op(self, func, stripped_types, s_args=(), kwargs={}):
+        return torch.Tensor.__torch_function__(func, stripped_types, s_args, kwargs)
+    
+    def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
+        return p_args
+    
+    def storage_post(self, func, types, s_outs=(), p_outs=(), kwargs={}):
+        return s_outs, p_outs
+
+class SBTProxyNoOp(SBTOperation):
+    def __init__(self, func_name):
+        super().__init__(func_name=func_name)
+
+    def storage_pre(self, func, types, args=(), kwargs={}):
+        s_array = []
+        p_array = []
+        for arg in args:
+            # TODO: Convert the sparse hybrid Tensor _s to sparse coo tensor.
+            s_array.append( arg._s if isinstance(arg, SparseBlockTensor) else arg )
+            
+            # Do nothing about the proxy Tensor.
+            p_array.append( arg._p if isinstance(arg, SparseBlockTensor) else arg )
+        return s_array, p_array
+    
+    def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
+        # Defaut operation on the proxy Tensor.
+        # Assume that the operation does not need to even touch the
+        # proxy tensor. For most of such operations, the proxy Tensor 
+        # is the only sparse Tensor in the list of arguments.
+        # Find the first sparse Tensor in operands.
+        p = [ op for op in p_args 
+                if isinstance(op, torch.Tensor) and 
+                   op.is_sparse == True ][0]
+        return p
+    
+    def storage_post(self, func, types, s_outs=(), p_outs=(), kwargs={}):
+        # s_outs (outs for storage _s) and p_outs (outs for proxy _p) are
+        # assumed to have the exact same order in the list.
+        # Recover the block structure of s_outs.
+        return s_outs, p_outs
+
+class SBTProxySameOperationAsStorage(SBTOperation):
+    def __init__(self, func_name):
+        super().__init__(func_name)
+
+    # NOTE: For test use.
+    def storage_pre(self, func, types, args=(), kwargs={}):
+        s_array = []
+        p_array = []
+        for arg in args:
+            # Convert the sparse hybrid Tensor _s to sparse coo tensor.
+            s_array.append( hybrid_2_coo( arg._s ) if isinstance(arg, SparseBlockTensor) else arg )
+            
+            # Do nothing about the proxy Tensor.
+            p_array.append( arg._p if isinstance(arg, SparseBlockTensor) else arg )
+        return s_array, p_array
+
+    def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
+        # This only gets called when the operation on sbt._s returns sparse Tensor.
+        return torch.Tensor.__torch_function__(func, stripped_types, p_args, kwargs)
+    
+    def storage_post(self, func, types, s_outs=(), p_outs=(), kwargs={}):
+        # s_outs (outs for storage _s) and p_outs (outs for proxy _p) are
+        # assumed to have the exact same order in the list.
+        # Recover the block structure of s_outs.
+        
+        h_outs = [ coo_2_hybrid(s, p) 
+                    if isinstance(s, torch.Tensor) and s.is_sparse == True 
+                    else s 
+                    for s, p in zip(s_outs, p_outs) ]
+        
+        return h_outs, p_outs
+
+_HANDLED_FUNCS_SPARSE = dict()
+
+def _add_sparse_op(name, cls):
+    global _HANDLED_FUNCS_SPARSE
+    _HANDLED_FUNCS_SPARSE[name] = cls(name)
+
+# Any supported operations that result in torch.Tensor should be added here.
+_add_sparse_op( '__format__', SBTOperation )
+_add_sparse_op( 'abs',    SBTProxyNoOp )
+_add_sparse_op( 'matmul', SBTProxySameOperationAsStorage )
+
+def _is_handled_func(func_name):
+    return func_name in _HANDLED_FUNCS_SPARSE
+
+# _HANDLED_FUNCS_SPARSE = [
+#     SBTOperationMetaData('matmul', True), #'smm',
+
+#     'is_sparse', 'dense_dim','sparse_dim', 'to_dense', 'values',
+#     #'coalesce', 'is_coalesced', 'indices' COO only
+#     #'crow_indices', 'col_indices' CSR and BSR only
+# ] # decided according to "https://pytorch.org/docs/stable/sparse.html"
 
 
-_HANDLED_FUNCS_SPARSE = [
-    'matmul'
-]
-class MyTensor(torch.Tensor):
+class SparseBlockTensor(torch.Tensor):
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs={}):
-        global _HANDLED_FUNCS_SPARSE
-
-        mytypes = (torch.Tensor if t is MyTensor else t for t in types)
-        myargs = (t.sbt if isinstance(t, MyTensor) else t for t in args)
-        res = torch.Tensor.__torch_function__(func, mytypes, myargs, kwargs)
-
+        # Debug use.
         print(f'func.__name__ = {func.__name__}')
-        if func.__name__ in _HANDLED_FUNCS_SPARSE:
-            out = MyTensor()
-            out.sbt = res
-        else:
-            out = res
-
-        return out
-
-
-def sparse_block_tensor(indices, values, size=None, dtype=None, device=None, requires_grad=False):
-    data = torch.sparse_coo_tensor(indices, values, size=size, dtype=dtype, device=device, requires_grad=requires_grad)
-    x = MyTensor()
-    x.sbt = data
-    return x
-
-
-
-class SparseBlockTensorNew(torch.Tensor):
-    def __init__(self, *data):
-        pass
-
-    @staticmethod
-    def to_sparse(data):
-        '''
-            this function turns tensor into sparse format
-        '''
-        if( not isinstance(data, torch.Tensor) ):
-            raise NotImplementedError("Input of SparseBlockTensor has to be a Tensor (dense or sparse)")
-
-        if( data.is_sparse ):
-            return data
-        else:
-            data = data.to_sparse_coo()
-            return data
-
-    @staticmethod
-    def __new__(cls, *data):
-        #sbt = cls.to_sparse( data[0] ) if isinstance(data[0], torch.Tensor) else cls.to_sparse(torch.Tensor(*data))
-        sbt = data[0] if isinstance(data[0], torch.Tensor) else torch.Tensor(*data)
-        return torch.Tensor.as_subclass( sbt, SparseBlockTensorNew)
-
-
-# ========== Mutual conversion betwen torch sparse coo tensor and SparseBlockTensor. ==========
-
-def sbt_to_torch_sparse_coo(sbt):
-    s_shape = ( *sbt.shape_blocks, *sbt.block_shape )
-
-    indices = sbt.block_indices[:, :2].permute((1, 0))
-
-    return torch.sparse_coo_tensor( 
-        indices, sbt.block_storage, s_shape, dtype=sbt.dtype, device=sbt.device)
-
-def torch_sparse_coo_to_sbt(s):
-    assert ( s.is_sparse ), f's must be a sparse tensor. '
-    assert ( s.layout == torch.sparse_coo ), f's must have the COO layout. s.layout = {s.layout}'
-    assert ( s.ndim == 4 ), f's.shape == {s.shape}'
-
-    if not s.is_coalesced():
-        s = s.coalesce()
-    
-    shape_blocks = s.shape[:2]
-    block_shape  = s.values().shape[1:3]
-
-    sbt = SparseBlockTensor( block_shape, dtype=s.dtype, device=s.device )
-    sbt.create(
-        shape_blocks=shape_blocks, 
-        block_indices=s.indices().detach().clone(), 
-        device=s.device)
-    sbt.block_storage = s.values().detach().clone()
-    sbt.dtype = s.dtype
-    sbt.coalesced = True
-
-    return sbt
-
-# ========== Mutual conversion betwen SciPy Block Sparse Row Matrix and SparseBlockTensor. ==========
-
-def sbt_to_bsr_cpu(sbt):
-    '''
-    Convert a SparseBlockTensor to a Block Row Matrix defined by SciPy. 
-    Note that this function is for test purpose. If sbt is on GPU, then
-    all the data will be off loaded to CPU.
-
-    NOTE: This function assumes that there are no empty rows of blocks.
-    '''
-
-    if not sbt.is_coalesced():
-        sbt = sbt.coalesce()
-
-    # We only need these two.
-    block_indices = sbt.block_indices
-    block_storage = sbt.block_storage
-
-    # Compose the indptr and indices variables. 
-    middle = torch.nonzero( torch.diff( block_indices[:, 0] ) ).view((-1,)) + 1
-    indptr = torch.zeros( (middle.numel() + 2,), dtype=INDEX_TYPE, device=block_indices.device )
-    indptr[1:-1] = middle
-    indptr[-1] = block_indices.shape[0] # block_indices is a table with many rows.
-    indices = block_indices[:, 1]
-
-    assert indptr.numel() - 1 == sbt.shape_blocks[0], \
-        f'indptr.numel() = {indptr.numel()}, sbt.rows = {sbt.rows}'
-
-    if sbt.is_cuda:
-        # sbt = sbt.to(device='cpu')
-        block_indices = block_indices.cpu()
-        block_storage = block_storage.cpu()
-        indptr = indptr.cpu()
-        indices = indices.cpu()
-    
-    return bsr_matrix( 
-        ( block_storage.numpy(), indices.numpy(), indptr.numpy() ),
-        shape=sbt.shape )
-
-# DTYPE_NUMPY_TO_TORCH = {
-#     np.int: torch.int,
-#     np.int64: torch.int64,
-#     np.float: torch.float64,
-#     np.float32: torch.float32,
-#     np.float64: torch.float64
-# }
-
-def get_equivalent_torch_dtype(dtype):
-    '''
-    Return the equivalent torch dtype based on numpy dtype.
-    '''
-
-    # Cannot use DTYPE_NUMPY_TO_TORCH for things like np.dtype('int64')
-    if dtype == int:
-        return torch.int # This might be wrong.
-    elif dtype == np.dtype('int32'):
-        return torch.int32
-    elif dtype == np.dtype('int64'):
-        return torch.int64
-    elif dtype == float:
-        return torch.float64
-    elif dtype == np.dtype('float32'):
-        return torch.float32
-    else:
-        raise Exception(f'dtype {dtype} not supported. ')
-
-def bsr_cpu_to_sbt(bsr, device=None):
-    '''
-    Warning: bsr.sum_duplicates() is called such that bsr is changed.
-    bsr.data may referring to an outer object. That object is also changed.
-
-    Convert a Block Row Matrix defined by SciPy to SparseBlockTensor.
-
-    dtype association:
-    np.int     -> torch.int
-    np.int64   -> torch.int64
-    np.float   -> torch.float64
-    np.float64 -> torch.float64
-    np.float32 -> torch.float32
-    '''
-
-    # Call the sum_duplicates() of bsr.
-    bsr.sum_duplicates()
-
-    # Get the dtype.
-    dtype = get_equivalent_torch_dtype(bsr.dtype)
-
-    # Create the SparseBlockTensor.
-    sbt = SparseBlockTensor( bsr.blocksize, dtype=dtype, device=device )
-
-    # Shape of blocks.
-    shape_blocks = [
-        bsr.shape[0] // bsr.blocksize[0], 
-        bsr.shape[1] // bsr.blocksize[1] ]
-
-    # Block indices.
-    d = np.diff( bsr.indptr )
-    block_row_indices = np.repeat( np.arange(d.size, dtype=int), d )
-    block_indices = np.stack( ( block_row_indices, bsr.indices ), axis=0 )
-    block_indices = torch.from_numpy( block_indices )
-
-    # Create memory for sbt.
-    sbt.create(
-        shape_blocks=shape_blocks,
-        block_indices=block_indices,
-        device=device )
-
-    # Block storage.
-    sbt.block_storage = torch.from_numpy( bsr.data ).to(device=device)
-
-    # Coalesce.
-    # The Block Row Matrix created by SciPy is always coalesced since we call
-    # sum_duplicates() explicitly. 
-    sbt.coalesced = True
-
-    return sbt
-
-# ========== Conversion from SparbBlockMatrix to CuPy array. ==========
-
-def flatten_index_from_sbt(sbt):
-    '''
-    Flatten the index from a SparseBlockTensor.
-    '''
-    
-    # Alias of the shape of the block.
-    bh, bw = sbt.block_shape
-
-    # Meshgrid coordinates for a single block.
-    x = torch.arange( bw, dtype=INDEX_TYPE, device=sbt.device )
-    y = torch.arange( bh, dtype=INDEX_TYPE, device=sbt.device )
-    xx, yy = torch.meshgrid( x, y, indexing='xy')
-
-    # Repeat xx and yy.
-    N = sbt.n_nz_blocks
-    xx = xx.repeat( N, 1, 1 )
-    yy = yy.repeat( N, 1, 1 )
-
-    # Shift xx and yy.
-    xx = xx + sbt.block_indices[:, 1].view( ( N, 1, 1 ) ) * bw
-    yy = yy + sbt.block_indices[:, 0].view( ( N, 1, 1 ) ) * bh
-
-    return xx.view((-1, )), yy.view((-1, ))
-
-def torch_to_cupy(t):
-    return cp.from_dlpack( to_dlpack(t) )
-
-def cupy_to_torch(c):
-    return from_dlpack( c.toDlpack() )
-
-def sbt_to_cupy(sbt):
-    '''
-    Convert a SparseBlockTensor to a CuPy sparse matrix.
-    '''
-
-    assert sbt.is_cuda, f'Only supports Tensors on GPU. '
-
-    # Flatten the index.
-    xx, yy = flatten_index_from_sbt(sbt)
-
-    # Flatten the data.
-    data = sbt.block_storage.view((-1, ))
-
-    # Convert xx, yy, and data to CuPy.
-    xx   = torch_to_cupy(xx)
-    yy   = torch_to_cupy(yy)
-    data = torch_to_cupy(data)
-
-    # Create the CuPy sparse matrix in the CSR format.
-    return cpx.scipy.sparse.csr_matrix( 
-        (data, (yy, xx)), 
-        shape=sbt.shape,
-        copy=False )
-
-# =========== The SparseBlockTensor class. ===========
-
-class SparseBlockTensor(object):
-    def __init__(self, 
-        block_shape: Iterable[int],
-        dtype: Optional[torch.dtype] = None,
-        device: Optional[str] = None) -> None:
-        super().__init__()
-
-        '''
-        Sparse block matrix using same block size for storage.
-        '''
-
-        for v in block_shape:
-            assert ( v > 0 ), f'block_shape must have all positive values. block_shape = {block_shape}'
-        self.block_shape = block_shape # The size of the individual blocks.
-
-        # row_block_structure: 1D array of int containing the row layout of the blocks. 
-        #     A component i of the array should contain the index of the 
-        #     first row of the block i+1.
-        # col_block_structure: 1D array of int containing the column layout of the blocks. 
-        #     A component i of the array should contain the index of the 
-        #     first column of the block i+1.
-
-        self.row_block_structure = torch.zeros((1,), dtype=INDEX_TYPE, device=device)
-        self.col_block_structure = torch.zeros((1,), dtype=INDEX_TYPE, device=device)
-
-        self.block_indices = None # Should be 2D Tensor of ints (3 columns). The values are the indices of block column, not the value column.
-                                  # Similar to g2o's _blockCols. 
-        self.block_storage = None # Should be 3D Tensor.
-        self.dtype = dtype if dtype is not None else FLOAT_TYPE
-
-        self.coalesced = False
-
-    def is_coalesced(self):
-        '''
-        Naive implementation.
-        '''
-        return self.coalesced
-
-    def dimension_str(self):
-        return \
-            f'block_shape = {self.block_shape}\n' + \
-            f'row_block_structure.numel() = {self.row_block_structure.numel()}\n' + \
-            f'col_block_structure.numel() = {self.col_block_structure.numel()}\n' + \
-            f'block_indices.shape = {self.block_indices.shape}\n' + \
-            f'block_storage.shape = {self.block_storage.shape}'
-
-    def show_dimensions(self):
-        print(self.dimension_str())
-
-    def create(self, 
-        shape_blocks: Iterable[int],
-        block_indices: Union[ List[List[int]], torch.Tensor ],
-        device: Optional[str]=None) -> None:
-        '''
-        Argument definitions are copied from g2o:
-        shape_blocks: number of blocks along vertical (number of block rows) and horizontal (number of block columns) directions.
-        block_indices: 2D list or Tensor. 2 rows. Every colume records the block index of a single block.
-        device: Tensor device.
-        '''
-
-        if device is None:
-            device = self.row_block_structure.device
-
-        self.row_block_structure = ( torch.arange( shape_blocks[0], dtype=INDEX_TYPE, device=device ) + 1 ) * self.block_shape[0]
-        self.col_block_structure = ( torch.arange( shape_blocks[1], dtype=INDEX_TYPE, device=device ) + 1 ) * self.block_shape[1]
-
-        if isinstance(block_indices, list):
-            assert ( len(block_indices) == 2 ), f'block_indices must be a 2D list. len(block_indices) = {len(block_indices)}'
-            block_indices = torch.Tensor(block_indices).to(device=device, dtype=INDEX_TYPE)
-        elif isinstance(block_indices, torch.Tensor):
-            assert ( block_indices.ndim == 2 ), f'Wrong dimension of block_indices. block_indices.shape = {block_indices.shape}'
-            block_indices = block_indices.to(device=device, dtype=INDEX_TYPE)
-        else:
-            raise Exception(f'block_indices must be a 2D list or Tensor')
-
-        self.block_indices = torch.zeros( (block_indices.shape[1], 3), device=device, dtype=INDEX_TYPE )
-        self.block_indices[:, :2] = block_indices.permute((1, 0))
-        self.block_indices[:, 2]  = torch.arange( self.block_indices.shape[0], dtype=INDEX_TYPE, device=device )
         
-        self.block_storage = torch.zeros(
-            (self.block_indices.shape[0], *self.block_shape), 
-            dtype=self.dtype, device=device )
-
-    def set_block_storage(self, block_storage, clone=False):
-        assert ( block_storage.ndim == 3 ), f'block_storage.ndim = {block_storage.ndim}'
-        assert ( block_storage.shape[0] == self.block_indices.shape[0] ), \
-            f'block_storage.shape = {block_storage.shape}, self.block_indices.shape = {self.block_indices.shape}'
-        assert ( block_storage.shape[1:3] == self.block_shape ), \
-            f'block_storage.shape = {block_storage.shape}, self.block_shape = {self.block_shape}'
-
-        if clone:
-            self.block_storage = block_storage.clone()
-        else:
-            self.block_storage = block_storage
-
-        self.dtype = self.block_storage.dtype
-
-    @property
-    def rows(self):
-        n = self.row_block_structure.numel()
-        # TODO: can we have better efficiency?
-        return self.row_block_structure[-1].item() if n > 0 and self.row_block_structure[0] >= 1 else 0
-    
-    @property
-    def cols(self):
-        n = self.col_block_structure.numel()
-        # TODO: can we have better efficiency?
-        return self.col_block_structure[-1].item() if n > 0 and self.col_block_structure[0] >= 1 else 0
-
-    @property
-    def shape(self):
-        return ( self.rows, self.cols )
-
-    @property
-    def shape_blocks(self):
-        if self.block_indices is None:
-            return (0, 0)
-        
-        return ( self.rows // self.block_shape[0], self.cols // self.block_shape[1] )
-
-    @property
-    def device(self):
-        return self.row_block_structure.device
-
-    @property
-    def is_cuda(self):
-        return self.row_block_structure.is_cuda
-
-    @device.setter
-    def device(self, d):
-        self.row_block_structure = self.row_block_structure.to(device=d)
-        self.col_block_structure = self.col_block_structure.to(device=d)
-        
-        if self.block_indices is not None:
-            self.block_indices = self.block_indices.to(device=d)
-
-        if self.block_storage is not None:
-            self.block_storage = self.block_storage.to(device=d)
-
-    @property
-    def n_nz_blocks(self):
-        return self.block_indices.shape[0]
-
-    def type(self, dtype=None):
-        if dtype is None:
-            return self.dtype
-        else:
-            # There might be bugs considering that when dtype == self.dtype, self is
-            # returned instead of a clone. However, this seems the same behavior with
-            # PyTorch's Tensor.type() function.
-            if dtype != self.dtype:
-                new_matrix = self.clone()
-                if new_matrix.block_storage is not None:
-                    new_matrix.block_storage = self.block_storage.type(dtype=dtype)
-                new_matrix.dtype = dtype
-                return new_matrix
-            else:
-                return self
-
-    def to(self, device=None, dtype=None, copy=False):
-        assert ( dtype is not None or device is not None ), \
-            f'dtype and device cannot both be None'
-
-        if isinstance(device, str):
-            if device == 'cuda':
-                device = torch.device( '%s:%d' % ( 'cuda', torch.cuda.current_device() ) )
-            elif re.match(r'^(cuda:\d+)', device):
-                device = torch.device( device )
-            elif device == 'cpu':
-                device = torch.device('cpu')
-            else:
-                raise Exception(f'device must be cuda, cuda:x or cpu if supplied as str. device = {device}')
-
-        # Record the event of deep copy.
-        flag_copied = False
-
-        if dtype is not None and dtype != self.dtype:
-            m = self.type(dtype=dtype)
-            flag_copied = True
-        else:
-            m = self
-
-        if device is not None and device != self.device:
-            if flag_copied:
-                m.device = device # m is modified.
-            else:
-                m = m.clone()
-                m.device = device # m is modified.
-                flag_copied = True
-
-        if copy and not flag_copied:
-            return self.clone()
-        else:
-            return m
-
-    def coalesce(self):
-        '''
-        Use PyTorch's sparse matrix to perform the coalesce operation.
-        This might not be memory-efficient since a copy of the matrix is created during the operation.
-        '''
-
-        # TODO: make a flag system shownig the status of coalesce. 
-        # May need also to wrap some member variables by accessor functions.
-
-        # Convert the sparse block matrix to torch sparse matrix.
-        scoo = sbt_to_torch_sparse_coo(self)
-
-        # coalesce.
-        scoo = scoo.coalesce()
-
-        # Convert the torch sparse matrix back to the sparse block matrix.
-        return torch_sparse_coo_to_sbt(scoo)
-
-    def rows_of_block(self, idx: int):
-        assert ( idx >= 0 ), \
-            f'idx must be a positive integer. idx = {idx}'
-        # TODO: Better efficiency?
-        return self.row_block_structure[0] \
-            if idx == 0 \
-            else ( self.row_block_structure[idx] - self.row_block_structure[idx - 1] ).item()
-    
-    def cols_of_block(self, idx: int):
-        assert ( idx >= 0 ), \
-            f'idx must be a positive integer. idx = {idx}'
-        # TODO: Better efficiency?
-        return self.col_block_structure[0] \
-            if idx == 0 \
-            else ( self.col_block_structure[idx] - self.col_block_structure[idx - 1] ).item()
-
-    def row_base_of_block(self, idx: int):
-        assert ( idx >= 0 ), \
-            f'idx must be a positive integer. idx = {idx}'
-        # TODO: Better efficiency?
-        return 0 if idx == 0 else self.row_block_structure[ idx - 1 ].item()
-
-    def col_base_of_block(self, idx: int):
-        assert ( idx >= 0 ), \
-            f'idx must be a positive integer. idx = {idx}'
-        # TODO: Better efficiency?
-        return 0 if idx == 0 else self.col_block_structure[ idx - 1 ].item()
-
-    def __deepcopy__(self):
-        new_matrix = SparseBlockTensor( self.block_shape )
-        new_matrix.col_block_structure = self.col_block_structure.clone()
-        new_matrix.row_block_structure = self.row_block_structure.clone()
-        
-        if self.block_indices is not None:
-            new_matrix.block_indices = self.block_indices.clone()
-
-        if self.block_storage is not None:
-            new_matrix.block_storage = self.block_storage.clone()
-
-        new_matrix.coalesced = self.coalesced
-
-        return new_matrix
-
-    def clone(self):
-        return self.__deepcopy__()
-
-    def slice(self, block_rows: Iterable[int], block_cols: Iterable[int], clone: bool=False):
-        '''
-        Return the selected blocks.
-        block_rows: the first and one-past-last row indices of blocks.
-        block_cols: the first and one-past-last col indices of blocks.
-        clone: True if the blocks are cloned.
-
-        Returns:
-        A new SparseBlockTensor object.
-        '''
-        raise NotImplementedError()
-
-    def transpose_(self):
-        '''
-        In-place transpose.
-        '''
-        self.block_shape = self.block_shape[::-1]
-
-        # We just need to swap row and column structures and the order of self.block_indices.
-        self.row_block_structure, self.col_block_structure = self.col_block_structure, self.row_block_structure
-        self.block_indices = torch.index_select( 
-            self.block_indices, 
-            1, 
-            torch.LongTensor([1, 0, 2]).to(device=self.block_indices.device) )
-
-        # Transpose the blocks.
-        self.block_storage = self.block_storage.permute((0, 2, 1))
-
-        self.coalesced = False
-
-        return self
-
-    def transpose(self):
-        '''
-        Return a copy of the current sparse block matrix and transpose.
-        '''
-        # Make a copy of the current sparse block matrix.
-        new_matrix = self.clone()
-        return new_matrix.transpose_()
-
-    def add_sparse_block_matrix(self, other):
-        '''
-        Currently only supports adding two sparse block matrices with the same block_shape.
-        '''
-
-        assert ( self.rows == other.rows and self.cols == other.cols), \
-            f'Incompatible dimensions: self: [{self.rows}, {self.cols}], other: [{other.rows}, {other.cols}]. '
-
-        # Concatenate the raw data of the two SparseBlockTensor.
-        c_block_indices = torch.cat( ( self.block_indices, other.block_indices ), dim=0 )
-        c_block_storage = torch.cat( ( self.block_storage, other.block_storage ), dim=0 )
-
-        # Perform add by converting to a PyTorch sparse tensor.
-        s_shape = ( *self.shape_blocks, *self.block_shape )
-        indices = c_block_indices[:, :2].permute((1, 0))
-
-        s = torch.sparse_coo_tensor( 
-            indices, c_block_storage, s_shape, 
-            dtype=self.dtype, device=self.device)
-
-        return torch_sparse_coo_to_sbt(s)
-
-    def add_broadcast(self, other):
-        sbt = self.clone()
-        sbt.block_storage.add_(other)
-        return sbt
-
-    def add_(self, other):
-        '''
-        WARNING: Calling this function changes the block_storage, it has side effects if
-        the block_storage referencing to an external tensor. This is the case when the 
-        set_block_storage() function is called with clone=False. 
-
-        other: must be a scalar or a Tensor or.
-        '''
-        if isinstance(other, ( int, float, torch.Tensor)):
-            self.block_storage.add_( other )
-        else:
+        if not _is_handled_func(func.__name__):
             raise Exception(
-                f'Currently only supports scalar or Tensor. type(other) = {type(other)}' )
+                f'All operations on SparseBlockTensor must be handled. \n{func.__name__} is not. ')
+        
+        sbt_op = _HANDLED_FUNCS_SPARSE[func.__name__]
+        
+        args_storage, args_proxy = sbt_op.storage_pre(func, types, args, kwargs)
+        
+        # Strip types
+        stripped_types = (torch.Tensor if t is SparseBlockTensor else t for t in types)
+        # if func.__name__ == 'matmul':
+        #     import ipdb; ipdb.set_trace()
+        #     pass
+        
+        # Let PyTorch do its dispatching.
+        outputs_storage = sbt_op.storage_op(func, stripped_types, args_storage, kwargs)
 
+        # Handle the proxy.
+        outputs_proxy = sbt_op.proxy_op(func, stripped_types, args_proxy, kwargs)
+        
+        # Do post processing.
+        if not isinstance(outputs_storage, (list, tuple)):
+            flag_list = False
+            outputs_storage = [outputs_storage]
+        else:
+            flag_list = True
+            
+        if not isinstance(outputs_proxy, (list, tuple)):
+            outputs_proxy = [outputs_proxy]
+            
+        outputs_list_storage, outputs_list_proxy = sbt_op.storage_post(func, stripped_types, outputs_storage, outputs_proxy, kwargs)
+
+        if outputs_list_storage[0] is None:
+            return None
+
+        outputs_final = []
+        for output_storage, output_proxy in zip( outputs_list_storage, outputs_list_proxy ):
+            # Recover the types.
+            if isinstance(output_storage, torch.Tensor) and not isinstance(output_storage, cls):
+                if not output_storage.is_sparse:
+                    outputs_final.append( output_storage )
+                    continue
+                
+                # Wrap s and p into a SparseBlockTensor.
+                sbt = cls()
+                sbt._s = output_storage
+                sbt._p = output_proxy
+                outputs_final.append( sbt )
+            # Not a tensor or not a SparseBlockTensor.
+            outputs_final.append( outputs_storage )
+        
+        if flag_list:
+            return outputs_final
+        else:
+            return outputs_final[0]
+
+    def __repr__(self):
+        r"""
+        t = SparseBlockTensor()
+        >>>t
+        SparseBlockTensor()
+        """
+        return str(self)
+
+    def __str__(self):
+        r"""
+        t = SparseBlockTensor()
+        print( t )
+        ' SparseBlockTensor() '
+        """
+        return f"SparseBlockTensor\nstorage:\n{self._s}\nproxy:\n{self._p}"
+
+    def __format__(self, spec):
+        return str(self)
+
+    def matmul(self, other):
+        r'''
+        return the corresponding sparse matrix and index matrix
+        '''
+        print(f'>>> Debug matmtl. ')
         return self
 
     def __add__(self, other):
-        '''
-        other: must be a SparseBlockTensor object, or a tensor, or a scalar value.
-        '''
-
-        if isinstance(other, SparseBlockTensor):
-            return self.add_sparse_block_matrix(other)
-        elif isinstance(other, ( int, float, torch.Tensor)):
-            # Not calling add_() to save a call to the isinstance() function.
-            return self.add_broadcast(other)
-        else:
-            raise Exception(
-                f'Currently only supports SparseBlockTensor, torch.Tensor, or scalar type. type(other) = {type(other)}' )
-
-    def __radd__(self, other):
-        '''
-        other: must be a SparseBlockTensor object, or a tensor, or a scalar value.
-        '''
-        return self.__add__(other)
-
-    def sub_broadcast(self, other):
-        sbt = self.clone()
-        sbt.block_storage.sub_(other)
-        return sbt
-
-    def sub_(self, other):
-        '''
-        WARNING: Calling this function changes the block_storage, it has side effects if
-        the block_storage referencing to an external tensor. This is the case when the 
-        set_block_storage() function is called with clone=False. 
-
-        other: must be a scalar or a Tensor.
-        '''
-        if isinstance(other, ( int, float, torch.Tensor)):
-            self.block_storage.sub_( other )
-        else:
-            raise Exception(
-                f'Currently only supports scalar or Tensor. type(other) = {type(other)}' )
-
-        return self
-
-    def __sub__(self, other):
-        '''
-        other: must be a SparseBlockTensor object, or a tensor, or a scalar value.
-        '''
-        
-        # This is not implemented as self.__add__( -1 * other) considering that
-        # torch.Tensor.sub_() might be more efficient.
-
-        if isinstance(other, SparseBlockTensor):
-            return self.add_sparse_block_matrix( -1 * other )
-        elif isinstance(other, ( int, float, torch.Tensor)):
-            # Not calling sub_() to save a call to the isinstance() function.
-            return self.sub_broadcast(other)
-        else:
-            raise Exception(
-                f'Currently only supports SparseBlockTensor, torch.Tensor, or scalar type. type(other) = {type(other)}' )
-
-    def __rsub__(self, other):
-        '''
-        other: must be a SparseBlockTensor object, or a tensor, or a scalar value.
-        '''
-        # This saves one multiplication compared with -1 * ( self - other )
-        # When other is a SparseBlockTensor.
-        return (-1 * self) + other
-
-    def mul_(self, other):
-        '''
-        WARNING: Calling this function changes the block_storage, it has side effects if
-        the block_storage referencing to an external tensor. This is the case when the 
-        set_block_storage() function is called with clone=False. 
-
-        other: must be a scalar or a Tensor.
-        '''
-        if isinstance(other, ( int, float, torch.Tensor )):
-            self.block_storage.mul_(other)
-        else:
-            raise Exception(
-                f'Currently only supports scalar type or Tensor. type(other) = {type(other)}' )
-
-        return self
+        pass
 
     def __mul__(self, other):
-        '''
-        Currently only supports multiplying by a scalar.
-        '''
-        res = self.clone()
-        res.mul_(other)
-        return res
-
-    def __rmul__(self, other):
-        '''
-        Currently only supports multiplying by a scalar.
-        '''
-        return self.__mul__(other)
-
-    def __matmul__(self, other):
-        '''
-        WARNING: This function causes the data to be offloaded to the CPU and back to the GPU if necessary.
-
-        other: must be a SparseBlockTensor object.
-        '''
-        
-        # ========== Checks. ==========
-
-        assert ( self.col_block_structure.numel() == other.row_block_structure.numel() ), \
-            f'Wrong dimension: \n>>> self: \n{self.dimension_str()}\n>>> other: \n{other.dimension_str()}'
-
-        assert ( torch.equal( self.col_block_structure, other.row_block_structure ) ), \
-            f'self and other has inconsistent col_block_structure and row_block_structure. '
-
-        assert ( self.is_coalesced() and other.is_coalesced() ), \
-            f'self.is_coalesced() = {self.is_coalesced()}, other.is_coalesced() = {other.is_coalesced()}'
-        
-        # ========== Checks done. ==========
-
-        # ========== Off load the data from GPU to CPU and multiply. ==========
-
-        bsr_self  = sbt_to_bsr_cpu(self)
-        bsr_other = sbt_to_bsr_cpu(other)
-        res_cpu   = bsr_self @ bsr_other
-
-        # ========== Convert the result back to GPU. ==========
-        res_gpu = bsr_cpu_to_sbt(res_cpu)
-
-        return res_gpu
-        
-    def multiply_symmetric_upper_triangle(self, other):
-        '''
-        Not clear what this function does in g2o.
-        '''
-        raise NotImplementedError()
-
-    def sym_permutate(slef, pinv: Iterable[int]):
-        raise NotImplementedError()
-
-    def fill_ccs(self):
-        '''
-        CCS - Column Compressed Structure.
-        '''
-        raise NotImplementedError()
+        pass
 
 
+def sparse_block_tensor(indices, values, size=None, dtype=None, device=None, requires_grad=False):
+    # Figure out the block shape.
+    n_block, block_shape = values.shape[0], values.shape[1:]
+    
+    # Storage.
+    storage = torch.sparse_coo_tensor(
+        indices, 
+        values, 
+        size=(*size, *block_shape), 
+        dtype=dtype, 
+        device=device, 
+        requires_grad=requires_grad ).coalesce()
+    
+    proxy = torch.sparse_coo_tensor(
+        indices,
+        torch.ones(n_block, dtype=dtype, device=device),
+        size=size,
+        dtype=dtype,
+        device=device,
+        requires_grad=False ).coalesce()
+    
+    x = SparseBlockTensor()
+    x._s = storage # s for storage.
+    x._p = proxy
+    return x
 
+def test_sparse_coo_2_sparse_hybrid_coo():
+    print()
+    
+    i = torch.Tensor([
+        [0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5],
+        [0, 1, 0, 1, 4, 5, 4, 5, 2, 3, 2, 3, 4, 5, 4, 5] ]).to(dtype=torch.int64)
+    v = torch.arange(16).float()
+    s = torch.sparse_coo_tensor(i, v, size=(6,6))
+    
+    i = torch.Tensor([
+        [0, 0, 1, 2],
+        [0, 2, 1, 2] ]).to(dtype=torch.int64)
+    v = torch.ones(4, dtype=torch.int64)
+    p = torch.sparse_coo_tensor(i, v, size=(3,3))
+    
+    print(f's = \n{s.to_dense()}')
+    print(f'p = \n{p.to_dense()}')
+    
+    h = coo_2_hybrid(s, p)
+    print(f'h = \n{h.to_dense()}')
+
+def test_abs():
+    print()
+
+    i = [[0, 1, 2],[2, 0, 2]]
+    v = torch.Tensor([[3, 4], [-5, -6], [7, 8]]).to(dtype=torch.float32)
+    x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
+
+    print(f'type(x) = {type(x)}')
+    print(f'x._s = \n{x._s}')
+    print(f'x._p = \n{x._p}')
+    
+    y = x.abs()
+    print(f'y = \n{y}')
+    
+    #print(x)
+
+    #y = x.to_dense()
+    #print(y)
+
+    # z = x @ x
+    #print(z)
+    #print(f'z = {z}')
+    #print(f'type(z) = {type(z)}')
+
+def test_mm():
+    print()
+
+    i = [[0, 0, 1, 2],[0, 2, 1, 2]]
+    v = torch.arange(16).view((-1, 2, 2)).to(dtype=torch.float32)
+    x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
+
+    # Show the storage and proxy.
+    print(f'type(x) = {type(x)}')
+    print(f'x._s = \n{x._s}')
+    print(f'x._p = \n{x._p}')
+    
+    # Perform matrix multiplication using the proxies.
+    m = x._p @ x._p
+    print(f'm = \n{m}')
+    
+    # Perform matrix multiplication.
+    y = x @ x
+    print(f'y = \n{y}')
+    
+    # Compute the true multiplication result.
+    xh = hybrid_2_coo(x._s)
+    print(f'xh = \n{xh.to_dense()}')
+    yh0 = xh @ xh
+    
+    # Convert our result.
+    yh = hybrid_2_coo(y._s)
+    
+    # Show and compare.
+    print(f'yh0 = \n{yh0.to_dense()}')
+    print(f'yh = \n{yh.to_dense()}')
+
+if __name__ == '__main__':
+    # test_sparse_coo_2_sparse_hybrid_coo()
+    # test_abs()
+    test_mm()
