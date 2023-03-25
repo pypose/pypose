@@ -26,15 +26,20 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
     index_shift = torch.stack( (index_shift_row, index_shift_col), dim=0 ) # 2 * n_block_elem
     
     # Repeat and shift the original indices.
-    indices_rp = indices_ori.repeat_interleave(n_block_elem, dim=1) # 2 * (n_block * n_block_elem)
-    indices_rp = indices_rp.view((2, n_block, n_block_elem)) # 2 * n_block * n_block_elem
-    indices_pm = indices_rp.permute(1, 0, 2) # n_block * 2 * n_block_elem
+    # 2 * (n_block * n_block_elem)
+    indices_rp = indices_ori.repeat_interleave(n_block_elem, dim=1)
+    # 2 * n_block * n_block_elem
+    indices_rp = indices_rp.view((2, n_block, n_block_elem))
+    # n_block * 2 * n_block_elem
+    indices_pm = indices_rp.permute(1, 0, 2)
     
     index_scale = torch.Tensor([*b_dim]).to(dtype=torch.int64, device=hybrid.device)
     index_scale = index_scale.view((1, 2, 1))
     
-    indices_new = indices_pm * index_scale + index_shift # n_block * 2 * n_block_elem
-    indices_new = indices_new.permute((1, 0, 2)).view((2, -1)) # 2 * n_block * n_block_elem -> 2 * (n_block * n_block_elem)
+    # n_block * 2 * n_block_elem
+    indices_new = indices_pm * index_scale + index_shift
+    # 2 * n_block * n_block_elem -> 2 * (n_block * n_block_elem)
+    indices_new = indices_new.permute((1, 0, 2)).view((2, -1))
     
     # === The dimension of the target coo matrix. ===
     coo_dim = [ t_dim[0]*b_dim[0], t_dim[1]*b_dim[1] ]
@@ -44,8 +49,9 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
 def sparse_coo_2_hybrid_block_sequence(s, block_shape):
     '''
     s is a sparse COO tensor. Any non-zero element in s indicates a block of size block_shape.
-    This function returns a new sparse hybrid COO tensor, which has the same block structure as s.
-    Every block of the hybrid tensor has the block sequnce number as the value for all of its elements.
+    This function returns a new sparse hybrid COO tensor, which has the same block structure 
+    as s. Every block of the hybrid tensor has the block sequnce number as the value for all of 
+    its elements.
     '''
     
     # Make sure we have ordered values.
@@ -62,13 +68,15 @@ def sparse_coo_2_hybrid_block_sequence(s, block_shape):
     block_seq = torch.arange(n_block, dtype=torch.int64, device=s.device)
     block_seq = block_seq.repeat_interleave(n_block_elem).view((n_block, *block_shape))
     
-    return torch.sparse_coo_tensor( s.indices(), block_seq, size=(*t_dim, *block_shape) ).coalesce()
+    return torch.sparse_coo_tensor( 
+            s.indices(), block_seq, size=(*t_dim, *block_shape) 
+        ).coalesce()
 
 def sparse_coo_2_hybrid_placeholder(s, block_shape, dtype, device):
     '''
     s is a sparse COO tensor. Any non-zero element in s indicates a block of size block_shape.
-    This function returns a new sparse hybrid COO tensor, which has the same block structure as s.
-    However, all the actual values of a block are zero.
+    This function returns a new sparse hybrid COO tensor, which has the same block structure 
+    as s. However, all the actual values of a block are zero.
     '''
     
     # Make sure we have ordered values.
@@ -84,7 +92,9 @@ def sparse_coo_2_hybrid_placeholder(s, block_shape, dtype, device):
     all_zero = torch.zeros(n_block * n_block_elem, dtype=dtype, device=device)
     all_zero = all_zero.view((n_block, *block_shape))
     
-    return torch.sparse_coo_tensor( s.indices(), all_zero, size=(*t_dim, *block_shape) ).coalesce()
+    return torch.sparse_coo_tensor( 
+            s.indices(), all_zero, size=(*t_dim, *block_shape) 
+        ).coalesce()
 
 def hybrid_2_coo(hybrid):
     '''
@@ -133,7 +143,8 @@ def coo_2_hybrid(coo, proxy):
     blocks[ block_seq.values(), in_block_indices[0], in_block_indices[1] ] = coo.values()
 
     # Create the sparse hybrid COO tensor.
-    return torch.sparse_coo_tensor(proxy.indices(), blocks.view((n_block, *b_dim)), size=(*t_dim, *b_dim))
+    return torch.sparse_coo_tensor(
+        proxy.indices(), blocks.view((n_block, *b_dim)), size=(*t_dim, *b_dim) )
 
 class SBTOperation(object):
     def __init__(self, func_name):
@@ -194,7 +205,9 @@ class SBTProxySameOperationAsStorage(SBTOperation):
         p_array = []
         for arg in args:
             # Convert the sparse hybrid Tensor _s to sparse coo tensor.
-            s_array.append( hybrid_2_coo( arg._s ) if isinstance(arg, SparseBlockTensor) else arg )
+            s_array.append( hybrid_2_coo( arg._s ) 
+                           if isinstance(arg, SparseBlockTensor) 
+                           else arg )
             
             # Do nothing about the proxy Tensor.
             p_array.append( arg._p if isinstance(arg, SparseBlockTensor) else arg )
@@ -218,6 +231,9 @@ class SBTProxySameOperationAsStorage(SBTOperation):
 
 _HANDLED_FUNCS_SPARSE = dict()
 
+def _is_handled_func(func_name):
+    return func_name in _HANDLED_FUNCS_SPARSE
+
 def _add_sparse_op(name, cls):
     global _HANDLED_FUNCS_SPARSE
     _HANDLED_FUNCS_SPARSE[name] = cls(name)
@@ -226,18 +242,6 @@ def _add_sparse_op(name, cls):
 _add_sparse_op( '__format__', SBTOperation )
 _add_sparse_op( 'abs',    SBTProxyNoOp )
 _add_sparse_op( 'matmul', SBTProxySameOperationAsStorage )
-
-def _is_handled_func(func_name):
-    return func_name in _HANDLED_FUNCS_SPARSE
-
-# _HANDLED_FUNCS_SPARSE = [
-#     SBTOperationMetaData('matmul', True), #'smm',
-
-#     'is_sparse', 'dense_dim','sparse_dim', 'to_dense', 'values',
-#     #'coalesce', 'is_coalesced', 'indices' COO only
-#     #'crow_indices', 'col_indices' CSR and BSR only
-# ] # decided according to "https://pytorch.org/docs/stable/sparse.html"
-
 
 class SparseBlockTensor(torch.Tensor):
 
@@ -248,7 +252,8 @@ class SparseBlockTensor(torch.Tensor):
         
         if not _is_handled_func(func.__name__):
             raise Exception(
-                f'All operations on SparseBlockTensor must be handled. \n{func.__name__} is not. ')
+                f'All operations on SparseBlockTensor must be handled. '
+                f'\n{func.__name__} is not. ' )
         
         sbt_op = _HANDLED_FUNCS_SPARSE[func.__name__]
         
@@ -276,7 +281,8 @@ class SparseBlockTensor(torch.Tensor):
         if not isinstance(outputs_proxy, (list, tuple)):
             outputs_proxy = [outputs_proxy]
             
-        outputs_list_storage, outputs_list_proxy = sbt_op.storage_post(func, stripped_types, outputs_storage, outputs_proxy, kwargs)
+        outputs_list_storage, outputs_list_proxy = \
+            sbt_op.storage_post(func, stripped_types, outputs_storage, outputs_proxy, kwargs)
 
         if outputs_list_storage[0] is None:
             return None
@@ -335,7 +341,8 @@ class SparseBlockTensor(torch.Tensor):
         pass
 
 
-def sparse_block_tensor(indices, values, size=None, dtype=None, device=None, requires_grad=False):
+def sparse_block_tensor(
+        indices, values, size=None, dtype=None, device=None, requires_grad=False):
     # Figure out the block shape.
     n_block, block_shape = values.shape[0], values.shape[1:]
     
