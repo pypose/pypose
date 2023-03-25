@@ -24,13 +24,13 @@ class BetasOptimizationObjective(torch.nn.Module):
         # calculate the control points in camera coordinate
         ctrl_pts_c = bmv(kernel_bases, self.betas)
         diff_c = ctrl_pts_c.reshape(*batch_shape, 1, 4, 3) - ctrl_pts_c.reshape(*batch_shape, 4, 1, 3)
-        diff_c = diff_c.reshape(*batch_shape, 48)
-        # diff_c = torch.sum(diff_c ** 2, dim=-1)
+        diff_c = diff_c.reshape(*batch_shape, 48)  # TODO: whether it is (16, 3) or (48, )?
+        diff_c = torch.norm(diff_c, dim=-1)
 
         # calculate the distance between control points in world coordinate
         diff_w = ctrl_pts_w.reshape(*batch_shape, 1, 4, 3) - ctrl_pts_w.reshape(*batch_shape, 4, 1, 3)
         diff_w = diff_w.reshape(*batch_shape, 48)
-        # diff_w = torch.sum(diff_w ** 2, dim=-1)
+        diff_w = torch.norm(diff_w, dim=-1)
 
         return diff_w - diff_c
 
@@ -47,9 +47,10 @@ class EPnP(torch.nn.Module):
 
     Examples:
         >>> import torch, pypose as pp
+        >>> torch.set_default_dtype(torch.float64)
         >>> # create some random test sample for a single camera
         >>> pose = pp.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239])
-        >>> f, img_size = 2, (7, 7)
+        >>> f, img_size = 2, (9, 9)
         >>> projection = torch.tensor([[f, 0, img_size[0] / 2],
         ...                            [0, f, img_size[1] / 2],
         ...                            [0, 0, 1              ]])
@@ -58,25 +59,24 @@ class EPnP(torch.nn.Module):
         ...                       [1., 0., 2.],
         ...                       [0., 1., 1.],
         ...                       [0., 0., 1.],
+        ...                       [1., 0., 1.],
         ...                       [5., 5., 3.]])
         >>> pixels = (pts_c @ projection.T)[:, :2] / (pts_c @ projection.T)[:, 2:]
         >>> pixels
-        tensor([[5.5000, 3.5000],
-                [4.5000, 3.5000],
-                [3.5000, 5.5000],
-                [3.5000, 3.5000],
-                [6.8333, 6.8333]])
+        tensor([[6.5000, 4.5000],
+                [5.5000, 4.5000],
+                [4.5000, 6.5000],
+                [4.5000, 4.5000],
+                [6.5000, 4.5000],
+                [7.8333, 7.8333]])
         >>> # transform the points to world coordinate
         >>> # solve the PnP problem to find the camera pose
         >>> pts_w = pose.Inv().Act(pts_c)
         >>> # solve the PnP problem
         >>> epnp = pp.module.EPnP()
         >>> # when input is not batched, remember to add a batch dimension
-        >>> pose = epnp(pts_w[None], pixels[None], projection[None])
-        >>> pose
-        SE3Type LieTensor:
-        LieTensor([[ 5.4955e-05, -8.0000e+00, -2.7895e-05,  6.8488e-06, -3.8270e-01,
-                        3.2812e-06,  9.2387e-01]])
+        >>> solved_pose = epnp(pts_w[None], pixels[None], projection[None])
+        >>> assert torch.allclose(solved_pose, pose[None], atol=1e-3)
 
     Note:
         The implementation is based on the paper
@@ -120,7 +120,7 @@ class EPnP(torch.nn.Module):
         alpha = self.compute_alphas(points, bases)
         m = self.build_m(pixels, alpha, intrinsics)
 
-        kernel_m = self.calculate_kernel(m) # [..., [3, 2, 1, 0]]  # to be consistent with the matlab code
+        kernel_m = self.calculate_kernel(m)[..., [3, 2, 1, 0]]  # to be consistent with the matlab code
 
         l_mat = self.build_l(kernel_m)
         rho = self.build_rho(bases)
