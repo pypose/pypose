@@ -88,7 +88,8 @@ def test(network, loader, device = "cuda:0"):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device", type=str, default='cuda:0', help="cuda or cpu")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    parser.add_argument("--device", type=str, default=device, help="cuda or cpu")
     parser.add_argument("--batch-size", type=int, default=4, help="batch size")
     parser.add_argument("--max_epoches", type=int, default=100, help="max_epoches")
     parser.add_argument("--dataroot", type=str, default='./examples/module/imu', help="dataset location downloaded")

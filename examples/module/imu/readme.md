@@ -6,7 +6,7 @@ Examples of IMU [preintegrating](./imu_integrator.py) and IMU [correction](./imu
 
     python -m pip install -U matplotlib
     pip install opencv-python
-    pip install pykitti
+    pip install pykitti tqdm
     pip install torchvision
 
 ## Prepare Dataset (Optional)
