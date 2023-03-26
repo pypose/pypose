@@ -1,7 +1,4 @@
 import torch
-import functorch
-import sys, math, warnings
-from torch import nn, Tensor
 from torch.autograd.functional import jacobian
 from torch.func import jacrev, jacfwd, functional_call
 
@@ -128,14 +125,13 @@ def modjac(model, input=None, create_graph=False, strict=False, vectorize=False,
         torch.Size([8, 6])
     '''
     params, buffers = dict(model.named_parameters()), dict(model.named_buffers())
-    params_names = params.keys()
-    params_values = tuple(params.values())
+    params_names, params_values = params.keys(), tuple(params.values())
 
     if input is None:
         input = tuple()
 
     def func_param(*new_params_values):
-        new_params_dict = {name: value for name, value in zip(params_names, new_params_values)}
+        new_params_dict = dict(zip(params_names, new_params_values))
         return functional_call(model, (new_params_dict, buffers), input)
 
     J = jacobian(func_param, params_values, create_graph=create_graph, strict=strict, \

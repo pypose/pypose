@@ -2,35 +2,47 @@ import copy
 import torch
 import pypose as pp
 from torch import nn
-import functorch
+from torch.func import functional_call
+from torch.utils._pytree import tree_map
 from torch.autograd.functional import jacobian
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def make_functional(mod, disable_autograd_tracking=False):
-    # relies on the code snippet from 
-    # https://pytorch.org/docs/stable/func.migrating.html?highlight=functorch#functorch-make-functional
-    params_dict = dict(mod.named_parameters())
-    params_names = params_dict.keys()
-    params_values = tuple(params_dict.values())
-    
-    stateless_mod = copy.deepcopy(mod)
-    stateless_mod.to('meta')
-
-    def fmodel(new_params_values, *args, **kwargs):
-        new_params_dict = {name: value for name, value in zip(params_names, new_params_values)}
-        return torch.func.functional_call(stateless_mod, new_params_dict, args, kwargs)
-  
-    if disable_autograd_tracking:
-        params_values = torch.utils._pytree.tree_map(torch.Tensor.detach, params_values)
-    return fmodel, params_values
 
 class TestJacobian:
 
-    def verify_jacobian(self, J):
-        for j in J:
-            assert not torch.any(torch.isnan(j))
+    def make_functional(self, mod, disable_autograd_tracking=False):
+        # relies on the code snippet from https://tinyurl.com/hrv99cuk
+        params_dict = dict(mod.named_parameters())
+        params_names = params_dict.keys()
+        params_values = tuple(params_dict.values())
+        
+        stateless_mod = copy.deepcopy(mod)
+        stateless_mod.to('meta')
 
-    def test_torch_jacobian(self):
+        def fmodel(new_params_values, *args, **kwargs):
+            new_params_dict = dict(zip(params_names, new_params_values))
+            return torch.func.functional_call(stateless_mod, new_params_dict, args, kwargs)
+
+        if disable_autograd_tracking:
+            params_values = torch.utils._pytree.tree_map(torch.Tensor.detach, params_values)
+        return fmodel, params_values
+
+    def verify_jacobian(self, J1, J2):
+        for j1, j2 in zip(J1, J2):
+            assert not torch.any(torch.isnan(j1))
+            torch.testing.assert_close(j1, j2)
+
+    def test_tensor_jacobian_single_param(self):
+
+        model = nn.Conv2d(2, 2, 2)
+        input = torch.randn(2, 2, 2)
+        func, params = self.make_functional(model)
+        J1 = jacobian(lambda *param: func(param, input), params)
+        J2 = pp.optim.functional.modjac(model, input)
+
+        self.verify_jacobian(J1, J2)
+
+    def test_tensor_jacobian_multi_param(self):
 
         class Model(torch.nn.Module):
             def __init__(self):
@@ -43,18 +55,12 @@ class TestJacobian:
 
         model = Model()
         input = torch.randn(2, 2, 2)
-        func, params = make_functional(model)
-        J = jacobian(lambda *param: func(param, input), params)
-        self.verify_jacobian(J)
+        func, params = self.make_functional(model)
+        J1 = jacobian(lambda *param: func(param, input), params)
+        J2 = pp.optim.functional.modjac(model, input)
+        self.verify_jacobian(J1, J2)
 
-        model = nn.Conv2d(2, 2, 2)
-        input = torch.randn(2, 2, 2)
-        func, params = make_functional(model)
-        J = jacobian(lambda *param: func(param, input), params)
-        self.verify_jacobian(J)
-
-
-    def test_pypose_jacobian(self):
+    def test_lietensor_jacobian(self):
 
         class PoseTransform(torch.nn.Module):
             def __init__(self):
@@ -65,14 +71,14 @@ class TestJacobian:
             def forward(self):
                 return self.p.Exp().tensor()
 
-        model, input = PoseTransform().to(device), pp.randn_SO3(device=device)
-        J1 = pp.optim.functional.modjac(model, input=None, flatten=True)
-        self.verify_jacobian(J1)
+        model = PoseTransform().to(device)
 
-        func, params = make_functional(model)
-        jacrev = torch.func.jacrev(lambda *param: func(param, input), params)
+        func, params = self.make_functional(model)
+        J1 = jacobian(lambda *param: func(param), params)
+        J2 = pp.optim.functional.modjac(model, input=None, flatten=False)
+        self.verify_jacobian(J1, J2)
 
-        model, input = PoseTransform().to(device), pp.randn_SO3(device=device)
+        model = PoseTransform().to(device)
         huber = pp.optim.kernel.Huber(delta=0.01)
 
         class RobustModel(nn.Module):
@@ -86,10 +92,11 @@ class TestJacobian:
 
         model = RobustModel(model, huber)
         J = pp.optim.functional.modjac(model, input=None, flatten=True)
-        self.verify_jacobian(J)
+        assert not torch.any(torch.isnan(J))
 
 
 if __name__ == '__main__':
     test = TestJacobian()
-    test.test_torch_jacobian()
-    test.test_pypose_jacobian()
+    test.test_tensor_jacobian_single_param()
+    test.test_tensor_jacobian_multi_param()
+    test.test_lietensor_jacobian()
