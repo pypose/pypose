@@ -1,19 +1,71 @@
 
+"""Sparse Block Tensor for PyPose.
+
+This module implements the sparse block tensor (referred to as SBT) for PyPose. SBT is designed
+to be primarily used to represent sparse block matrices. We make extensive use of PyTorch's
+sparse tensor for the current implementation, especially the COO tensor and the hybrid COO 
+tensor (referred to as Hybrid tensor). Some highlights:
+
+* A block is a 2-dimensional dense tensor. So the dimension of an SBT is [ sH, sW, bH, bW ] 
+  where sH and sW are the sparse shape and bH and bW are block shape. See the following for the 
+  terminology.
+* An SBT consists of a Hybrid tensor to represent the data storage and a plain COO tensor to 
+  preserve the block structure. We term them as the Storage and Proxy, respectively.
+* All operations are implemented by using the PyTorch sparse tensor API. On high level, we 
+  convert a Hybrid tensor to the COO format, perform the operation by PyTorch, and then convert
+  the result back to the Hybrid format.
+* For all supported operations, we try to handle the Proxy correctly preserving the block 
+  structure where applicable.
+* Gradient is supported where underlying PyTorch's operation supports it. 
+
+The following terminology is specific to our SBT implementation:
+
+* block: A 2-dimensional dense tensor.
+* block shape, dense shape, dense dimension: The shape of a single block.
+* sparse shape, sparse dimension: The shape of the sparse tensor without irrespect to the block 
+  shape. Thus for a 3x3 SBT with block shape 2x2, the sparse shape is 3x3. The sparse shape of
+  this SBT's COO equivalent is 6x6.
+
+For PyTorhc's sparse tensor, please refer to `Pytorch Sparse tensor`_.
+
+Example:
+    Examples to be added
+
+        $ Awesome_exmaples.py
+
+Attributes:
+    module_level_variable1 (int): Module level variables.
+
+.. _PyTorch Sparse tensor:
+   https://pytorch.org/docs/stable/sparse.html#torch-sparse
+
+"""
+
 import torch
 from torch.utils._pytree import tree_map, tree_flatten
 
 def make_coo_indices_and_dims_from_hybrid(hybrid):
+    """Create index and dimension info for converting a Hybrid tensor to a COO tensor.
+
+    Create the index and dimension information for converting a Hybrid tensor to a COO tensor. 
+
+    Args:
+        hybrid (torch.Tensor): The Hybrid tensor.
+
+    Returns:
+        torch.Tensor: The indices for creating a COO tensor.
+        list of int: The dimension of the COO tensor.
+    """
     # Get the coalesced version such that we can operate on the indices.
     hybrid = hybrid.coalesce()
     
-    # The original tensor dimension and block dimension.
-    t_dim, b_dim = hybrid.shape[:2], hybrid.shape[2:]
+    # The block dimension.
+    b_dim = hybrid.shape[2:]
     assert len(b_dim) == 2, f'hybrid.shape = {hybrid.shape}. '
-    n_block = hybrid.values().shape[0]
-    n_block_elem = b_dim[0] * b_dim[1]
+    n_block = hybrid.values().shape[0] # Number of blocks.
+    n_block_elem = b_dim[0] * b_dim[1] # Number of elements per block.
     
     # === Compose target coo indices. ===
-    indices_ori = hybrid.indices()
     
     # Index shift for every element in a block.
     shift_row = torch.arange(b_dim[0], dtype=torch.int64, device=hybrid.device)
@@ -21,28 +73,30 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
     index_shift_row, index_shift_col = torch.meshgrid( shift_row, shift_col, indexing='ij' )
     
     # Flatten the index shift.
-    index_shift_row = index_shift_row.contiguous().view((-1,)) # contiguous() is necessary.
+    # contiguous() is necessary after meshgrid().
+    index_shift_row = index_shift_row.contiguous().view((-1,))
     index_shift_col = index_shift_col.contiguous().view((-1,))
     index_shift = torch.stack( (index_shift_row, index_shift_col), dim=0 ) # 2 * n_block_elem
     
     # Repeat and shift the original indices.
-    # 2 * (n_block * n_block_elem)
+    indices_ori = hybrid.indices()
+    # 2 * n_block -> 2 * ( n_block * n_block_elem ), rp stands for repeated.
     indices_rp = indices_ori.repeat_interleave(n_block_elem, dim=1)
-    # 2 * n_block * n_block_elem
+    # 2 * ( n_block * n_block_elem ) -> 2 * n_block * n_block_elem
     indices_rp = indices_rp.view((2, n_block, n_block_elem))
-    # n_block * 2 * n_block_elem
+    # 2 * n_block * n_block_elem -> n_block * 2 * n_block_elem, pm stands for permuted.
     indices_pm = indices_rp.permute(1, 0, 2)
     
+    # Compute the new indices by muliplying the block shape and adding the index shift.
     index_scale = torch.Tensor([*b_dim]).to(dtype=torch.int64, device=hybrid.device)
     index_scale = index_scale.view((1, 2, 1))
-    
     # n_block * 2 * n_block_elem
     indices_new = indices_pm * index_scale + index_shift
-    # 2 * n_block * n_block_elem -> 2 * (n_block * n_block_elem)
+    # n_block * 2 * n_block_elem -> 2 * (n_block * n_block_elem)
     indices_new = indices_new.permute((1, 0, 2)).view((2, -1))
     
-    # === The dimension of the target coo matrix. ===
-    coo_dim = [ t_dim[0]*b_dim[0], t_dim[1]*b_dim[1] ]
+    # === The sharse dimension of the target coo matrix. ===
+    coo_dim = [ hybrid.shape[0]*b_dim[0], hybrid.shape[1]*b_dim[1] ]
     
     return indices_new, coo_dim
 
