@@ -75,8 +75,8 @@ class EPnP(torch.nn.Module):
         >>> # solve the PnP problem
         >>> epnp = pp.module.EPnP()
         >>> # when input is not batched, remember to add a batch dimension
-        >>> solved_pose = epnp(pts_w[None], pixels[None], projection[None])
-        >>> assert torch.allclose(solved_pose, pose[None], atol=1e-3)
+        >>> solved_pose = epnp(pts_w, pixels, projection)
+        >>> assert torch.allclose(solved_pose, pose, atol=1e-3)
 
     Note:
         The implementation is based on the paper
@@ -367,7 +367,9 @@ class EPnP(torch.nn.Module):
 
         # Update the control points and the object points in the camera coordinates based on the sign
         neg_z_mask = torch.any(points_c[..., 2] < 0, dim=-1)  # (N, )
-        negate_switch = torch.ones((points.shape[0],), dtype=points.dtype, device=points.device)
+
+        # for batched data
+        negate_switch = torch.ones(batch_shape, dtype=points.dtype, device=points.device)
         negate_switch[neg_z_mask] = negate_switch[neg_z_mask] * -1
         points_c = points_c * negate_switch.reshape(*batch_shape, 1, 1)
         sc = sc[..., 0, 0] * negate_switch
@@ -394,7 +396,7 @@ class EPnP(torch.nn.Module):
 
         # Calculate the rotation matrix
         m = torch.matmul(pts_c[..., :, None], pts_w[..., None, :])
-        m = m.sum(dim=1)  # along the point dimension
+        m = m.sum(dim=-3)  # along the point dimension
 
         u, s, vh = torch.svd(m)
         rot = u.matmul(vh.mT)

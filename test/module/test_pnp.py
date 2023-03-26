@@ -49,9 +49,16 @@ def rmse_t(pred, gt):
 
 
 class TestEPnP:
-    def test_epnp_5pts(self):
+    def test_epnp_nonbatch(self):
         # TODO: Implement this
-        return
+        data = load_data()
+
+        # instantiate epnp
+        epnp = pp.module.EPnP(naive=False)
+        solution_non_batch = epnp(data['objPts'][0], data['imgPts'][0], data['camMat'][0])
+        solution_batch = epnp(data['objPts'], data['imgPts'], data['camMat'])
+
+        assert torch.allclose(solution_non_batch.rotation().matrix(), solution_batch.rotation().matrix())
 
     def test_epnp_10pts(self):
         # TODO: Implement this
