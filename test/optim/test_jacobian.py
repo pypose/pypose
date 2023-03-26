@@ -21,10 +21,10 @@ class TestJacobian:
 
         def fmodel(new_params_values, *args, **kwargs):
             new_params_dict = dict(zip(params_names, new_params_values))
-            return torch.func.functional_call(stateless_mod, new_params_dict, args, kwargs)
+            return functional_call(stateless_mod, new_params_dict, args, kwargs)
 
         if disable_autograd_tracking:
-            params_values = torch.utils._pytree.tree_map(torch.Tensor.detach, params_values)
+            params_values = tree_map(torch.Tensor.detach, params_values)
         return fmodel, params_values
 
     def verify_jacobian(self, J1, J2):
