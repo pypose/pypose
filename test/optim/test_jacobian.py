@@ -39,8 +39,11 @@ class TestJacobian:
         func, params = self.make_functional(model)
         J1 = jacobian(lambda *param: func(param, input), params)
         J2 = pp.optim.functional.modjac(model, input)
-
+        J3 = pp.optim.functional.modjacrev(model, input)
+        J4 = pp.optim.functional.modjacfwd(model, input)
         self.verify_jacobian(J1, J2)
+        self.verify_jacobian(J1, J3.values())
+        self.verify_jacobian(J1, J4.values())
 
     def test_tensor_jacobian_multi_param(self):
 

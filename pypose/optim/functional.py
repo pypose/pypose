@@ -1,4 +1,5 @@
 import torch
+from functools import partial
 from torch.autograd.functional import jacobian
 from torch.func import jacrev, jacfwd, functional_call
 
@@ -156,9 +157,9 @@ def modjac(model, input=None, create_graph=False, strict=False, vectorize=False,
 
 def modjacrev(model, input, argnums=0, *, has_aux=False):
     params = dict(model.named_parameters())
-    return jacrev(functional_call, argnums=1+argnums, has_aux=has_aux)(model, params, input)
+    return jacrev(partial(functional_call, model), argnums=argnums, has_aux=has_aux)(params, input)
 
 
 def modjacfwd(model, input, argnums=0, *, has_aux=False):
     params = dict(model.named_parameters())
-    return jacfwd(functional_call, argnums=1+argnums, has_aux=has_aux)(model, params, input)
+    return jacfwd(partial(functional_call, model), argnums=argnums, has_aux=has_aux)(params, input)
