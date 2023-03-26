@@ -203,7 +203,7 @@ class EPnP(torch.nn.Module):
         center = points.mean(dim=-2, keepdim=True)
         translated = points - center
         u, s, vh = torch.linalg.svd(translated.mT @ translated)
-        controls = center + s.sqrt().unsqueeze(-1) * vh
+        controls = center + s.sqrt().unsqueeze(-1) * vh.mT
         return torch.cat([center, controls], dim=-2)
 
 
