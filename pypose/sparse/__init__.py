@@ -1,1 +1,5 @@
-from .sparse_block_tensor import sparse_block_tensor
+from .sparse_block_tensor import (
+    hybrid_2_coo,
+    coo_2_hybrid,
+    sparse_block_tensor
+)

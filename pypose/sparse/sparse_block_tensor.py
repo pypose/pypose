@@ -1,5 +1,5 @@
 
-"""Sparse Block Tensor for PyPose.
+'''Sparse Block Tensor for PyPose.
 
 This module implements the sparse block tensor (referred to as SBT) for PyPose. SBT is designed
 to be primarily used to represent sparse block matrices. We make extensive use of PyTorch's
@@ -25,6 +25,7 @@ The following terminology is specific to our SBT implementation:
 * sparse shape, sparse dimension: The shape of the sparse tensor without irrespect to the block 
   shape. Thus for a 3x3 SBT with block shape 2x2, the sparse shape is 3x3. The sparse shape of
   this SBT's COO equivalent is 6x6.
+* non-zero structure: The block pattern of a Hybrid tensor or a non-zero pattern of a COO tensor.
 
 For PyTorhc's sparse tensor, please refer to `Pytorch Sparse tensor`_.
 
@@ -39,13 +40,13 @@ Attributes:
 .. _PyTorch Sparse tensor:
    https://pytorch.org/docs/stable/sparse.html#torch-sparse
 
-"""
+'''
 
 import torch
 from torch.utils._pytree import tree_map, tree_flatten
 
 def make_coo_indices_and_dims_from_hybrid(hybrid):
-    """Create index and dimension info for converting a Hybrid tensor to a COO tensor.
+    '''Create index and dimension info for converting a Hybrid tensor to a COO tensor.
 
     Create the index and dimension information for converting a Hybrid tensor to a COO tensor. 
 
@@ -55,7 +56,7 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
     Returns:
         torch.Tensor: The indices for creating a COO tensor.
         list of int: The dimension of the COO tensor.
-    """
+    '''
     # Get the coalesced version such that we can operate on the indices.
     hybrid = hybrid.coalesce()
     
@@ -100,90 +101,147 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
     
     return indices_new, coo_dim
 
-def sparse_coo_2_hybrid_block_sequence(s, block_shape):
-    '''
-    s is a sparse COO tensor. Any non-zero element in s indicates a block of size block_shape.
-    This function returns a new sparse hybrid COO tensor, which has the same block structure 
-    as s. Every block of the hybrid tensor has the block sequnce number as the value for all of 
-    its elements.
-    '''
+def repeated_value_as_hybrid_value(coo, block_shape, val_func):
+    '''Create a Hybrid tesnor based on a COO tensor with element value from the val_func argument.
     
+    val_func is a callable that returns a 1D torch tensor. We call this tensor as val. The 
+    signature of val_func is::
+    
+        val = val_func(n_blk, device)
+    
+    where n_blk is the number of blocks.
+    
+    coo is a COO tensor. Logically, a non-zero element of coo indicates a block of size block_shape.
+    This function returns a new Hybrid tensor, which has the same non-zero structure as coo. Every 
+    block of the Hybrid tensor takes one element of val for all of its elements. Thus, a block of 
+    the output Hybrid tensor repeats a single value of val.
+    
+    TODO:
+        Add an example.
+    
+    Args:
+        coo (torch.Tensor): The COO tensor.
+        block_shape (2-element): The block shape of the output Hybrid tensor.
+        val_func (callable): Returns value to be repeated.
+
+    Returns:
+        Hybrid tensor (torch.Tensor): The created Hybrid tensor.
+    '''
     # Make sure we have ordered values.
-    s = s.coalesce()
-    
-    # Only use the sparse dimension.
-    t_dim = s.shape[:2]
+    coo = coo.coalesce()
     
     # Number of block and number of elements per block.
-    n_block = s.values().shape[0]
+    n_block = coo.values().shape[0]
     n_block_elem = block_shape[0] * block_shape[1]
     
     # Prepare the sequence number.
-    block_seq = torch.arange(n_block, dtype=torch.int64, device=s.device)
-    block_seq = block_seq.repeat_interleave(n_block_elem).view((n_block, *block_shape))
-    
-    return torch.sparse_coo_tensor( 
-            s.indices(), block_seq, size=(*t_dim, *block_shape) 
-        ).coalesce()
-
-def sparse_coo_2_hybrid_placeholder(s, block_shape, dtype, device):
-    '''
-    s is a sparse COO tensor. Any non-zero element in s indicates a block of size block_shape.
-    This function returns a new sparse hybrid COO tensor, which has the same block structure 
-    as s. However, all the actual values of a block are zero.
-    '''
-    
-    # Make sure we have ordered values.
-    s = s.coalesce()
+    val = val_func(n_blk=n_block, device=coo.device)
+    val = val.repeat_interleave(n_block_elem).view((n_block, *block_shape))
     
     # Only use the sparse dimension.
-    t_dim = s.shape[:2]
-    
-    # Number of block and number of elements per block.
-    n_block = s.values().shape[0]
-    n_block_elem = block_shape[0] * block_shape[1]
-    
-    all_zero = torch.zeros(n_block * n_block_elem, dtype=dtype, device=device)
-    all_zero = all_zero.view((n_block, *block_shape))
+    s_dim = coo.shape[:2]
     
     return torch.sparse_coo_tensor( 
-            s.indices(), all_zero, size=(*t_dim, *block_shape) 
+            coo.indices(), val, size=(*s_dim, *block_shape) 
         ).coalesce()
 
-def hybrid_2_coo(hybrid):
+def sparse_coo_2_hybrid_block_sequence(coo, block_shape):
+    '''Create a Hybrid tesnor based on a COO tensor with element value as block sequence number.
+    
+    coo is a COO tensor. Logically, a non-zero element of coo indicates a block of size block_shape.
+    This function returns a new Hybrid tensor, which has the same non-zero structure as coo. Every 
+    block of the Hybrid tensor takes the block sequnce number as the value for all of its elements. 
+    
+    TODO:
+        Add an example.
+    
+    Args:
+        coo (torch.Tensor): The COO tensor.
+        block_shape (2-element): The block shape of the output Hybrid tensor.
+
+    Returns:
+        Hybrid tensor (torch.Tensor): The created Hybrid tensor.
     '''
-    Covnert a sparse hybrid COO tensor to a sparse COO tensor.
+    # Repeat the sequence number.
+    val_func = lambda n_blk, device : \
+        torch.arange(n_blk, dtype=torch.int64, device=device)
+    return repeated_value_as_hybrid_value(coo, block_shape, val_func)
+
+def sparse_coo_2_hybrid_placeholder(coo, block_shape, dtype):
+    '''Create a Hybrid tesnor based on a COO tensor with all zero elements.
+    
+    coo is a COO tensor. Any non-zero element in coo indicates a block of size block_shape.
+    This function returns a new Hybrid tensor, which has the same non-zero structure as coo. 
+    However, all the actual values of a block are zero.
+    
+    TODO:
+        Add an example.
+    
+    Args:
+        coo (torch.Tensor): The COO tensor.
+        block_shape (2-element): The block shape of the output Hybrid tensor.
+        dtype (torch.dtype): The data type of the output Hybrid tensor.
+
+    Returns:
+        Hybrid tensor (torch.Tensor): The created Hybrid tensor.
+    '''
+    # All zero number with dtype specified.
+    val_func = lambda n_blk, device, dtype=dtype : \
+        torch.zeros( n_blk, device=device, dtype=dtype )
+    return repeated_value_as_hybrid_value(coo, block_shape, val_func)
+
+def hybrid_2_coo(hybrid):
+    '''Covnert a Hybrid tensor to a COO tensor.
+    
+    This function converts a Hybrid tensor to a COO tensor.
+    
+    Args:
+        hybrid (torch.Tensor): The Hybrid tensor.
+
+    Returns:
+        COO tensor (torch.Tensor): The created COO tensor.
+    
     '''
     hybrid = hybrid.coalesce()
-    indices_new, coo_dim = make_coo_indices_and_dims_from_hybrid(hybrid)
-    return torch.sparse_coo_tensor(indices_new, hybrid.values().view((-1,)), size=coo_dim)
+    indices_new, sparse_dim = make_coo_indices_and_dims_from_hybrid(hybrid)
+    return torch.sparse_coo_tensor(indices_new, hybrid.values().view((-1,)), size=sparse_dim)
 
 def coo_2_hybrid(coo, proxy):
-    '''
-    Convert a sparse COO tensor to a sparse hybrid COO tensor by referring to the proxy.
+    '''Convert a COO tensor to a Hybrid tensor by referring to the proxy.
     
-    A proxy is a sparse COO tensor. Any non-zero element in the proxy indicates a block.
+    A proxy is a COO tensor. Any non-zero element in proxy indicates a block of the Hybrid tensor.
+    
+    Args:
+        coo (torch.Tensor): The COO tensor.
+        proxy (torch.Tensor): The proxy tensor as COO format.
+
+    Returns:
+        Hybrid tensor (torch.Tensor): The created Hybrid tensor.
     '''
+    assert coo.device == proxy.device, \
+        f'coo and proxy must be on the same device. '\
+        f'coo.device = {coo.device}, proxy.device = {proxy.device}. '
+    
     proxy = proxy.coalesce()
     
-    # Figure out the shape of the target hybrid tensor.
-    t_dim = proxy.shape[:2]
-    assert coo.shape[0] % t_dim[0] == 0 and coo.shape[1] % t_dim[1] == 0, \
-        f'coo and t_dim are not compatible: coo.shape = {coo.shape}, t_dim = {t_dim}. '
-    b_dim = [ coo.shape[0] // t_dim[0], coo.shape[1] // t_dim[1] ]
+    # Figure out the shape of the target Hybrid tensor.
+    s_dim = proxy.shape[:2]
+    assert coo.shape[0] % s_dim[0] == 0 and coo.shape[1] % s_dim[1] == 0, \
+        f'coo and s_dim are not compatible: coo.shape = {coo.shape}, s_dim = {s_dim}. '
+    b_dim = [ coo.shape[0] // s_dim[0], coo.shape[1] // s_dim[1] ] # block dimension.
     
-    # Create a temporary sparse hybrid COO tensor to represent the block sequence.
+    # Create a temporary Hybrid tensor to represent the block sequence.
     block_seq = sparse_coo_2_hybrid_block_sequence(proxy, b_dim)
     block_seq = hybrid_2_coo(block_seq).coalesce()
     
-    # Create a temporary sparse hybrid COO tensor for the placeholders.
-    block_phd = sparse_coo_2_hybrid_placeholder(proxy, b_dim, dtype=coo.dtype, device=coo.device)
+    # Create a temporary Hybrid tensor for the placeholders.
+    block_phd = sparse_coo_2_hybrid_placeholder(proxy, b_dim, dtype=coo.dtype)
     # PyTorch may has a bug here. If one of the tensors is coalesced, the the add operation will 
     # result in a coalesced tensor, no matter whether the other tensor is coalesced or not.
     # block_phd = hybrid_2_coo(block_phd).coalesce() 
     block_phd = hybrid_2_coo(block_phd)
     
-    # Force the input coo tensor to have the same struture as block_seq and block_phd.
+    # Pad the input COO tensor to have the same non-zero struture as block_seq and block_phd.
     coo = coo + block_phd
     coo = coo.coalesce()
     
@@ -198,7 +256,7 @@ def coo_2_hybrid(coo, proxy):
 
     # Create the sparse hybrid COO tensor.
     return torch.sparse_coo_tensor(
-        proxy.indices(), blocks.view((n_block, *b_dim)), size=(*t_dim, *b_dim) )
+        proxy.indices(), blocks.view((n_block, *b_dim)), size=(*s_dim, *b_dim) )
 
 class SBTOperation(object):
     def __init__(self, func_name):
@@ -363,19 +421,19 @@ class SparseBlockTensor(torch.Tensor):
             return outputs_final[0]
 
     def __repr__(self):
-        r"""
+        r'''
         t = SparseBlockTensor()
         >>>t
         SparseBlockTensor()
-        """
+        '''
         return str(self)
 
     def __str__(self):
-        r"""
+        r'''
         t = SparseBlockTensor()
         print( t )
         ' SparseBlockTensor() '
-        """
+        '''
         return f"SparseBlockTensor\nstorage:\n{self._s}\nproxy:\n{self._p}"
 
     def __format__(self, spec):
