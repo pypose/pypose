@@ -389,12 +389,10 @@ class EPnP(torch.nn.Module):
 
         # calculate the scaling factors
         # below are batched vector dot product
-        sc_1 = torch.matmul(dist_c.unsqueeze(-2), dist_c.unsqueeze(-1))
-        sc_2 = torch.matmul(dist_c.unsqueeze(-2), dist_w.unsqueeze(-1))
-        sc = (1 / sc_1 * sc_2)
+        sc = 1 / torch.linalg.vecdot(dist_c, dist_c) * torch.linalg.vecdot(dist_c, dist_w)
 
         # Update the control points and the object points in the camera coordinates based on the scaling factors
-        ctrl_pts_c = ctrl_pts_c * sc
+        ctrl_pts_c = ctrl_pts_c * sc[..., None, None]
         points_c = alphas.matmul(ctrl_pts_c)
 
         # Update the control points and the object points in the camera coordinates based on the sign
@@ -404,7 +402,7 @@ class EPnP(torch.nn.Module):
         negate_switch = torch.ones(batch, dtype=points.dtype, device=points.device)
         negate_switch[neg_z_mask] = negate_switch[neg_z_mask] * -1
         points_c = points_c * negate_switch.reshape(*batch, 1, 1)
-        sc = sc[..., 0, 0] * negate_switch
+        sc = sc * negate_switch
         return ctrl_pts_c, points_c, sc
 
     @staticmethod
