@@ -50,7 +50,6 @@ def rmse_t(pred, gt):
 
 class TestEPnP:
     def test_epnp_nonbatch(self):
-        # TODO: Implement this
         data = load_data()
 
         # instantiate epnp
@@ -60,9 +59,29 @@ class TestEPnP:
 
         assert torch.allclose(solution_non_batch.rotation().matrix(), solution_batch.rotation().matrix())
 
-    def test_epnp_10pts(self):
-        # TODO: Implement this
-        return
+    
+    def test_epnp_6pts(self):
+        # create some random test sample for a single camera
+        pose = pp.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239]).to(torch.float64)
+        f, img_size = 2, (9, 9)
+        projection = torch.tensor([[f, 0, img_size[0] / 2],
+                                   [0, f, img_size[1] / 2],
+                                   [0, 0, 1              ]], dtype=torch.float64)
+        # some random points in the view
+        pts_c = torch.tensor([[2., 0., 2.],
+                              [1., 0., 2.],
+                              [0., 1., 1.],
+                              [0., 0., 1.],
+                              [1., 0., 1.],
+                              [5., 5., 3.]], dtype=torch.float64)
+        pixels = pp.homo2cart(pts_c @ projection.T)
+        # transform the points to world coordinate
+        # solve the PnP problem to find the camera pose
+        pts_w = pose.Inv().Act(pts_c)
+        # solve the PnP problem
+        epnp = pp.module.EPnP(intrinsics=projection)
+        solved_pose = epnp(pts_w, pixels)
+        torch.testing.assert_close(solved_pose, pose, rtol=1e-4, atol=1e-4)
 
     def test_epnp_random(self):
         def solution_opencv(obj_pts, img_pts, intrinsics):
@@ -113,6 +132,6 @@ class TestEPnP:
 
 if __name__ == "__main__":
     epnp_fixture = TestEPnP()
-    epnp_fixture.test_epnp_5pts()
-    epnp_fixture.test_epnp_10pts()
+    epnp_fixture.test_epnp_nonbatch()
+    epnp_fixture.test_epnp_6pts()
     epnp_fixture.test_epnp_random()

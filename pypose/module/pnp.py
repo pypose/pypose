@@ -47,10 +47,10 @@ class EPnP(torch.nn.Module):
             Set to ``None`` to disable refinement.
         naive (bool): Use naive control points selection method, otherwise use SVD
             decomposition method to select. Default: ``False``.
+        intrinsics (Optional[torch.Tensor]): The camera intrinsics. The shape is (3, 3).
 
     Examples:
         >>> import torch, pypose as pp
-        >>> torch.set_default_dtype(torch.float64)
         >>> # create some random test sample for a single camera
         >>> pose = pp.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239])
         >>> f, img_size = 2, (9, 9)
@@ -64,7 +64,7 @@ class EPnP(torch.nn.Module):
         ...                       [0., 0., 1.],
         ...                       [1., 0., 1.],
         ...                       [5., 5., 3.]])
-        >>> pixels = (pts_c @ projection.T)[:, :2] / (pts_c @ projection.T)[:, 2:]
+        >>> pixels = pp.homo2cart(pts_c @ projection.T)
         >>> pixels
         tensor([[6.5000, 4.5000],
                 [5.5000, 4.5000],
@@ -76,10 +76,12 @@ class EPnP(torch.nn.Module):
         >>> # solve the PnP problem to find the camera pose
         >>> pts_w = pose.Inv().Act(pts_c)
         >>> # solve the PnP problem
-        >>> epnp = pp.module.EPnP()
-        >>> # when input is not batched, remember to add a batch dimension
-        >>> solved_pose = epnp(pts_w, pixels, projection)
-        >>> assert torch.allclose(solved_pose, pose, atol=1e-3)
+        >>> epnp = pp.module.EPnP(intrinsics=projection)
+        >>> pose = epnp(pts_w, pixels)
+        >>> pose
+        SE3Type LieTensor:
+        LieTensor([ 7.3552e-05, -8.0000e+00,  1.4997e-04, -8.1382e-06, -3.8271e-01,
+                    5.6476e-06,  9.2387e-01])
 
     Note:
         The implementation is based on the paper
@@ -89,10 +91,12 @@ class EPnP(torch.nn.Module):
           <https://github.com/cvlab-epfl/EPnP>`_, In Proceedings of ICCV, 2007.
     """
 
-    def __init__(self, naive=False, optimizer=GN):
+    def __init__(self, naive=False, optimizer=GN, intrinsics=None):
         super().__init__()
         self.naive = naive
         self.optimizer = optimizer
+        if intrinsics is not None:
+            self.register_buffer('intrinsics', intrinsics)
 
         self.register_buffer('six_indices', torch.tensor(
             [(0 * 4 + 1), (0 * 4 + 2), (0 * 4 + 3), (1 * 4 + 2), (1 * 4 + 3), (2 * 4 + 3)]))
@@ -104,18 +108,23 @@ class EPnP(torch.nn.Module):
         # equal mask for above pairs [ True, False, True, False, False, True, False, False, False, True, ]
         self.register_buffer('multiply_mask', torch.tensor([1., 2., 1., 2., 2., 1., 2., 2., 2., 1.]))
 
-    def forward(self, points, pixels, intrinsics):
+
+    def forward(self, points, pixels, intrinsics=None):
         """
         Args:
             points (``torch.Tensor``): 3D object points in the world coordinates.
                 Shape (batch_size, n, 3)
             pixels (``torch.Tensor``): 2D image points, which are the projection of
                 object points. Shape (batch_size, n, 2)
-            intrinsics (``torch.Tensor``): camera intrinsics. Shape (batch_size, 3, 3)
+            intrinsics (``Optional[torch.Tensor]``): camera intrinsics. Shape (batch_size, 3, 3).
+                Setting it to any non-``None`` value will override the default intrinsics kept
+                in the module.
 
         Returns:
             ``LieTensor``: estimated pose (``SE3type``) for the camera.
         """
+        if intrinsics is None:
+            intrinsics = self.intrinsics
         # shape checking
         batch = torch.broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
 
@@ -157,7 +166,7 @@ class EPnP(torch.nn.Module):
 
         ctrl_pts_c = bmv(kernel_m, beta)
         ctrl_pts_c, points_c, sc = self._compute_norm_sign_scaling_factor(ctrl_pts_c, alpha, points)
-        pose = self.get_se3(points, points_c)
+        pose = self._get_se3(points, points_c)
         if request_error:
             perspective_camera = PerspectiveCameras(pose, intrinsics)
             error = perspective_camera.reprojection_error(points, pixels)
@@ -399,7 +408,7 @@ class EPnP(torch.nn.Module):
         return ctrl_pts_c, points_c, sc
 
     @staticmethod
-    def get_se3(pts_w, pts_c):
+    def _get_se3(pts_w, pts_c):
         """
         Get the rotation matrix and translation vector based on the object points in world coordinate and camera
         coordinate.
