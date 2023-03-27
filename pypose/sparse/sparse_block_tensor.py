@@ -259,6 +259,33 @@ def coo_2_hybrid(coo, proxy):
         proxy.indices(), blocks.view((n_block, *b_dim)), size=(*s_dim, *b_dim) )
 
 class SBTOperation(object):
+    '''Sparse Block Tensor Operation base clase.
+
+    An operation on an SBT will eventually be executed by the __torch_function__ method, where 
+    the type of SBT needs to be stripped and recovered in order to make PyTorch's dispatching 
+    mechanism work. Currently, an SBT consists of a Storage tensor and a Proxy tensor. All 
+    operations on an SBT must properly address the Proxy tensor. The type stripping-recovery 
+    cycle and the Proxy tensor handling are fundamentally associated with the operation itself. 
+    This SBTOperation class defines the interfaces for carrying out the above tasks.
+
+    There are 4 methods defined in the SBTOperation class that the inheriting class can 
+    override. They are:
+
+    * storage_pre: This method, most of the time, perform the type stripping operations. The 
+      Hybrid tensor to COO tensor conversion, if necessary, should also be implemented here.
+    * storage_op: The actual operation performed on the Storage tensor.
+    * proxy_op: The appropriate operation that needs to be performed on the Proxy tensor to 
+      preserve the block structure.
+    * storage_post: This method, most of the time, perform the type recovery operations.
+
+    Args:
+        func_name (str): The name of the operation.
+
+    Attributes:
+        func_name (str): The name of the operation.
+
+    '''
+
     def __init__(self, func_name):
         super().__init__()
         self.func_name = func_name
@@ -267,93 +294,238 @@ class SBTOperation(object):
         return args, args
     
     def storage_op(self, func, stripped_types, s_args=(), kwargs={}):
+        # Forward all the arguments to PyTorch's __torch_function__ by default.
         return torch.Tensor.__torch_function__(func, stripped_types, s_args, kwargs)
     
     def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
+        '''The operation on the Proxy tensor.
+        
+        Returns:
+            tuple?
+
+        '''
+        # Do nothing about the Proxy tensor by default.
         return p_args
     
     def storage_post(self, func, types, s_outs=(), p_outs=(), kwargs={}):
+        # Do nothing by default.
         return s_outs, p_outs
 
 class SBTProxyNoOp(SBTOperation):
+    '''An SBT Operation that does not touch the Proxy tensor.
+    
+    This class implements the SBTOperation interfaces for the operations that do not touch the 
+    Proxy tensor of an SBT. Most of the time, such operations also work directly on the Storage 
+    tensor which is a Hybrid tensor. Therefore, the storage_pre and storage_post methods do not 
+    need to do the Hybrid-COO conversion.
+
+    E.g., mostly the inplace operations such as torch.add_().
+
+    Args:
+        func_name (str): The name of the operation.
+
+    '''
+
     def __init__(self, func_name):
         super().__init__(func_name=func_name)
 
     def storage_pre(self, func, types, args=(), kwargs={}):
+        '''Separate the Storange and Proxy tensor.
+
+        Returns:
+            s_array (list): A list of Storage tensors. Could be Hybrid tensors.
+            p_array (list): A list of Proxy tensors.
+        '''
         s_array = []
         p_array = []
         for arg in args:
-            # TODO: Convert the sparse hybrid Tensor _s to sparse coo tensor.
             s_array.append( arg._s if isinstance(arg, SparseBlockTensor) else arg )
-            
-            # Do nothing about the proxy Tensor.
             p_array.append( arg._p if isinstance(arg, SparseBlockTensor) else arg )
         return s_array, p_array
     
+    # def storage_op(self, func, stripped_types, s_args=(), kwargs={}):
+    #     # Forward all the arguments to parent's interface.
+    #     return super().storage_op(func, stripped_types, s_args, kwargs)
+
     def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
-        # Defaut operation on the proxy Tensor.
-        # Assume that the operation does not need to even touch the
-        # proxy tensor. For most of such operations, the proxy Tensor 
-        # is the only sparse Tensor in the list of arguments.
+        '''No-op on the Proxy tensor.
+
+        Returns:
+            p (torch.Tensor): The Proxy tensor.
+        
+        Note:
+            Assume that the operation does not need to even touch the proxy tensor. For most of 
+            such operations, the proxy Tensor is the only sparse Tensor in the list of arguments.
+
+        '''
         # Find the first sparse Tensor in operands.
         p = [ op for op in p_args 
-                if isinstance(op, torch.Tensor) and 
-                   op.is_sparse == True ][0]
+                if isinstance(op, torch.Tensor) and op.is_sparse == True 
+            ][0]
         return p
     
     def storage_post(self, func, types, s_outs=(), p_outs=(), kwargs={}):
-        # s_outs (outs for storage _s) and p_outs (outs for proxy _p) are
-        # assumed to have the exact same order in the list.
-        # Recover the block structure of s_outs.
+        '''Pose processing on the Storage tensor.
+
+        No need to do anything about the Storage and Proxy tensors.
+
+        Returns:
+            s_outs (tuple): A tuple of Storage tensors.
+            p_outs (tuple): A tuple of Proxy tensors.
+
+        Notes:
+            s_outs (outs for Storage) and p_outs (outs for Proxy) are assumed to have the exact 
+            same order.
+
+        '''
         return s_outs, p_outs
 
-class SBTProxySameOperationAsStorage(SBTOperation):
+class SBTProxyCloneOp(SBTProxyNoOp):
+    '''An SBT Operation that clones the Proxy tensor.
+    
+    This class implements the SBTOperation interfaces for the operations that clones the 
+    Proxy tensor of an SBT. Most of the time, such operations also work directly on the Storage 
+    tensor which is a Hybrid tensor. Therefore, the storage_pre and storage_post methods do not 
+    need to do the Hybrid-COO conversion.
+
+    E.g., torch.abs().
+
+    Args:
+        func_name (str): The name of the operation.
+
+    '''
+
     def __init__(self, func_name):
         super().__init__(func_name)
 
-    # NOTE: For test use.
+    def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
+        '''Clone on the Proxy tensor.
+
+        Returns:
+            p (torch.Tensor): The Proxy tensor.
+        
+        Note:
+            Assume that the operation does not need to even touch the proxy tensor. For most of 
+            such operations, the proxy Tensor is the only sparse Tensor in the list of 
+            arguments. The returned Proxy tensor is first detached from the input.
+
+        '''
+        # Find the first sparse Tensor in operands.
+        p = [ op for op in p_args 
+                if isinstance(op, torch.Tensor) and op.is_sparse == True 
+            ][0]
+        return p.detach().clone()
+
+class SBTProxySameOpAsStorage(SBTOperation):
+    '''SBT Operations that performs the same operation on the Proxy tensor.
+
+    This class implements the SBTOperation that performs the same operation on the Proxy tensor. 
+    Most of such operations require to convert the Storage tensor from Hybrid to COO format.
+
+    E.g., torch.add().
+
+    Args:
+        func_name (str): The name of the operation.
+    
+    '''
+    
+    def __init__(self, func_name):
+        super().__init__(func_name)
+
     def storage_pre(self, func, types, args=(), kwargs={}):
+        '''Separate the Storage and Proxy tensors. Convert the Storage tensor to COO format.
+
+        Returns:
+            s_array (list): A list of Storage tensors that are converted to COO format.
+            p_array (list): A list of Proxy tensors.
+        '''
         s_array = []
         p_array = []
         for arg in args:
-            # Convert the sparse hybrid Tensor _s to sparse coo tensor.
+            # Convert the sparse Hybrid tensor _s to COO tensor.
             s_array.append( hybrid_2_coo( arg._s ) 
                            if isinstance(arg, SparseBlockTensor) 
                            else arg )
             
-            # Do nothing about the proxy Tensor.
+            # Do nothing about the Proxy tensor.
             p_array.append( arg._p if isinstance(arg, SparseBlockTensor) else arg )
         return s_array, p_array
 
+    # def storage_op(self, func, stripped_types, s_args=(), kwargs={}):
+    #     # Forward all the arguments to parent's interface.
+    #     return super().storage_op(func, stripped_types, s_args, kwargs)
+
     def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
-        # This only gets called when the operation on sbt._s returns sparse Tensor.
+        '''Opertion on the Proxy tensor.
+
+        Note:
+            This method only gets called when the operation on the Storage returns sparse Tensor.
+        '''
         return torch.Tensor.__torch_function__(func, stripped_types, p_args, kwargs)
     
     def storage_post(self, func, types, s_outs=(), p_outs=(), kwargs={}):
-        # s_outs (outs for storage _s) and p_outs (outs for proxy _p) are
-        # assumed to have the exact same order in the list.
-        # Recover the block structure of s_outs.
-        
-        h_outs = [ coo_2_hybrid(s, p) 
+        '''Recover the block structure of s_outs.
+
+        Returns:
+            s_outs (list): A list of Storage tensors in Hybrid format.
+            p_outs (tuple): A tuple of Proxy tensors.
+
+        Note:
+            s_outs (outs for Storage) and p_outs (outs for Proxy) are assumed to have the exact 
+            same order.
+        '''
+        s_outs = [ coo_2_hybrid(s, p) 
                     if isinstance(s, torch.Tensor) and s.is_sparse == True 
                     else s 
                     for s, p in zip(s_outs, p_outs) ]
         
-        return h_outs, p_outs
+        return s_outs, p_outs
 
 _HANDLED_FUNCS_SPARSE = dict()
+'''dict: A dictionary of all supported operations on SparseBlockTensor.
+
+Key: The name of the operation.
+Value: An SBTOperation object.
+'''
 
 def _is_handled_func(func_name):
+    '''Check if a operation is supported by SBT.
+
+    Returns:
+        bool: True if the operation is supported by SBT. False otherwise.
+    '''
     return func_name in _HANDLED_FUNCS_SPARSE
 
 def _add_sparse_op(name, cls):
+    '''Add an operation to the supported operations on SBT.
+
+    Args:
+        name (str): The name of the operation.
+        cls (SBTOperation): The SBTOperation class.
+    '''
     global _HANDLED_FUNCS_SPARSE
     _HANDLED_FUNCS_SPARSE[name] = cls(name)
 
-# Any supported operations that result in torch.Tensor should be added here.
+# ========================================================
+# ========== Register all supported operations. ==========
+# ========================================================
+
+# ========== Special Python methods. ==========
 _add_sparse_op( '__format__', SBTOperation )
+
+# ========== Linear Algebra operations. ==========
+_add_sparse_op( 'matmul', SBTProxySameOpAsStorage )
+
+# ========== Tensor methods. ==========
+
+# ========== Operations for COO tensors. ==========
+
+# ========== Unary functions. ==========
 _add_sparse_op( 'abs',    SBTProxyNoOp )
-_add_sparse_op( 'matmul', SBTProxySameOperationAsStorage )
+
+# ==============================================================
+# ========== End of supported operation registration. ==========
+# ==============================================================
 
 class SparseBlockTensor(torch.Tensor):
 
