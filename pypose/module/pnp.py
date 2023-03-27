@@ -8,18 +8,21 @@ from ..optim.scheduler import StopOnPlateau
 
 
 class BetasOptimizationObjective(torch.nn.Module):
-    # Optimize the betas according to the objectives in the paper.
+    # Optimize the betas according to the objectives in the ePnP paper.
     # For the details, please refer to equation 15.
     def __init__(self, betas):
         super().__init__()
         self.betas = torch.nn.Parameter(betas)
 
     def forward(self, ctrl_pts_w, kernel_bases):
-        # Args:
-        #     ctrl_pts_w: The control points in world coordinate. The shape is (B, 4, 3).
-        #     kernel_bases: The kernel bases. The shape is (B, 16, 4).
-        # Returns:
-        #     torch.Tensor: The loss. The shape is (B, ).
+        """
+        Args:
+            ctrl_pts_w: The control points in world coordinate. The shape is (B, 4, 3).
+            kernel_bases: The kernel bases. The shape is (B, 16, 4).
+        
+        Returns:
+            torch.Tensor: The loss. The shape is (B, ).
+        """
         batch_shape = kernel_bases.shape[:-2]
         # calculate the control points in camera coordinate
         ctrl_pts_c = bmv(kernel_bases, self.betas)
@@ -85,6 +88,7 @@ class EPnP(torch.nn.Module):
           Non-Iterative O(n) Solution to the PnP Problem
           <https://github.com/cvlab-epfl/EPnP>`_, In Proceedings of ICCV, 2007.
     """
+
     def __init__(self, naive=False, optimizer=GN):
         super().__init__()
         self.naive = naive
@@ -116,20 +120,20 @@ class EPnP(torch.nn.Module):
         batch = torch.broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
 
         # Select naive and calculate alpha in the world coordinate
-        bases = self.naive_basis(points) if self.naive else self.svd_basis(points)
-        alpha = self.compute_alphas(points, bases)
-        m = self.build_m(pixels, alpha, intrinsics)
+        bases = self._naive_basis(points) if self.naive else self._svd_basis(points)
+        alpha = self._compute_alphas(points, bases)
+        m = self._build_m(pixels, alpha, intrinsics)
 
-        kernel_m = self.calculate_kernel(m)[..., [3, 2, 1, 0]]  # to be consistent with the matlab code
+        kernel_m = self._calculate_kernel(m)[..., [3, 2, 1, 0]]  # to be consistent with the matlab code
 
-        l_mat = self.build_l(kernel_m)
-        rho = self.build_rho(bases)
+        l_mat = self._build_l(kernel_m)
+        rho = self._build_rho(bases)
 
         solution_keys = ['error', 'pose', 'ctrl_pts_c', 'points_c', 'beta', 'scale']
         solutions = {key: [] for key in solution_keys}
         for dim in range(1, 4):  # kernel space dimension of 4 is unstable
-            beta = self.calculate_betas(dim, l_mat, rho)
-            solution = self.generate_solution(beta, kernel_m, alpha, points, pixels, intrinsics)
+            beta = self._calculate_betas(dim, l_mat, rho)
+            solution = self._generate_solution(beta, kernel_m, alpha, points, pixels, intrinsics)
             for key in solution_keys:
                 solutions[key].append(solution[key])
 
@@ -145,14 +149,14 @@ class EPnP(torch.nn.Module):
             solutions[key] = solutions[key].squeeze(len(batch))
 
         if self.optimizer is not None:
-            solutions = self.optimization_step(solutions, kernel_m, bases, alpha, points, pixels, intrinsics)
+            solutions = self._optimization_step(solutions, kernel_m, bases, alpha, points, pixels, intrinsics)
         return solutions['pose']
 
-    def generate_solution(self, beta, kernel_m, alpha, points, pixels, intrinsics, request_error=True):
+    def _generate_solution(self, beta, kernel_m, alpha, points, pixels, intrinsics, request_error=True):
         solution = dict()
 
         ctrl_pts_c = bmv(kernel_m, beta)
-        ctrl_pts_c, points_c, sc = self.compute_norm_sign_scaling_factor(ctrl_pts_c, alpha, points)
+        ctrl_pts_c, points_c, sc = self._compute_norm_sign_scaling_factor(ctrl_pts_c, alpha, points)
         pose = self.get_se3(points, points_c)
         if request_error:
             perspective_camera = PerspectiveCameras(pose, intrinsics)
@@ -168,7 +172,7 @@ class EPnP(torch.nn.Module):
 
         return solution
 
-    def optimization_step(self, solutions, kernel_m, ctrl_pts_w, alpha, points, pixels, intrinsics):
+    def _optimization_step(self, solutions, kernel_m, ctrl_pts_w, alpha, points, pixels, intrinsics):
         """
         Args:
             solutions (dict): a dict of solutions
@@ -178,6 +182,7 @@ class EPnP(torch.nn.Module):
             points (Tensor): 3D object points, shape (batch_size, n, 3)
             pixels (Tensor): 2D image points, shape (batch_size, n, 2)
             intrinsics (Tensor): camera intrinsics, shape (batch_size, 3, 3)
+
         Returns:
             None. This function will update the solutions in place.
         """
@@ -187,18 +192,18 @@ class EPnP(torch.nn.Module):
         scheduler.optimize(input=(ctrl_pts_w, kernel_m))
         beta = objective.betas.data
 
-        solution = self.generate_solution(beta, kernel_m, alpha, points, pixels, intrinsics, request_error=False)
+        solution = self._generate_solution(beta, kernel_m, alpha, points, pixels, intrinsics, request_error=False)
         return solution
 
     @staticmethod
-    def naive_basis(points):
+    def _naive_basis(points):
         # Select 4 naive points, 3 unit bases and 1 origin point.
-        controls = torch.zeros_like(points[...,:4,:])
+        controls = torch.zeros_like(points[..., :4, :])
         controls.diagonal(dim1=-2, dim2=-1).fill_(1)
         return controls
 
     @staticmethod
-    def svd_basis(points):
+    def _svd_basis(points):
         # Select 4 control points with SVD
         center = points.mean(dim=-2, keepdim=True)
         translated = points - center
@@ -206,23 +211,32 @@ class EPnP(torch.nn.Module):
         controls = center + s.sqrt().unsqueeze(-1) * vh.mT
         return torch.cat([center, controls], dim=-2)
 
-
     @staticmethod
-    def compute_alphas(points, bases):
-        # Compute the coordinates of points with respect to the bases.
-        # Check equation 1 in paper for more details.
+    def _compute_alphas(points, bases):
+        """Compute the alphas, which are a set of weights corresponded of control points for each object point. 
+        Check equation 1 in paper for more details.
+
+        Args:
+            points (torch.Tensor): object points in the world coordinate, shape (..., num_pts, 3)
+            ctrl_pts_w (torch.Tensor): control points in the world coordinate, shape (..., 4, 3)
+
+        Returns:
+            torch.Tensor: alphas, shape (..., num_pts, 4)
+        """
         points, bases = cart2homo(points), cart2homo(bases)
         return torch.linalg.solve(A=bases, B=points, left=False)
 
     @staticmethod
-    def build_m(pixels, alpha, intrinsics):
-        # Construct M matrix. Check equation 7 in paper for more details.
-        # Args:
-        #     pixels (torch.Tensor): (..., point, 2)
-        #     alpha (torch.Tensor): (..., point, 4)
-        #     intrinsics (torch.Tensor): (..., 3, 3)
-        # Returns:
-        #     torch.Tensor: (..., point * 2, 12)
+    def _build_m(pixels, alpha, intrinsics):
+        """Construct M matrix. Check equation 7 in paper for more details.
+        Args:
+            pixels (torch.Tensor): (..., point, 2)
+            alpha (torch.Tensor): (..., point, 4)
+            intrinsics (torch.Tensor): (..., 3, 3)
+
+        Returns:
+            torch.Tensor: (..., point * 2, 12)
+        """
         batch, point = pixels.shape[:-2], pixels.shape[-2]
         u, v = pixels[..., 0], pixels[..., 1]
         fu, u0 = intrinsics[..., 0, 0, None], intrinsics[..., 0, 2, None]
@@ -240,23 +254,32 @@ class EPnP(torch.nn.Module):
         return M.reshape(*batch, point * 2, 12)
 
     @staticmethod
-    def calculate_kernel(M, least=4):
-        # Given M matrix, find eigenvectors with the least eigenvalues.
-        # Check equation 8 in paper for more details.
-        batch = M.shape[:-2] # M is (..., point * 2, 12)
+    def _calculate_kernel(M, least=4):
+        """Given M matrix, find eigenvectors with the least eigenvalues.
+        Check equation 8 in paper for more details.
+
+        Args:
+            m (torch.Tensor): m, shape (..., num_pts * 2, 12)
+            top (int, optional): number of top eigen vectors to take. Defaults to 4.
+
+        Returns:
+            torch.Tensor: kernel, shape (..., 12, top)
+        """
+        batch = M.shape[:-2]  # M is (..., point * 2, 12)
         eigenvalues, eigenvectors = torch.linalg.eig(M.mT @ M)
         eigenvalues, eigenvectors = eigenvalues.real, eigenvectors.real
         index = eigenvalues.argsort(descending=False)[..., :least] # (batch, 4)
         index = index.unsqueeze(-2).tile((1,) * len(batch) + (12, 1)) # (batch, 12, 4)
         return torch.gather(eigenvectors, dim=-1, index=index) # (batch, 12, 4)
 
-    def build_l(self, kernel_bases):
+    def _build_l(self, kernel_bases):
         """Given the kernel of m, compute the L matrix. Check [source]
         (https://github.com/cvlab-epfl/EPnP/blob/5abc3cfa76e8e92e5a8f4be0370bbe7da246065e/cpp/epnp.cpp#L478)
         for more details. Inputs are batched.
 
         Args:
             kernel_bases (torch.Tensor): kernel of m, shape (..., 12, 4)
+
         Returns:
             torch.Tensor: L, shape (..., 6, 10)
         """
@@ -274,7 +297,7 @@ class EPnP(torch.nn.Module):
         dot_products = dot_products * self.multiply_mask.reshape((1,) * len(batch_shape) + (10, 1))
         return dot_products.mT  # shape (batch_shape, 6, 10)
 
-    def build_rho(self, cont_pts_w):
+    def _build_rho(self, cont_pts_w):
         """Given the coordinates of control points, compute the rho vector. Check [source]
         (https://github.com/cvlab-epfl/EPnP/blob/5abc3cfa76e8e92e5a8f4be0370bbe7da246065e/cpp/epnp.cpp#L520)
         for more details.
@@ -289,7 +312,7 @@ class EPnP(torch.nn.Module):
         return torch.sum(dist ** 2, dim=-1)  # l2 norm
 
     @staticmethod
-    def calculate_betas(dim, l_mat, rho):
+    def _calculate_betas(dim, l_mat, rho):
         """Given the L matrix and rho vector, compute the beta vector. Check equation 10 - 14 in paper for more details.
         Inputs are batched.
 
@@ -330,7 +353,7 @@ class EPnP(torch.nn.Module):
             return torch.stack([beta1, beta2, beta3, beta4], dim=-1)
 
     @staticmethod
-    def compute_norm_sign_scaling_factor(xc, alphas, points):
+    def _compute_norm_sign_scaling_factor(xc, alphas, points):
         """Compute the scaling factor and the sign of the scaling factor
 
         Args:
@@ -368,7 +391,7 @@ class EPnP(torch.nn.Module):
         # Update the control points and the object points in the camera coordinates based on the sign
         neg_z_mask = torch.any(points_c[..., 2] < 0, dim=-1)  # (N, )
 
-        # for batched data
+        # for batched data and non-batched data
         negate_switch = torch.ones(batch_shape, dtype=points.dtype, device=points.device)
         negate_switch[neg_z_mask] = negate_switch[neg_z_mask] * -1
         points_c = points_c * negate_switch.reshape(*batch_shape, 1, 1)
@@ -385,8 +408,7 @@ class EPnP(torch.nn.Module):
             pts_w: The object points in world coordinate. The shape is (..., N, 3).
             pts_c: The object points in camera coordinate. The shape is (..., N, 3).
         Returns:
-            R: The rotation matrix. The shape is (..., 3, 3).
-            T: The translation vector. The shape is (..., 3).
+            ``LieTensor``: estimated pose (``SE3type``) for the camera.
         """
         # Get the centered points
         center_w = pts_w.mean(dim=-2)
@@ -411,4 +433,3 @@ class EPnP(torch.nn.Module):
         pose = mat2SE3(rt)
 
         return pose
-
