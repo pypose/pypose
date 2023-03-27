@@ -23,16 +23,16 @@ class BetasOptimizationObjective(torch.nn.Module):
         Returns:
             torch.Tensor: The loss. The shape is (B, ).
         """
-        batch_shape = kernel_bases.shape[:-2]
+        batch = kernel_bases.shape[:-2]
         # calculate the control points in camera coordinate
         ctrl_pts_c = bmv(kernel_bases, self.betas)
-        diff_c = ctrl_pts_c.reshape(*batch_shape, 1, 4, 3) - ctrl_pts_c.reshape(*batch_shape, 4, 1, 3)
-        diff_c = diff_c.reshape(*batch_shape, 48)  # TODO: whether it is (16, 3) or (48, )?
+        diff_c = ctrl_pts_c.reshape(*batch, 1, 4, 3) - ctrl_pts_c.reshape(*batch, 4, 1, 3)
+        diff_c = diff_c.reshape(*batch, 48)  # TODO: whether it is (16, 3) or (48, )?
         diff_c = torch.norm(diff_c, dim=-1)
 
         # calculate the distance between control points in world coordinate
-        diff_w = ctrl_pts_w.reshape(*batch_shape, 1, 4, 3) - ctrl_pts_w.reshape(*batch_shape, 4, 1, 3)
-        diff_w = diff_w.reshape(*batch_shape, 48)
+        diff_w = ctrl_pts_w.reshape(*batch, 1, 4, 3) - ctrl_pts_w.reshape(*batch, 4, 1, 3)
+        diff_w = diff_w.reshape(*batch, 48)
         diff_w = torch.norm(diff_w, dim=-1)
 
         return diff_w - diff_c
@@ -113,10 +113,10 @@ class EPnP(torch.nn.Module):
         """
         Args:
             points (``torch.Tensor``): 3D object points in the world coordinates.
-                Shape (batch_size, n, 3)
+                Shape (..., n, 3)
             pixels (``torch.Tensor``): 2D image points, which are the projection of
-                object points. Shape (batch_size, n, 2)
-            intrinsics (``Optional[torch.Tensor]``): camera intrinsics. Shape (batch_size, 3, 3).
+                object points. Shape (..., n, 2)
+            intrinsics (``Optional[torch.Tensor]``): camera intrinsics. Shape (..., 3, 3).
                 Setting it to any non-``None`` value will override the default intrinsics kept
                 in the module.
 
@@ -185,12 +185,12 @@ class EPnP(torch.nn.Module):
         """
         Args:
             solutions (dict): a dict of solutions
-            kernel_m (Tensor): kernel matrix, shape (batch_size, n, 4)
-            ctrl_pts_w (Tensor): control points in the world coordinate, shape (batch_size, 4, 3)
-            alpha (Tensor): alpha, shape (batch_size, n, 4)
-            points (Tensor): 3D object points, shape (batch_size, n, 3)
-            pixels (Tensor): 2D image points, shape (batch_size, n, 2)
-            intrinsics (Tensor): camera intrinsics, shape (batch_size, 3, 3)
+            kernel_m (Tensor): kernel matrix, shape (batch, n, 4)
+            ctrl_pts_w (Tensor): control points in the world coordinate, shape (batch, 4, 3)
+            alpha (Tensor): alpha, shape (batch, n, 4)
+            points (Tensor): 3D object points, shape (batch, n, 3)
+            pixels (Tensor): 2D image points, shape (batch, n, 2)
+            intrinsics (Tensor): camera intrinsics, shape (batch, 3, 3)
 
         Returns:
             None. This function will update the solutions in place.
@@ -292,19 +292,19 @@ class EPnP(torch.nn.Module):
         Returns:
             torch.Tensor: L, shape (..., 6, 10)
         """
-        batch_shape = kernel_bases.shape[:-2]
-        kernel_bases = kernel_bases.mT  # shape (batch_shape, 4, 12)
+        batch = kernel_bases.shape[:-2]
+        kernel_bases = kernel_bases.mT  # shape (batch, 4, 12)
         # calculate the pairwise distance matrix within bases
-        diff = kernel_bases.reshape(*batch_shape, 4, 1, 4, 3) - kernel_bases.reshape(*batch_shape, 4, 4, 1, 3)
-        diff = diff.flatten(start_dim=-3, end_dim=-2)  # shape (batch_shape, 4, 16, 3)
+        diff = kernel_bases.reshape(*batch, 4, 1, 4, 3) - kernel_bases.reshape(*batch, 4, 4, 1, 3)
+        diff = diff.flatten(start_dim=-3, end_dim=-2)  # shape (batch, 4, 16, 3)
         # six_indices are (0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3) before flatten
-        dv = diff[..., self.six_indices, :]  # shape (batch_shape, 4, 6, 3)
+        dv = diff[..., self.six_indices, :]  # shape (batch, 4, 6, 3)
 
         # generate l
         dot_products = torch.sum(
             dv[..., self.ten_indices_pair[0], :, :] * dv[..., self.ten_indices_pair[1], :, :], dim=-1)
-        dot_products = dot_products * self.multiply_mask.reshape((1,) * len(batch_shape) + (10, 1))
-        return dot_products.mT  # shape (batch_shape, 6, 10)
+        dot_products = dot_products * self.multiply_mask.reshape((1,) * len(batch) + (10, 1))
+        return dot_products.mT  # shape (batch, 6, 10)
 
     def _build_rho(self, cont_pts_w):
         """Given the coordinates of control points, compute the rho vector. Check [source]
@@ -332,9 +332,9 @@ class EPnP(torch.nn.Module):
         Returns:
             torch.Tensor: beta, shape (..., 4)
         """
-        batch_shape = l_mat.shape[:-2]
+        batch = l_mat.shape[:-2]
         if dim == 1:
-            betas = torch.zeros(*batch_shape, 4, device=l_mat.device, dtype=l_mat.dtype)
+            betas = torch.zeros(*batch, 4, device=l_mat.device, dtype=l_mat.dtype)
             betas[..., -1] = 1
             return betas
         elif dim == 2:
@@ -374,9 +374,9 @@ class EPnP(torch.nn.Module):
             objPts_c (torch.tensor): the object points in the camera coordinates
             sc (torch.tensor): the scaling factor
         """
-        batch_shape = xc.shape[:-1]
+        batch = xc.shape[:-1]
         # Calculate the control points and object points in the camera coordinates
-        ctrl_pts_c = xc.reshape((*batch_shape, 4, 3))
+        ctrl_pts_c = xc.reshape((*batch, 4, 3))
         points_c = alphas @ ctrl_pts_c
 
         # Calculate the distance of the reference points in the world coordinates
@@ -401,9 +401,9 @@ class EPnP(torch.nn.Module):
         neg_z_mask = torch.any(points_c[..., 2] < 0, dim=-1)  # (N, )
 
         # for batched data and non-batched data
-        negate_switch = torch.ones(batch_shape, dtype=points.dtype, device=points.device)
+        negate_switch = torch.ones(batch, dtype=points.dtype, device=points.device)
         negate_switch[neg_z_mask] = negate_switch[neg_z_mask] * -1
-        points_c = points_c * negate_switch.reshape(*batch_shape, 1, 1)
+        points_c = points_c * negate_switch.reshape(*batch, 1, 1)
         sc = sc[..., 0, 0] * negate_switch
         return ctrl_pts_c, points_c, sc
 
@@ -439,6 +439,5 @@ class EPnP(torch.nn.Module):
         # Calculate the translation vector based on the rotation matrix and the equation
         t = center_c - bmv(rot, center_w)
         rt = torch.cat((rot, t.unsqueeze(-1)), dim=-1)
-        pose = mat2SE3(rt)
 
-        return pose
+        return mat2SE3(rt)
