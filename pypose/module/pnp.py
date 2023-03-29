@@ -40,7 +40,52 @@ class BetasOptimizationObjective(torch.nn.Module):
 
 class EPnP(torch.nn.Module):
     r"""
-    EPnP Solver - a non-iterative O(n) solution to the PnP problem.
+    EPnP Solver - a non-iterative O(n) solution to the PnP problem for :math:`n \geq 4`.
+
+    As an overview of the process, first define each of the n points in the world coordinate as :math:`p^w_i` and their
+    corresponding position in camera coordinate as :math:`p^c_i`.
+    They are represented by weighted sums of the four selected controls points, :math:`c^w_j` and :math:`c^c_j` in
+    camera coordinate respectively. Let the projection matrix be :math:`P = K[R|T]`, where :math:`K` is the camera
+    intrinsic matrix, :math:`R` is the rotation matrix and :math:`T` is the translation vector.
+
+    .. math::
+        \begin{aligned}
+            p^w_i &= \sum^4_{j=1}{\alpha_{ij}c^w_j} \\
+            p^c_i &= \sum^4_{j=1}{\alpha_{ij}c^c_j} \\
+            \sum^4_{j=1}{\alpha_{ij}} &= 1
+        \end{aligned}
+
+    From this, the derivation of the points projection equations is as follows:
+
+    .. math::
+        \begin{aligned}
+            s_i\,p^{img}_i &= K\sum^4_{j=1}{\alpha_{ij}c^c_j}
+        \end{aligned}
+
+    Where :math:`p^{img}_i` is the projected image pixels in form :math:`(u_i, v_i, 1)`, :math:'s_i' is the scale factor.
+    Let the control point in camera coordinate represented by :math:`c^c_j = (x^c_j, y^c_j, z^c_j, 1)`.
+    Rearranging the image point equation yields the following two linear equations for each of the n points:
+
+    .. math::
+        \begin{aligned}
+            \sum^4_{j=1}{\alpha_{ij}f_xx^c_j + \alpha_{ij}(u_0 - u_i)z^c_j} &= 0 \\
+            \sum^4_{j=1}{\alpha_{ij}f_yy^c_j + \alpha_{ij}(v_0 - v_i)z^c_j} &= 0
+        \end{aligned}
+
+    Using these two equations for each of the n points, the system :math:`Mx = 0` can be formed where
+    :math:`x = \begin{bmatrix}c^{c^T}_1 & c^{c^T}_2 & c^{c^T}_3 & c^{c^T}_4\end{bmatrix}^T`.
+    The solution for the control points exists in the kernel space of :math:`M` and is expressed as
+
+    .. math::
+    \begin{aligned}
+        x &= \sum^N_{i=1}{\beta_iv_i}
+    \end{aligned}
+    x = \sum^N_{i=1}{\beta_iv_i}
+    where N (4) is the number of singular values in M and each :math:`v_i` is the corresponding right singular vector of M.
+    The final step involves calculating the coefficients \beta_i.
+    Optionally, the Gauss-Newton algorithm is used to refine them.
+    The camera pose that minimize the error of transforming the world coordinat points, :math:'p^w_i', to image
+    coordinate points, :math:`p^c_i` which is known as long as :math:`c^{c^T}_4` is known, are then calculated.
 
     Args:
         optimizer (Optional[torch.optim.Optimizer]): Optimizer to refine the solution.
