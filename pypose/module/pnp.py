@@ -62,8 +62,8 @@ class EPnP(torch.nn.Module):
             s_i\,p^{img}_i &= K\sum^4_{j=1}{\alpha_{ij}c^c_j}
         \end{aligned}
 
-    Where :math:`p^{img}_i` is the projected image pixels in form :math:`(u_i, v_i, 1)`, :math:'s_i' is the scale factor.
-    Let the control point in camera coordinate represented by :math:`c^c_j = (x^c_j, y^c_j, z^c_j, 1)`.
+    Where :math:`p^{img}_i` is the projected image pixels in form :math:`(u_i, v_i, 1)`, :math:`s_i` is the scale factor.
+    Let the control point in camera coordinate represented by :math:`c^c_j = (x^c_j, y^c_j, z^c_j)`.
     Rearranging the image point equation yields the following two linear equations for each of the n points:
 
     .. math::
@@ -77,14 +77,14 @@ class EPnP(torch.nn.Module):
     The solution for the control points exists in the kernel space of :math:`M` and is expressed as
 
     .. math::
-    \begin{aligned}
-        x &= \sum^N_{i=1}{\beta_iv_i}
-    \end{aligned}
-    x = \sum^N_{i=1}{\beta_iv_i}
-    where N (4) is the number of singular values in M and each :math:`v_i` is the corresponding right singular vector of M.
-    The final step involves calculating the coefficients \beta_i.
+        \begin{aligned}
+            x &= \sum^N_{i=1}{\beta_iv_i}
+        \end{aligned}
+
+    where N (4) is the number of singular values in M and each :math:`v_i` is the corresponding right singular vector of
+    :math:`M`. The final step involves calculating the coefficients :math:`\beta_i`.
     Optionally, the Gauss-Newton algorithm is used to refine them.
-    The camera pose that minimize the error of transforming the world coordinat points, :math:'p^w_i', to image
+    The camera pose that minimize the error of transforming the world coordinat points, :math:`p^w_i`, to image
     coordinate points, :math:`p^c_i` which is known as long as :math:`c^{c^T}_4` is known, are then calculated.
 
     Args:
