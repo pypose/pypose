@@ -1,11 +1,6 @@
-import warnings
-import torch
-from .utils import SO3, so3
-from .lietensor import LieTensor
-
-
-from pypose.lietensor.lietensor import LieTensor, SE3_type, SO3_type, Sim3_type, RxSO3_type
-from .utils import SO3, SE3, RxSO3, Sim3
+import torch, warnings
+from .utils import SO3, so3, SE3, RxSO3, Sim3
+from .lietensor import LieTensor, SE3_type, SO3_type, Sim3_type, RxSO3_type
 
 
 def mat2SO3(mat, check=True, rtol=1e-5, atol=1e-5):

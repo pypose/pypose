@@ -12,8 +12,8 @@ class Bicycle(pp.module.NLS):
     see: https://dingyan89.medium.com/simple-understanding-of-kinematic-bicycle-model
     -81cac6420357
     The robot is given a rotational and forward velocity, and traverses the 2D plane accordingly.
-    This model is Nonlinear Time Invariant (NTI) and can be filtered with the ``pp.module.EKF``
-    and  ``pp.module.UKF``.
+    This model is discrete-time non-linear system (NLS) and can be filtered with the
+    -``pp.module.EKF`` and  ``pp.module.UKF``.
     '''
 
     def __init__(self):
@@ -22,7 +22,7 @@ class Bicycle(pp.module.NLS):
     def state_transition(self, state, input, t=None):
         '''
         Don't add noise in this function, as it will be used for automatically
-        linearizing the system by the parent class ``pp.module.System``.
+        linearizing the system by the parent class ``pp.module.NLS``.
         '''
         theta = state[..., 2] + input[1]
         x = state[..., 0] + input[..., 0] * theta.cos()
@@ -32,7 +32,7 @@ class Bicycle(pp.module.NLS):
     def observation(self, state, input, t=None):
         '''
         Don't add noise in this function, as it will be used for automatically
-        linearizing the system by the parent class ``pp.module.System``.
+        linearizing the system by the parent class ``pp.module.NLS``.
         '''
         return state
 

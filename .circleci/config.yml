@@ -44,6 +44,7 @@ commands:
             export CUDA_VERSION_SHORT=$(echo ${CUDA_VERSION} | sed -E 's/([0-9]+)\.([0-9]+).*/\1.\2/')
             sudo apt-get update -y
             sudo apt-get install -y make
+            pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
   build_package: &build_package
     description: Build PyPose package of specified type
     parameters:
@@ -101,7 +102,7 @@ jobs:
           name: Build PyPose documentation
           command: |
             pip install dist/pypose-*.whl
-            pip install -r requirements/dev.txt
+            pip install -r requirements/docs.txt
             cd docs
             make dirhtml
             tar -czvf build/docs.tar.gz build/dirhtml/*
@@ -136,7 +137,6 @@ jobs:
           name: Setup tests
           command: |
             pip install dist/pypose-*.whl
-            pip install -r requirements/main.txt
             mkdir pytest-results
             pytest --junitxml=pytest-results/junit.xml
       - store_test_results:
@@ -151,15 +151,15 @@ workflows:
     jobs:
       - linux_build_wheel:
           cuda_version: "11.7"
-          torch_version: "1.13.*"
+          torch_version: "2.0.*"
           python_version: "3.9"
       - build_docs:
           requires: [linux_build_wheel]
           cuda_version: "11.7"
-          torch_version: "1.13.*"
+          torch_version: "2.0.*"
           python_version: "3.9"
       - run_tests:
           requires: [linux_build_wheel]
           cuda_version: "11.7"
-          torch_version: "1.13.*"
+          torch_version: "2.0.*"
           python_version: "3.9"

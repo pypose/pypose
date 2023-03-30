@@ -88,7 +88,8 @@ def test(network, loader, device = "cuda:0"):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device", type=str, default='cuda:0', help="cuda or cpu")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    parser.add_argument("--device", type=str, default=device, help="cuda or cpu")
     parser.add_argument("--batch-size", type=int, default=4, help="batch size")
     parser.add_argument("--max_epoches", type=int, default=100, help="max_epoches")
     parser.add_argument("--dataroot", type=str, default='./examples/module/imu', help="dataset location downloaded")
@@ -97,8 +98,8 @@ if __name__ == '__main__':
     parser.add_argument('--load_ckpt', default=False, action="store_true")
     args = parser.parse_args(); print(args)
 
-    train_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0], duration=10, mode='train')
-    test_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0],  duration=10, mode='test')
+    train_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0], duration=10, mode='train', download=True)
+    test_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0],  duration=10, mode='test', download=True)
     train_loader = Data.DataLoader(dataset=train_dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=True)
     test_loader = Data.DataLoader(dataset=test_dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=False)
 
