@@ -14,3 +14,24 @@ from .lietensor import gradcheck, gradgradcheck
 from .lietensor.function import *
 from . import module, optim
 from .basics import *
+
+
+def digit_version(version_str):
+    digits = []
+    for x in version_str.split('.'):
+        if x.isdigit():
+            digits.append(int(x))
+        elif x.find('rc') != -1:
+            patch_version = x.split('rc')
+            digits.append(int(patch_version[0]) - 1)
+            digits.append(int(patch_version[1]))
+    return digits
+
+
+torch_min_ver = '2.0'
+torch_version = digit_version(torch.__version__)
+
+
+assert digit_version(torch_min_ver) <= torch_version, \
+    f'PyTorch=={torch.__version__} is used but incompatible. ' \
+    f'Please install torch>={torch_min_ver}.'
