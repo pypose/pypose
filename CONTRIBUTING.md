@@ -26,6 +26,8 @@ git clone https://github.com/{your_github_id}/pypose.git
 # git clone git@github.com:{your_github_id}/pypose.git
 ```
 
+From now on, you could open the PyPose code repo using your favorite code editor. 
+If you are using VSCode, you may optionally use our [recommended settings](./vscode/README.md). 
 After that, you should add official repository as the upstream repository
 
 ```bash
