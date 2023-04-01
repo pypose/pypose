@@ -419,4 +419,4 @@ class EPnP(torch.nn.Module):
         R[mask] = - R[mask]
         t = Cc.mT - R @ Cw.mT
         T = torch.cat((R, t), dim=-1)
-        return mat2SE3(T)
+        return mat2SE3(T, check=False)
