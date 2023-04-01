@@ -56,6 +56,18 @@ class TestEPnP:
         assert torch.allclose(solution_non_batch.rotation().matrix(), solution_batch.rotation().matrix()[0])
 
 
+    def test_epnp_highdim(self):
+        data = load_data()
+        epnp = pp.module.EPnP()
+        # batch shape: [3, 2, ...]
+        solution_highdim = epnp(data['objPts'][None][[0, 0, 0]], data['imgPts'][None][[0, 0, 0]], data['camMat'][None][[0, 0, 0]])
+        # batch shape: [2, ...]
+        solution_lowdim = epnp(data['objPts'], data['imgPts'], data['camMat'])
+
+        assert solution_highdim.rotation().matrix()[0].shape == solution_lowdim.rotation().matrix().shape
+        assert torch.allclose(solution_highdim.rotation().matrix()[0], solution_lowdim.rotation().matrix())
+
+
     def test_epnp_6pts(self):
         # create some random test sample for a single camera
         pose = pp.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239]).to(torch.float64)
