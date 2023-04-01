@@ -18,7 +18,7 @@ from . import module, optim
 from .basics import *
 
 
-torch_min_ver = '2.0'
-assert version.parse(torch_min_ver) <= version.parse(torch.__version__), \
+min_torch = '2.0'
+assert version.parse(min_torch) <= version.parse(torch.__version__), \
     f'PyTorch=={torch.__version__} is used but incompatible. ' \
-    f'Please install torch>={torch_min_ver}.'
+    f'Please install torch>={min_torch}.'
