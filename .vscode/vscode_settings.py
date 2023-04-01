@@ -25,7 +25,8 @@ def deep_update(d: dict, u: dict) -> dict:  # type: ignore[type-arg]
         if isinstance(v, dict):
             d[k] = deep_update(d.get(k, {}), v)
         elif isinstance(v, list):
-            d[k] = d.get(k, []) + v
+            if v not in d.get(k, []):
+                d[k] = d.get(k, []) + v
         else:
             d[k] = v
     return d
