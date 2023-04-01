@@ -93,7 +93,7 @@ class CamerasBase(torch.nn.Module):
         return error
 
 
-class PerspectiveCameras(CamerasBase):
+class Camera(CamerasBase):
     r"""
     A class which stores a batch of parameters to generate a batch of
     transformation matrices using the multi-view geometry convention for
@@ -110,14 +110,14 @@ class PerspectiveCameras(CamerasBase):
         >>> pose = pp.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239])
         >>> f = 2
         >>> img_size = (7, 7)
-        >>> projection_matrix = torch.tensor([[f, 0, img_size[0] / 2,], [0, f, img_size[1] / 2,], [0, 0, 1, ]])
+        >>> projection = torch.tensor([[f, 0, img_size[0] / 2,], [0, f, img_size[1] / 2,], [0, 0, 1, ]])
         >>> pts_w = torch.tensor([[ 2.8284,  8.0000,  0.0000],
         ...                       [ 2.1213,  8.0000,  0.7071],
         ...                       [ 0.7071,  9.0000,  0.7071],
         ...                       [ 0.7071,  8.0000,  0.7071],
         ...                       [ 5.6569, 13.0000, -1.4142]])
         >>> # instantiate the camera
-        >>> camera = pp.module.PerspectiveCameras(pose=pose, intrinsics=projection_matrix)
+        >>> camera = pp.module.Camera(pose=pose, intrinsics=projection)
         >>> # transform the points to image coordinates
         >>> img_pts = camera.world2pixel(pts_w)
         >>> img_pts

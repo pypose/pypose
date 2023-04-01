@@ -1,4 +1,3 @@
-import io, os, urllib
 import torch, pypose as pp
 from torchvision.datasets.utils import download_and_extract_archive
 
@@ -53,13 +52,13 @@ class TestEPnP:
         data = load_data()
 
         # instantiate epnp
-        epnp = pp.module.EPnP(naive=False)
+        epnp = pp.module.EPnP()
         solution_non_batch = epnp(data['objPts'][0], data['imgPts'][0], data['camMat'][0])
         solution_batch = epnp(data['objPts'], data['imgPts'], data['camMat'])
 
         assert torch.allclose(solution_non_batch.rotation().matrix(), solution_batch.rotation().matrix())
 
-    
+
     def test_epnp_6pts(self):
         # create some random test sample for a single camera
         pose = pp.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239]).to(torch.float64)
@@ -115,7 +114,7 @@ class TestEPnP:
         data = load_data()
 
         # instantiate epnp
-        epnp = pp.module.EPnP(naive=False)
+        epnp = pp.module.EPnP()
         solution = epnp(data['objPts'], data['imgPts'], data['camMat'])
         solution_ref = solution_opencv(data['objPts'][0],
                                        data['imgPts'][0],

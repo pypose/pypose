@@ -1,13 +1,15 @@
 import torch
 from .. import bmv
 from .. import mat2SE3
+from .camera import Camera
 from ..basics import cart2homo
-from ..optim import LM, GN
+from ..optim import GaussNewton
 from torch import broadcast_shapes
-from .cameras import PerspectiveCameras
 from ..optim.scheduler import StopOnPlateau
+from ..optim.solver import Cholesky, PINV, LSTSQ
 
-class BetasOptimizationObjective(torch.nn.Module):
+
+class BetasObjective(torch.nn.Module):
     # Optimize the betas according to the objectives in the ePnP paper.
     # For the details, please refer to equation 15.
     def __init__(self, betas):
@@ -19,7 +21,7 @@ class BetasOptimizationObjective(torch.nn.Module):
         Args:
             ctrl_pts_w: The control points in world coordinate. The shape is (B, 4, 3).
             kernel_bases: The kernel bases. The shape is (B, 16, 4).
-        
+
         Returns:
             torch.Tensor: The loss. The shape is (B, ).
         """
@@ -136,10 +138,9 @@ class EPnP(torch.nn.Module):
           <https://github.com/cvlab-epfl/EPnP>`_, In Proceedings of ICCV, 2007.
     """
 
-    def __init__(self, naive=False, optimizer=GN, intrinsics=None):
+    def __init__(self, intrinsics=None, refine=True):
         super().__init__()
-        self.naive = naive
-        self.optimizer = optimizer
+        self.refine = refine
         if intrinsics is not None:
             self.register_buffer('intrinsics', intrinsics)
 
@@ -155,7 +156,7 @@ class EPnP(torch.nn.Module):
 
 
     def forward(self, points, pixels, intrinsics=None):
-        r"""
+        r'''
         Args:
             points (``torch.Tensor``): 3D object points in the world coordinates.
                 Shape (..., n, 3)
@@ -167,12 +168,12 @@ class EPnP(torch.nn.Module):
 
         Returns:
             ``LieTensor``: estimated pose (``SE3type``) for the camera.
-        """
+        '''
         intrinsics = self.intrinsics if intrinsics is None else intrinsics
         batch = broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
 
         # Select naive and calculate alpha in the world coordinate
-        bases = self._naive_basis(points) if self.naive else self._svd_basis(points)
+        bases = self._svd_basis(points)
         alpha = self._compute_alphas(points, bases)
         kernel = self._calculate_kernel(pixels, alpha, intrinsics)
         l_mat = self._build_l(kernel)
@@ -197,8 +198,10 @@ class EPnP(torch.nn.Module):
             solutions[key] = torch.gather(solutions[key], len(batch), best_idx_)
             solutions[key] = solutions[key].squeeze(len(batch))
 
-        if self.optimizer is not None:
-            solutions = self._optimization_step(solutions, kernel, bases, alpha, points, pixels, intrinsics)
+        if self.refine:
+            beta = self._refine(solutions['beta'] * solutions['scale'].unsqueeze(-1), kernel, bases)
+            solutions = self._generate_solution(beta, kernel, alpha, points, pixels, intrinsics)
+
         return solutions['pose']
 
     def _generate_solution(self, beta, kernel, alpha, points, pixels, intrinsics, request_error=True):
@@ -208,8 +211,8 @@ class EPnP(torch.nn.Module):
         ctrl_pts_c, points_c, sc = self._compute_norm_sign_scaling_factor(ctrl_pts_c, alpha, points)
         pose = self._get_se3(points, points_c)
         if request_error:
-            perspective_camera = PerspectiveCameras(pose, intrinsics)
-            error = perspective_camera.reprojection_error(points, pixels)
+            camera = Camera(pose, intrinsics)
+            error = camera.reprojection_error(points, pixels)
             solution['error'] = error
 
         # save the solution
@@ -221,39 +224,22 @@ class EPnP(torch.nn.Module):
 
         return solution
 
-    def _optimization_step(self, solutions, kernel, ctrl_pts_w, alpha, points, pixels, intrinsics):
+    def _refine(self, beta, kernel, bases):
         """
         Args:
             solutions (dict): a dict of solutions
             kernel (Tensor): kernel matrix, shape (batch, n, 4)
-            ctrl_pts_w (Tensor): control points in the world coordinate, shape (batch, 4, 3)
-            alpha (Tensor): alpha, shape (batch, n, 4)
-            points (Tensor): 3D object points, shape (batch, n, 3)
-            pixels (Tensor): 2D image points, shape (batch, n, 2)
-            intrinsics (Tensor): camera intrinsics, shape (batch, 3, 3)
-
-        Returns:
-            None. This function will update the solutions in place.
+            bases (Tensor): control points in the world coordinate, shape (batch, 4, 3)
         """
-        objective = BetasOptimizationObjective(solutions['beta'] * solutions['scale'].unsqueeze(-1))
-        gn = self.optimizer(objective)
-        scheduler = StopOnPlateau(gn, steps=10, patience=3, verbose=False)
-        scheduler.optimize(input=(ctrl_pts_w, kernel))
-        beta = objective.betas.data
-
-        solution = self._generate_solution(beta, kernel, alpha, points, pixels, intrinsics, request_error=False)
-        return solution
-
-    @staticmethod
-    def _naive_basis(points):
-        # Select 4 naive points, 3 unit bases and 1 origin point.
-        controls = torch.zeros_like(points[..., :4, :])
-        controls.diagonal(dim1=-2, dim2=-1).fill_(1)
-        return controls
+        objective = BetasObjective(beta)
+        optim = GaussNewton(objective, solver=LSTSQ())
+        scheduler = StopOnPlateau(optim, steps=10, patience=3)
+        scheduler.optimize(input=(bases, kernel))
+        return objective.betas
 
     @staticmethod
     def _svd_basis(points):
-        # Select 4 control points with SVD
+        # Select 4 virtual control points with SVD
         center = points.mean(dim=-2, keepdim=True)
         translated = points - center
         u, s, vh = torch.linalg.svd(translated.mT @ translated)
@@ -356,7 +342,7 @@ class EPnP(torch.nn.Module):
             beta2 = betas[..., 2].abs().sqrt() * betas[..., 1].sign() * betas[..., 0].sign()
             zeros = torch.zeros_like(beta1)
             return torch.stack([zeros, zeros, beta1, beta2], dim=-1)
-    
+
         elif dim == 3:
             l_mat = l_mat[..., (2, 4, 7, 5, 8, 9)]  # matched with matlab code
             betas = torch.linalg.solve(l_mat, rho.unsqueeze(-1)).squeeze(-1)  # shape: (b, 6)
