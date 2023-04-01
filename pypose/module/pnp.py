@@ -268,8 +268,7 @@ class EPnP(torch.nn.Module):
 
     def _build_lrho(self, nullv, bases):
         # prepare l_mat and rho to compute beta
-        batch = nullv.shape[:-2]
-        nullv = nullv.reshape(*batch, 4, 4, 3)
+        nullv = nullv.unflatten(dim=-1, sizes=(4, 3))
         i = (1, 2, 3, 2, 3, 3)
         j = (0, 0, 0, 1, 1, 2)
         dv = nullv[..., i, :] - nullv[..., j, :]
