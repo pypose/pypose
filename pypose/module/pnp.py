@@ -3,9 +3,9 @@ from .. import bmv
 from .. import mat2SE3
 from ..basics import cart2homo
 from ..optim import LM, GN
+from torch import broadcast_shapes
 from .cameras import PerspectiveCameras
 from ..optim.scheduler import StopOnPlateau
-
 
 class BetasOptimizationObjective(torch.nn.Module):
     # Optimize the betas according to the objectives in the ePnP paper.
@@ -155,39 +155,34 @@ class EPnP(torch.nn.Module):
 
 
     def forward(self, points, pixels, intrinsics=None):
-        """
+        r"""
         Args:
             points (``torch.Tensor``): 3D object points in the world coordinates.
                 Shape (..., n, 3)
             pixels (``torch.Tensor``): 2D image points, which are the projection of
                 object points. Shape (..., n, 2)
             intrinsics (``Optional[torch.Tensor]``): camera intrinsics. Shape (..., 3, 3).
-                Setting it to any non-``None`` value will override the default intrinsics kept
-                in the module.
+                Setting it to any non-``None`` value will override the default intrinsics
+                kept in the module.
 
         Returns:
             ``LieTensor``: estimated pose (``SE3type``) for the camera.
         """
-        if intrinsics is None:
-            intrinsics = self.intrinsics
-        # shape checking
-        batch = torch.broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
+        intrinsics = self.intrinsics if intrinsics is None else intrinsics
+        batch = broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
 
         # Select naive and calculate alpha in the world coordinate
         bases = self._naive_basis(points) if self.naive else self._svd_basis(points)
         alpha = self._compute_alphas(points, bases)
-        m = self._build_m(pixels, alpha, intrinsics)
-
-        kernel_m = self._calculate_kernel(m)[..., [3, 2, 1, 0]]  # to be consistent with the matlab code
-
-        l_mat = self._build_l(kernel_m)
+        kernel = self._calculate_kernel(pixels, alpha, intrinsics)
+        l_mat = self._build_l(kernel)
         rho = self._build_rho(bases)
 
         solution_keys = ['error', 'pose', 'ctrl_pts_c', 'points_c', 'beta', 'scale']
         solutions = {key: [] for key in solution_keys}
-        for dim in range(1, 4):  # kernel space dimension of 4 is unstable
+        for dim in range(1, 5):  # kernel space dimension of 4 is unstable
             beta = self._calculate_betas(dim, l_mat, rho)
-            solution = self._generate_solution(beta, kernel_m, alpha, points, pixels, intrinsics)
+            solution = self._generate_solution(beta, kernel, alpha, points, pixels, intrinsics)
             for key in solution_keys:
                 solutions[key].append(solution[key])
 
@@ -203,13 +198,13 @@ class EPnP(torch.nn.Module):
             solutions[key] = solutions[key].squeeze(len(batch))
 
         if self.optimizer is not None:
-            solutions = self._optimization_step(solutions, kernel_m, bases, alpha, points, pixels, intrinsics)
+            solutions = self._optimization_step(solutions, kernel, bases, alpha, points, pixels, intrinsics)
         return solutions['pose']
 
-    def _generate_solution(self, beta, kernel_m, alpha, points, pixels, intrinsics, request_error=True):
+    def _generate_solution(self, beta, kernel, alpha, points, pixels, intrinsics, request_error=True):
         solution = dict()
 
-        ctrl_pts_c = bmv(kernel_m, beta)
+        ctrl_pts_c = bmv(kernel, beta)
         ctrl_pts_c, points_c, sc = self._compute_norm_sign_scaling_factor(ctrl_pts_c, alpha, points)
         pose = self._get_se3(points, points_c)
         if request_error:
@@ -226,11 +221,11 @@ class EPnP(torch.nn.Module):
 
         return solution
 
-    def _optimization_step(self, solutions, kernel_m, ctrl_pts_w, alpha, points, pixels, intrinsics):
+    def _optimization_step(self, solutions, kernel, ctrl_pts_w, alpha, points, pixels, intrinsics):
         """
         Args:
             solutions (dict): a dict of solutions
-            kernel_m (Tensor): kernel matrix, shape (batch, n, 4)
+            kernel (Tensor): kernel matrix, shape (batch, n, 4)
             ctrl_pts_w (Tensor): control points in the world coordinate, shape (batch, 4, 3)
             alpha (Tensor): alpha, shape (batch, n, 4)
             points (Tensor): 3D object points, shape (batch, n, 3)
@@ -243,10 +238,10 @@ class EPnP(torch.nn.Module):
         objective = BetasOptimizationObjective(solutions['beta'] * solutions['scale'].unsqueeze(-1))
         gn = self.optimizer(objective)
         scheduler = StopOnPlateau(gn, steps=10, patience=3, verbose=False)
-        scheduler.optimize(input=(ctrl_pts_w, kernel_m))
+        scheduler.optimize(input=(ctrl_pts_w, kernel))
         beta = objective.betas.data
 
-        solution = self._generate_solution(beta, kernel_m, alpha, points, pixels, intrinsics, request_error=False)
+        solution = self._generate_solution(beta, kernel, alpha, points, pixels, intrinsics, request_error=False)
         return solution
 
     @staticmethod
@@ -267,30 +262,16 @@ class EPnP(torch.nn.Module):
 
     @staticmethod
     def _compute_alphas(points, bases):
-        """Compute the alphas, which are a set of weights corresponded of control points for each object point. 
-        Check equation 1 in paper for more details.
-
-        Args:
-            points (torch.Tensor): object points in the world coordinate, shape (..., num_pts, 3)
-            ctrl_pts_w (torch.Tensor): control points in the world coordinate, shape (..., 4, 3)
-
-        Returns:
-            torch.Tensor: alphas, shape (..., num_pts, 4)
-        """
+        # Compute weights (..., N, 4) corresponded to bases (..., N, 4)
+        # for points (..., N, 3). Check equation 1 in paper for details.
         points, bases = cart2homo(points), cart2homo(bases)
         return torch.linalg.solve(A=bases, B=points, left=False)
 
     @staticmethod
-    def _build_m(pixels, alpha, intrinsics):
-        """Construct M matrix. Check equation 7 in paper for more details.
-        Args:
-            pixels (torch.Tensor): (..., point, 2)
-            alpha (torch.Tensor): (..., point, 4)
-            intrinsics (torch.Tensor): (..., 3, 3)
-
-        Returns:
-            torch.Tensor: (..., point * 2, 12)
-        """
+    def _calculate_kernel(pixels, alpha, intrinsics, least=4):
+        # Construct M matrix and find its eigenvectors with the least eigenvalues
+        # Check equation 7 in paper for more details.
+        # pixels (..., point, 2); alpha (..., point, 4); intrinsics (..., 3, 3)
         batch, point = pixels.shape[:-2], pixels.shape[-2]
         u, v = pixels[..., 0], pixels[..., 1]
         fu, u0 = intrinsics[..., 0, 0, None], intrinsics[..., 0, 2, None]
@@ -304,26 +285,11 @@ class EPnP(torch.nn.Module):
                          O, a0 * fv, a0 * (v0 - v),
                          O, a1 * fv, a1 * (v0 - v),
                          O, a2 * fv, a2 * (v0 - v),
-                         O, a3 * fv, a3 * (v0 - v)], dim=-1) # (batch, point, 24)
-        return M.reshape(*batch, point * 2, 12)
-
-    @staticmethod
-    def _calculate_kernel(M, least=4):
-        """Given M matrix, find eigenvectors with the least eigenvalues.
-        Check equation 8 in paper for more details.
-
-        Args:
-            m (torch.Tensor): m, shape (..., num_pts * 2, 12)
-            top (int, optional): number of top eigen vectors to take. Defaults to 4.
-
-        Returns:
-            torch.Tensor: kernel, shape (..., 12, top)
-        """
-        batch = M.shape[:-2]  # M is (..., point * 2, 12)
+                         O, a3 * fv, a3 * (v0 - v)], dim=-1).reshape(*batch, point * 2, 12)
         eigenvalues, eigenvectors = torch.linalg.eig(M.mT @ M)
         eigenvalues, eigenvectors = eigenvalues.real, eigenvectors.real
-        index = eigenvalues.argsort(descending=False)[..., :least] # (batch, 4)
-        index = index.unsqueeze(-2).tile((1,) * len(batch) + (12, 1)) # (batch, 12, 4)
+        _, index = eigenvalues.topk(k=least, largest=False, sorted=True) # (batch, 4)
+        index = index.flip(dims=[-1]).unsqueeze(-2).tile((1,)*len(batch)+(12, 1))
         return torch.gather(eigenvectors, dim=-1, index=index) # (batch, 12, 4)
 
     def _build_l(self, kernel_bases):
@@ -351,7 +317,7 @@ class EPnP(torch.nn.Module):
         dot_products = dot_products * self.multiply_mask.reshape((1,) * len(batch) + (10, 1))
         return dot_products.mT  # shape (batch, 6, 10)
 
-    def _build_rho(self, cont_pts_w):
+    def _build_rho(self, bases):
         """Given the coordinates of control points, compute the rho vector. Check [source]
         (https://github.com/cvlab-epfl/EPnP/blob/5abc3cfa76e8e92e5a8f4be0370bbe7da246065e/cpp/epnp.cpp#L520)
         for more details.
@@ -362,7 +328,7 @@ class EPnP(torch.nn.Module):
         Returns:
             torch.Tensor: rho, shape (..., 6, 1)
         """
-        dist = cont_pts_w[..., self.six_indices_pair[0], :] - cont_pts_w[..., self.six_indices_pair[1], :]
+        dist = bases[..., self.six_indices_pair[0], :] - bases[..., self.six_indices_pair[1], :]
         return torch.sum(dist ** 2, dim=-1)  # l2 norm
 
     @staticmethod
@@ -382,28 +348,30 @@ class EPnP(torch.nn.Module):
             betas = torch.zeros(*batch, 4, device=l_mat.device, dtype=l_mat.dtype)
             betas[..., -1] = 1
             return betas
+
         elif dim == 2:
             l_mat = l_mat[..., (5, 8, 9)]  # matched with matlab code
-            betas_ = bmv(torch.linalg.pinv(l_mat), rho)  # shape: (b, 3)
-            beta1 = torch.sqrt(torch.abs(betas_[..., 0]))
-            beta2 = torch.sqrt(torch.abs(betas_[..., 2])) * torch.sign(betas_[..., 1]) * torch.sign(betas_[..., 0])
-
-            return torch.stack([torch.zeros_like(beta1), torch.zeros_like(beta1), beta1, beta2], dim=-1)
+            betas = bmv(torch.linalg.pinv(l_mat), rho)  # shape: (b, 3)
+            beta1 = betas[..., 0].abs().sqrt()
+            beta2 = betas[..., 2].abs().sqrt() * betas[..., 1].sign() * betas[..., 0].sign()
+            zeros = torch.zeros_like(beta1)
+            return torch.stack([zeros, zeros, beta1, beta2], dim=-1)
+    
         elif dim == 3:
             l_mat = l_mat[..., (2, 4, 7, 5, 8, 9)]  # matched with matlab code
-            betas_ = torch.linalg.solve(l_mat, rho.unsqueeze(-1)).squeeze(-1)  # shape: (b, 6)
-            beta1 = torch.sqrt(torch.abs(betas_[..., 0]))
-            beta2 = torch.sqrt(torch.abs(betas_[..., 3])) * torch.sign(betas_[..., 1]) * torch.sign(betas_[..., 0])
-            beta3 = torch.sqrt(torch.abs(betas_[..., 5])) * torch.sign(betas_[..., 2]) * torch.sign(betas_[..., 0])
+            betas = torch.linalg.solve(l_mat, rho.unsqueeze(-1)).squeeze(-1)  # shape: (b, 6)
+            beta1 = betas[..., 0].abs().sqrt()
+            zeros = torch.zeros_like(beta1)
+            beta2 = betas[..., 3].abs().sqrt() * betas[..., 1].sign() * betas[..., 0].sign()
+            beta3 = betas[..., 5].abs().sqrt() * betas[..., 2].sign() * betas[..., 0].sign()
+            return torch.stack([zeros, beta1, beta2, beta3], dim=-1)
 
-            return torch.stack([torch.zeros_like(beta1), beta1, beta2, beta3], dim=-1)
         elif dim == 4:
-            betas_ = bmv(torch.linalg.pinv(l_mat), rho)  # shape: (b, 10)
-            beta4 = torch.sqrt(abs(betas_[..., 0]))
-            beta3 = torch.sqrt(abs(betas_[..., 2])) * torch.sign(betas_[..., 1]) * torch.sign(betas_[..., 0])
-            beta2 = torch.sqrt(abs(betas_[..., 5])) * torch.sign(betas_[..., 3]) * torch.sign(betas_[..., 0])
-            beta1 = torch.sqrt(abs(betas_[..., 9])) * torch.sign(betas_[..., 6]) * torch.sign(betas_[..., 0])
-
+            betas = bmv(torch.linalg.pinv(l_mat), rho)  # shape: (b, 10)
+            beta4 = betas[..., 0].abs().sqrt()
+            beta3 = betas[..., 2].abs().sqrt() * betas[..., 1].sign() * betas[..., 0].sign()
+            beta2 = betas[..., 5].abs().sqrt() * betas[..., 3].sign() * betas[..., 0].sign()
+            beta1 = betas[..., 9].abs().sqrt() * betas[..., 6].sign() * betas[..., 0].sign()
             return torch.stack([beta1, beta2, beta3, beta4], dim=-1)
 
     @staticmethod
