@@ -1,6 +1,6 @@
 # Recommended settings for VS Code
 
-If you are a vscode/codespace user, you may use the recommended setting by running: 
+VS Code or Codespace users may have the recommended settings by running: 
 
 ```python
 python .vscode/vscode_settings.py
