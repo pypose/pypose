@@ -1,6 +1,6 @@
 import torch
-from .. import bmv
 from .. import mat2SE3
+from .. import bmv, bvv
 from .camera import Camera
 from ..basics import cart2homo
 from ..optim import GaussNewton
@@ -406,35 +406,17 @@ class EPnP(torch.nn.Module):
 
     @staticmethod
     def _get_se3(pts_w, pts_c):
-        """
-        Get the rotation matrix and translation vector based on the object points in world coordinate and camera
-        coordinate.
-
-        Args:
-            pts_w: The object points in world coordinate. The shape is (..., N, 3).
-            pts_c: The object points in camera coordinate. The shape is (..., N, 3).
-        Returns:
-            ``LieTensor``: estimated pose (``SE3type``) for the camera.
-        """
-        # Get the centered points
-        center_w = pts_w.mean(dim=-2)
-        pts_w = pts_w - center_w.unsqueeze(-2)
-        center_c = pts_c.mean(dim=-2)
-        pts_c = pts_c - center_c.unsqueeze(-2)
-
-        # Calculate the rotation matrix
-        m = torch.matmul(pts_c[..., :, None], pts_w[..., None, :])
-        m = m.sum(dim=-3)  # along the point dimension
-
-        u, s, vh = torch.svd(m)
-        rot = u.matmul(vh.mT)
-
-        # if det(R) < 0, make it positive
-        negate_mask = torch.linalg.det(rot) < 0
-        rot[negate_mask] = -rot[negate_mask]
-
-        # Calculate the translation vector based on the rotation matrix and the equation
-        t = center_c - bmv(rot, center_w)
-        rt = torch.cat((rot, t.unsqueeze(-1)), dim=-1)
-
-        return mat2SE3(rt)
+        # Get the transform for the two associated batched point sets.
+        Cw = pts_w.mean(dim=-2, keepdim=True)
+        Pw = pts_w - Cw
+        Cc = pts_c.mean(dim=-2, keepdim=True)
+        Pc = pts_c - Cc
+        M = bvv(Pc, Pw).sum(dim=-3)
+        U, S, Vh = torch.linalg.svd(M)
+        R = U @ Vh
+        # mirror improper rotation that det(R) = -1
+        mask = (R.det() + 1).abs() < 1e-6
+        R[mask] = - R[mask]
+        t = Cc.mT - R @ Cw.mT
+        T = torch.cat((R, t), dim=-1)
+        return mat2SE3(T)
