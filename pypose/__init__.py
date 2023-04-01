@@ -1,3 +1,5 @@
+from packaging import version
+
 from ._version import __version__
 
 from .lietensor import LieTensor, Parameter, SO3, so3, SE3, se3, Sim3, sim3, RxSO3, rxso3
@@ -16,22 +18,7 @@ from . import module, optim
 from .basics import *
 
 
-def digit_version(version_str):
-    digits = []
-    for x in version_str.split('.'):
-        if x.isdigit():
-            digits.append(int(x))
-        elif x.find('rc') != -1:
-            patch_version = x.split('rc')
-            digits.append(int(patch_version[0]) - 1)
-            digits.append(int(patch_version[1]))
-    return digits
-
-
 torch_min_ver = '2.0'
-torch_version = digit_version(torch.__version__)
-
-
-assert digit_version(torch_min_ver) <= torch_version, \
+assert version.parse('2.0') <= version.parse(torch.__version__), \
     f'PyTorch=={torch.__version__} is used but incompatible. ' \
     f'Please install torch>={torch_min_ver}.'
