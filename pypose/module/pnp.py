@@ -16,7 +16,7 @@ class BetasObjective(torch.nn.Module):
         super().__init__()
         self.betas = torch.nn.Parameter(betas)
 
-    def forward(self, ctrl_pts_w, kernel_bases):
+    def forward(self, ctrl_pts_w, nullv):
         """
         Args:
             ctrl_pts_w: The control points in world coordinate. The shape is (B, 4, 3).
@@ -25,9 +25,9 @@ class BetasObjective(torch.nn.Module):
         Returns:
             torch.Tensor: The loss. The shape is (B, ).
         """
-        batch = kernel_bases.shape[:-2]
+        batch = nullv.shape[:-2]
         # calculate the control points in camera coordinate
-        ctrl_pts_c = bmv(kernel_bases, self.betas)
+        ctrl_pts_c = bmv(nullv.mT, self.betas)
         diff_c = ctrl_pts_c.reshape(*batch, 1, 4, 3) - ctrl_pts_c.reshape(*batch, 4, 1, 3)
         diff_c = diff_c.reshape(*batch, 48)  # TODO: whether it is (16, 3) or (48, )?
         diff_c = torch.norm(diff_c, dim=-1)
@@ -144,17 +144,6 @@ class EPnP(torch.nn.Module):
         if intrinsics is not None:
             self.register_buffer('intrinsics', intrinsics)
 
-        self.register_buffer('six_indices', torch.tensor(
-            [(0 * 4 + 1), (0 * 4 + 2), (0 * 4 + 3), (1 * 4 + 2), (1 * 4 + 3), (2 * 4 + 3)]))
-        self.register_buffer('six_indices_pair', torch.tensor([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]).T)
-        self.register_buffer('ten_indices_pair', torch.tensor([(0, 0),
-                                                               (0, 1), (1, 1),
-                                                               (0, 2), (1, 2), (2, 2),
-                                                               (0, 3), (1, 3), (2, 3), (3, 3)]).T)
-        # equal mask for above pairs [ True, False, True, False, False, True, False, False, False, True, ]
-        self.register_buffer('multiply_mask', torch.tensor([1., 2., 1., 2., 2., 1., 2., 2., 2., 1.]))
-
-
     def forward(self, points, pixels, intrinsics=None):
         r'''
         Args:
@@ -175,15 +164,14 @@ class EPnP(torch.nn.Module):
         # Select naive and calculate alpha in the world coordinate
         bases = self._svd_basis(points)
         alpha = self._compute_alphas(points, bases)
-        kernel = self._calculate_kernel(pixels, alpha, intrinsics)
-        l_mat = self._build_l(kernel)
-        rho = self._build_rho(bases)
+        nullv = self._compute_nullv(pixels, alpha, intrinsics)
+        l_mat, rho = self._build_lrho(nullv, bases)
 
         solution_keys = ['error', 'pose', 'ctrl_pts_c', 'points_c', 'beta', 'scale']
         solutions = {key: [] for key in solution_keys}
-        for dim in range(1, 5):  # kernel space dimension of 4 is unstable
+        for dim in range(1, 5):  # nullv space dimension of 4 is unstable
             beta = self._calculate_betas(dim, l_mat, rho)
-            solution = self._generate_solution(beta, kernel, alpha, points, pixels, intrinsics)
+            solution = self._generate_solution(beta, nullv, alpha, points, pixels, intrinsics)
             for key in solution_keys:
                 solutions[key].append(solution[key])
 
@@ -199,15 +187,15 @@ class EPnP(torch.nn.Module):
             solutions[key] = solutions[key].squeeze(len(batch))
 
         if self.refine:
-            beta = self._refine(solutions['beta'] * solutions['scale'].unsqueeze(-1), kernel, bases)
-            solutions = self._generate_solution(beta, kernel, alpha, points, pixels, intrinsics)
+            beta = self._refine(solutions['beta'] * solutions['scale'].unsqueeze(-1), nullv, bases)
+            solutions = self._generate_solution(beta, nullv, alpha, points, pixels, intrinsics)
 
         return solutions['pose']
 
-    def _generate_solution(self, beta, kernel, alpha, points, pixels, intrinsics, request_error=True):
+    def _generate_solution(self, beta, nullv, alpha, points, pixels, intrinsics, request_error=True):
         solution = dict()
 
-        ctrl_pts_c = bmv(kernel, beta)
+        ctrl_pts_c = bmv(nullv.mT, beta)
         ctrl_pts_c, points_c, sc = self._compute_norm_sign_scaling_factor(ctrl_pts_c, alpha, points)
         pose = self._get_se3(points, points_c)
         if request_error:
@@ -224,17 +212,17 @@ class EPnP(torch.nn.Module):
 
         return solution
 
-    def _refine(self, beta, kernel, bases):
+    def _refine(self, beta, nullv, bases):
         """
         Args:
             solutions (dict): a dict of solutions
-            kernel (Tensor): kernel matrix, shape (batch, n, 4)
+            nullv (Tensor): null vectors of M matrix, shape (batch, n, 4)
             bases (Tensor): control points in the world coordinate, shape (batch, 4, 3)
         """
         objective = BetasObjective(beta)
         optim = GaussNewton(objective, solver=LSTSQ())
         scheduler = StopOnPlateau(optim, steps=10, patience=3)
-        scheduler.optimize(input=(bases, kernel))
+        scheduler.optimize(input=(bases, nullv))
         return objective.betas
 
     @staticmethod
@@ -254,8 +242,8 @@ class EPnP(torch.nn.Module):
         return torch.linalg.solve(A=bases, B=points, left=False)
 
     @staticmethod
-    def _calculate_kernel(pixels, alpha, intrinsics, least=4):
-        # Construct M matrix and find its eigenvectors with the least eigenvalues
+    def _compute_nullv(pixels, alpha, intrinsics, least=4):
+        # Construct M matrix and find its null eigenvectors with the least eigenvalues
         # Check equation 7 in paper for more details.
         # pixels (..., point, 2); alpha (..., point, 4); intrinsics (..., 3, 3)
         batch, point = pixels.shape[:-2], pixels.shape[-2]
@@ -276,46 +264,20 @@ class EPnP(torch.nn.Module):
         eigenvalues, eigenvectors = eigenvalues.real, eigenvectors.real
         _, index = eigenvalues.topk(k=least, largest=False, sorted=True) # (batch, 4)
         index = index.flip(dims=[-1]).unsqueeze(-2).tile((1,)*len(batch)+(12, 1))
-        return torch.gather(eigenvectors, dim=-1, index=index) # (batch, 12, 4)
+        return torch.gather(eigenvectors, dim=-1, index=index).mT # (batch, 4, 12)
 
-    def _build_l(self, kernel_bases):
-        """Given the kernel of m, compute the L matrix. Check [source]
-        (https://github.com/cvlab-epfl/EPnP/blob/5abc3cfa76e8e92e5a8f4be0370bbe7da246065e/cpp/epnp.cpp#L478)
-        for more details. Inputs are batched.
-
-        Args:
-            kernel_bases (torch.Tensor): kernel of m, shape (..., 12, 4)
-
-        Returns:
-            torch.Tensor: L, shape (..., 6, 10)
-        """
-        batch = kernel_bases.shape[:-2]
-        kernel_bases = kernel_bases.mT  # shape (batch, 4, 12)
-        # calculate the pairwise distance matrix within bases
-        diff = kernel_bases.reshape(*batch, 4, 1, 4, 3) - kernel_bases.reshape(*batch, 4, 4, 1, 3)
-        diff = diff.flatten(start_dim=-3, end_dim=-2)  # shape (batch, 4, 16, 3)
-        # six_indices are (0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3) before flatten
-        dv = diff[..., self.six_indices, :]  # shape (batch, 4, 6, 3)
-
-        # generate l
-        dot_products = torch.sum(
-            dv[..., self.ten_indices_pair[0], :, :] * dv[..., self.ten_indices_pair[1], :, :], dim=-1)
-        dot_products = dot_products * self.multiply_mask.reshape((1,) * len(batch) + (10, 1))
-        return dot_products.mT  # shape (batch, 6, 10)
-
-    def _build_rho(self, bases):
-        """Given the coordinates of control points, compute the rho vector. Check [source]
-        (https://github.com/cvlab-epfl/EPnP/blob/5abc3cfa76e8e92e5a8f4be0370bbe7da246065e/cpp/epnp.cpp#L520)
-        for more details.
-        Inputs are batched.
-
-        Args:
-            cont_pts_w (torch.Tensor): coordinates of control points, shape (..., 4, 3)
-        Returns:
-            torch.Tensor: rho, shape (..., 6, 1)
-        """
-        dist = bases[..., self.six_indices_pair[0], :] - bases[..., self.six_indices_pair[1], :]
-        return torch.sum(dist ** 2, dim=-1)  # l2 norm
+    def _build_lrho(self, nullv, bases):
+        # prepare l_mat and rho to compute beta
+        batch = nullv.shape[:-2]
+        nullv = nullv.reshape(*batch, 4, 4, 3)
+        i = (1, 2, 3, 2, 3, 3)
+        j = (0, 0, 0, 1, 1, 2)
+        dv = nullv[..., i, :] - nullv[..., j, :]
+        a = (0, 0, 1, 0, 1, 2, 0, 1, 2, 3)
+        b = (0, 1, 1, 2, 2, 2, 3, 3, 3, 3)
+        dp = (dv[..., a, :, :] * dv[..., b, :, :]).sum(dim=-1)
+        m = torch.tensor([1, 2, 1, 2, 2, 1, 2, 2, 2, 1], device=dp.device, dtype=dp.dtype)
+        return dp.mT * m, (bases[..., i, :] - bases[..., j, :]).pow(2).sum(-1)
 
     @staticmethod
     def _calculate_betas(dim, l_mat, rho):

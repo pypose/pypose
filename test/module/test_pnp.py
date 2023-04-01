@@ -13,11 +13,11 @@ def reprojection_error(pts_w, img_pts, intrinsics, rt):
     Returns:
         error: The reprojection error. The shape is (..., ).
     """
-    proj_mat = torch.bmm(intrinsics[..., :3], rt)
+    proj_mat = intrinsics[..., :3] @ rt
     # concat 1 to the last column of objPts_w
     obj_pts_w_ex = torch.cat((pts_w, torch.ones_like(pts_w[..., :1])), dim=-1)
     # Calculate the image points
-    img_repj = torch.bmm(obj_pts_w_ex, proj_mat.transpose(dim0=-1, dim1=-2))
+    img_repj = obj_pts_w_ex @ proj_mat.mT
 
     # Normalize the image points
     img_repj = img_repj[..., :2] / img_repj[..., 2:]
@@ -50,12 +50,9 @@ def rmse_t(pred, gt):
 class TestEPnP:
     def test_epnp_nonbatch(self):
         data = load_data()
-
-        # instantiate epnp
         epnp = pp.module.EPnP()
         solution_non_batch = epnp(data['objPts'][0], data['imgPts'][0], data['camMat'][0])
         solution_batch = epnp(data['objPts'], data['imgPts'], data['camMat'])
-
         assert torch.allclose(solution_non_batch.rotation().matrix(), solution_batch.rotation().matrix())
 
 
@@ -97,28 +94,21 @@ class TestEPnP:
                                 [0.06300202, -0.35908455, 0.93117615]])
             Rt = torch.concatenate((rot.reshape((3, 3)), t.reshape((3, 1))), dim=1)
 
-            obj_pts = obj_pts[None].to(torch.float32)
-            img_pts = img_pts[None].to(torch.float32)
-            intrinsics = intrinsics[None].to(torch.float32)
-            Rt = Rt[None]
+            obj_pts = obj_pts.to(torch.float32)
+            img_pts = img_pts.to(torch.float32)
+            intrinsics = intrinsics.to(torch.float32)
 
-            rot = Rt[:, :3, :3]
-            t = Rt[:, :3, 3]
+            rot = Rt[..., :3, :3]
+            t = Rt[..., :3, 3]
 
-            error = reprojection_error(obj_pts,
-                                       img_pts,
-                                       intrinsics,
-                                       Rt, )
+            error = reprojection_error(obj_pts, img_pts, intrinsics, Rt)
             return dict(Rt=Rt, error=error, R=rot, T=t)
 
         data = load_data()
 
-        # instantiate epnp
         epnp = pp.module.EPnP()
         solution = epnp(data['objPts'], data['imgPts'], data['camMat'])
-        solution_ref = solution_opencv(data['objPts'][0],
-                                       data['imgPts'][0],
-                                       data['camMat'][0])
+        solution_ref = solution_opencv(data['objPts'][0], data['imgPts'][0], data['camMat'][0])
         gt_rot = data['Rt'][..., :3, :3]
         gt_t = data['Rt'][..., :3, 3]
 
