@@ -53,7 +53,7 @@ class TestEPnP:
         epnp = pp.module.EPnP()
         solution_non_batch = epnp(data['objPts'][0], data['imgPts'][0], data['camMat'][0])
         solution_batch = epnp(data['objPts'], data['imgPts'], data['camMat'])
-        assert torch.allclose(solution_non_batch.rotation().matrix(), solution_batch.rotation().matrix())
+        assert torch.allclose(solution_non_batch.rotation().matrix(), solution_batch.rotation().matrix()[0])
 
 
     def test_epnp_6pts(self):
