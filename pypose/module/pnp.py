@@ -10,8 +10,7 @@ from ..optim.solver import Cholesky, PINV, LSTSQ
 
 
 class BetaObjective(torch.nn.Module):
-    # Optimize the betas according to the objectives in the ePnP paper.
-    # For the details, please refer to equation 15.
+    # Optimize the beta according to the objective in the ePnP paper.
     def __init__(self, beta):
         super().__init__()
         self.beta = torch.nn.Parameter(beta)
