@@ -19,7 +19,7 @@ class BetaObjective(torch.nn.Module):
 
     def forward(self, base_w, nullv):
         # See Eq. 15 in the paper
-        base_c = bmv(nullv.mT, self.beta).unflatten(-1, (4, 3))
+        base_c = bmv(nullv.mT, self.beta).unflatten(dim=-1, sizes=(4, 3))
         dist_c = (base_c[..., self.i, :] - base_c[..., self.j, :]).norm(dim=-1)
         dist_w = (base_w[..., self.i, :] - base_w[..., self.j, :]).norm(dim=-1)
         return dist_w - dist_c
@@ -199,17 +199,13 @@ class EPnP(torch.nn.Module):
         return solution
 
     def _refine(self, beta, nullv, bases):
-        """
-        Args:
-            solutions (dict): a dict of solutions
-            nullv (Tensor): null vectors of M matrix, shape (batch, n, 4)
-            bases (Tensor): control points in the world coordinate, shape (batch, 4, 3)
-        """
+        # Refine beta according to Eq 15 in the paper
         model = BetaObjective(beta)
         optim = GaussNewton(model, solver=LSTSQ())
         scheduler = StopOnPlateau(optim, steps=10, patience=3)
         scheduler.optimize(input=(bases, nullv))
-        return model.beta
+        # Retain the grad of initial beta after optimization.
+        return beta + (model.beta - beta).detach()
 
     @staticmethod
     def _svd_basis(points):
