@@ -141,6 +141,7 @@ class EPnP(torch.nn.Module):
     def __init__(self, intrinsics=None, refine=True):
         super().__init__()
         self.refine = refine
+        self.solver = LSTSQ()
         if intrinsics is not None:
             self.register_buffer('intrinsics', intrinsics)
 
@@ -170,7 +171,7 @@ class EPnP(torch.nn.Module):
         solution_keys = ['error', 'pose', 'ctrl_pts_c', 'points_c', 'beta', 'scale']
         solutions = {key: [] for key in solution_keys}
         for dim in range(1, 5):  # nullv space dimension of 4 is unstable
-            beta = self._calculate_betas(dim, l_mat, rho)
+            beta = self._calculate_beta(dim, l_mat, rho)
             solution = self._generate_solution(beta, nullv, alpha, points, pixels, intrinsics)
             for key in solution_keys:
                 solutions[key].append(solution[key])
@@ -259,14 +260,15 @@ class EPnP(torch.nn.Module):
                          O, a0 * fv, a0 * (v0 - v),
                          O, a1 * fv, a1 * (v0 - v),
                          O, a2 * fv, a2 * (v0 - v),
-                         O, a3 * fv, a3 * (v0 - v)], dim=-1).reshape(*batch, point * 2, 12)
+                         O, a3 * fv, a3 * (v0 - v)], dim=-1).view(*batch, point * 2, 12)
         eigenvalues, eigenvectors = torch.linalg.eig(M.mT @ M)
         eigenvalues, eigenvectors = eigenvalues.real, eigenvectors.real
         _, index = eigenvalues.topk(k=least, largest=False, sorted=True) # (batch, 4)
         index = index.flip(dims=[-1]).unsqueeze(-2).tile((1,)*len(batch)+(12, 1))
         return torch.gather(eigenvectors, dim=-1, index=index).mT # (batch, 4, 12)
 
-    def _build_lrho(self, nullv, bases):
+    @staticmethod
+    def _build_lrho(nullv, bases):
         # prepare l_mat and rho to compute beta
         nullv = nullv.unflatten(dim=-1, sizes=(4, 3))
         i = (1, 2, 3, 2, 3, 3)
@@ -278,48 +280,31 @@ class EPnP(torch.nn.Module):
         m = torch.tensor([1, 2, 1, 2, 2, 1, 2, 2, 2, 1], device=dp.device, dtype=dp.dtype)
         return dp.mT * m, (bases[..., i, :] - bases[..., j, :]).pow(2).sum(-1)
 
-    @staticmethod
-    def _calculate_betas(dim, l_mat, rho):
-        """Given the L matrix and rho vector, compute the beta vector. Check equation 10 - 14 in paper for more details.
-        Inputs are batched.
-
-        Args:
-            dim (int): dimension of the problem, 1, 2, or 3
-            l_mat (torch.Tensor): L, shape (..., 6, 10)
-            rho (torch.Tensor): rho, shape (..., 6)
-        Returns:
-            torch.Tensor: beta, shape (..., 4)
-        """
-        batch = l_mat.shape[:-2]
+    def _calculate_beta(self, dim, l_mat, rho):
+        # Given the L matrix and rho vector, compute the beta vector.
+        # Check Eq 10 - 14 in paper.
+        # l_mat (..., 6, 10); rho (..., 6); beta (..., 4)
+        beta = torch.zeros_like(rho[...,:4])
         if dim == 1:
-            betas = torch.zeros(*batch, 4, device=l_mat.device, dtype=l_mat.dtype)
-            betas[..., -1] = 1
-            return betas
-
+            beta[..., -1] = 1
         elif dim == 2:
-            l_mat = l_mat[..., (5, 8, 9)]  # matched with matlab code
-            betas = bmv(torch.linalg.pinv(l_mat), rho)  # shape: (b, 3)
-            beta1 = betas[..., 0].abs().sqrt()
-            beta2 = betas[..., 2].abs().sqrt() * betas[..., 1].sign() * betas[..., 0].sign()
-            zeros = torch.zeros_like(beta1)
-            return torch.stack([zeros, zeros, beta1, beta2], dim=-1)
-
+            L = l_mat[..., (5, 8, 9)]
+            res = self.solver(L, rho) # (b, 3)
+            beta[..., 2] = res[..., 0].abs().sqrt()
+            beta[..., 3] = res[..., 2].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
         elif dim == 3:
-            l_mat = l_mat[..., (2, 4, 7, 5, 8, 9)]  # matched with matlab code
-            betas = torch.linalg.solve(l_mat, rho.unsqueeze(-1)).squeeze(-1)  # shape: (b, 6)
-            beta1 = betas[..., 0].abs().sqrt()
-            zeros = torch.zeros_like(beta1)
-            beta2 = betas[..., 3].abs().sqrt() * betas[..., 1].sign() * betas[..., 0].sign()
-            beta3 = betas[..., 5].abs().sqrt() * betas[..., 2].sign() * betas[..., 0].sign()
-            return torch.stack([zeros, beta1, beta2, beta3], dim=-1)
-
+            L = l_mat[..., (2, 4, 7, 5, 8, 9)]
+            res = self.solver(L, rho) # (b, 6)
+            beta[..., 1] = res[..., 0].abs().sqrt()
+            beta[..., 2] = res[..., 3].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
+            beta[..., 3] = res[..., 5].abs().sqrt() * res[..., 2].sign() * res[..., 0].sign()
         elif dim == 4:
-            betas = bmv(torch.linalg.pinv(l_mat), rho)  # shape: (b, 10)
-            beta4 = betas[..., 0].abs().sqrt()
-            beta3 = betas[..., 2].abs().sqrt() * betas[..., 1].sign() * betas[..., 0].sign()
-            beta2 = betas[..., 5].abs().sqrt() * betas[..., 3].sign() * betas[..., 0].sign()
-            beta1 = betas[..., 9].abs().sqrt() * betas[..., 6].sign() * betas[..., 0].sign()
-            return torch.stack([beta1, beta2, beta3, beta4], dim=-1)
+            res = self.solver(l_mat, rho) # (b, 10)
+            beta[..., 0] = res[..., 9].abs().sqrt() * res[..., 6].sign() * res[..., 0].sign()
+            beta[..., 1] = res[..., 5].abs().sqrt() * res[..., 3].sign() * res[..., 0].sign()
+            beta[..., 2] = res[..., 2].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
+            beta[..., 3] = res[..., 0].abs().sqrt()
+        return beta
 
     @staticmethod
     def _compute_norm_sign_scaling_factor(xc, alphas, points):
@@ -367,7 +352,7 @@ class EPnP(torch.nn.Module):
 
     @staticmethod
     def _get_se3(pts_w, pts_c):
-        # Get the transform for the two associated batched point sets.
+        # Get transform for two associated batched point sets.
         Cw = pts_w.mean(dim=-2, keepdim=True)
         Pw = pts_w - Cw
         Cc = pts_c.mean(dim=-2, keepdim=True)
