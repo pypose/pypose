@@ -64,7 +64,7 @@ class TestEPnP:
         # batch shape: [2, ...]
         solution_lowdim = epnp(data['objPts'], data['imgPts'], data['camMat'])
 
-        assert solution_highdim.rotation().matrix()[0].shape == solution_lowdim.rotation().matrix().shape
+        assert solution_highdim[0].shape == solution_lowdim.shape
         assert torch.allclose(solution_highdim.rotation().matrix()[0], solution_lowdim.rotation().matrix())
 
 
