@@ -157,9 +157,11 @@ def modjac(model, input=None, create_graph=False, strict=False, vectorize=False,
 
 def modjacrev(model, input, argnums=0, *, has_aux=False):
     params = dict(model.named_parameters())
-    return jacrev(partial(functional_call, model), argnums=argnums, has_aux=has_aux)(params, input)
+    func = partial(functional_call, model)
+    return jacrev(func, argnums=argnums, has_aux=has_aux)(params, input)
 
 
 def modjacfwd(model, input, argnums=0, *, has_aux=False):
     params = dict(model.named_parameters())
-    return jacfwd(partial(functional_call, model), argnums=argnums, has_aux=has_aux)(params, input)
+    func = partial(functional_call, model)
+    return jacfwd(func, argnums=argnums, has_aux=has_aux)(params, input)

@@ -26,6 +26,8 @@ git clone https://github.com/{your_github_id}/pypose.git
 # git clone git@github.com:{your_github_id}/pypose.git
 ```
 
+If you are using VSCode, you may use our [recommended settings](./.vscode/README.md). 
+
 After that, you should add official repository as the upstream repository
 
 ```bash
