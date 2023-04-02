@@ -6,13 +6,11 @@ import torchdata
 from torchdata.datapipes.iter import FileOpener, HttpReader, IterableWrapper, IterDataPipe
 
 
-
 collection = [
     "multi_view_training_dslr_undistorted.7z",
     "multi_view_test_dslr_undistorted.7z",
 ]
 
-# Download the dataset
 scenes = [
           "courtyard_dslr_undistorted.7z",
           "delivery_area_dslr_undistorted.7z",
@@ -42,13 +40,6 @@ scenes = [
 base_url = 'https://www.eth3d.net/data/'
 
 
-
-
-def decompress_7z(file: str):
-    with py7zr.SevenZipFile(os.path.join(file), 'r') as archive:
-        archive.extractall(path=root)
-    return file
-
 class Decompressor7z(IterDataPipe):
     def __init__(self, dp) -> None:
         self.dp = dp
@@ -59,25 +50,29 @@ class Decompressor7z(IterDataPipe):
                 yield from zip.readall().items()  # key: filename 
                     
 
-def ETH3d(root: Union[str, Path]):
+def download_pipe(root: Union[str, Path]):
     root = os.fspath(root)
     url_dp = IterableWrapper([base_url + archive_name for archive_name in scenes])
 
     # Cache tar.gz archive
-    cache_compressed_dp = url_dp.on_disk_cache(
+    cache_compressed = url_dp.on_disk_cache(
         filepath_fn=lambda url: os.path.join(root, os.path.basename(url)),
     )
-    cache_compressed_dp = HttpReader(cache_compressed_dp).end_caching(same_filepath_fn=True)
-    cache_decompressed_dp = cache_compressed_dp.on_disk_cache(
+    cache_compressed = HttpReader(cache_compressed).end_caching(same_filepath_fn=True)
+    cache_decompressed = cache_compressed.on_disk_cache(
         filepath_fn=lambda tar_path: os.path.join(root, tar_path.split(".")[0])  # for book keeping of the files extracted
     )
 
-    cache_decompressed_dp = Decompressor7z(cache_decompressed_dp).end_caching(
+    cache_decompressed = Decompressor7z(cache_decompressed).end_caching(
         filepath_fn=lambda file_path: os.path.join(root, file_path)
     )
 
-    list(cache_decompressed_dp)
-    return 
+    return cache_decompressed
+
+
+def load_pipe(cache_pipe):
+    annotation = cache_pipe.filter(lambda x: any(i in x for i in ['cameras.txt', 'images.txt', 'points3D.txt'])).batch(3)
+    return annotation
 
 
 if __name__ == '__main__':
@@ -85,4 +80,4 @@ if __name__ == '__main__':
     data_cache_directory = 'data_cache_eth3d_dp'
     os.makedirs(data_cache_directory, exist_ok=True)
 
-    ETH3d(data_cache_directory)
+    list(load_pipe(download_pipe(data_cache_directory)))
