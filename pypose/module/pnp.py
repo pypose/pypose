@@ -9,35 +9,21 @@ from ..optim.scheduler import StopOnPlateau
 from ..optim.solver import Cholesky, PINV, LSTSQ
 
 
-class BetasObjective(torch.nn.Module):
+class BetaObjective(torch.nn.Module):
     # Optimize the betas according to the objectives in the ePnP paper.
     # For the details, please refer to equation 15.
-    def __init__(self, betas):
+    def __init__(self, beta):
         super().__init__()
-        self.betas = torch.nn.Parameter(betas)
+        self.beta = torch.nn.Parameter(beta)
+        self.i = (0, 0, 0, 1, 1, 2)
+        self.j = (1, 2, 3, 2, 3, 3)
 
-    def forward(self, ctrl_pts_w, nullv):
-        """
-        Args:
-            ctrl_pts_w: The control points in world coordinate. The shape is (B, 4, 3).
-            kernel_bases: The kernel bases. The shape is (B, 16, 4).
-
-        Returns:
-            torch.Tensor: The loss. The shape is (B, ).
-        """
-        batch = nullv.shape[:-2]
-        # calculate the control points in camera coordinate
-        ctrl_pts_c = bmv(nullv.mT, self.betas)
-        diff_c = ctrl_pts_c.reshape(*batch, 1, 4, 3) - ctrl_pts_c.reshape(*batch, 4, 1, 3)
-        diff_c = diff_c.reshape(*batch, 48)  # TODO: whether it is (16, 3) or (48, )?
-        diff_c = torch.norm(diff_c, dim=-1)
-
-        # calculate the distance between control points in world coordinate
-        diff_w = ctrl_pts_w.reshape(*batch, 1, 4, 3) - ctrl_pts_w.reshape(*batch, 4, 1, 3)
-        diff_w = diff_w.reshape(*batch, 48)
-        diff_w = torch.norm(diff_w, dim=-1)
-
-        return diff_w - diff_c
+    def forward(self, base_w, nullv):
+        # See Eq. 15 in the paper
+        base_c = bmv(nullv.mT, self.beta).unflatten(-1, (4, 3))
+        dist_c = (base_c[..., self.i, :] - base_c[..., self.j, :]).norm(dim=-1)
+        dist_w = (base_w[..., self.i, :] - base_w[..., self.j, :]).norm(dim=-1)
+        return dist_w - dist_c
 
 
 class EPnP(torch.nn.Module):
@@ -220,11 +206,11 @@ class EPnP(torch.nn.Module):
             nullv (Tensor): null vectors of M matrix, shape (batch, n, 4)
             bases (Tensor): control points in the world coordinate, shape (batch, 4, 3)
         """
-        objective = BetasObjective(beta)
-        optim = GaussNewton(objective, solver=LSTSQ())
+        model = BetaObjective(beta)
+        optim = GaussNewton(model, solver=LSTSQ())
         scheduler = StopOnPlateau(optim, steps=10, patience=3)
         scheduler.optimize(input=(bases, nullv))
-        return objective.betas
+        return model.beta
 
     @staticmethod
     def _svd_basis(points):
