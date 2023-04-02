@@ -143,3 +143,5 @@ docs/source/generated
 examples/module/imu/2011_09_26.zip
 examples/module/imu/2011_09_26/*
 examples/module/imu/save/*
+examples/module/pgo/pgodata/*
+examples/module/pgo/save/*
