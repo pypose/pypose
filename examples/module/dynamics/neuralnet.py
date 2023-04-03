@@ -1,3 +1,4 @@
+import argparse, os
 import torch, pypose as pp
 import matplotlib.pyplot as plt
 
@@ -29,19 +30,34 @@ def subPlot(ax, x, y, xlabel=None, ylabel=None):
 
 if __name__ == "__main__":
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    parser = argparse.ArgumentParser(description='NeuralNet Example')
+    parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
+    parser.add_argument("--save", type=str, default='./examples/module/dynamics/save/', 
+                        help="location of png files to save")
+    parser.add_argument('--show', dest='show', action='store_true',
+                        help="show plot, default: False")
+    parser.set_defaults(show=False)
+    args = parser.parse_args(); print(args)
+    os.makedirs(os.path.join(args.save), exist_ok=True)
+
     dt = 0.01  # Time step size
     N  = 1000  # Number of time steps
-    time  = torch.arange(0, N, device=device) * dt
+    time  = torch.arange(0, N, device=args.device) * dt
     input = torch.sin(time)
-    state = torch.zeros(N, 2, device=device) # trajectory
-    state[0] = torch.tensor([1., 1.], device=device)
+    state = torch.zeros(N, 2, device=args.device) # trajectory
+    state[0] = torch.tensor([1., 1.], device=args.device)
 
-    model = NNDynamics([5, 10]).to(device)
+    model = NNDynamics([5, 10]).to(args.device)
     for i in range(N - 1):
         state[i + 1], _ = model(state[i], input[i])
 
     f, ax = plt.subplots(nrows=2, sharex=True)
     subPlot(ax[0], time, state[:, 0], ylabel='X')
     subPlot(ax[1], time, state[:, 1], ylabel='Y', xlabel='Time')
-    plt.show()
+
+    figure = os.path.join(args.save + 'neuralnet.png')
+    plt.savefig(figure)
+    print("Saved to", figure)
+
+    if args.show:
+        plt.show()
