@@ -185,9 +185,9 @@ class EPnP(torch.nn.Module):
     def _generate_solution(self, beta, nullv, alpha, points, pixels, intrinsics,
                            request_error=True):
         bases = bmv(nullv.mT, beta)
-        bases, points_c, sc = self._compute_norm_sign_scaling_factor(bases,
-                                                                     alpha,
-                                                                     points)
+        bases, points_c, sc = self._compute_scale(bases,
+                                                  alpha,
+                                                  points)
         pose = self._get_se3(points, points_c)
         solution = dict(pose=pose, bases=bases, beta=beta, scale=sc)
         if request_error:
@@ -288,48 +288,36 @@ class EPnP(torch.nn.Module):
         return betas
 
     @staticmethod
-    def _compute_norm_sign_scaling_factor(xc, alphas, points):
+    def _compute_scale(xc, alphas, points):
         """Compute the scaling factor and the sign of the scaling factor
 
         Args:
-            xc (torch.tensor): the (unscaled) control points in the camera coordinates, or the result from null space.
-            alphas (torch.tensor): the weights of the control points to recover the object points
-            points (torch.tensor): the object points in the world coordinates
+            xc (torch.tensor): the (unscaled) control points in the camera coordinates
+            alphas (torch.tensor): the weights to recover the object points
+            points (torch.tensor): the points in the world coordinates
         Returns:
-            contPts_c (torch.tensor): the control points in the camera coordinates
-            objPts_c (torch.tensor): the object points in the camera coordinates
-            sc (torch.tensor): the scaling factor
+            Tuple[torch.tensor]: bases in the camera coordinate,
+            points in the camera coordinate, and the scale
         """
-        batch = xc.shape[:-1]
-        # Calculate the control points and object points in the camera coordinates
-        bases = xc.reshape((*batch, 4, 3))
+        bases = xc.unflatten(-1, (4, 3))
         points_c = alphas @ bases
 
-        # Calculate the distance of the reference points in the world coordinates
+        # distance in the world coordinates
         points_w_centered = points - points.mean(dim=-2, keepdim=True)
-        dist_w = torch.linalg.norm(points_w_centered, dim=-1)
-
-        # Calculate the distance of the reference points in the camera coordinates
+        dist_w = points_w_centered.norm(dim=-1)
+        # distance in the camera coordinates
         points_c_centered = points_c - points_c.mean(dim=-2, keepdim=True)
-        dist_c = torch.linalg.norm(points_c_centered, dim=-1)
+        dist_c = points_c_centered.norm(dim=-1)
 
-        # calculate the scaling factors
-        # below are batched vector dot product
         sc = 1 / torch.linalg.vecdot(dist_c, dist_c) * torch.linalg.vecdot(dist_c, dist_w)
-
-        # Update the control points and the object points in the camera coordinates based on the scaling factors
+        # the real position
         bases = bases * sc[..., None, None]
-        points_c = alphas.matmul(bases)
+        points_c = alphas @ bases
 
-        # Update the control points and the object points in the camera coordinates based on the sign
-        neg_z_mask = torch.any(points_c[..., 2] < 0, dim=-1)  # (N, )
-
-        # for batched data and non-batched data
-        negate_switch = torch.ones(batch, dtype=points.dtype, device=points.device)
-        negate_switch[neg_z_mask] = negate_switch[neg_z_mask] * -1
-        points_c = points_c * negate_switch.reshape(*batch, 1, 1)
-        sc = sc * negate_switch
-        return bases, points_c, sc
+        # negate when z < 0
+        neg_z_mask = torch.any(points_c[..., 2] < 0, dim=-1)  # (batch, )
+        negate_switch = torch.ones_like(sc) - neg_z_mask * 2
+        return bases, points_c * negate_switch[..., None, None], sc * negate_switch
 
     @staticmethod
     def _get_se3(pts_w, pts_c):
