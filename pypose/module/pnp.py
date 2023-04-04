@@ -159,36 +159,37 @@ class EPnP(torch.nn.Module):
         nullv = self._compute_nullv(pixels, alpha, intrinsics)
         l_mat, rho = self._build_lrho(nullv, bases)
 
-        solution_keys = ['error', 'pose', 'ctrl_pts_c', 'points_c', 'beta', 'scale']
-        solutions = {key: [] for key in solution_keys}
+        betas = torch.zeros((4,) + nullv.shape[:-1]).to(nullv)
         for dim in range(1, 5):  # nullv space dimension of 4 is unstable
-            beta = self._calculate_beta(dim, l_mat, rho)
-            solution = self._generate_solution(beta, nullv, alpha, points, pixels, intrinsics)
-            for key in solution_keys:
-                solutions[key].append(solution[key])
-
-        # stack the results
-        for key in solutions.keys():
-            solutions[key] = torch.stack(solutions[key], dim=len(batch))
-        best_error, best_idx = torch.min(solutions['error'], dim=len(batch))
-        for key in solutions.keys():
-            # retrieve the best solution using gather
-            best_idx_ = best_idx.reshape(best_idx.shape + (1,) * (solutions[key].dim() - len(batch)))
-            best_idx_ = best_idx_.tile((1,) * (len(batch) + 1) + solutions[key].shape[len(batch) + 1:])
-            solutions[key] = torch.gather(solutions[key], len(batch), best_idx_)
-            solutions[key] = solutions[key].squeeze(len(batch))
+            betas[dim - 1] = self._calculate_beta(dim, l_mat, rho)
+        solution = self._generate_solution(betas,
+                                           nullv.unsqueeze(0),
+                                           alpha.unsqueeze(0),
+                                           points.unsqueeze(0),
+                                           pixels.unsqueeze(0),
+                                           intrinsics.unsqueeze(0))
+        _, best = torch.min(solution['error'], dim=0)
+        for key in solution.keys():
+            solution[key] = solution[key].gather(
+                0, best.view(
+                    (1,) + best.shape + (1,) * (solution[key].dim() - len(batch) - 1)
+                ).expand_as(solution[key][:1])
+            ).squeeze(0)
 
         if self.refine:
-            beta = self._refine(solutions['beta'] * solutions['scale'].unsqueeze(-1), nullv, bases)
-            solutions = self._generate_solution(beta, nullv, alpha, points, pixels, intrinsics)
+            beta = self._refine(solution['beta'] * solution['scale'].unsqueeze(-1), nullv,
+                                bases)
+            solution = self._generate_solution(beta, nullv, alpha, points, pixels, intrinsics)
 
-        return solutions['pose']
+        return solution['pose']
 
-    def _generate_solution(self, beta, nullv, alpha, points, pixels, intrinsics, request_error=True):
+    def _generate_solution(self, beta, nullv, alpha, points, pixels, intrinsics,
+                           request_error=True):
         solution = dict()
 
         ctrl_pts_c = bmv(nullv.mT, beta)
-        ctrl_pts_c, points_c, sc = self._compute_norm_sign_scaling_factor(ctrl_pts_c, alpha, points)
+        ctrl_pts_c, points_c, sc = self._compute_norm_sign_scaling_factor(ctrl_pts_c, alpha,
+                                                                          points)
         pose = self._get_se3(points, points_c)
         if request_error:
             camera = Camera(pose, intrinsics)
@@ -250,9 +251,9 @@ class EPnP(torch.nn.Module):
                          O, a3 * fv, a3 * (v0 - v)], dim=-1).view(*batch, point * 2, 12)
         eigenvalues, eigenvectors = torch.linalg.eig(M.mT @ M)
         eigenvalues, eigenvectors = eigenvalues.real, eigenvectors.real
-        _, index = eigenvalues.topk(k=least, largest=False, sorted=True) # (batch, 4)
-        index = index.flip(dims=[-1]).unsqueeze(-2).tile((1,)*len(batch)+(12, 1))
-        return torch.gather(eigenvectors, dim=-1, index=index).mT # (batch, 4, 12)
+        _, index = eigenvalues.topk(k=least, largest=False, sorted=True)  # (batch, 4)
+        index = index.flip(dims=[-1]).unsqueeze(-2).tile((1,) * len(batch) + (12, 1))
+        return torch.gather(eigenvectors, dim=-1, index=index).mT  # (batch, 4, 12)
 
     @staticmethod
     def _build_lrho(nullv, bases):
@@ -271,22 +272,22 @@ class EPnP(torch.nn.Module):
         # Given the L matrix and rho vector, compute the beta vector.
         # Check Eq 10 - 14 in paper.
         # l_mat (..., 6, 10); rho (..., 6); beta (..., 4)
-        beta = torch.zeros_like(rho[...,:4])
+        beta = torch.zeros_like(rho[..., :4])
         if dim == 1:
             beta[..., -1] = 1
         elif dim == 2:
             L = l_mat[..., (5, 8, 9)]
-            res = self.solver(L, rho) # (b, 3)
+            res = self.solver(L, rho)  # (b, 3)
             beta[..., 2] = res[..., 0].abs().sqrt()
             beta[..., 3] = res[..., 2].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
         elif dim == 3:
             L = l_mat[..., (2, 4, 7, 5, 8, 9)]
-            res = self.solver(L, rho) # (b, 6)
+            res = self.solver(L, rho)  # (b, 6)
             beta[..., 1] = res[..., 0].abs().sqrt()
             beta[..., 2] = res[..., 3].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
             beta[..., 3] = res[..., 5].abs().sqrt() * res[..., 2].sign() * res[..., 0].sign()
         elif dim == 4:
-            res = self.solver(l_mat, rho) # (b, 10)
+            res = self.solver(l_mat, rho)  # (b, 10)
             beta[..., 0] = res[..., 9].abs().sqrt() * res[..., 6].sign() * res[..., 0].sign()
             beta[..., 1] = res[..., 5].abs().sqrt() * res[..., 3].sign() * res[..., 0].sign()
             beta[..., 2] = res[..., 2].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
