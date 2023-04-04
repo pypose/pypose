@@ -159,7 +159,7 @@ class EPnP(torch.nn.Module):
         nullv = self._compute_nullv(pixels, alpha, intrinsics)
         l_mat, rho = self._build_lrho(nullv, bases)
 
-        betas = torch.stack([self._calculate_beta(dim, l_mat, rho) for dim in range(1, 5)])
+        betas = self._calculate_betas(l_mat, rho)
         solution = self._generate_solution(betas,
                                            nullv.unsqueeze(0),
                                            alpha.unsqueeze(0),
@@ -266,31 +266,32 @@ class EPnP(torch.nn.Module):
         m = torch.tensor([1, 2, 1, 2, 2, 1, 2, 2, 2, 1], device=dp.device, dtype=dp.dtype)
         return dp.mT * m, (bases[..., i, :] - bases[..., j, :]).pow(2).sum(-1)
 
-    def _calculate_beta(self, dim, l_mat, rho):
-        # Given the L matrix and rho vector, compute the beta vector.
+    def _calculate_betas(self, l_mat, rho):
+        # Given the L matrix and rho vector, compute the betas vector.
         # Check Eq 10 - 14 in paper.
-        # l_mat (..., 6, 10); rho (..., 6); beta (..., 4)
-        beta = torch.zeros_like(rho[..., :4])
-        if dim == 1:
-            beta[..., -1] = 1
-        elif dim == 2:
-            L = l_mat[..., (5, 8, 9)]
-            res = self.solver(L, rho)  # (b, 3)
-            beta[..., 2] = res[..., 0].abs().sqrt()
-            beta[..., 3] = res[..., 2].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
-        elif dim == 3:
-            L = l_mat[..., (2, 4, 7, 5, 8, 9)]
-            res = self.solver(L, rho)  # (b, 6)
-            beta[..., 1] = res[..., 0].abs().sqrt()
-            beta[..., 2] = res[..., 3].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
-            beta[..., 3] = res[..., 5].abs().sqrt() * res[..., 2].sign() * res[..., 0].sign()
-        elif dim == 4:
-            res = self.solver(l_mat, rho)  # (b, 10)
-            beta[..., 0] = res[..., 9].abs().sqrt() * res[..., 6].sign() * res[..., 0].sign()
-            beta[..., 1] = res[..., 5].abs().sqrt() * res[..., 3].sign() * res[..., 0].sign()
-            beta[..., 2] = res[..., 2].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
-            beta[..., 3] = res[..., 0].abs().sqrt()
-        return beta
+        # l_mat (..., 6, 10); rho (..., 6); betas (..., 4)
+        # return betas (4, ..., 4)
+        betas = torch.zeros((4,) + rho.shape[:-1] + (4,), device=rho.device, dtype=rho.dtype)
+        # dim == 1:
+        betas[0, ..., -1] = 1
+        # dim == 2:
+        L = l_mat[..., (5, 8, 9)]
+        res = self.solver(L, rho)  # (b, 3)
+        betas[1, ..., 2] = res[..., 0].abs().sqrt()
+        betas[1, ..., 3] = res[..., 2].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
+        # dim == 3:
+        L = l_mat[..., (2, 4, 7, 5, 8, 9)]
+        res = self.solver(L, rho)  # (b, 6)
+        betas[2, ..., 1] = res[..., 0].abs().sqrt()
+        betas[2, ..., 2] = res[..., 3].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
+        betas[2, ..., 3] = res[..., 5].abs().sqrt() * res[..., 2].sign() * res[..., 0].sign()
+        # dim == 4:
+        res = self.solver(l_mat, rho)  # (b, 10)
+        betas[3, ..., 0] = res[..., 9].abs().sqrt() * res[..., 6].sign() * res[..., 0].sign()
+        betas[3, ..., 1] = res[..., 5].abs().sqrt() * res[..., 3].sign() * res[..., 0].sign()
+        betas[3, ..., 2] = res[..., 2].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
+        betas[3, ..., 3] = res[..., 0].abs().sqrt()
+        return betas
 
     @staticmethod
     def _compute_norm_sign_scaling_factor(xc, alphas, points):
