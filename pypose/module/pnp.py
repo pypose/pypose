@@ -159,9 +159,7 @@ class EPnP(torch.nn.Module):
         nullv = self._compute_nullv(pixels, alpha, intrinsics)
         l_mat, rho = self._build_lrho(nullv, bases)
 
-        betas = torch.zeros((4,) + nullv.shape[:-1]).to(nullv)
-        for dim in range(1, 5):  # nullv space dimension of 4 is unstable
-            betas[dim - 1] = self._calculate_beta(dim, l_mat, rho)
+        betas = torch.stack([self._calculate_beta(dim, l_mat, rho) for dim in range(1, 5)])
         solution = self._generate_solution(betas,
                                            nullv.unsqueeze(0),
                                            alpha.unsqueeze(0),
