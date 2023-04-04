@@ -3,9 +3,10 @@ from pathlib import Path
 from typing import Union
 import numpy as np
 import py7zr
+import pypose as pp
 import torchdata
 from torchdata.datapipes.iter import FileOpener, HttpReader, IterableWrapper, \
-    IterDataPipe, Mapper, Zipper
+    IterDataPipe, Mapper, Zipper, IterKeyZipper
 
 collection = [
     "multi_view_training_dslr_undistorted.7z",
@@ -83,6 +84,8 @@ def demux_func(file):
         return 1
     elif 'images.txt' in file:
         return 2
+    elif '.JPG' in file:
+        return 3
     else:
         return None
 
@@ -108,47 +111,63 @@ def load_points(file):
     return point3d_dict
 
 
-def load_image(data):
-    camera, point, (filename, pointer) = data
-    image = pointer.readlines()
-    image = image[4:]  # discard comments
+def colmap2lietensor(x: np.array):
+    return pp.SE3(x[..., [4, 5, 6, 1, 2, 3, 0]])
 
-    for i in range(0, len(image), 2):  # for each image
-        # first line: IMAGE_ID QW QX QY QZ TX TY TZ CAMERA_ID NAME
-        image_rt = np.fromstring(image[i], dtype=np.float32, sep=' ', count=8)[1:]  # (7,)
-        image[i] = image[i].split()
-        image_id = int(image[i][0])
-        camera_id = int(image[i][8])
-        image_name = image[i][9]
-        # second line: POINTS2D[] as (X, Y, POINT3D_ID)
-        image_points = np.fromstring(image[i + 1], dtype=np.float32, sep=' ').reshape(-1, 3)[:,
-                       :2]  # (N, 2)
-        point_ids = np.array([int(i) for i in image[i + 1].split()[2::3]])
-        assert len(point_ids) == len(image_points)
 
-        # for each image, generate a batch of testing samples
-        batched_points2d, batched_points_ids, batched_points_xyz = batches_of_2d_points(
-            image_points, point_ids, point3d_xyz_dict, num_points, batch_size)
+def parse_image(data):
+    (filename, first_line), (_, second_line) = data
+    # first line: IMAGE_ID QW QX QY QZ TX TY TZ CAMERA_ID NAME
+    pose = np.fromstring(first_line, dtype=np.float32, sep=' ', count=8)[1:]  # (7,)
+    first_line = first_line.split()
+    image_id = int(first_line[0])
+    camera_id = int(first_line[8])
+    jpg_name = first_line[9]
 
-        # tile rot and t to batch_size
-        batched_rot = np.tile(rot[None], (batch_size, 1, 1))
-        batched_t = np.tile(t[None], (batch_size, 1))
-        batched_camera_intrinsics = np.tile(camera_data_dict[camera_id][None],
-                                            (batch_size, 1, 1))
+    # second line: POINTS2D[] as (X, Y, POINT3D_ID)
+    pixels = np.fromstring(second_line, dtype=np.float32, sep=' ').reshape(-1, 3)[:,
+             :2]  # (N, 2)
+    point_ids = np.array([int(i) for i in second_line.split()[2::3]])
+    assert len(point_ids) == len(pixels)
+    return dict(image_txt=filename, jpg_name=jpg_name, image_id=image_id,
+                camera_id=camera_id, pixels=pixels, point_ids=point_ids,
+                pose=colmap2lietensor(pose))
+
+    # for each image, generate a batch of testing samples
+    batched_points2d, batched_points_ids, batched_points_xyz = batches_of_2d_points(
+        pixels, point_ids, point3d_xyz_dict, num_points, batch_size)
+
+    # tile rot and t to batch_size
+    batched_rot = np.tile(rot[None], (batch_size, 1, 1))
+    batched_t = np.tile(t[None], (batch_size, 1))
+    batched_camera_intrinsics = np.tile(camera_data_dict[camera_id][None],
+                                        (batch_size, 1, 1))
 
 
 def load_pipe(cache_pipe):
-    camera, point, image = cache_pipe.demux(3, demux_func, drop_none=True)
+    camera, point, image, jpg = cache_pipe.demux(4, demux_func, drop_none=True)
 
-    camera = Mapper(camera, load_camera)
-    point = Mapper(point, load_points)
+    # camera = Mapper(camera, load_camera)
+    # point = Mapper(point, load_points)
     image = FileOpener(image)
 
-    return Zipper(camera, point, image)
+    def append_filename(*args):
+        return tuple
+
+    image = image.readlines(skip_lines=4).batch(2).map(parse_image)
+
+    image_with_jpg = IterKeyZipper(image, jpg,
+                                   key_fn=lambda x: os.path.basename(x['jpg_name']),
+                                   ref_key_fn=os.path.basename,
+                                   merge_fn=lambda x, y: x | {'jpg_path': y},
+                                   keep_key=False)
+    assert len(list(image_with_jpg)) == len(list(jpg)) == len(list(image))
+    return image
+
 
 if __name__ == '__main__':
-
     data_root = 'data_cache_eth3d_dp'
     os.makedirs(data_root, exist_ok=True)
+    # for i in download_pipe(data_root): print(i)
+    img = load_pipe(download_pipe(data_root))
 
-    print(next(iter(load_pipe(download_pipe(data_root)))))
