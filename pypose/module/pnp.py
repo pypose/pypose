@@ -177,33 +177,27 @@ class EPnP(torch.nn.Module):
         if self.refine:
             beta = self._refine(solution['beta'] * solution['scale'].unsqueeze(-1), nullv,
                                 bases)
-            solution = self._generate_solution(beta, nullv, alpha, points, pixels, intrinsics)
+            solution = self._generate_solution(beta, nullv, alpha, points, pixels,
+                                               intrinsics)
 
         return solution['pose']
 
     def _generate_solution(self, beta, nullv, alpha, points, pixels, intrinsics,
                            request_error=True):
-        solution = dict()
-
-        ctrl_pts_c = bmv(nullv.mT, beta)
-        ctrl_pts_c, points_c, sc = self._compute_norm_sign_scaling_factor(ctrl_pts_c, alpha,
-                                                                          points)
+        bases = bmv(nullv.mT, beta)
+        bases, points_c, sc = self._compute_norm_sign_scaling_factor(bases,
+                                                                     alpha,
+                                                                     points)
         pose = self._get_se3(points, points_c)
+        solution = dict(pose=pose, bases=bases, beta=beta, scale=sc)
         if request_error:
             camera = Camera(pose, intrinsics)
             error = camera.reprojection_error(points, pixels)
             solution['error'] = error
-
-        # save the solution
-        solution['pose'] = pose
-        solution['ctrl_pts_c'] = ctrl_pts_c
-        solution['points_c'] = points_c
-        solution['beta'] = beta
-        solution['scale'] = sc
-
         return solution
 
-    def _refine(self, beta, nullv, bases):
+    @staticmethod
+    def _refine(beta, nullv, bases):
         # Refine beta according to Eq 15 in the paper
         model = BetaObjective(beta)
         optim = GaussNewton(model, solver=LSTSQ())
@@ -308,8 +302,8 @@ class EPnP(torch.nn.Module):
         """
         batch = xc.shape[:-1]
         # Calculate the control points and object points in the camera coordinates
-        ctrl_pts_c = xc.reshape((*batch, 4, 3))
-        points_c = alphas @ ctrl_pts_c
+        bases = xc.reshape((*batch, 4, 3))
+        points_c = alphas @ bases
 
         # Calculate the distance of the reference points in the world coordinates
         points_w_centered = points - points.mean(dim=-2, keepdim=True)
@@ -324,8 +318,8 @@ class EPnP(torch.nn.Module):
         sc = 1 / torch.linalg.vecdot(dist_c, dist_c) * torch.linalg.vecdot(dist_c, dist_w)
 
         # Update the control points and the object points in the camera coordinates based on the scaling factors
-        ctrl_pts_c = ctrl_pts_c * sc[..., None, None]
-        points_c = alphas.matmul(ctrl_pts_c)
+        bases = bases * sc[..., None, None]
+        points_c = alphas.matmul(bases)
 
         # Update the control points and the object points in the camera coordinates based on the sign
         neg_z_mask = torch.any(points_c[..., 2] < 0, dim=-1)  # (N, )
@@ -335,7 +329,7 @@ class EPnP(torch.nn.Module):
         negate_switch[neg_z_mask] = negate_switch[neg_z_mask] * -1
         points_c = points_c * negate_switch.reshape(*batch, 1, 1)
         sc = sc * negate_switch
-        return ctrl_pts_c, points_c, sc
+        return bases, points_c, sc
 
     @staticmethod
     def _get_se3(pts_w, pts_c):
