@@ -1,4 +1,5 @@
 import os
+from functools import partial
 from pathlib import Path
 from typing import Union
 import numpy as np
@@ -13,7 +14,7 @@ collection = [
     "multi_view_test_dslr_undistorted.7z",
 ]
 
-scenes = [
+full_scenes = [
     "courtyard_dslr_undistorted.7z",
     "delivery_area_dslr_undistorted.7z",
     "electro_dslr_undistorted.7z",
@@ -52,7 +53,7 @@ class Decompressor7z(IterDataPipe):
                 yield from zip.readall().items()  # key: filename
 
 
-def download_pipe(root: Union[str, Path]):
+def download_pipe(root: Union[str, Path], scenes=full_scenes):
     root = os.fspath(root)
     url_dp = IterableWrapper([base_url + archive_name for archive_name in scenes])
     # download
@@ -66,7 +67,7 @@ def download_pipe(root: Union[str, Path]):
         # for book keeping of the files extracted
     )
     cache_decompressed = Decompressor7z(cache_decompressed).end_caching(
-        filepath_fn=lambda file_path: os.path.join(root, file_path)
+        filepath_fn=partial(os.path.join, root)
     )
     return cache_decompressed
 
@@ -101,7 +102,7 @@ def load_camera(file):
 
 
 def load_points(file):
-    # each row is a point, defined by: POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[] as (IMAGE_ID, POINT2D_IDX)
+    # each row defined by: POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[] as (IMAGE_ID, POINT2D_IDX)
     point3d_ids = np.loadtxt(file, usecols=(0,), dtype=int, ndmin=1)  # (N,)
     point3d_xyz = np.loadtxt(file, usecols=(1, 2, 3), dtype=np.float32, ndmin=2)  # (N, 3)
     point3d_rgb = np.loadtxt(file, usecols=(4, 5, 6), dtype=int, ndmin=2)  # (N, 3)
@@ -116,7 +117,7 @@ def colmap2lietensor(x: np.array):
 
 
 def parse_image(data):
-    (filename, first_line), (_, second_line) = data
+    ((camera, point, filename), first_line), (_, second_line) = data
     # first line: IMAGE_ID QW QX QY QZ TX TY TZ CAMERA_ID NAME
     pose = np.fromstring(first_line, dtype=np.float32, sep=' ', count=8)[1:]  # (7,)
     first_line = first_line.split()
@@ -125,13 +126,12 @@ def parse_image(data):
     jpg_name = first_line[9]
 
     # second line: POINTS2D[] as (X, Y, POINT3D_ID)
-    pixels = np.fromstring(second_line, dtype=np.float32, sep=' ').reshape(-1, 3)[:,
-             :2]  # (N, 2)
+    pixels = np.fromstring(second_line, dtype=np.float32, sep=' ').reshape(-1, 3)[:, :2]
     point_ids = np.array([int(i) for i in second_line.split()[2::3]])
     assert len(point_ids) == len(pixels)
     return dict(image_txt=filename, jpg_name=jpg_name, image_id=image_id,
                 camera_id=camera_id, pixels=pixels, point_ids=point_ids,
-                pose=colmap2lietensor(pose))
+                pose=colmap2lietensor(pose), camera=camera, point=point, )
 
     # for each image, generate a batch of testing samples
     batched_points2d, batched_points_ids, batched_points_xyz = batches_of_2d_points(
@@ -149,11 +149,9 @@ def load_pipe(cache_pipe):
 
     # camera = Mapper(camera, load_camera)
     # point = Mapper(point, load_points)
-    image = FileOpener(image)
-
-    def append_filename(*args):
-        return tuple
-
+    image_file, image_io = FileOpener(image).unzip(2)
+    annotation = Zipper(camera.map(load_camera), point.map(load_points), image_file)
+    image = Zipper(annotation, image_io)
     image = image.readlines(skip_lines=4).batch(2).map(parse_image)
 
     image_with_jpg = IterKeyZipper(image, jpg,
@@ -170,4 +168,3 @@ if __name__ == '__main__':
     os.makedirs(data_root, exist_ok=True)
     # for i in download_pipe(data_root): print(i)
     img = load_pipe(download_pipe(data_root))
-
