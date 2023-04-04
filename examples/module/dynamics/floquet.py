@@ -1,3 +1,4 @@
+import argparse, os
 import torch, pypose as pp
 import math, matplotlib.pyplot as plt
 
@@ -33,18 +34,26 @@ def subPlot(ax, x, y, xlabel=None, ylabel=None):
 
 if __name__ == "__main__":
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    parser = argparse.ArgumentParser(description='Floquet Example')
+    parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
+    parser.add_argument("--save", type=str, default='./examples/module/dynamics/save/', 
+                        help="location of png files to save")
+    parser.add_argument('--show', dest='show', action='store_true',
+                        help="show plot, default: False")
+    parser.set_defaults(show=False)
+    args = parser.parse_args(); print(args)
+    os.makedirs(os.path.join(args.save), exist_ok=True)
 
     N = 100    # Number of time steps
-    time  = torch.arange(0, N, device=device)
+    time  = torch.arange(0, N, device=args.device)
     input = (2 * math.pi * time / 50).sin()
 
-    state = torch.zeros(N, 2, device=device)
-    state[0] = torch.tensor([1., 1.], device=device)
-    obser = torch.zeros(N, 2, device=device)
+    state = torch.zeros(N, 2, device=args.device)
+    state[0] = torch.tensor([1., 1.], device=args.device)
+    obser = torch.zeros(N, 2, device=args.device)
 
     # Calculate trajectory
-    model = Floquet().to(device)
+    model = Floquet().to(args.device)
     for i in range(N - 1):
         state[i + 1], obser[i] = model(state[i], input[i])
 
@@ -64,5 +73,11 @@ if __name__ == "__main__":
     subPlot(ax[1], time, state[:, 1], ylabel='State[1]')
     subPlot(ax[2], time[:-1], obser[:-1, 0], ylabel='Observe[0]')
     subPlot(ax[3], time[:-1], obser[:-1, 1], ylabel='Observe[1]', xlabel='Time')
-    plt.show()
+
+    figure = os.path.join(args.save + 'floquet.png')
+    plt.savefig(figure)
+    print("Saved to", figure)
+
+    if args.show:
+        plt.show()
     
