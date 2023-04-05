@@ -1,4 +1,4 @@
-import torch
+import torch, os
 import numpy as np
 import pypose as pp
 import matplotlib.pyplot as plt
@@ -37,7 +37,7 @@ class Bicycle(pp.module.NLS):
         return state
 
 
-def bicycle_plot(model_name, state, est, cov):
+def bicycle_plot(model_name, state, est, cov, save=None, show=False):
     N = state.shape[0]
     state = state.cpu().numpy()
     est = est.cpu().numpy()
@@ -63,4 +63,11 @@ def bicycle_plot(model_name, state, est, cov):
     est_plot, = ax.plot(est[:, 0], est[:, 1], '.-', label="Estimated State")
     ax.legend(handler_map={est_plot: HandlerLine2D(numpoints=1)})
     plt.title("%s Example" % model_name.upper())
-    plt.show()
+
+    if save is not None:
+        figure = os.path.join(save, model_name + '_bicycle.png')
+        plt.savefig(figure)
+        print("Saved to", figure)
+
+    if show:
+        plt.show()

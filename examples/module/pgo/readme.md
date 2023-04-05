@@ -19,13 +19,13 @@ An example for Pose Graph Optimization (PGO)
 ## Run:
 
 ```bash
-python pgo.py
+python examples/module/pgo/pgo.py
 ```
 
 Or
 
 ```bash
-python pgo.py --device cuda:0 --dataroot DATAROOT
+python examples/module/pgo/pgo.py --device cuda:0 --dataroot DATAROOT
 ```
 
 Note: change `DATAROOT` to the folder you select.
