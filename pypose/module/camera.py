@@ -1,7 +1,26 @@
 import torch
-import pypose as pp
 from torch import nn
 from typing import Optional
+from ..basics import homo2cart
+from .. import LieTensor, Parameter, identity_SE3
+
+
+def camera2pixel(points, intrinsics):
+    return homo2cart(points @ intrinsics.mT)
+
+
+def reprojerr(points, pixels, pose, intrinsics):
+    """
+    Args:
+        points: The object points in world coordinate. The shape is (..., N, 3).
+        pixels: The image points. The shape is (..., N, 2).
+        pose (LieTensor): (..., 7)
+        intrinsics (torch.Tensor): (..., 3, 3)
+    Returns:
+        Per point reprojection error. The shape is (..., N).
+    """
+    img_repj = camera2pixel(pose[..., None, :] @ points, intrinsics)
+    return (img_repj - pixels).norm(dim=-1)
 
 
 class CamerasBase(torch.nn.Module):
@@ -30,9 +49,9 @@ class CamerasBase(torch.nn.Module):
     def __init__(self, pose=None, ):
         super().__init__()
         if pose is not None:
-            self.pose = pp.Parameter(pose)
+            self.pose = Parameter(pose)
         elif self.pose is None:
-            self.pose = pp.Parameter(pp.identity_SE3())
+            self.pose = Parameter(identity_SE3())
 
     def get_camera_center(self):
         """
@@ -75,22 +94,15 @@ class CamerasBase(torch.nn.Module):
         """
         raise NotImplementedError
 
-    def reprojection_error(self, points, pixels):
+    def reprojerr(self, points, pixels):
         """
-        Calculate the reprojection error.
         Args:
             points: The object points in world coordinate. The shape is (..., N, 3).
             pixels: The image points. The shape is (..., N, 2).
         Returns:
-            error: The reprojection error. The shape is (..., ).
+            Per point reprojection error. The shape is (..., N).
         """
-        # Calculate the image points
-        img_repj = self.world2pixel(points)
-
-        error = torch.linalg.norm(img_repj - pixels, dim=-1)
-        error = error.mean(dim=-1)
-
-        return error
+        return reprojerr(points, pixels, self.pose, self.intrinsics)
 
 
 class Camera(CamerasBase):
@@ -130,7 +142,7 @@ class Camera(CamerasBase):
 
     def __init__(
             self,
-            pose: Optional[pp.LieTensor] = None,
+            pose: Optional[LieTensor] = None,
             intrinsics: Optional[torch.Tensor] = None,
     ):
         super().__init__(pose=pose)
@@ -148,5 +160,4 @@ class Camera(CamerasBase):
             points (torch.Tensor): A tensor of shape (B, N, 2) where B is the batch size.
         """
         # this is equivalent to left multiplying the intrinsics to the points
-        img_repj = points.matmul(self.intrinsics.mT)
-        return img_repj[..., :2] / img_repj[..., 2:]
+        return camera2pixel(points, self.intrinsics)

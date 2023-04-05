@@ -1,12 +1,13 @@
 import torch
+from torch import broadcast_shapes
+
 from .. import mat2SE3
 from .. import bmv, bvv
-from .camera import Camera
+from .camera import reprojerr
 from ..basics import cart2homo
 from ..optim import GaussNewton
-from torch import broadcast_shapes
+from ..optim.solver import LSTSQ
 from ..optim.scheduler import StopOnPlateau
-from ..optim.solver import Cholesky, PINV, LSTSQ
 
 
 class BetaObjective(torch.nn.Module):
@@ -178,7 +179,7 @@ class EPnP(torch.nn.Module):
             beta = self._refine(solution['beta'] * solution['scale'].unsqueeze(-1), nullv,
                                 bases)
             solution = self._generate_solution(beta, nullv, alpha, points, pixels,
-                                               intrinsics)
+                                               intrinsics, request_error=False)
 
         return solution['pose']
 
@@ -191,9 +192,7 @@ class EPnP(torch.nn.Module):
         pose = self._get_se3(points, points_c)
         solution = dict(pose=pose, bases=bases, beta=beta, scale=sc)
         if request_error:
-            camera = Camera(pose, intrinsics)
-            error = camera.reprojection_error(points, pixels)
-            solution['error'] = error
+            solution['error'] = reprojerr(points, pixels, pose, intrinsics).mean(dim=-1)
         return solution
 
     @staticmethod
