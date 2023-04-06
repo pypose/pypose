@@ -54,7 +54,7 @@ if __name__ == '__main__':
     args = parser.parse_args(); print(args)
     os.makedirs(os.path.join(args.save), exist_ok=True)
 
-    data = G2OPGO(args.dataroot, args.dataname, device=args.device)
+    data = G2OPGO(args.dataroot, args.dataname, device=args.device, download=True)
     edges, poses, infos = data.edges, data.poses, data.infos
 
     graph = PoseGraph(data.nodes).to(args.device)

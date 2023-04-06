@@ -1,3 +1,5 @@
+from packaging import version
+
 from ._version import __version__
 
 from .lietensor import LieTensor, Parameter, SO3, so3, SE3, se3, Sim3, sim3, RxSO3, rxso3
@@ -14,3 +16,9 @@ from .lietensor import gradcheck, gradgradcheck
 from .lietensor.function import *
 from . import module, optim
 from .basics import *
+
+
+min_torch = '2.0'
+assert version.parse(min_torch) <= version.parse(torch.__version__), \
+    f'PyTorch=={torch.__version__} is used but incompatible. ' \
+    f'Please install torch>={min_torch}.'
