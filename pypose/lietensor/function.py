@@ -4,6 +4,17 @@ from . import LieTensor
 This function file includes functions using LieTensor attributes.
 '''
 
+def islietensor(obj):
+    r'''
+    Check whether an instance or object is a LieTensor or not.
+    Args:
+        obj (``obj``): a Python object or instantance.
+    Return:
+        :obj:``bool``: ``True`` if obj is a LieTensor object otherwise `False`.
+    '''
+    return True if isinstance(obj, LieTensor) else False
+
+
 def bvv(lvec, rvec, *, out=None):
     r'''
     Performs batched vector-vector product, which results in matrices.

@@ -1,25 +1,49 @@
 import torch
 from torch import nn
 from typing import Optional
+from .. import islietensor, bmv
 from ..basics import homo2cart
+from torch import broadcast_shapes
 from .. import LieTensor, Parameter, identity_SE3
 
 
 def camera2pixel(points, intrinsics):
+    r'''
+    Project a set of points in camera frame to pixels.
+    Args:
+        points (``torch.Tensor``): The object points in camera coordinate.
+            The shape has to be (..., N, 3).
+        intrinsics (``torch.Tensor``): The intrinsic matrices of cameras.
+            The shape has to be (..., 3, 3).
+    Returns:
+        pixels: The image points. The associated pixel. The shape has to be (..., N, 2).
+        pose (``LieTensor``): The camera pose. The shape has to be (..., 7)
+    '''
     return homo2cart(points @ intrinsics.mT)
 
 
 def reprojerr(points, pixels, pose, intrinsics):
-    """
+    r'''
+    Performs batched projection for a set of points from the world frame to comera frame
+    and return the reprojection error with respect to the associated pixels, given camera
+    pose and intrinsic matrices. Shape has to be broadcastable.
     Args:
-        points: The object points in world coordinate. The shape is (..., N, 3).
-        pixels: The image points. The shape is (..., N, 2).
-        pose (LieTensor): (..., 7)
-        intrinsics (torch.Tensor): (..., 3, 3)
+        points (``torch.Tensor``): The object points in world coordinate.
+            The shape has to be (..., N, 3).
+        pixels (``torch.Tensor``): The image points. The associated pixel.
+            The shape has to be (..., N, 2).
+        pose (``LieTensor``): The camera pose.
+            The shape has to be (..., 7)
+        intrinsics (``torch.Tensor``): intrinsic matrices.
+            The shape has to be (..., 3, 3)
     Returns:
         Per point reprojection error. The shape is (..., N).
-    """
-    img_repj = camera2pixel(pose[..., None, :] @ points, intrinsics)
+    '''
+    batch = broadcast_shapes(points.shape[:-2], pixels.shape[:-2], \
+                             pose.shape[:-1], intrinsics.shape[:-3])
+    assert points.size(-1) == 3 and pixels.size(-1) == 2 and islietensor(pose) and \
+           intrinsics.size(-1) == intrinsics.size(-2) == 3, "Shape not compatible."
+    img_repj = camera2pixel(pose.unsqueeze(-2) @ points, intrinsics)
     return (img_repj - pixels).norm(dim=-1)
 
 

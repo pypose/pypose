@@ -159,14 +159,35 @@ class EPnP(torch.nn.Module):
         alpha = self._compute_alphas(points, bases)
         nullv = self._compute_nullv(pixels, alpha, intrinsics)
         l_mat, rho = self._build_lrho(nullv, bases)
-
         betas = self._calculate_betas(l_mat, rho)
-        solution = self._generate_solution(betas,
-                                           nullv.unsqueeze(0),
-                                           alpha.unsqueeze(0),
-                                           points.unsqueeze(0),
-                                           pixels.unsqueeze(0),
-                                           intrinsics.unsqueeze(0))
+        pose, scale = self._generate_solution(betas, nullv, alpha, points, pixels, intrinsics)
+
+        solution = dict(pose=pose, beta=betas, scale=scale)
+        # return pose, bases, scale
+        solution['error'] = reprojerr(points, pixels, pose, intrinsics).mean(dim=-1)
+        solution = self._best_solution(batch, solution)
+
+        if self.refine:
+            beta = self._refine(solution['beta'] * solution['scale'].unsqueeze(-1), nullv, bases)
+            pose, scale = self._generate_solution(beta, nullv, alpha, points, pixels,
+                                               intrinsics, request_error=False)
+
+        return pose
+
+    def _generate_solution(self, beta, nullv, alpha, points, pixels, intrinsics,
+                           request_error=True):
+        bases = bmv(nullv.mT, beta)
+        bases, points_c, scale = self._compute_scale(bases, alpha, points)
+        pose = self._get_se3(points, points_c)
+        solution = dict(pose=pose, bases=bases, beta=beta, scale=scale)
+        return pose, scale
+        # return pose=pose, bases=bases, beta=beta, scale=scale
+        if request_error:
+            solution['error'] = reprojerr(points, pixels, pose, intrinsics).mean(dim=-1)
+        return solution
+
+    @staticmethod
+    def _best_solution(batch, solution):
         _, best = torch.min(solution['error'], dim=0)
         for key in solution.keys():
             solution[key] = solution[key].gather(
@@ -174,25 +195,6 @@ class EPnP(torch.nn.Module):
                     (1,) + best.shape + (1,) * (solution[key].dim() - len(batch) - 1)
                 ).expand_as(solution[key][:1])
             ).squeeze(0)
-
-        if self.refine:
-            beta = self._refine(solution['beta'] * solution['scale'].unsqueeze(-1), nullv,
-                                bases)
-            solution = self._generate_solution(beta, nullv, alpha, points, pixels,
-                                               intrinsics, request_error=False)
-
-        return solution['pose']
-
-    def _generate_solution(self, beta, nullv, alpha, points, pixels, intrinsics,
-                           request_error=True):
-        bases = bmv(nullv.mT, beta)
-        bases, points_c, sc = self._compute_scale(bases,
-                                                  alpha,
-                                                  points)
-        pose = self._get_se3(points, points_c)
-        solution = dict(pose=pose, bases=bases, beta=beta, scale=sc)
-        if request_error:
-            solution['error'] = reprojerr(points, pixels, pose, intrinsics).mean(dim=-1)
         return solution
 
     @staticmethod
