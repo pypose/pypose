@@ -151,51 +151,43 @@ class EPnP(torch.nn.Module):
         Returns:
             ``LieTensor``: estimated pose (``SE3type``) for the camera.
         '''
-        intrinsics = self.intrinsics if intrinsics is None else intrinsics
-        batch = broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
+        K = self.intrinsics if intrinsics is None else intrinsics
+        batch = broadcast_shapes(points.shape[:-2], pixels.shape[:-2], K.shape[:-2])
 
         # Select naive and calculate alpha in the world coordinate
         bases = self._svd_basis(points)
         alpha = self._compute_alphas(points, bases)
-        nullv = self._compute_nullv(pixels, alpha, intrinsics)
+        nullv = self._compute_nullv(pixels, alpha, K)
         l_mat, rho = self._build_lrho(nullv, bases)
         betas = self._calculate_betas(l_mat, rho)
-        pose, scale = self._generate_solution(betas, nullv, alpha, points, pixels, intrinsics)
-
-        solution = dict(pose=pose, beta=betas, scale=scale)
-        # return pose, bases, scale
-        solution['error'] = reprojerr(points, pixels, pose, intrinsics).mean(dim=-1)
-        solution = self._best_solution(batch, solution)
+        poses, scales = self._generate_solution(betas, nullv, alpha, points, pixels, K)
+        errors = reprojerr(points, pixels, poses, K)
+        pose, beta, scale = self._best_solution(batch, errors, poses, betas, scales)
 
         if self.refine:
-            beta = self._refine(solution['beta'] * solution['scale'].unsqueeze(-1), nullv, bases)
-            pose, scale = self._generate_solution(beta, nullv, alpha, points, pixels,
-                                               intrinsics, request_error=False)
+            beta = self._refine(beta * scale.unsqueeze(-1), nullv, bases)
+            pose, scale = self._generate_solution(beta, nullv, alpha, points, pixels, K)
 
         return pose
 
-    def _generate_solution(self, beta, nullv, alpha, points, pixels, intrinsics,
-                           request_error=True):
+    def _generate_solution(self, beta, nullv, alpha, points, pixels, intrinsics):
         bases = bmv(nullv.mT, beta)
         bases, points_c, scale = self._compute_scale(bases, alpha, points)
         pose = self._get_se3(points, points_c)
-        solution = dict(pose=pose, bases=bases, beta=beta, scale=scale)
         return pose, scale
-        # return pose=pose, bases=bases, beta=beta, scale=scale
-        if request_error:
-            solution['error'] = reprojerr(points, pixels, pose, intrinsics).mean(dim=-1)
-        return solution
 
     @staticmethod
-    def _best_solution(batch, solution):
-        _, best = torch.min(solution['error'], dim=0)
+    def _best_solution(batch, errors, poses, betas, scales):
+        solution = dict(pose=poses, beta=betas, scale=scales)
+        # return pose, bases, scale
+        _, best = torch.min(errors.mean(dim=-1), dim=0)
         for key in solution.keys():
             solution[key] = solution[key].gather(
                 0, best.view(
                     (1,) + best.shape + (1,) * (solution[key].dim() - len(batch) - 1)
                 ).expand_as(solution[key][:1])
             ).squeeze(0)
-        return solution
+        return solution['pose'], solution['beta'], solution['scale']
 
     @staticmethod
     def _refine(beta, nullv, bases):
