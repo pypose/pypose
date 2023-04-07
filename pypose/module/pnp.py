@@ -152,7 +152,7 @@ class EPnP(torch.nn.Module):
             ``LieTensor``: estimated pose (``SE3type``) for the camera.
         '''
         K = self.intrinsics if intrinsics is None else intrinsics
-        batch = broadcast_shapes(points.shape[:-2], pixels.shape[:-2], K.shape[:-2])
+        broadcast_shapes(points.shape[:-2], pixels.shape[:-2], K.shape[:-2])
 
         # Select naive and calculate alpha in the world coordinate
         bases = self._svd_basis(points)
@@ -162,7 +162,7 @@ class EPnP(torch.nn.Module):
         betas = self._calculate_betas(l_mat, rho)
         poses, scales = self._generate_solution(betas, nullv, alpha, points, pixels, K)
         errors = reprojerr(points, pixels, poses, K)
-        pose, beta, scale = self._best_solution(batch, errors, poses, betas, scales)
+        pose, beta, scale = self._best_solution(errors, poses, betas, scales)
 
         if self.refine:
             beta = self._refine(beta * scale.unsqueeze(-1), nullv, bases)
@@ -177,17 +177,9 @@ class EPnP(torch.nn.Module):
         return pose, scale
 
     @staticmethod
-    def _best_solution(batch, errors, poses, betas, scales):
-        solution = dict(pose=poses, beta=betas, scale=scales)
-        # return pose, bases, scale
-        _, best = torch.min(errors.mean(dim=-1), dim=0)
-        for key in solution.keys():
-            solution[key] = solution[key].gather(
-                0, best.view(
-                    (1,) + best.shape + (1,) * (solution[key].dim() - len(batch) - 1)
-                ).expand_as(solution[key][:1])
-            ).squeeze(0)
-        return solution['pose'], solution['beta'], solution['scale']
+    def _best_solution(errors, poses, betas, scales):
+        _, best = errors.mean(dim=-1).min(dim=-1)
+        return poses[best], betas[best], scales[best]
 
     @staticmethod
     def _refine(beta, nullv, bases):
