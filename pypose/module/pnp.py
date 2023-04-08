@@ -159,19 +159,19 @@ class EPnP(torch.nn.Module):
         bases = self._svd_basis(points)
         alpha = self._compute_alpha(points, bases)
         nullv = self._compute_nullv(pixels, alpha, intrinsics)
-        l_mat, rho = self._build_lrho(nullv, bases)
-        betas = self._calculate_betas(l_mat, rho)
-        poses, scales = self._generate_solution(betas, nullv, alpha, points)
+        l_mat, rho = self._compute_lrho(nullv, bases)
+        betas = self._compute_betas(l_mat, rho)
+        poses, scales = self._compute_solution(betas, nullv, alpha, points)
         errors = reprojerr(points, pixels, poses, intrinsics)
         pose, beta, scale = self._best_solution(errors, poses, betas, scales)
 
         if self.refine:
-            beta = self._refine(beta * scale.unsqueeze(-1), nullv, bases)
-            pose, scale = self._generate_solution(beta, nullv, alpha, points)
+            beta = self._refine(beta * scale, nullv, bases)
+            pose, scale = self._compute_solution(beta, nullv, alpha, points)
 
         return pose
 
-    def _generate_solution(self, beta, nullv, alpha, points):
+    def _compute_solution(self, beta, nullv, alpha, points):
         bases = bmv(nullv.mT, beta)
         bases, transp, scale = self._compute_scale(bases, alpha, points)
         pose = self._points_transform(points, transp)
@@ -182,7 +182,7 @@ class EPnP(torch.nn.Module):
         _, idx = torch.min(errors.mean(dim=-1, keepdim=True), dim=0, keepdim=True)
         pose = poses.gather(0, index=idx.tile(poses.size(-1))).squeeze(0)
         beta = betas.gather(0, index=idx.tile(betas.size(-1))).squeeze(0)
-        scale = scales.gather(0, index=idx.squeeze(-1)).squeeze(0)
+        scale = scales.gather(0, index=idx).squeeze(0)
         return pose, beta, scale
 
     @staticmethod
@@ -237,7 +237,7 @@ class EPnP(torch.nn.Module):
         return torch.gather(eigenvectors, dim=-1, index=index).mT  # (batch, 4, 12)
 
     @staticmethod
-    def _build_lrho(nullv, bases):
+    def _compute_lrho(nullv, bases):
         # prepare l_mat and rho to compute beta
         nullv = nullv.unflatten(dim=-1, sizes=(4, 3))
         i = (1, 2, 3, 2, 3, 3)
@@ -249,7 +249,7 @@ class EPnP(torch.nn.Module):
         m = torch.tensor([1, 2, 1, 2, 2, 1, 2, 2, 2, 1], device=dp.device, dtype=dp.dtype)
         return dp.mT * m, (bases[..., i, :] - bases[..., j, :]).pow(2).sum(-1)
 
-    def _calculate_betas(self, l_mat, rho):
+    def _compute_betas(self, l_mat, rho):
         # Given the L matrix and rho vector, compute the betas vector.
         # Check Eq 10 - 14 in paper.
         # l_mat (..., 6, 10); rho (..., 6); betas (..., 4); return betas (4, ..., 4)
@@ -279,7 +279,7 @@ class EPnP(torch.nn.Module):
     def _compute_scale(bases, alpha, points):
         # Compute the scaling factor and the sign of the scaling factor
         # input:  bases (4, ..., 12); alpha (..., N, 4); points (..., N, 3);
-        # return: bases (4, ..., 4, 3);
+        # return: bases (4, ..., 4, 3); scalep (4, ..., N, 3); scale (4, ..., 1)
         bases = bases.unflatten(-1, (4, 3))
         transp = alpha @ bases # transformed points
         dw = (points - points.mean(dim=-2, keepdim=True)).norm(dim=-1)
@@ -289,7 +289,9 @@ class EPnP(torch.nn.Module):
         scalep = alpha @ bases # scaled transformed points
         mask = torch.any(scalep[..., 2] < 0, dim=-1) # negate when z < 0
         sign = torch.ones_like(scale) - mask * 2     # 1 or -1
-        return bases, scalep * sign[..., None, None], scale * sign
+        scalep = sign[..., None, None] * scalep
+        scale = (sign * scale).unsqueeze(-1)
+        return bases, scalep, scale
 
     @staticmethod
     def _points_transform(pts_w, pts_c):
