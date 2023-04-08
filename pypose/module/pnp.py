@@ -4,11 +4,10 @@ from torch import broadcast_shapes
 
 from .. import mat2SE3
 from .. import bmv, bvv
-from ..function import reprojerr
-from ..basics import cart2homo
 from ..optim import GaussNewton
 from ..optim.solver import LSTSQ
 from ..optim.scheduler import StopOnPlateau
+from ..function import reprojerr, cart2homo
 
 
 class BetaObjective(torch.nn.Module):
