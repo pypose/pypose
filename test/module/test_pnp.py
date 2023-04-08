@@ -2,49 +2,43 @@ import torch, pypose as pp
 from torchvision.datasets.utils import download_and_extract_archive
 
 
-def load_data():
-    download_and_extract_archive('https://github.com/pypose/pypose/releases/'\
-                                 'download/v0.3.6/epnp-test-data.pt.zip', '.')
-    return torch.load('./epnp-test-data.pt')
-
-
-def rmse_rot(pred, gt):
-    diff = pred - gt
-    f_norm = torch.norm(diff, dim=(-2, -1))
-    return f_norm.mean()
-
-
-def rmse_t(pred, gt):
-    diff = pred - gt
-    norm = diff ** 2
-    norm = torch.sum(norm, dim=-1)
-    return norm.mean()
-
-
 class TestEPnP:
+
+    def load_data():
+        download_and_extract_archive('https://github.com/pypose/pypose/releases/'\
+                                    'download/v0.3.6/epnp-test-data.pt.zip', \
+                                    './test/module')
+        return torch.load('./test/module/epnp-test-data.pt')
+
     def test_epnp_nonbatch(self):
-        data = load_data()
+        data = self.load_data()
         epnp = pp.module.EPnP()
-        solution_non_batch = epnp(data['objPts'][0], data['imgPts'][0], data['camMat'][0])
-        solution_batch = epnp(data['objPts'], data['imgPts'], data['camMat'])
-        assert torch.allclose(solution_non_batch.rotation().matrix(), solution_batch.rotation().matrix()[0])
+        # data['objPts'][0], data['imgPts'][0], data['camMat'][0]
+        points = data['objPts'].unsqueeze(0)
+        pixels = data['imgPts'].unsqueeze(0)
+        intrincis = data['camMat'].unsqueeze(0)
+        pose_non_batch = epnp(points, pixels, intrincis)
+        pose_batch = epnp(data['objPts'], data['imgPts'], data['camMat'])
+        assert torch.allclose(pose_non_batch, pose_batch[0])
 
 
     def test_epnp_highdim(self):
-        data = load_data()
+        data = self.load_data()
         epnp = pp.module.EPnP()
         # batch shape: [3, 2, ...]
-        solution_highdim = epnp(data['objPts'][None][[0, 0, 0]], data['imgPts'][None][[0, 0, 0]], data['camMat'][None][[0, 0, 0]])
-        # batch shape: [2, ...]
+        points = data['objPts'][None][[0, 0, 0]]
+        pixels = data['imgPts'][None][[0, 0, 0]]
+        intrincis = data['camMat'][None][[0, 0, 0]]
+        solution_highdim = epnp(points, pixels, intrincis)
         solution_lowdim = epnp(data['objPts'], data['imgPts'], data['camMat'])
-
         assert solution_highdim[0].shape == solution_lowdim.shape
-        assert torch.allclose(solution_highdim.rotation().matrix()[0], solution_lowdim.rotation().matrix())
+        assert torch.allclose(solution_highdim[0], solution_lowdim)
 
 
     def test_epnp_6pts(self):
         # create some random test sample for a single camera
-        pose = pp.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239]).to(torch.float64)
+        pose = pp.SE3([ 0.0000, -8.0000,  0.0000,
+                        0.0000, -0.3827,  0.0000,  0.9239]).to(torch.float64)
         f, img_size = 2, (9, 9)
         projection = torch.tensor([[f, 0, img_size[0] / 2],
                                    [0, f, img_size[1] / 2],
@@ -66,43 +60,36 @@ class TestEPnP:
         torch.testing.assert_close(solved_pose, pose, rtol=1e-4, atol=1e-4)
 
     def test_epnp_random(self):
-        def solution_opencv(obj_pts, img_pts, intrinsics):
-            distortion = None
-            # results given by cv2.solvePnP(obj_pts, img_pts, intrinsics, distortion, flags=cv2.SOLVEPNP_EPNP)
-            rvec = torch.tensor([[-0.37279579],
-                                 [0.09247041],
-                                 [-0.82372009]])
-            t = torch.tensor([[-0.07126862],
-                              [-0.22845308],
-                              [6.92614964]])
-            rot = torch.tensor([[0.67947332, 0.69882627, 0.22351252],
+        # results given by cv2.solvePnP(obj_pts, img_pts, intrinsics, \
+        #                               distortion, flags=cv2.SOLVEPNP_EPNP)
+        t_ref = torch.tensor([-0.07126862, -0.22845308, 6.92614964])
+        rot_ref = torch.tensor([[0.67947332,  0.69882627, 0.22351252],
                                 [-0.73099025, 0.61862761, 0.28801584],
                                 [0.06300202, -0.35908455, 0.93117615]])
-            Rt = torch.concatenate((rot.reshape((3, 3)), t.reshape((3, 1))), dim=1)
 
-            obj_pts = obj_pts.to(torch.float32)
-            img_pts = img_pts.to(torch.float32)
-            intrinsics = intrinsics.to(torch.float32)
-
-            rot = Rt[..., :3, :3]
-            t = Rt[..., :3, 3]
-            pose = pp.mat2SE3(Rt)
-            error = pp.reprojerr(obj_pts, img_pts, intrinsics, pose)
-            return dict(Rt=Rt, error=error, R=rot, T=t)
-
-        data = load_data()
-
+        data = self.load_data()
         epnp = pp.module.EPnP()
-        solution = epnp(data['objPts'], data['imgPts'], data['camMat'])
-        solution_ref = solution_opencv(data['objPts'][0], data['imgPts'][0], data['camMat'][0])
+        pose = epnp(data['objPts'], data['imgPts'], data['camMat'])
+        rot = pose.rotation().matrix()
+        t = pose.translation()
         gt_rot = data['Rt'][..., :3, :3]
         gt_t = data['Rt'][..., :3, 3]
 
-        print("Pypose EPnP solution, rmse of R:", rmse_rot(solution.rotation().matrix(), gt_rot))
-        print("Pypose EPnP solution, rmse of t:", rmse_t(solution.translation(), gt_t))
+        def rmse_rot(pred, gt):
+            diff = pred - gt
+            f_norm = torch.norm(diff, dim=(-2, -1))
+            return f_norm.mean()
 
-        print("OpenCV EPnP solution, rmse of R:", rmse_rot(solution_ref['R'], gt_rot))
-        print("OpenCV EPnP solution, rmse of t:", rmse_t(solution_ref['T'], gt_t))
+        def rmse_t(pred, gt):
+            diff = pred - gt
+            norm = diff ** 2
+            norm = torch.sum(norm, dim=-1)
+            return norm.mean()
+
+        print("Pypose EPnP solution, rmse of R:", rmse_rot(rot, gt_rot))
+        print("Pypose EPnP solution, rmse of t:", rmse_t(t, gt_t))
+        print("OpenCV EPnP solution, rmse of R:", rmse_rot(rot_ref, gt_rot))
+        print("OpenCV EPnP solution, rmse of t:", rmse_t(t_ref, gt_t))
 
 
 if __name__ == "__main__":
