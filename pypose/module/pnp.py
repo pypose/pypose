@@ -1,4 +1,5 @@
 import torch
+from torch.linalg import vecdot
 from torch import broadcast_shapes
 
 from .. import mat2SE3
@@ -151,29 +152,29 @@ class EPnP(torch.nn.Module):
         Returns:
             ``LieTensor``: estimated pose (``SE3type``) for the camera.
         '''
-        K = self.intrinsics if intrinsics is None else intrinsics
-        broadcast_shapes(points.shape[:-2], pixels.shape[:-2], K.shape[:-2])
+        intrinsics = self.intrinsics if intrinsics is None else intrinsics
+        broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
 
         # Select naive and calculate alpha in the world coordinate
         bases = self._svd_basis(points)
-        alpha = self._compute_alphas(points, bases)
-        nullv = self._compute_nullv(pixels, alpha, K)
+        alpha = self._compute_alpha(points, bases)
+        nullv = self._compute_nullv(pixels, alpha, intrinsics)
         l_mat, rho = self._build_lrho(nullv, bases)
         betas = self._calculate_betas(l_mat, rho)
-        poses, scales = self._generate_solution(betas, nullv, alpha, points, pixels, K)
-        errors = reprojerr(points, pixels, poses, K)
+        poses, scales = self._generate_solution(betas, nullv, alpha, points)
+        errors = reprojerr(points, pixels, poses, intrinsics)
         pose, beta, scale = self._best_solution(errors, poses, betas, scales)
 
         if self.refine:
             beta = self._refine(beta * scale.unsqueeze(-1), nullv, bases)
-            pose, scale = self._generate_solution(beta, nullv, alpha, points, pixels, K)
+            pose, scale = self._generate_solution(beta, nullv, alpha, points)
 
         return pose
 
-    def _generate_solution(self, beta, nullv, alpha, points, pixels, intrinsics):
+    def _generate_solution(self, beta, nullv, alpha, points):
         bases = bmv(nullv.mT, beta)
-        bases, points_c, scale = self._compute_scale(bases, alpha, points)
-        pose = self._get_se3(points, points_c)
+        bases, transp, scale = self._compute_scale(bases, alpha, points)
+        pose = self._points_transform(points, transp)
         return pose, scale
 
     @staticmethod
@@ -204,7 +205,7 @@ class EPnP(torch.nn.Module):
         return torch.cat([center, controls], dim=-2)
 
     @staticmethod
-    def _compute_alphas(points, bases):
+    def _compute_alpha(points, bases):
         # Compute weights (..., N, 4) corresponded to bases (..., N, 4)
         # for points (..., N, 3). Check equation 1 in paper for details.
         points, bases = cart2homo(points), cart2homo(bases)
@@ -251,64 +252,47 @@ class EPnP(torch.nn.Module):
     def _calculate_betas(self, l_mat, rho):
         # Given the L matrix and rho vector, compute the betas vector.
         # Check Eq 10 - 14 in paper.
-        # l_mat (..., 6, 10); rho (..., 6); betas (..., 4)
-        # return betas (4, ..., 4)
-        betas = torch.zeros((4,) + rho.shape[:-1] + (4,), device=rho.device, dtype=rho.dtype)
+        # l_mat (..., 6, 10); rho (..., 6); betas (..., 4); return betas (4, ..., 4)
+        betas = torch.zeros((4,)+rho.shape[:-1]+(4,), device=rho.device, dtype=rho.dtype)
         # dim == 1:
         betas[0, ..., -1] = 1
         # dim == 2:
         L = l_mat[..., (5, 8, 9)]
-        res = self.solver(L, rho)  # (b, 3)
-        betas[1, ..., 2] = res[..., 0].abs().sqrt()
-        betas[1, ..., 3] = res[..., 2].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
+        S = self.solver(L, rho)  # (b, 3)
+        betas[1, ..., 2] = S[..., 0].abs().sqrt()
+        betas[1, ..., 3] = S[..., 2].abs().sqrt() * S[..., 1].sign() * S[..., 0].sign()
         # dim == 3:
         L = l_mat[..., (2, 4, 7, 5, 8, 9)]
-        res = self.solver(L, rho)  # (b, 6)
-        betas[2, ..., 1] = res[..., 0].abs().sqrt()
-        betas[2, ..., 2] = res[..., 3].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
-        betas[2, ..., 3] = res[..., 5].abs().sqrt() * res[..., 2].sign() * res[..., 0].sign()
+        S = self.solver(L, rho)  # (b, 6)
+        betas[2, ..., 1] = S[..., 0].abs().sqrt()
+        betas[2, ..., 2] = S[..., 3].abs().sqrt() * S[..., 1].sign() * S[..., 0].sign()
+        betas[2, ..., 3] = S[..., 5].abs().sqrt() * S[..., 2].sign() * S[..., 0].sign()
         # dim == 4:
-        res = self.solver(l_mat, rho)  # (b, 10)
-        betas[3, ..., 0] = res[..., 9].abs().sqrt() * res[..., 6].sign() * res[..., 0].sign()
-        betas[3, ..., 1] = res[..., 5].abs().sqrt() * res[..., 3].sign() * res[..., 0].sign()
-        betas[3, ..., 2] = res[..., 2].abs().sqrt() * res[..., 1].sign() * res[..., 0].sign()
-        betas[3, ..., 3] = res[..., 0].abs().sqrt()
+        S = self.solver(l_mat, rho)  # (b, 10)
+        betas[3, ..., 0] = S[..., 9].abs().sqrt() * S[..., 6].sign() * S[..., 0].sign()
+        betas[3, ..., 1] = S[..., 5].abs().sqrt() * S[..., 3].sign() * S[..., 0].sign()
+        betas[3, ..., 2] = S[..., 2].abs().sqrt() * S[..., 1].sign() * S[..., 0].sign()
+        betas[3, ..., 3] = S[..., 0].abs().sqrt()
         return betas
 
     @staticmethod
-    def _compute_scale(xc, alphas, points):
-        """Compute the scaling factor and the sign of the scaling factor
-
-        Args:
-            xc (torch.tensor): the (unscaled) control points in the camera coordinates
-            alphas (torch.tensor): the weights to recover the object points
-            points (torch.tensor): the points in the world coordinates
-        Returns:
-            Tuple[torch.tensor]: bases in the camera coordinate,
-            points in the camera coordinate, and the scale
-        """
-        bases = xc.unflatten(-1, (4, 3))
-        points_c = alphas @ bases
-
-        # distance in the world coordinates
-        points_w_centered = points - points.mean(dim=-2, keepdim=True)
-        dist_w = points_w_centered.norm(dim=-1)
-        # distance in the camera coordinates
-        points_c_centered = points_c - points_c.mean(dim=-2, keepdim=True)
-        dist_c = points_c_centered.norm(dim=-1)
-
-        sc = 1 / torch.linalg.vecdot(dist_c, dist_c) * torch.linalg.vecdot(dist_c, dist_w)
-        # the real position
-        bases = bases * sc[..., None, None]
-        points_c = alphas @ bases
-
-        # negate when z < 0
-        neg_z_mask = torch.any(points_c[..., 2] < 0, dim=-1)  # (batch, )
-        negate_switch = torch.ones_like(sc) - neg_z_mask * 2
-        return bases, points_c * negate_switch[..., None, None], sc * negate_switch
+    def _compute_scale(bases, alpha, points):
+        # Compute the scaling factor and the sign of the scaling factor
+        # input:  bases (4, ..., 12); alpha (..., N, 4); points (..., N, 3);
+        # return: bases (4, ..., 4, 3);
+        bases = bases.unflatten(-1, (4, 3))
+        transp = alpha @ bases # transformed points
+        dw = (points - points.mean(dim=-2, keepdim=True)).norm(dim=-1)
+        dc = (transp - transp.mean(dim=-2, keepdim=True)).norm(dim=-1)
+        scale = vecdot(dc, dw) / vecdot(dc, dc)
+        bases = bases * scale[..., None, None] # the real position
+        scalep = alpha @ bases # scaled transformed points
+        mask = torch.any(scalep[..., 2] < 0, dim=-1) # negate when z < 0
+        sign = torch.ones_like(scale) - mask * 2     # 1 or -1
+        return bases, scalep * sign[..., None, None], scale * sign
 
     @staticmethod
-    def _get_se3(pts_w, pts_c):
+    def _points_transform(pts_w, pts_c):
         # Get transform for two associated batched point sets.
         Cw = pts_w.mean(dim=-2, keepdim=True)
         Pw = pts_w - Cw
