@@ -134,5 +134,6 @@ class TestEPnP:
 if __name__ == "__main__":
     epnp_fixture = TestEPnP()
     epnp_fixture.test_epnp_nonbatch()
+    epnp_fixture.test_epnp_highdim()
     epnp_fixture.test_epnp_6pts()
     epnp_fixture.test_epnp_random()

@@ -178,8 +178,11 @@ class EPnP(torch.nn.Module):
 
     @staticmethod
     def _best_solution(errors, poses, betas, scales):
-        _, best = errors.mean(dim=-1).min(dim=-1)
-        return poses[best], betas[best], scales[best]
+        _, idx = torch.min(errors.mean(dim=-1, keepdim=True), dim=0, keepdim=True)
+        pose = poses.gather(0, index=idx.tile(poses.size(-1))).squeeze(0)
+        beta = betas.gather(0, index=idx.tile(betas.size(-1))).squeeze(0)
+        scale = scales.gather(0, index=idx.squeeze(-1)).squeeze(0)
+        return pose, beta, scale
 
     @staticmethod
     def _refine(beta, nullv, bases):

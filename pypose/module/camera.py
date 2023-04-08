@@ -40,7 +40,7 @@ def reprojerr(points, pixels, pose, intrinsics):
         Per point reprojection error. The shape is (..., N).
     '''
     batch = broadcast_shapes(points.shape[:-2], pixels.shape[:-2], \
-                             pose.shape[:-1], intrinsics.shape[:-3])
+                             pose.shape[:-1], intrinsics.shape[:-2])
     assert points.size(-1) == 3 and pixels.size(-1) == 2 and islietensor(pose) and \
            intrinsics.size(-1) == intrinsics.size(-2) == 3, "Shape not compatible."
     img_repj = camera2pixel(pose.unsqueeze(-2) @ points, intrinsics)
