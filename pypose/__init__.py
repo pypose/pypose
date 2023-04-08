@@ -15,6 +15,7 @@ from .lietensor import mat2SO3, mat2SE3, mat2Sim3, mat2RxSO3, from_matrix, matri
 from .lietensor import gradcheck, gradgradcheck
 from .lietensor.function import *
 from . import module, optim
+from .function import *
 from .basics import *
 
 

@@ -4,7 +4,7 @@ from torch import broadcast_shapes
 
 from .. import mat2SE3
 from .. import bmv, bvv
-from .camera import reprojerr
+from ..function import reprojerr
 from ..basics import cart2homo
 from ..optim import GaussNewton
 from ..optim.solver import LSTSQ
@@ -97,7 +97,7 @@ class EPnP(torch.nn.Module):
         ...                        [0., 0., 1.],
         ...                        [1., 0., 1.],
         ...                        [5., 5., 3.]])
-        >>> pixels = pp.camera2pixel(object, intrinsics)
+        >>> pixels = pp.point2pixel(object, intrinsics)
         >>> pose = pp.SE3([ 0., -8,  0.,  0., -0.3827,  0.,  0.9239])
         >>> points = pose.Inv() @ object
         ...
@@ -160,7 +160,7 @@ class EPnP(torch.nn.Module):
         l_mat, rho = self._compute_lrho(nullv, bases)
         betas = self._compute_betas(l_mat, rho)
         poses, scales = self._compute_solution(betas, nullv, alpha, points)
-        errors = reprojerr(points, pixels, poses, intrinsics)
+        errors = reprojerr(points, pixels, intrinsics, poses)
         pose, beta, scale = self._best_solution(errors, poses, betas, scales)
 
         if self.refine:

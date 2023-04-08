@@ -17,4 +17,3 @@ Modules
    module.LQR
    module.IMUPreintegrator
    module.EPnP
-   module.PerspectiveCameras

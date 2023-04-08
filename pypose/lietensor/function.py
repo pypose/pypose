@@ -4,7 +4,7 @@ from . import LieTensor
 This function file includes functions using LieTensor attributes.
 '''
 
-def islietensor(obj):
+def is_lietensor(obj):
     r'''
     Check whether an instance or object is a LieTensor or not.
     Args:

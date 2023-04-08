@@ -2,32 +2,6 @@ import torch, pypose as pp
 from torchvision.datasets.utils import download_and_extract_archive
 
 
-def reprojection_error(pts_w, img_pts, intrinsics, rt):
-    """
-    Calculate the reprojection error.
-    Args:
-        pts_w: The object points in world coordinate. The shape is (..., N, 3).
-        img_pts: The image points. The shape is (..., N, 2).
-        intrinsics: The camera matrix. The shape is (..., 3, 3).
-        rt: The rotation matrix and translation vector. The shape is (..., 3, 4).
-    Returns:
-        error: The reprojection error. The shape is (..., ).
-    """
-    proj_mat = intrinsics[..., :3] @ rt
-    # concat 1 to the last column of objPts_w
-    obj_pts_w_ex = torch.cat((pts_w, torch.ones_like(pts_w[..., :1])), dim=-1)
-    # Calculate the image points
-    img_repj = obj_pts_w_ex @ proj_mat.mT
-
-    # Normalize the image points
-    img_repj = img_repj[..., :2] / img_repj[..., 2:]
-
-    error = torch.linalg.norm(img_repj - img_pts, dim=-1)
-    error = torch.mean(error, dim=-1)
-
-    return error
-
-
 def load_data():
     download_and_extract_archive('https://github.com/pypose/pypose/releases/'\
                                  'download/v0.3.6/epnp-test-data.pt.zip', '.')
@@ -112,8 +86,8 @@ class TestEPnP:
 
             rot = Rt[..., :3, :3]
             t = Rt[..., :3, 3]
-
-            error = reprojection_error(obj_pts, img_pts, intrinsics, Rt)
+            pose = pp.mat2SE3(Rt)
+            error = pp.reprojerr(obj_pts, img_pts, intrinsics, pose)
             return dict(Rt=Rt, error=error, R=rot, T=t)
 
         data = load_data()
