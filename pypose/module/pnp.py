@@ -107,7 +107,7 @@ class EPnP(torch.nn.Module):
                     3.6321e-06,  9.2387e-01])
 
     Warning:
-        Currently this module only support batched rectified camera intrinsics, which can
+        Currently this module only supports batched rectified camera intrinsics, which can
         be defined in the form:
 
         .. math::
