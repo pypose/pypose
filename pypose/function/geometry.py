@@ -49,7 +49,7 @@ def reprojerr(points, pixels, intrinsics, extrinsics):
     '''
     broadcast_shapes(points.shape[:-2], pixels.shape[:-2], \
                      extrinsics.shape[:-1], intrinsics.shape[:-2])
-    assert points.size(-1) == 3 and pixels.size(-1) == 2 and is_lietensor(extrinsics) and \
-           intrinsics.size(-1) == intrinsics.size(-2) == 3, "Shape not compatible."
+    assert points.size(-1) == 3 and pixels.size(-1) == 2 and is_lietensor(extrinsics) \
+        and intrinsics.size(-1) == intrinsics.size(-2) == 3, "Shape not compatible."
     img_repj = point2pixel(points, intrinsics, extrinsics)
     return (img_repj - pixels).norm(dim=-1)
