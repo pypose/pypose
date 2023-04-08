@@ -1,7 +1,20 @@
 import torch
 from ..basics import pm
-from .. import is_lietensor
+from .. import LieTensor
 from torch import broadcast_shapes
+
+
+def is_lietensor(obj):
+    r'''
+    Check whether an instance or object is a LieTensor or not.
+
+    Args:
+        obj (``obj``): a Python object or instantance.
+
+    Return:
+        ``bool``: ``True`` if obj is a LieTensor object otherwise ``False``.
+    '''
+    return True if isinstance(obj, LieTensor) else False
 
 
 def cart2homo(coordinates:torch.Tensor):
@@ -65,9 +78,9 @@ def point2pixel(points, intrinsics, extrinsics=None):
     Args:
         points (``torch.Tensor``): The object points in camera coordinate.
             The shape has to be (..., N, 3).
-        intrinsics (``torch.Tensor``): The intrinsic matrices of cameras.
+        intrinsics (``torch.Tensor``): The intrinsic parameters of cameras.
             The shape has to be (..., 3, 3).
-        extrinsics (``pypose.LieTensor``, optional): The extrinsic transform of cameras.
+        extrinsics (``pypose.LieTensor``, optional): The extrinsic parameters of cameras.
             The shape has to be (..., 7). If ``None``, the points are assumed to be in
             the camera frame, otherwise in the world frame. Default: ``None``.
 
@@ -84,10 +97,8 @@ def point2pixel(points, intrinsics, extrinsics=None):
 
 def reprojerr(points, pixels, intrinsics, extrinsics):
     r'''
-    Performs batched re-projection and returns the per-pixel error (distance).
-
-    Calculate the reprojection error for points in the world coordinate and their
-    associated pixels, given camera pose and intrinsic matrices.
+    Calculates batched per-pixel reprojection error (distance) for points in the world
+    coordinate, given camera intrinsic and extrinsic parameters.
 
     Args:
         points (``torch.Tensor``): The object points in world coordinate.
