@@ -28,37 +28,41 @@ class BetaObjective(torch.nn.Module):
 
 
 class EPnP(torch.nn.Module):
-    r"""
-    EPnP Solver - a non-iterative O(n) solution to the PnP problem for :math:`n \geq 4`.
+    r'''
+    Batched EPnP Solver - a non-iterative :math:`\mathcal{O}(n)` solution to the
+    Perspective-:math:`n`-Point (PnP) problem for :math:`n \geq 4`.
 
-    As an overview of the process, first define each of the n points in the world
-    coordinate as :math:`p^w_i` and their corresponding position in camera coordinate
-    as :math:`p^c_i`.
-    They are represented by weighted sums of the four selected controls points,
-    :math:`c^w_j` and :math:`c^c_j` in camera coordinate respectively.
+    Args:
+        intrinsics (``torch.Tensor``, optional): The camera intrinsics.
+            The shape is (..., 3, 3). Default: None
+        refine (``bool``, optional): refine the solution with Gaussian-Newton optimizer.
+            Default: ``True``.
+
+    Assume each of the :math:`n` points in the world coordinate is :math:`p^w_i` and in
+    camera coordinate is :math:`p^c_i`.
+    They are represented by weighted sums of the four virtual control points,
+    :math:`c^w_j` and :math:`c^c_j` in the world and camera coordinate, respectively.
+
+    .. math::
+        \begin{aligned}
+            & p^w_i = \sum^4_{j=1}{\alpha_{ij}c^w_j} \\
+            & p^c_i = \sum^4_{j=1}{\alpha_{ij}c^c_j} \\
+            & \sum^4_{j=1}{\alpha_{ij}} = 1
+        \end{aligned}
+
     Let the projection matrix be :math:`P = K[R|T]`, where :math:`K` is the camera
-    intrinsic matrix, :math:`R` is the rotation matrix and :math:`T` is the translation
-    vector.
+    intrinsics, :math:`R` is the rotation matrix and :math:`T` is the translation
+    vector. Then we have
 
     .. math::
         \begin{aligned}
-            p^w_i &= \sum^4_{j=1}{\alpha_{ij}c^w_j} \\
-            p^c_i &= \sum^4_{j=1}{\alpha_{ij}c^c_j} \\
-            \sum^4_{j=1}{\alpha_{ij}} &= 1
+            s_i p^{\text{img}}_i &= K\sum^4_{j=1}{\alpha_{ij}c^c_j},
         \end{aligned}
 
-    From this, the derivation of the points projection equations is as follows:
-
-    .. math::
-        \begin{aligned}
-            s_i\,p^{img}_i &= K\sum^4_{j=1}{\alpha_{ij}c^c_j}
-        \end{aligned}
-
-    Where :math:`p^{img}_i` is the projected image pixels in form :math:`(u_i, v_i, 1)`,
+    where :math:`p^{\text{img}}_i` is pixels in homogeneous form :math:`(u_i, v_i, 1)`,
     :math:`s_i` is the scale factor. Let the control point in camera coordinate
-    represented by :math:`c^c_j = (x^c_j, y^c_j, z^c_j)`.
-    Rearranging the image point equation yields the following two linear equations for
-    each of the n points:
+    represented by :math:`c^c_j = (x^c_j, y^c_j, z^c_j)`. Rearranging the projection
+    equation yields two linear equations for each of the :math:`n` points:
 
     .. math::
         \begin{aligned}
@@ -66,71 +70,63 @@ class EPnP(torch.nn.Module):
             \sum^4_{j=1}{\alpha_{ij}f_yy^c_j + \alpha_{ij}(v_0 - v_i)z^c_j} &= 0
         \end{aligned}
 
-    Using these two equations for each of the n points, the system :math:`Mx = 0` can be
-    formed where
-    :math:`x = \begin{bmatrix}c^{c^T}_1 & c^{c^T}_2 & c^{c^T}_3 & c^{c^T}_4\end{bmatrix}^T`.
-    The solution for the control points exists in the kernel space of :math:`M` and is
-    expressed as
+    Assume :math:`\mathbf{x} = \begin{bmatrix} c^{c^T}_1 & c^{c^T}_2 & c^{c^T}_3 &
+    c^{c^T}_4 \end{bmatrix}^T`, then the two equations form a system :math:`Mx = 0`
+    considering all of the :math:`n` points. Its solution can be expressed as
 
     .. math::
         \begin{aligned}
-            x &= \sum^N_{i=1}{\beta_iv_i}
+            x &= \sum^4_{i=1}{\beta_iv_i},
         \end{aligned}
 
-    where N (4) is the number of singular values in M and each :math:`v_i` is the
-    corresponding right singular vector of :math:`M`. The final step involves calculating
-    the coefficients :math:`\beta_i`. Optionally, the Gauss-Newton algorithm is used to
-    refine them. The camera pose that minimize the error of transforming the world
-    coordinate points, :math:`p^w_i`, to image coordinate points, :math:`p^c_i` which is
-    known as long as :math:`c^{c^T}_4` is known, are then calculated.
+    where :math:`v_i` is the null vectors of matrix :math:`M^T M` corresponding to its
+    least 4 eigenvalues.
 
-    Args:
-        refine (Optional[torch.optim.Optimizer]): Optimizer to refine the solution.
-            Set to ``None`` to disable refinement.
-        intrinsics (Optional[torch.Tensor]): The camera intrinsics. The shape is (3, 3).
+    The final step involves calculating the coefficients :math:`\beta_i`. Optionally, the
+    Gauss-Newton algorithm can be used to refine the solution of :math:`\beta_i`.
 
-    Examples:
+    Example:
         >>> import torch, pypose as pp
-        >>> # create some random test sample for a single camera
-        >>> pose = pp.SE3([ 0.0000, -8.0000,  0.0000,  0.0000, -0.3827,  0.0000,  0.9239])
-        >>> f, img_size = 2, (9, 9)
-        >>> projection = torch.tensor([[f, 0, img_size[0] / 2],
-        ...                            [0, f, img_size[1] / 2],
-        ...                            [0, 0, 1              ]])
-        >>> # some random points in the view
-        >>> pts_c = torch.tensor([[2., 0., 2.],
-        ...                       [1., 0., 2.],
-        ...                       [0., 1., 1.],
-        ...                       [0., 0., 1.],
-        ...                       [1., 0., 1.],
-        ...                       [5., 5., 3.]])
-        >>> pixels = pp.homo2cart(pts_c @ projection.T)
-        >>> pixels
-        tensor([[6.5000, 4.5000],
-                [5.5000, 4.5000],
-                [4.5000, 6.5000],
-                [4.5000, 4.5000],
-                [6.5000, 4.5000],
-                [7.8333, 7.8333]])
-        >>> # transform the points to world coordinate
-        >>> # solve the PnP problem to find the camera pose
-        >>> pts_w = pose.Inv().Act(pts_c)
-        >>> # solve the PnP problem
-        >>> epnp = pp.module.EPnP(intrinsics=projection)
-        >>> pose = epnp(pts_w, pixels)
-        >>> pose
+        >>> f, (H, W) = 2, (9, 9) # focal length and image height, width
+        >>> intrinsics = torch.tensor([[f, 0, H / 2],
+        ...                            [0, f, W / 2],
+        ...                            [0, 0,   1  ]])
+        >>> object = torch.tensor([[2., 0., 2.],
+        ...                        [1., 0., 2.],
+        ...                        [0., 1., 1.],
+        ...                        [0., 0., 1.],
+        ...                        [1., 0., 1.],
+        ...                        [5., 5., 3.]])
+        >>> pixels = pp.camera2pixel(object, intrinsics)
+        >>> pose = pp.SE3([ 0., -8,  0.,  0., -0.3827,  0.,  0.9239])
+        >>> points = pose.Inv() @ object
+        ...
+        >>> epnp = pp.module.EPnP(intrinsics)
+        >>> pose = epnp(points, pixels)
         SE3Type LieTensor:
-        LieTensor([ 7.3552e-05, -8.0000e+00,  1.4997e-04, -8.1382e-06, -3.8271e-01,
-                    5.6476e-06,  9.2387e-01])
+        LieTensor([ 3.9816e-05, -8.0000e+00,  5.8174e-05, -3.3186e-06, -3.8271e-01,
+                    3.6321e-06,  9.2387e-01])
+
+    Warning:
+        Currently this module only support batched rectified camera intrinsics, which can
+        be defined in the form:
+
+        .. math::
+            K = \begin{pmatrix}
+                    f_x &   0 & c_x \\
+                    0   & f_u & c_y \\
+                    0   &   0 &   1
+                \end{pmatrix}
+
+        The full form of camera intrinsics will be supported in a future release.
 
     Note:
         The implementation is based on the paper
 
-        * Francesc Moreno-Noguer, Vincent Lepetit, and Pascal Fua, `Accurate
-          Non-Iterative O(n) Solution to the PnP Problem
-          <https://github.com/cvlab-epfl/EPnP>`_, In Proceedings of ICCV, 2007.
-    """
-
+        * Francesc Moreno-Noguer, Vincent Lepetit, and Pascal Fua, `EPnP: An Accurate O(n)
+          Solution to the PnP Problem <https://doi.org/10.1007/s11263-008-0152-6>`_,
+          International Journal of Computer Vision (IJCV), 2009.
+    '''
     def __init__(self, intrinsics=None, refine=True):
         super().__init__()
         self.refine = refine
@@ -145,13 +141,15 @@ class EPnP(torch.nn.Module):
                 Shape (..., n, 3)
             pixels (``torch.Tensor``): 2D image points, which are the projection of
                 object points. Shape (..., n, 2)
-            intrinsics (``Optional[torch.Tensor]``): camera intrinsics. Shape (..., 3, 3).
+            intrinsics (torch.Tensor, optional): camera intrinsics. Shape (..., 3, 3).
                 Setting it to any non-``None`` value will override the default intrinsics
                 kept in the module.
 
         Returns:
             ``LieTensor``: estimated pose (``SE3type``) for the camera.
         '''
+        assert pixels.size(-2) == points.size(-2) >= 4, \
+            "Number of points/pixels cannot be smaller than 4."
         intrinsics = self.intrinsics if intrinsics is None else intrinsics
         broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
 
