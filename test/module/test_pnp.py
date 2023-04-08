@@ -4,7 +4,7 @@ from torchvision.datasets.utils import download_and_extract_archive
 
 class TestEPnP:
 
-    def load_data():
+    def load_data(self):
         download_and_extract_archive('https://github.com/pypose/pypose/releases/'\
                                     'download/v0.3.6/epnp-test-data.pt.zip', \
                                     './test/module')
@@ -76,15 +76,10 @@ class TestEPnP:
         gt_t = data['Rt'][..., :3, 3]
 
         def rmse_rot(pred, gt):
-            diff = pred - gt
-            f_norm = torch.norm(diff, dim=(-2, -1))
-            return f_norm.mean()
+            return (pred - gt).norm(dim=(-2, -1)).mean()
 
         def rmse_t(pred, gt):
-            diff = pred - gt
-            norm = diff ** 2
-            norm = torch.sum(norm, dim=-1)
-            return norm.mean()
+            return (pred - gt).pow(2).sum(dim=-1).mean()
 
         print("Pypose EPnP solution, rmse of R:", rmse_rot(rot, gt_rot))
         print("Pypose EPnP solution, rmse of t:", rmse_t(t, gt_t))
