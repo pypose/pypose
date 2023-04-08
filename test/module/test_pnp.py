@@ -13,7 +13,6 @@ class TestEPnP:
     def test_epnp_nonbatch(self):
         data = self.load_data()
         epnp = pp.module.EPnP()
-        # data['objPts'][0], data['imgPts'][0], data['camMat'][0]
         points = data['objPts'].unsqueeze(0)
         pixels = data['imgPts'].unsqueeze(0)
         intrincis = data['camMat'].unsqueeze(0)
