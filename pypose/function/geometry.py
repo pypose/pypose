@@ -86,6 +86,36 @@ def point2pixel(points, intrinsics, extrinsics=None):
 
     Returns:
         ``torch.Tensor``: The associated pixel with shape (..., N, 2).
+
+    Example:
+        >>> import torch, pypose as pp
+        >>> f, (H, W) = 2, (9, 9) # focal length and image height, width
+        >>> intrinsics = torch.tensor([[f, 0, H / 2],
+        ...                            [0, f, W / 2],
+        ...                            [0, 0,   1  ]])
+        >>> object = torch.tensor([[2., 0., 2.],
+        ...                        [1., 0., 2.],
+        ...                        [0., 1., 1.],
+        ...                        [0., 0., 1.],
+        ...                        [1., 0., 1.],
+        ...                        [5., 5., 3.]])
+        >>> pixels = pp.point2pixel(object, intrinsics)
+        >>> pixels
+        tensor([[6.5000, 4.5000],
+                [5.5000, 4.5000],
+                [4.5000, 6.5000],
+                [4.5000, 4.5000],
+                [6.5000, 4.5000],
+                [7.8333, 7.8333]])
+        >>> pose = pp.SE3([ 0., -8,  0.,  0., -0.3827,  0.,  0.9239])
+        >>> pixels = pp.point2pixel(object, intrinsics, pose)
+        >>> pixels
+        tensor([[  4.4999,  -1.1568],
+                [  3.8332,  -3.0425],
+                [  2.4998, -15.2997],
+                [  2.4998, -18.1282],
+                [  4.4999,  -6.8135],
+                [  4.9999,   3.4394]])
     '''
     assert points.size(-1) == 3, "Points shape incorrect"
     assert intrinsics.size(-1) == intrinsics.size(-2) == 3, "Intrinsics shape incorrect."
@@ -111,6 +141,19 @@ def reprojerr(points, pixels, intrinsics, extrinsics):
             The shape has to be (..., 7).
     Returns:
         Per-pixel reprojection error. The shape is (..., N).
+
+    Example:
+        >>> import torch, pypose as pp
+        >>> f, (H, W) = 2, (9, 9) # focal length and image height, width
+        >>> intrinsics = torch.tensor([[f, 0, H / 2],
+        ...                            [0, f, W / 2],
+        ...                            [0, 0,   1  ]])
+        >>> object = torch.randn(6, 3)
+        >>> pose = pp.randn_SE3()
+        >>> pixels = pp.point2pixel(object, intrinsics, pose)
+        >>> err = pp.reprojerr(object, pixels, intrinsics, pose)
+        >>> err
+        tensor([0., 0., 0., 0., 0., 0.])
     '''
     broadcast_shapes(points.shape[:-2], pixels.shape[:-2], \
                      extrinsics.shape[:-1], intrinsics.shape[:-2])

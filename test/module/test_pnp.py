@@ -18,8 +18,8 @@ class TestEPnP:
         intrincis = data['camMat'].unsqueeze(0)
         pose_non_batch = epnp(points, pixels, intrincis)
         pose_batch = epnp(data['objPts'], data['imgPts'], data['camMat'])
+        assert pose_non_batch[0].shape == pose_batch.shape == torch.Size([2, 7])
         assert torch.allclose(pose_non_batch, pose_batch[0])
-
 
     def test_epnp_highdim(self):
         data = self.load_data()
@@ -32,7 +32,6 @@ class TestEPnP:
         solution_lowdim = epnp(data['objPts'], data['imgPts'], data['camMat'])
         assert solution_highdim[0].shape == solution_lowdim.shape
         assert torch.allclose(solution_highdim[0], solution_lowdim)
-
 
     def test_epnp_6pts(self):
         # create some random test sample for a single camera
