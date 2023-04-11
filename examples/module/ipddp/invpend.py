@@ -1,13 +1,13 @@
 import pypose as pp
 import torch as torch
 import torch.nn as nn
-from pypose.module.dynamics import System
+from pypose.module.dynamics import System, NLS
 from pypose.module.ipddp import ddpOptimizer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Create class for inverted-pendulum dynamics
-class InvPend(System):
+class InvPend(NLS): # why use NLS to inherit?
     def __init__(self, dt, length=[10.0], gravity=10.0):
         super(InvPend, self).__init__()
         self.tau = dt
@@ -33,7 +33,6 @@ if __name__ == "__main__":
                           [-1., 0.],
                           [-2.5, 1.]])
 
-    # Create dynamics solver object
     sys = InvPend(dt) 
     n_state = 2
     n_input = 1 
@@ -57,9 +56,17 @@ if __name__ == "__main__":
     gu = torch.vstack( (torch.eye(n_input, n_input), - torch.eye(n_input, n_input)) )
     g = torch.hstack( (-0.25 * torch.ones(1, n_input), -0.25 * torch.ones(1, n_input)) )
     lincon = pp.module.LinCon(gx, gu, g)
-    solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, n_state, n_input, gx.shape[0], N, init_traj) 
 
-    traj_opt = solver.optimizer()
+    traj_opt = [None for batch_id in range(n_batch)]
+
+    for batch_id in range(n_batch): # use for loop and keep the ddpOptimizer 
+        stage_cost = pp.module.QuadCost(Q[batch_id], R[batch_id], S[batch_id], c[batch_id])
+        terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id], R[batch_id], S[batch_id], c[batch_id])
+        lincon = pp.module.LinCon(gx, gu, g)  
+        init_traj_sample = {'state': torch.unsqueeze(init_traj['state'][batch_id],1), 
+                            'input': torch.unsqueeze(init_traj['input'][batch_id],1)} 
+        solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, n_state, n_input, gx.shape[-2], N, init_traj_sample) 
+        traj_opt[batch_id] = solver.optimizer()
 
 
     

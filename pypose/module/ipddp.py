@@ -89,8 +89,8 @@ class fwdPass:
         self.computecrelated()
 
     def computeprelated(self): # terms related to the terminal cost
-        self.p = self.computep(self.x[...,-1,:])
-        self.p_fn.set_refpoint(state=self.x[...,-1,:], input=self.u[...,-1,:])
+        self.p = self.computep(self.x[-1])
+        self.p_fn.set_refpoint(state=self.x[-1], input=self.u[-1])
         self.px = self.p_fn.cx.mT
         self.pxx = self.p_fn.cxx.squeeze(0).squeeze(1)
         return 
