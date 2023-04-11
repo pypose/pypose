@@ -192,25 +192,25 @@ class ddpOptimizer(nn.Module):
     The class of ipddp optimizer
     iterates between forwardpass and backwardpass to get a final trajectory 
     '''
-    def __init__(self, system, constraint, Q, p, T):
-    # def __init__(self, sys=None, stage_cost=None, terminal_cost=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=None, init_traj=None):
+    # def __init__(self, system, constraint, Q, p, T):
+    def __init__(self, sys=None, stage_cost=None, terminal_cost=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=None, init_traj=None):
         r'''
         Initialize three key classes
         '''
         super().__init__()
-        self.system = system
-        self.constraint = constraint
-        self.T = T
-        self.Q = Q
-        self.p = p
-        self.constraint_flag = True
-        self.contraction_flag = True
-        self.W = torch.randn(2, 5, 6, 7) # todo:change
+        # self.system = system
+        # self.constraint = constraint
+        # self.T = T
+        # self.Q = Q
+        # self.p = p
+        # self.constraint_flag = True
+        # self.contraction_flag = True
+        # self.W = torch.randn(2, 5, 6, 7) # todo:change
 
-        # self.alg = algParam()
-        # self.fp = fwdPass(sys=sys, stage_cost=stage_cost, terminal_cost=terminal_cost, cons=cons, n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon, init_traj=init_traj)
-        # self.bp = bwdPass(sys=sys,            cons=cons,n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon)
-        # self.N = horizon
+        self.alg = algParam()
+        self.fp = fwdPass(sys=sys, stage_cost=stage_cost, terminal_cost=terminal_cost, cons=cons, n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon, init_traj=init_traj)
+        self.bp = bwdPass(sys=sys,            cons=cons,n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon)
+        self.N = horizon
 
 
     def backwardpass(self):

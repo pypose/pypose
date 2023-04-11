@@ -153,7 +153,7 @@ class Cost(nn.Module):
         # equivalent simpler form
         func = lambda x: self.cost(x, self._ref_input)
         jac_func = lambda x: excludeBatch(jacobian(func, x, create_graph=True))
-        return excludeBatch(jacobian(jac_func, self._ref_state, **self.jacargs),order=2)
+        return excludeBatch(jacobian(jac_func, self._ref_state, **self.jacargs),type=2)
     
     @property
     def cxu(self):
@@ -169,7 +169,7 @@ class Cost(nn.Module):
             return excludeBatch(jac)
         # func = lambda x,u: self.cost(x, u)
         # jac_func = lambda u: excludeBatch(jacobian(func, x, create_graph=True))        
-        return excludeBatch(jacobian(jac_func, self._ref_input,  **self.jacargs), order=2)
+        return excludeBatch(jacobian(jac_func, self._ref_input,  **self.jacargs), type=2)
     
     @property
     def cux(self):
@@ -191,7 +191,7 @@ class Cost(nn.Module):
         '''
         func = lambda u: self.cost(self._ref_state, u)
         jac_func = lambda u: excludeBatch(jacobian(func, u, create_graph=True))
-        return excludeBatch(jacobian(jac_func, self._ref_input,  **self.jacargs), order=2)
+        return excludeBatch(jacobian(jac_func, self._ref_input,  **self.jacargs), type=2)
     
     @property
     def c(self):
@@ -213,14 +213,14 @@ class Cost(nn.Module):
                            - 0.5 * pp.bvmv(self._ref_input, self.cux, self._ref_state) \
                            - 0.5 * pp.bvmv(self._ref_input, self.cuu, self._ref_input)  
 
-def excludeBatch(inp, order=1):
+def excludeBatch(inp, type=1):
     B = inp.shape[-3:-1]
-    if order == 1: # 1st order derivative
+    if type == 1: # zero dim per sample
         out = torch.zeros(inp.shape[-3:], dtype=inp.dtype, device=inp.device)
         for i in range(B[0]): #todo: compatible with non-batch case
             for j in range(B[1]):
                 out[i,j,:] = inp[i,j,i,j,:]
-    if order == 2: # 2nd order derivative
+    if type == 2: # vector per sample
         out = torch.zeros(inp.shape[:3]+(inp.shape[-1:]), dtype=inp.dtype, device=inp.device)
         for i in range(B[0]):
             for j in range(B[1]):

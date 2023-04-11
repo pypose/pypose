@@ -7,11 +7,13 @@ class NonLinConstraint(Constraint):
         super(NonLinConstraint, self).__init__()
 
     def constraint(self, state, input):
-        return torch.sum(state**3,dim=-1) + torch.sum(input**4,dim=-1)
+        return torch.dstack((torch.sum(state**3,dim=-1) + torch.sum(input**4,dim=-1),
+                             torch.sum(state**4,dim=-1) + torch.sum(input**2,dim=-1)
+        )) # vector constraint
 
 
 if __name__ == "__main__":
-    n_batch = 2
+    n_batch = 1
     T = 4
     state = torch.randn(n_batch, T, 3)
     input = torch.randn(n_batch, T, 3)
@@ -22,7 +24,7 @@ if __name__ == "__main__":
     # 1st, 2nd order partial derivatives at current state and input
     jacob_state, jacob_input = state, input
     nonLinConstraint.set_refpoint(state=jacob_state, input=jacob_input)
-    print('gx', nonLinConstraint.gx.size(), torch.linalg.norm(nonLinConstraint.gx - (3*state**2)))
-    print('gu', nonLinConstraint.gu.size(), torch.linalg.norm(nonLinConstraint.gu - (4*input**3)))
+    print('gx', nonLinConstraint.gx.size(), torch.linalg.norm(nonLinConstraint.gx[:,:,0,:] - (3*state**2)))
+    print('gu', nonLinConstraint.gu.size(), torch.linalg.norm(nonLinConstraint.gu[:,:,0,:] - (4*input**3)))
 
     
