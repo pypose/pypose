@@ -563,7 +563,7 @@ class ddpGrad:
                                         torch.cat([fp_list[batch_id].fxu.mT, fp_list[batch_id].fuu],dim=-1)], dim=-2) 
                                             for batch_id in range(n_batch)], dim=0) 
             # todo second order dynamics
-            self.T = self.F.size(-4)
+            self.T = self.F.size(-3)
 
     def ipddp_backward(self, mu):
         # Q: (B*, T, N, N), p: (B*, T, N), where B* can be any batch dimensions, e.g., (2, 3)
