@@ -1,6 +1,7 @@
 import pypose as pp
 import torch as torch
 import torch.nn as nn
+from pypose.module.cost import excludeBatch 
 from torch.autograd.functional import jacobian
 
 class Constraint(nn.Module):
@@ -25,7 +26,7 @@ class Constraint(nn.Module):
     def __init__(self):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
-        self.jacargs = {'vectorize':False, 'strategy':'reverse-mode'}
+        # self.jacargs = {'vectorize':False, 'strategy':'reverse-mode'}
 
     def forward(self, state, input):
         r'''
@@ -76,7 +77,7 @@ class Constraint(nn.Module):
             \mathbf{g}_{\mathbf_{x}} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{x}} \right|_{\chi^*}
         '''
         func = lambda x: self.constraint(x, self._ref_input)
-        return jacobian(func, self._ref_state, **self.jacargs)
+        return excludeBatch(jacobian(func, self._ref_state, **self.jacargs))
 
     @property
     def gu(self):
@@ -86,8 +87,8 @@ class Constraint(nn.Module):
         .. math::
             \mathbf{g}_{\mathbf_{u}} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
-        func = lambda x: self.cost(self._ref_state, x)
-        return jacobian(func, self._ref_input, **self.jacargs)    
+        func = lambda u: self.constraint(self._ref_state, u)
+        return excludeBatch(jacobian(func, self._ref_input, **self.jacargs))    
 
     @property
     def g(self):

@@ -64,8 +64,8 @@ class Cost(nn.Module):
 
     def __init__(self):
         super().__init__()
-        # self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
-        self.jacargs = {'vectorize':False, 'strategy':'reverse-mode'}
+        self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
+        # self.jacargs = {'vectorize':False, 'strategy':'reverse-mode'}
 
     def forward(self, state, input):
         r'''
@@ -115,7 +115,7 @@ class Cost(nn.Module):
             c_{\mathbf{x}} = \left. \frac{\partial c}{\partial \mathbf{x}} \right|_{\chi^*}
         '''
         func = lambda x: self.cost(x, self._ref_input)
-        return jacobian(func, self._ref_state, **self.jacargs)
+        return excludeBatch(jacobian(func, self._ref_state, **self.jacargs))
 
     @property
     def cu(self):
@@ -126,7 +126,7 @@ class Cost(nn.Module):
             c_{\mathbf{u}} = \left. \frac{\partial c}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
         func = lambda x: self.cost(self._ref_state, x)
-        return jacobian(func, self._ref_input, **self.jacargs)    
+        return excludeBatch(jacobian(func, self._ref_input, **self.jacargs))    
 
     @property
     def cxx(self):
@@ -152,9 +152,9 @@ class Cost(nn.Module):
 
         # equivalent simpler form
         func = lambda x: self.cost(x, self._ref_input)
-        jac_func = lambda x: jacobian(func, x, create_graph=True) 
-        return jacobian(jac_func, self._ref_state, **self.jacargs).squeeze(0).squeeze(1)
-
+        jac_func = lambda x: excludeBatch(jacobian(func, x, create_graph=True))
+        return excludeBatch(jacobian(jac_func, self._ref_state, **self.jacargs),order=2)
+    
     @property
     def cxu(self):
         r'''
@@ -166,8 +166,10 @@ class Cost(nn.Module):
         def jac_func(u):
             func = lambda x: self.cost(x, u)
             jac = jacobian(func, self._ref_state, create_graph=True) # substitute x here
-            return jac
-        return jacobian(jac_func, self._ref_input,  **self.jacargs).squeeze(0).squeeze(1)
+            return excludeBatch(jac)
+        # func = lambda x,u: self.cost(x, u)
+        # jac_func = lambda u: excludeBatch(jacobian(func, x, create_graph=True))        
+        return excludeBatch(jacobian(jac_func, self._ref_input,  **self.jacargs), order=2)
     
     @property
     def cux(self):
@@ -177,12 +179,8 @@ class Cost(nn.Module):
         .. math::
             c_\mathbf{ux} = \left. \frac{\partial^{2} c}{\partial \mathbf{u} \partial \mathbf{x}} \right|_{\chi^*}
         '''
-        def jac_func(x):
-            func = lambda u: self.cost(x, u)
-            jac = jacobian(func, self._ref_input, create_graph=True)
-            return jac
-        return jacobian(jac_func, self._ref_state,  **self.jacargs).squeeze(0).squeeze(1)
- 
+        return self.cxu.mT
+    
     @property
     def cuu(self):
         r'''
@@ -191,12 +189,10 @@ class Cost(nn.Module):
         .. math::
             c_\mathbf{uu} = \left. \frac{\partial^{2} c}{\partial \mathbf{u}^{2}} \right|_{\chi^*}
         '''
-        def jac_func(u):
-            func = lambda u: self.cost(self._ref_state, u)
-            jac = jacobian(func, u, create_graph=True)
-            return jac
-        return jacobian(jac_func, self._ref_input, **self.jacargs).squeeze(0).squeeze(1)
-
+        func = lambda u: self.cost(self._ref_state, u)
+        jac_func = lambda u: excludeBatch(jacobian(func, u, create_graph=True))
+        return excludeBatch(jacobian(jac_func, self._ref_input,  **self.jacargs), order=2)
+    
     @property
     def c(self):
         r'''
@@ -216,6 +212,20 @@ class Cost(nn.Module):
                            - 0.5 * pp.bvmv(self._ref_state, self.cxu, self._ref_input) \
                            - 0.5 * pp.bvmv(self._ref_input, self.cux, self._ref_state) \
                            - 0.5 * pp.bvmv(self._ref_input, self.cuu, self._ref_input)  
+
+def excludeBatch(inp, order=1):
+    B = inp.shape[-3:-1]
+    if order == 1: # 1st order derivative
+        out = torch.zeros(inp.shape[-3:], dtype=inp.dtype, device=inp.device)
+        for i in range(B[0]): #todo: compatible with non-batch case
+            for j in range(B[1]):
+                out[i,j,:] = inp[i,j,i,j,:]
+    if order == 2: # 2nd order derivative
+        out = torch.zeros(inp.shape[:3]+(inp.shape[-1:]), dtype=inp.dtype, device=inp.device)
+        for i in range(B[0]):
+            for j in range(B[1]):
+                out[i,j,:,:] = inp[i,j,:,i,j,:]
+    return out        
 
 class QuadCost(Cost):
     r'''

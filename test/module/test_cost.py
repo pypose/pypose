@@ -14,5 +14,6 @@ if __name__ == "__main__":
     print(state.shape, input.shape)
     quadcost.set_refpoint(state=state, input=input)
     print(quadcost.cx.size())
-    print(quadcost.cxx.size())
-    print(pp.bdot(state, torch.randn(n_batch,T,3)).shape)
+    print(quadcost.cu.size())
+    print(quadcost.cxx.size()) # set directly
+    # print(pp.bdot(state, torch.randn(n_batch,T,3)).shape)
