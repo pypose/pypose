@@ -508,26 +508,28 @@ class ddpOptimizer(nn.Module):
 
         return self.fp, self.bp, self.alg
 
-    def forward(self, x_init):
-        # detached version to solve the best traj
-        # with torch.no_grad(): #todo: uncomment
-        #     fp_best,bp_best,alg_best = self.optimizer()
+class ddpGrad:
 
+    def __init__(self,sys=None):
+        self.f_fn = sys
+
+    def forward(self, fp_list, x_init):
         with torch.autograd.set_detect_anomaly(True): # for debug
             # self.fp = fp_best #todo: uncomment
             # self.bp = bp_best
             # self.alg = alg_best
             # self.fp.initialroll()
             # x_init = self.fp.x[0]
-            self.prepare()
+            self.prepare(fp_list)
             Ku, ku = self.ipddp_backward(mu=1e-3)
             x, u, cost, cons = self.ipddp_forward(x_init, Ku, ku)
         return x, u, cost, cons
 
-    def prepare(self):
-        fp = self.fp  #todo: uncomment
-        fp.computeall()
-        # self.c, self.s = fp.c, fp.s
+    def prepare(self, fp_list):
+        n_batch = len(fp_list)
+        # fp = self.fp  #todo: uncomment
+        # fp.computeall()
+        self.c, self.s = torch.stack((fp_list[batch_id].c for batch_id in range(n_batch))), fp.s
         self.c = torch.randn(2, 5, 6)
         self.s = 0.01 * torch.ones_like(self.c) 
         with torch.no_grad(): # detach
