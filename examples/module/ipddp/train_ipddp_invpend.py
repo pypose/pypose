@@ -11,7 +11,13 @@ from invpend import InvPend
 from pypose.module.ipddp import ddpOptimizer, ddpGrad
 
 def main():
-    torch.set_default_dtype(torch.float64)
+    # torch.set_default_dtype(torch.float64)
+    # a = torch.randn((3,2,1)).unsqueeze(-1)
+    # b = torch.randn((3,4,2,3,3))
+    # b0 = b[...,0,:,:,:]
+    # c = torch.tensordot(a, b0, dims=([1], [1]))
+    # print(c.shape)
+    # exit()
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_state', type=int, default=2)
     parser.add_argument('--n_input', type=int, default=1)
@@ -94,7 +100,7 @@ def main():
         sys_ = InvPend(dt, length=_param)
         _ipddp_list = [None for batch_id in range(n_batch)]
         _fp_best_list = [None for batch_id in range(n_batch)]
-        ddpgrad = ddpGrad(sys_)
+        ddpgrad = ddpGrad(sys_, lincon)
         for batch_id in range(n_batch):
             init_traj_sample = {'state': torch.unsqueeze(init_traj['state'][batch_id],1), 
                                 'input': torch.unsqueeze(init_traj['input'][batch_id],1)} 
@@ -105,20 +111,20 @@ def main():
             with torch.no_grad():            
                 _fp_best_list[batch_id],_,_ = _ipddp_list[batch_id].optimizer()
         x_init = init_traj['state'][...,0,:]
-        _fp, _, _ = ddpgrad.forward(_fp_best_list, x_init) # todo: last iteration should use batch computation.
-        x_pred, u_pred = _fp.x, _fp.u
+        x_pred, u_pred, _, _ = ddpgrad.forward(_fp_best_list, x_init) # todo: last iteration should use batch computation.
         print('x_pred solved')
 
         sys = InvPend(dt, length=expert['param'])
         ipddp_list = [None for batch_id in range(n_batch)]
+        fp_list = [None for batch_id in range(n_batch)]
         for batch_id in range(n_batch):
             ipddp_list[batch_id] = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, 
                                     n_state, n_input, gx.shape[0], 
                                     N, init_traj_sample) 
-            fp_list, _, _ = ipddp_list[batch_id].optimizer()
+            fp_list[batch_id], _, _ = ipddp_list[batch_id].optimizer()
         
-        fp = 0 # todo assembly fp from fp_list
-        x_true, u_true = fp.x, fp.u
+        x_true, u_true = torch.stack([fp_list[batch_id].x[:-1].squeeze(-2) for batch_id in range(n_batch)],dim=0), \
+                         torch.stack([fp_list[batch_id].u.squeeze(-2) for batch_id in range(n_batch)],dim=0)
         print('x_true solved')
 
         traj_loss = 1e4*(torch.mean((u_true - u_pred)**2) + \

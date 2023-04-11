@@ -16,7 +16,7 @@ class InvPend(NLS): # why use NLS to inherit?
 
     def state_transition(self, state, input, t=None):
         force = input.squeeze()
-        _dstate = torch.stack((state[0,1], force+self.gravity/self.length[0]*torch.sin(state[0,0].clone())))
+        _dstate = torch.stack([state[...,1], force+self.gravity/self.length[0]*torch.sin(state[...,0].clone())], dim=-1)
         return state + torch.mul(_dstate, self.tau)
 
     def observation(self, state, input, t=None):

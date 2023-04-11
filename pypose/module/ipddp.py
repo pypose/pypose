@@ -7,7 +7,7 @@ class algParam:
     r'''
     The class of algorithm parameter.
     '''
-    def __init__(self, mu=1.0, maxiter=45, tol=1.0e-7, infeas=False):
+    def __init__(self, mu=1.0, maxiter=2, tol=1.0e-7, infeas=False):
         self.mu = mu  
         self.maxiter = maxiter
         self.tol = torch.tensor(tol)
@@ -510,8 +510,11 @@ class ddpOptimizer(nn.Module):
 
 class ddpGrad:
 
-    def __init__(self,sys=None):
-        self.f_fn = sys
+    def __init__(self, sys, cons):
+        self.system = sys
+        self.constraint_flag = True
+        self.constraint = cons
+        self.contraction_flag = True
 
     def forward(self, fp_list, x_init):
         with torch.autograd.set_detect_anomaly(True): # for debug
@@ -529,34 +532,53 @@ class ddpGrad:
         n_batch = len(fp_list)
         # fp = self.fp  #todo: uncomment
         # fp.computeall()
-        self.c, self.s = torch.stack((fp_list[batch_id].c for batch_id in range(n_batch))), fp.s
-        self.c = torch.randn(2, 5, 6)
-        self.s = 0.01 * torch.ones_like(self.c) 
+        self.c, self.s = torch.stack([fp_list[batch_id].c for batch_id in range(n_batch)],dim=0).squeeze(-1), \
+                         torch.stack([fp_list[batch_id].s for batch_id in range(n_batch)],dim=0).squeeze(-1)
+        # self.c = torch.randn(2, 5, 6)
+        # self.s = 0.01 * torch.ones_like(self.c) 
         with torch.no_grad(): # detach
-            self.Qxx_terminal[..., :,:] = 0 # todo: vstack fp.pxx
-            self.Qx_terminal[...,:,:] = 0   # todo: vstack fp.px
-            for t in range(self.T-1, -1, -1): 
-                self.Q[...,t,:,:] = 0 # todo: vstack fp.qxx, fp.qxu, fp.quu 
-                self.p[...,t,:] = 0 # todo: vstack fp.qx, fp.qu  
-                self.W[...,t,:,:] = 0 # todo: vstack fp.cx, fp.cu
-                # fx,fu,fxx,fxu,fuu = fp.fx, fp.fu, fp.fxx, fp.fxu, fp.fuu
-                self.F = 0 # todo concatenate A,B
-                self.G = 0 # todo second order dynamics
+            self.Qxx_terminal = torch.stack([fp_list[batch_id].pxx for batch_id in range(n_batch)],dim=0)
+            self.Qx_terminal = torch.stack([fp_list[batch_id].px.squeeze(-1) for batch_id in range(n_batch)],dim=0)
+            # for t in range(self.T-1, -1, -1): 
+            self.Q = torch.stack([
+                                        torch.cat([torch.cat([fp_list[batch_id].qxx, fp_list[batch_id].qxu],dim=-1),
+                                        torch.cat([fp_list[batch_id].qxu.mT, fp_list[batch_id].quu],dim=-1)], dim=-2) 
+                                            for batch_id in range(n_batch)], dim=0) 
+                # todo: vstack fp.qxx, fp.qxu, fp.quu 
+            self.p  = torch.stack([
+                                        torch.cat([fp_list[batch_id].qx, fp_list[batch_id].qu],dim=-2) 
+                                            for batch_id in range(n_batch)], dim=0).squeeze(-1)
+            # todo: vstack fp.qx, fp.qu  
+            self.W = torch.stack([
+                                        torch.cat([fp_list[batch_id].cx, fp_list[batch_id].cu],dim=-1) 
+                                            for batch_id in range(n_batch)], dim=0) 
+            # todo: vstack fp.cx, fp.cu
+            # fx,fu,fxx,fxu,fuu = fp.fx, fp.fu, fp.fxx, fp.fxu, fp.fuu
+            self.F = torch.stack([
+                                        torch.cat([fp_list[batch_id].fx, fp_list[batch_id].fu],dim=-1) 
+                                            for batch_id in range(n_batch)], dim=0) 
+             # todo concatenate A,B
+            self.G = torch.stack([
+                                        torch.cat([torch.cat([fp_list[batch_id].fxx, fp_list[batch_id].fxu],dim=-1),
+                                        torch.cat([fp_list[batch_id].fxu.mT, fp_list[batch_id].fuu],dim=-1)], dim=-2) 
+                                            for batch_id in range(n_batch)], dim=0) 
+            # todo second order dynamics
+            self.T = self.F.size(-4)
 
     def ipddp_backward(self, mu):
         # Q: (B*, T, N, N), p: (B*, T, N), where B* can be any batch dimensions, e.g., (2, 3)
         B = self.p.shape[:-2]
-        ns, nc = self.system.B.size(-2), self.system.B.size(-1)
+        ns, nc = self.Qx_terminal.size(-1), self.F.size(-1) - self.Qx_terminal.size(-1)
         Ku = torch.zeros(B + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
         ku = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
 
-        V, v = self.Qx_terminal, self.Qxx_terminal
+        V, v = self.Qxx_terminal, self.Qx_terminal
         for t in range(self.T-1, -1, -1): 
             Ft = self.F[...,t,:,:]
             Qt = self.Q[...,t,:,:] + Ft.mT @ V @ Ft
             qt = self.p[...,t,:] + bmv(Ft.mT, v) 
-            if self.contraction_flag:
-                Qt += torch.tensordot(v.mT, self.G[...,t,:,:,:], dims=-1) # todo :check
+            # if self.contraction_flag:
+            #     Qt += torch.tensordot(v.mT, self.G[...,t,:,:,:], dims=-1) # todo :check!!!!
             if self.constraint_flag:
                 Wt = self.W[...,t,:,:]
                 st, ct = self.s[...,t,:], self.c[...,t,:] 
@@ -586,14 +608,14 @@ class ddpGrad:
         assert x_init.dtype == Ku.dtype == ku.dtype
         assert x_init.ndim == 2, "Shape not compatible."
         B = self.p.shape[:-2]
-        ns, nc = self.system.B.size(-2), self.system.B.size(-1)
+        ns, nc = self.Qx_terminal.size(-1), self.F.size(-1) - self.Qx_terminal.size(-1)
         u = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
         cost = torch.zeros(B, dtype=self.p.dtype, device=self.p.device)
         x = torch.zeros(B + (self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
         x[..., 0, :] = x_init
         xt = x_init
 
-        self.system.set_refpoint(t=0)
+        self.system.set_refpoint(t=torch.Tensor([0.]))
         for t in range(self.T):
             Kut, kut = Ku[...,t,:,:], ku[...,t,:]
             u[..., t, :] = ut = bmv(Kut, xt) + kut 
