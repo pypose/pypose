@@ -2,6 +2,17 @@
 import torch
 import pypose as pp
 from pypose.sparse import sparse_block_tensor, coo_2_hybrid, hybrid_2_coo
+import pypose.sparse as sp
+
+def test_pypose_operation():
+    a = pp.randn_so3(2, requires_grad=True)
+    b = pp.randn_so3(2, requires_grad=True)
+    c = a + b
+    print(f'c = \n{c}')
+    d = torch.add(a, b)
+    print(f'd = \n{d}')
+    e = pp.add(a, b)
+    print(f'e = \n{e}')
 
 def test_sparse_coo_2_sparse_hybrid_coo():
     print()
@@ -27,6 +38,12 @@ def test_abs():
     
     y = x.abs()
     print(f'y = \n{y}')
+
+    y2 = torch.abs(x)
+    print(f'y2 = \n{y2}')
+
+    y3 = sp.abs(x)
+    print(f'y3 = \n{y3}')
     
     #print(x)
 
@@ -69,3 +86,13 @@ def test_mm():
     # Show and compare.
     print(f'yh0 = \n{yh0.to_dense()}')
     print(f'yh = \n{yh.to_dense()}')
+
+def test_is_sparse():
+    print()
+
+    i = [[0, 0, 1, 2],[0, 2, 1, 2]]
+    v = torch.arange(16).view((-1, 2, 2)).to(dtype=torch.float32)
+    x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
+
+    iss = x.is_sparse
+    print(f'x.is_sparse = {iss}')

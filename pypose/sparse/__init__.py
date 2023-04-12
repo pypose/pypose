@@ -3,3 +3,5 @@ from .sparse_block_tensor import (
     coo_2_hybrid,
     sparse_block_tensor
 )
+
+from .operations import *

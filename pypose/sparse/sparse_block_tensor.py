@@ -42,6 +42,8 @@ Attributes:
 
 '''
 
+import functools
+
 import torch
 from torch.utils._pytree import tree_map, tree_flatten
 
@@ -311,6 +313,24 @@ class SBTOperation(object):
         # Do nothing by default.
         return s_outs, p_outs
 
+class SBTGetOp(SBTOperation):
+    def __init__(self, func_name):
+        super().__init__(func_name=func_name)
+
+    def storage_pre(self, func, types, args=(), kwargs={}):
+        '''Separate the Storange and Proxy tensor.
+
+        Returns:
+            s_array (list): A list of Storage tensors. Could be Hybrid tensors.
+            p_array (list): A list of Proxy tensors.
+        '''
+        s_array = []
+        p_array = []
+        for arg in args:
+            s_array.append( arg._s if isinstance(arg, SparseBlockTensor) else arg )
+            p_array.append( arg._p if isinstance(arg, SparseBlockTensor) else arg )
+        return s_array, p_array
+
 class SBTProxyNoOp(SBTOperation):
     '''An SBT Operation that does not touch the Proxy tensor.
     
@@ -506,12 +526,35 @@ def _add_sparse_op(name, cls):
     global _HANDLED_FUNCS_SPARSE
     _HANDLED_FUNCS_SPARSE[name] = cls(name)
 
+# def register_sop(cls, dispatch_name):
+#     '''Register an operation to the supported operations on SBT.
+
+#     This function is meant to be used as a decorator.
+
+#     Args:
+#         func (function): The function of the operation.
+#         cls (SBTOperation): The SBTOperation class.
+#         dispatch_name (str): The name of the operation. If None, use the name of the function.
+#     '''
+#     def register(func):
+#         @functools.wraps(func)
+#         def register_wrapper():
+#             if dispatch_name is None:
+#                 dispatch_name = func.__name__
+#             _add_sparse_op(dispatch_name, cls)
+        
+#         register_wrapper()
+#         return func
+
+#     return register
+
 # ========================================================
 # ========== Register all supported operations. ==========
 # ========================================================
 
 # ========== Special Python methods. ==========
 _add_sparse_op( '__format__', SBTOperation )
+_add_sparse_op( '__get__', SBTGetOp )
 
 # ========== Linear Algebra operations. ==========
 _add_sparse_op( 'matmul', SBTProxySameOpAsStorage )
@@ -521,7 +564,7 @@ _add_sparse_op( 'matmul', SBTProxySameOpAsStorage )
 # ========== Operations for COO tensors. ==========
 
 # ========== Unary functions. ==========
-_add_sparse_op( 'abs',    SBTProxyNoOp )
+_add_sparse_op( 'abs', SBTProxyNoOp )
 
 # ==============================================================
 # ========== End of supported operation registration. ==========
@@ -611,18 +654,25 @@ class SparseBlockTensor(torch.Tensor):
     def __format__(self, spec):
         return str(self)
 
-    def matmul(self, other):
+    # @register_sop(cls=SBTProxySameOpAsStorage, dispatch_name='matmul')
+    def __matmul__(self, other):
         r'''
         return the corresponding sparse matrix and index matrix
         '''
         print(f'>>> Debug matmtl. ')
-        return self
+        return torch.matmul(self, other)
 
     def __add__(self, other):
         pass
 
     def __mul__(self, other):
         pass
+
+    # NOTE: for torch operations that need special treatment, place an override here. Then call 
+    # the corresponding function of PyTorch to begin the dispatching. E.g.: 
+    # def abs(self):
+    #     print('This is SBT abs(). ')
+    #     return torch.abs(self)
 
 
 def sparse_block_tensor(
