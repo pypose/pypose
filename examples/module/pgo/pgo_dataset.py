@@ -2,11 +2,22 @@ import os,torch
 import numpy as np
 import pypose as pp
 import torch.utils.data as Data
+from torchvision.datasets.utils import download_and_extract_archive
 
 
 class G2OPGO(Data.Dataset):
-    def __init__(self, root, dataname, device='cpu'):
+    '''
+    This data is from the following paper:
+    L. Carlone, R. Tron, K. Daniilidis, and F. Dellaert. Initialization Techniques for 3D
+    SLAM: a Survey on Rotation Estimation and its Use in Pose Graph Optimization. In IEEE
+    Intl. Conf. on Robotics and Automation (ICRA), pages 4597-4604, 2015.
+    '''
+    link = 'https://github.com/pypose/pypose/releases/download/v0.4.0/parking-garage.zip'
+    def __init__(self, root, dataname, device='cpu', download=True):
         super().__init__()
+
+        if download:
+            download_and_extract_archive(self.link, root)
 
         def info2mat(info):
             mat = np.zeros((6,6))
@@ -16,6 +27,7 @@ class G2OPGO(Data.Dataset):
                 mat[i:,i] = info[ix:ix+(6-i)]
                 ix += (6-i)
             return mat
+
         self.dtype = torch.get_default_dtype()
         filename = os.path.join(root, dataname)
         ids, nodes, edges, poses, infos = [], [], [], [], []

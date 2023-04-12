@@ -78,7 +78,7 @@ class TestOptim:
                 print('Optimization Early Done with loss:', loss.item())
                 break
         print('Done', timer.toc())
-        assert idx == 99, "Optimization requires too many steps."
+        assert idx == 99, "Optimization shouldn't stop early."
 
         posnet = PoseInv(2, 2).to(device)
         optimizer = pp.optim.LM(posnet)

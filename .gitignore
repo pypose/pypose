@@ -127,10 +127,24 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-.vscode
 
 # sphinx
 docs/source/generated
 
 # Operating system
 .DS_Store
+
+# IDE config
+.idea/
+.vscode/launch.json
+
+# Example data
+examples/module/imu/2011_09_26.zip
+examples/module/imu/2011_09_26/*
+examples/module/imu/save/*
+examples/module/filter/save/*
+examples/module/dynamics/save/*
+examples/module/pgo/pgodata/*
+examples/module/pgo/save/*
+*epnp-test-data.pt*
+*__MACOSX

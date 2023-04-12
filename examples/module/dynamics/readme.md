@@ -1,6 +1,6 @@
 # Defining Dynamical Systems
 
-Examples for defining general time-discrete time-varying dynamical systems
+Examples for defining general discrete-time nonlinear dynamical systems
 
 ## Installation
 
@@ -10,12 +10,19 @@ Examples for defining general time-discrete time-varying dynamical systems
 
     + The classical Cart-Pole example, nonlinear time-invariant system
 
-        python cartpole.py
+        python examples/module/dynamics/cartpole.py
 
-    + A Floquet system example, linear time-varying system
+    + A Floquet system example, nonlinear time-varying system
 
-        python floquet.py
+        python examples/module/dynamics/floquet.py
 
     + Dynamics defined using a neural network, nonlinear time-invariant system
 
-        python neuralnet.py
+        python examples/module/dynamics/neuralnet.py
+
+    + optional arguments:
+
+        -h, --help       show this help message and exit
+        --device DEVICE  cuda or cpu
+        --save SAVE      location of png files to save
+        --show           show plot, default: False
