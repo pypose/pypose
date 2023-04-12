@@ -146,3 +146,5 @@ examples/module/filter/save/*
 examples/module/dynamics/save/*
 examples/module/pgo/pgodata/*
 examples/module/pgo/save/*
+*epnp-test-data.pt*
+*__MACOSX

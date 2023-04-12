@@ -49,7 +49,7 @@ SO3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=SO3_type)
         \mathrm{data}[*, :] = [q_x, q_y, q_z, q_w],
 
     where :math:`q_x^2 + q_y^2 + q_z^2 + q_w^2 = 1`.
-    
+
     Note:
         Normalization is not required at initialization as it is done internally
         by the library right before further computation. However, the normalized
@@ -281,7 +281,7 @@ def randn_like(input, sigma=1.0, **kwargs):
 
         memory_format (torch.memory_format, optional): the desired memory format of returned
             Tensor. Default: ``torch.preserve_format``.
-    
+
     Note:
         The parameter sigma (:math:`\sigma`) can either be:
 
@@ -366,7 +366,7 @@ def randn_so3(*lsize, sigma=1.0, **kwargs):
 
         .. math::
             \delta_x' = \frac{x_0}{d}, \delta_y' = \frac{y_0}{d}, \delta_z' = \frac{z_0}{d},
-        
+
         where
 
         .. math::
@@ -375,7 +375,7 @@ def randn_so3(*lsize, sigma=1.0, **kwargs):
         .. math::
             d = \sqrt{(x^2_0+y^2_0+z^2_0)}.
 
-        Note that the point :math:`[x_0, y_0, z_0]` follows 3-D Gaussian distribution, 
+        Note that the point :math:`[x_0, y_0, z_0]` follows 3-D Gaussian distribution,
         which is centrosymmetry with respect to :math:`(0, 0, 0)`. Therefore, we have
         :math:`\delta_x'^2+\delta_y'^2+\delta_z'^2=1` and the normalized points follow
         uniform distribution on a standard sphere, i.e.,
@@ -413,7 +413,7 @@ def randn_SO3(*lsize, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`SO3_type` LieTensor filled with the Exponential map of the random
     :obj:`so3_type` LieTensor.
-    
+
     .. math::
         \begin{aligned}
         \mathrm{data}[*, :] &= \mathrm{Exp}([\delta_x, \delta_y, \delta_z]) \\
@@ -431,7 +431,7 @@ def randn_SO3(*lsize, sigma=1.0, **kwargs):
         lsize (int...): a sequence of integers defining the lshape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float, optional): standard deviation for the angle of the generated rotation. 
+        sigma (float, optional): standard deviation for the angle of the generated rotation.
             Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
@@ -440,7 +440,7 @@ def randn_SO3(*lsize, sigma=1.0, **kwargs):
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: ``None``. 
+            Default: ``None``.
             If ``None``, uses a global default (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
@@ -480,12 +480,12 @@ def randn_SO3(*lsize, sigma=1.0, **kwargs):
 
 def randn_se3(*lsize, sigma=1.0, **kwargs):
     r'''
-    Returns :obj:`se3_type` LieTensor filled with random numbers. 
+    Returns :obj:`se3_type` LieTensor filled with random numbers.
 
     .. math::
         \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z],
-    
-    where translation :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
+
+    where translation :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution
     :math:`\mathcal{N}(0, \sigma_t)`, rotation :math:`[\delta_x, \delta_y, \delta_z]` is
     generated using :meth:`pypose.randn_so3()` with standard deviation :math:`\sigma_r`.
     Note that standard deviations :math:`\sigma_t` and :math:`\sigma_r` are
@@ -495,8 +495,8 @@ def randn_se3(*lsize, sigma=1.0, **kwargs):
         lsize (int...): a sequence of integers defining the lshape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float or (float...), optional): standard deviation 
-            (:math:`\sigma_t` and :math:`\sigma_r`) 
+        sigma (float or (float...), optional): standard deviation
+            (:math:`\sigma_t` and :math:`\sigma_r`)
             for the two normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
@@ -505,7 +505,7 @@ def randn_se3(*lsize, sigma=1.0, **kwargs):
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: ``None``. If ``None``, uses a global default 
+            Default: ``None``. If ``None``, uses a global default
             (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
@@ -522,15 +522,15 @@ def randn_se3(*lsize, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-        - a single ``float`` -- in which all the elements in the :obj:`se3_type` 
-          share the same sigma, i.e., 
+        - a single ``float`` -- in which all the elements in the :obj:`se3_type`
+          share the same sigma, i.e.,
           :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` = :math:`\sigma`.
-        - a ``tuple`` of two floats -- in which case, the specific sigmas are 
-          assigned independently, i.e., 
+        - a ``tuple`` of two floats -- in which case, the specific sigmas are
+          assigned independently, i.e.,
           :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`).
-        - a ``tuple`` of four floats -- in which case, the specific sigmas for 
-          each translation data are assigned independently, i.e., 
-          :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, 
+        - a ``tuple`` of four floats -- in which case, the specific sigmas for
+          each translation data are assigned independently, i.e.,
+          :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`,
           :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`).
 
     Example:
@@ -560,7 +560,7 @@ def randn_SE3(*lsize, sigma=1.0, **kwargs):
     .. math::
         \mathrm{data}[*, :] = \mathrm{Exp}([\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z]),
 
-    where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
+    where :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution
     :math:`\mathcal{N}(0, \sigma_t)`, :math:`[\delta_x, \delta_y, \delta_z]` is
     generated using :meth:`pypose.randn_so3()` with with standard deviation
     :math:`\sigma_r`, and :math:`\mathrm{Exp}()` is the Exponential map. Note that standard
@@ -573,7 +573,7 @@ def randn_SE3(*lsize, sigma=1.0, **kwargs):
         lsize (int...): a sequence of integers defining the lshape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float or (float...), optional): standard deviation 
+        sigma (float or (float...), optional): standard deviation
             (:math:`\sigma_t` and :math:`\sigma_r`) for the two normal distribution.
             Default: ``1.0``.
 
@@ -583,7 +583,7 @@ def randn_SE3(*lsize, sigma=1.0, **kwargs):
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: ``None``. If None, uses a global default 
+            Default: ``None``. If None, uses a global default
             (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
@@ -600,15 +600,15 @@ def randn_SE3(*lsize, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-        - a single ``float`` -- in which all the elements in the :obj:`SE3_type` 
-          share the same sigma, i.e., 
+        - a single ``float`` -- in which all the elements in the :obj:`SE3_type`
+          share the same sigma, i.e.,
           :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` = :math:`\sigma`.
-        - a ``tuple`` of two floats -- in which case, the specific sigmas are 
+        - a ``tuple`` of two floats -- in which case, the specific sigmas are
           assigned independently, i.e.,
           :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`).
         - a ``tuple`` of four floats -- in which case, the specific sigmas for
-          each translation data are assigned independently, i.e., 
-          :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, 
+          each translation data are assigned independently, i.e.,
+          :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`,
           :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`).
 
     Example:
@@ -632,12 +632,12 @@ def randn_SE3(*lsize, sigma=1.0, **kwargs):
 
 def randn_sim3(*lsize, sigma=1.0, **kwargs):
     r'''
-    Returns :obj:`sim3_type` LieTensor filled with random numbers. 
+    Returns :obj:`sim3_type` LieTensor filled with random numbers.
 
     .. math::
         \mathrm{data}[*, :] = [\tau_x, \tau_y, \tau_z, \delta_x, \delta_y, \delta_z, \log s],
 
-    where translation :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
+    where translation :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution
     :math:`\mathcal{N}(0, \sigma_t)`, rotation :math:`[\delta_x, \delta_y, \delta_z]` is
     generated using :meth:`pypose.randn_so3()` with standard deviation :math:`\sigma_r`,
     scale :math:`\log s` is generated from a normal distribution :math:`\mathcal{N}(0, \sigma_s)`.
@@ -648,7 +648,7 @@ def randn_sim3(*lsize, sigma=1.0, **kwargs):
         lsize (int...): a sequence of integers defining the lshape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float or (float...), optional): standard deviation (:math:`\sigma_t`, 
+        sigma (float or (float...), optional): standard deviation (:math:`\sigma_t`,
             :math:`\sigma_r`, and :math:`\sigma_s`) for the three normal distribution.
             Default: ``1.0``.
 
@@ -658,7 +658,7 @@ def randn_sim3(*lsize, sigma=1.0, **kwargs):
         generator (torch.Generator, optional): a pseudorandom number generator for sampling.
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: ``None``. If ``None``, uses a global default 
+            Default: ``None``. If ``None``, uses a global default
             (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
@@ -675,17 +675,17 @@ def randn_sim3(*lsize, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-        - a single ``float`` -- in which all the elements in the :obj:`sim3_type` 
-          share the same sigma, i.e., 
-          :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` 
+        - a single ``float`` -- in which all the elements in the :obj:`sim3_type`
+          share the same sigma, i.e.,
+          :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}`
           = :math:`\sigma`.
-        - a ``tuple`` of three floats -- in which case, the specific sigmas for 
-          the three parts are assigned independently, i.e., 
-          :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`, 
+        - a ``tuple`` of three floats -- in which case, the specific sigmas for
+          the three parts are assigned independently, i.e.,
+          :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`,
           :math:`\sigma_{\rm{s}}`).
-        - a ``tuple`` of five floats -- in which case, the specific sigmas for 
+        - a ``tuple`` of five floats -- in which case, the specific sigmas for
           each translation data are also assigned independently, i.e.,
-          :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, 
+          :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`,
           :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`, :math:`\sigma_{\rm{s}}`).
 
     Example:
@@ -715,7 +715,7 @@ def randn_Sim3(*lsize, sigma=1.0, **kwargs):
         \mathrm{data}[*, :] = \mathrm{Exp}([\tau_x, \tau_y, \tau_z, \delta_x,
         \delta_y, \delta_z, \log s]),
 
-    where translation :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution 
+    where translation :math:`[\tau_x, \tau_y, \tau_z]` is generated from a normal distribution
     :math:`\mathcal{N}(0, \sigma_t)`, rotation :math:`[\delta_x, \delta_y, \delta_z]` is
     generated using :meth:`pypose.randn_so3()` with with standard deviation
     :math:`\sigma_r`, scale :math:`\log s` is generated from a normal distribution
@@ -731,7 +731,7 @@ def randn_Sim3(*lsize, sigma=1.0, **kwargs):
             Can be a variable number of arguments or a collection like a list or tuple.
 
         sigma (float or (float...), optional): standard deviation
-            (:math:`\sigma_t`, :math:`\sigma_r`, and :math:`\sigma_s`) 
+            (:math:`\sigma_t`, :math:`\sigma_r`, and :math:`\sigma_s`)
             for the three normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
@@ -740,7 +740,7 @@ def randn_Sim3(*lsize, sigma=1.0, **kwargs):
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: ``None``. If ``None``, uses a global default 
+            Default: ``None``. If ``None``, uses a global default
             (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
@@ -757,17 +757,17 @@ def randn_Sim3(*lsize, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-        - a single ``float`` -- in which all the elements in the :obj:`Sim3_type` 
-          share the same sigma, i.e., 
-          :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}` 
+        - a single ``float`` -- in which all the elements in the :obj:`Sim3_type`
+          share the same sigma, i.e.,
+          :math:`\sigma_{\rm{t}}` = :math:`\sigma_{\rm{r}}`
           = :math:`\sigma_{\rm{s}}` = :math:`\sigma`.
-        - a ``tuple`` of three floats -- in which case, the specific sigmas 
-          for the three parts are assigned independently, i.e., 
-          :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`, 
+        - a ``tuple`` of three floats -- in which case, the specific sigmas
+          for the three parts are assigned independently, i.e.,
+          :math:`\sigma` = (:math:`\sigma_{\rm{t}}`, :math:`\sigma_{\rm{r}}`,
           :math:`\sigma_{\rm{s}}`).
-        - a ``tuple`` of five floats -- in which case, the specific sigmas 
+        - a ``tuple`` of five floats -- in which case, the specific sigmas
           for each translation data are also assigned independently, i.e.,
-          :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`, 
+          :math:`\sigma` = (:math:`\sigma_{\rm{tx}}`, :math:`\sigma_{\rm{ty}}`,
           :math:`\sigma_{\rm{tz}}`, :math:`\sigma_{\rm{r}}`, :math:`\sigma_{\rm{s}}`).
 
     Example:
@@ -790,7 +790,7 @@ def randn_Sim3(*lsize, sigma=1.0, **kwargs):
 
 def randn_rxso3(*lsize, sigma=1.0, **kwargs):
     r'''
-    Returns :obj:`rxso3_type` LieTensor filled with random numbers. 
+    Returns :obj:`rxso3_type` LieTensor filled with random numbers.
 
     .. math::
         \mathrm{data}[*, :] = [\delta_x, \delta_y, \delta_z, \log s],
@@ -805,7 +805,7 @@ def randn_rxso3(*lsize, sigma=1.0, **kwargs):
         lsize (int...): a sequence of integers defining the lshape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float or (float...), optional): standard deviation (:math:`\sigma_r`, 
+        sigma (float or (float...), optional): standard deviation (:math:`\sigma_r`,
             and :math:`\sigma_s`) for the two normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
@@ -814,7 +814,7 @@ def randn_rxso3(*lsize, sigma=1.0, **kwargs):
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: ``None``. If ``None``, uses a global default 
+            Default: ``None``. If ``None``, uses a global default
             (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
@@ -831,11 +831,11 @@ def randn_rxso3(*lsize, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-        - a single ``float`` -- in which all the elements in the :obj:`rxso3_type` share 
-          the same sigma, i.e., :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` 
+        - a single ``float`` -- in which all the elements in the :obj:`rxso3_type` share
+          the same sigma, i.e., :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}`
           = :math:`\sigma`.
-        - a ``tuple`` of two floats -- in which case, the specific sigmas for the two parts 
-          are assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{r}}`, 
+        - a ``tuple`` of two floats -- in which case, the specific sigmas for the two parts
+          are assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{r}}`,
           :math:`\sigma_{\rm{s}}`).
 
     Example:
@@ -853,7 +853,7 @@ def randn_rxso3(*lsize, sigma=1.0, **kwargs):
 def randn_RxSO3(*lsize, sigma=1.0, **kwargs):
     r'''
     Returns :obj:`RxSO3_type` LieTensor filled with the Exponential map of the random
-    :obj:`rxso3_type` LieTensor. The :obj:`rxso3_type` LieTensor is generated using 
+    :obj:`rxso3_type` LieTensor. The :obj:`rxso3_type` LieTensor is generated using
     :meth:`randn_rxso3()`.
 
     .. math::
@@ -870,7 +870,7 @@ def randn_RxSO3(*lsize, sigma=1.0, **kwargs):
         lsize (int...): a sequence of integers defining the lshape of the output tensor.
             Can be a variable number of arguments or a collection like a list or tuple.
 
-        sigma (float or (float...), optional): standard deviation (:math:`\sigma_r`, 
+        sigma (float or (float...), optional): standard deviation (:math:`\sigma_r`,
             and :math:`\sigma_s`) for the two normal distribution. Default: ``1.0``.
 
         requires_grad (bool, optional): If autograd should record operations on
@@ -879,7 +879,7 @@ def randn_RxSO3(*lsize, sigma=1.0, **kwargs):
         generator (torch.Generator, optional): a pseudorandom number generator for sampling
 
         dtype (torch.dtype, optional): the desired data type of returned tensor.
-            Default: ``None``. If ``None``, uses a global default 
+            Default: ``None``. If ``None``, uses a global default
             (see :meth:`torch.set_default_tensor_type()`).
 
         layout (torch.layout, optional): the desired layout of returned Tensor.
@@ -896,11 +896,11 @@ def randn_RxSO3(*lsize, sigma=1.0, **kwargs):
     Note:
         The parameter :math:`\sigma` can either be:
 
-        - a single ``float`` -- in which all the elements in the :obj:`RxSO3_type` share 
-          the same sigma, i.e., :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` = 
+        - a single ``float`` -- in which all the elements in the :obj:`RxSO3_type` share
+          the same sigma, i.e., :math:`\sigma_{\rm{r}}` = :math:`\sigma_{\rm{s}}` =
           :math:`\sigma`.
-        - a ``tuple`` of two floats -- in which case, the specific sigmas for the two parts 
-          are assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{r}}`, 
+        - a ``tuple`` of two floats -- in which case, the specific sigmas for the two parts
+          are assigned independently, i.e., :math:`\sigma` = (:math:`\sigma_{\rm{r}}`,
           :math:`\sigma_{\rm{s}}`).
 
     Example:
@@ -920,7 +920,7 @@ def identity_like(liegroup, **kwargs):
      Returns identity LieTensor with the same :obj:`lsize` and :obj:`ltype` as the given LieTensor.
 
     Args:
-        liegroup (LieTensor): the size of liegroup will determine the size of the output tensor. 
+        liegroup (LieTensor): the size of liegroup will determine the size of the output tensor.
 
     Args:
         requires_grad (bool, optional): If autograd should record operations on
@@ -938,7 +938,7 @@ def identity_like(liegroup, **kwargs):
             Default: if None, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
-    
+
     Example:
         >>> x = pp.randn_SO3(3, device="cuda:0", dtype=torch.double, requires_grad=True)
         >>> pp.identity_like(x, device="cpu")
@@ -977,10 +977,10 @@ def identity_SO3(*lsize, **kwargs):
             Default: if None, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
-    
+
     Returns:
         LieTensor: a :obj:`SO3_type` LieTensor
-    
+
     Example:
         >>> pp.identity_SO3()
         SO3Type LieTensor:
@@ -1002,7 +1002,7 @@ def identity_SO3(*lsize, **kwargs):
 def identity_so3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`so3_type` LieTensor with the given :obj:`lsize`.
-    
+
     See :obj:`so3()` for implementation details.
 
     Args:
@@ -1026,10 +1026,10 @@ def identity_so3(*lsize, **kwargs):
             Default: if None, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
-    
+
     Returns:
         LieTensor: a :obj:`so3_type` LieTensor
-    
+
     Example:
         >>> pp.identity_so3()
         so3Type LieTensor:
@@ -1051,14 +1051,14 @@ def identity_so3(*lsize, **kwargs):
 def identity_SE3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`SE3_type` LieTensor with the given :obj:`lsize`.
-    
+
     See :obj:`SE3()` for implementation details.
 
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
             the output LieTensor. Can be a variable number of arguments or a collection like a
             list or tuple. If not given, a single :obj:`SE3_type` item will be returned.
-    
+
     Args:
 
         requires_grad (bool, optional): If autograd should record operations on
@@ -1076,10 +1076,10 @@ def identity_SE3(*lsize, **kwargs):
             Default: if None, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
-    
+
     Returns:
         LieTensor: a :obj:`SE3_type` LieTensor
-    
+
     Example:
         >>> pp.identity_SE3()
         SE3Type LieTensor:
@@ -1101,9 +1101,9 @@ def identity_SE3(*lsize, **kwargs):
 def identity_se3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`se3_type` LieTensor with the given :obj:`lsize`.
-    
+
     See :obj:`se3()` for implementation details.
-    
+
     Args:
         lsize (int..., optional): a sequence of integers defining the :obj:`LieTensor.lshape` of
             the output LieTensor. Can be a variable number of arguments or a collection like a
@@ -1125,10 +1125,10 @@ def identity_se3(*lsize, **kwargs):
             Default: if None, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
-    
+
     Returns:
         LieTensor: a :obj:`se3_type` LieTensor
-    
+
     Example:
         >>> pp.identity_se3()
         se3Type LieTensor:
@@ -1150,7 +1150,7 @@ def identity_se3(*lsize, **kwargs):
 def identity_sim3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`sim3_type` LieTensor with the given :obj:`lsize`.
-    
+
     See :obj:`sim3()` for implementation details.
 
     Args:
@@ -1174,10 +1174,10 @@ def identity_sim3(*lsize, **kwargs):
             Default: if None, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
-    
+
     Returns:
         LieTensor: a :obj:`sim3_type` LieTensor
-        
+
     Example:
         >>> pp.identity_sim3()
         sim3Type LieTensor:
@@ -1199,7 +1199,7 @@ def identity_sim3(*lsize, **kwargs):
 def identity_Sim3(*lsize, **kwargs):
     r'''
     Returns identity :obj:`Sim3_type` LieTensor with the given :obj:`lsize`.
-    
+
     See :obj:`Sim3()` for implementation details.
 
     Args:
@@ -1223,10 +1223,10 @@ def identity_Sim3(*lsize, **kwargs):
             Default: if None, uses the current device for the default tensor
             type (see :meth:`torch.set_default_tensor_type()`). device will be the CPU
             for CPU tensor types and the current CUDA device for CUDA tensor types.
-    
+
     Returns:
         LieTensor: a :obj:`Sim3_type` LieTensor
-        
+
     Example:
         >>> pp.identity_Sim3()
         Sim3Type LieTensor:
@@ -1242,13 +1242,13 @@ def identity_Sim3(*lsize, **kwargs):
         tensor([[[0., 0., 0., 0., 0., 0., 1., 1.]],
                 [[0., 0., 0., 0., 0., 0., 1., 1.]]])
     '''
-    return Sim3_type.identity(*lsize, **kwargs)    
+    return Sim3_type.identity(*lsize, **kwargs)
 
 
 def identity_rxso3(*size, **kwargs):
     r'''
     Returns identity :obj:`rxso3_type` LieTensor with the given :obj:`lsize`.
-    
+
     See :obj:`rxSO3()` for implementation details.
 
     Args:
@@ -1296,7 +1296,7 @@ def identity_rxso3(*size, **kwargs):
 
 def identity_RxSO3(*size, **kwargs):
     r'''Returns identity :obj:`RxSO3_type` LieTensor with the given :obj:`lsize`.
-    
+
     See :obj:`RxSO3()` for implementation details.
 
     Args:
@@ -1430,7 +1430,7 @@ def Exp(input):
 
         .. math::
             \mathbf{y}_i = \left[\mathbf{J}_i\bm{\tau}_i, \mathrm{Exp}(\bm{\phi}_i)\right],
-        
+
         where :math:`\mathrm{Exp}` is the Exponential map for :obj:`so3_type` input and
         :math:`\mathbf{J}_i` is the left Jacobian for :obj:`so3_type` input.
 
@@ -1456,7 +1456,7 @@ def Exp(input):
 
         .. math::
             \mathbf{y}_i = \left[^{s}\mathbf{W}_i\bm{\tau}_i, \mathrm{Exp}(^{s}\bm{\phi}_i)\right],
-        
+
         where
 
         .. math::
@@ -1466,7 +1466,7 @@ def Exp(input):
 
         .. math::
             A = \left\{
-                    \begin{array}{ll} 
+                    \begin{array}{ll}
                         \frac{s_i\sin\theta_i\sigma_i + (1-s_i\cos\theta_i)\theta_i}
                         {\theta_i(\sigma_i^2 + \theta_i^2)}, \quad \|\theta_i\| \geq \text{eps}, \\
                         \frac{(\sigma_i-1)s_i+1}{\sigma_i^2}, \quad \|\theta_i\| < \text{eps},
@@ -1474,9 +1474,9 @@ def Exp(input):
                 \right.
 
         .. math::
-            B = 
+            B =
             \left\{
-                \begin{array}{ll} 
+                \begin{array}{ll}
                     \left( C - \frac{(s_i\cos\theta_i-1)\sigma+ s_i\sin\theta_i\sigma_i}
                     {\theta_i^2+\sigma_i^2}\right)\frac{1}{\theta_i^2}, \quad \|\theta_i\|
                         \geq \text{eps}, \\
@@ -1492,7 +1492,7 @@ def Exp(input):
 
         .. math::
             A = \left\{
-                    \begin{array}{ll} 
+                    \begin{array}{ll}
                         \frac{1-\cos\theta_i}{\theta_i^2}, \quad \|\theta_i\| \geq \text{eps}, \\
                         \frac{1}{2}, \quad \|\theta_i\| < \text{eps},
                     \end{array}
@@ -1500,7 +1500,7 @@ def Exp(input):
 
         .. math::
             B = \left\{
-                    \begin{array}{ll} 
+                    \begin{array}{ll}
                         \frac{\theta_i - \sin\theta_i}{\theta_i^3}, \quad \|\theta_i\|
                             \geq \text{eps}, \\
                         \frac{1}{6}, \quad \|\theta_i\| < \text{eps},
@@ -1509,7 +1509,7 @@ def Exp(input):
 
         .. math::
             C = 1
-    
+
     Note:
         The detailed explanation of the above :math:`\mathrm{Exp}`: calculation can be found
         in the paper:
@@ -1532,7 +1532,7 @@ def Exp(input):
                 \theta = \|\mathbf{x}\|.
 
         Then, the corresponding quaternion is:
-        
+
             .. math::
                 \mathbf{q} = \left[\frac{\sin(\|\mathbf{x}\|/2)}{\|\mathbf{x}\|} \mathbf{x},
                     \cos(\|\mathbf{x}\|/2) \right].
@@ -1629,7 +1629,7 @@ def Log(input):
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :obj:`rxso3_type`
-    
+
     Warning:
         This function :func:`Log()` is different from :func:`log()`, which returns
         a new torch tensor with the logarithm of the elements of the input tensor.
@@ -1643,11 +1643,11 @@ def Log(input):
         If :math:`\|\boldsymbol{\nu}_i\| > \text{eps}`:
 
         .. math::
-            \mathbf{y}_i = 
+            \mathbf{y}_i =
                 \left\{
-                    \begin{array}{ll} 
+                    \begin{array}{ll}
                         2\frac{\mathrm{arctan}(\|\boldsymbol{\nu}_i\|/w_i)}{\|
-                        \boldsymbol{\nu}_i\|}\boldsymbol{\nu}_i, 
+                        \boldsymbol{\nu}_i\|}\boldsymbol{\nu}_i,
                             \quad \|w_i\| > \text{eps}, \\
                         \mathrm{pm}(w_i) \frac{\pi}{\|\boldsymbol{\nu}_i\|}
                             \boldsymbol{\nu}_i, \quad \|w_i\| \leq \text{eps},
@@ -1657,9 +1657,9 @@ def Log(input):
         otherwise:
 
         .. math::
-            \mathbf{y}_i = 2\left( \frac{1}{w_i} - 
+            \mathbf{y}_i = 2\left( \frac{1}{w_i} -
                 \frac{\|\boldsymbol{\nu}_i\|^2}{3w_i^3}\right)\boldsymbol{\nu}_i.
-        
+
         where :math:`\mathrm{pm}` is the plus or minus (:math:`\pm`) operator
         (refer to :meth:`pm`).
 
@@ -1708,7 +1708,7 @@ def Log(input):
 
         .. math::
             A = \left\{
-                    \begin{array}{ll} 
+                    \begin{array}{ll}
                         \frac{s_i\sin\theta_i\sigma_i + (1-s_i\cos\theta_i)\theta_i}
                         {\theta_i(\sigma_i^2 + \theta_i^2)}, \quad \|\theta_i\| > \text{eps}, \\
                         \frac{(\sigma_i-1)s_i+1}{\sigma_i^2}, \quad \|\theta_i\| \leq \text{eps},
@@ -1716,9 +1716,9 @@ def Log(input):
                 \right.
 
         .. math::
-            B = 
+            B =
             \left\{
-                \begin{array}{ll} 
+                \begin{array}{ll}
                     \left( C - \frac{(s_i\cos\theta_i-1)\sigma+ s_i\sin\theta_i\sigma_i}
                     {\theta_i^2+\sigma_i^2}\right)\frac{1}{\theta_i^2},
                         \quad \|\theta_i\| > \text{eps}, \\
@@ -1734,7 +1734,7 @@ def Log(input):
 
         .. math::
             A = \left\{
-                    \begin{array}{ll} 
+                    \begin{array}{ll}
                         \frac{1-\cos\theta_i}{\theta_i^2}, \quad \|\theta_i\| > \text{eps}, \\
                         \frac{1}{2}, \quad \|\theta_i\| \leq \text{eps},
                     \end{array}
@@ -1742,7 +1742,7 @@ def Log(input):
 
         .. math::
             B = \left\{
-                    \begin{array}{ll} 
+                    \begin{array}{ll}
                         \frac{\theta_i - \sin\theta_i}{\theta_i^3},
                             \quad \|\theta_i\| > \text{eps}, \\
                         \frac{1}{6}, \quad \|\theta_i\| \leq \text{eps},
@@ -1768,15 +1768,15 @@ def Log(input):
 
         Therefore, given a quaternion :math:`\mathbf{q}=[\boldsymbol{\nu}, w]`, where
         :math:`\boldsymbol{\nu}` is the vector part, :math:`w` is the scalar part, to find
-        the corresponding rotation vector, the rotation angle :math:`\theta` can be obtained as 
+        the corresponding rotation vector, the rotation angle :math:`\theta` can be obtained as
 
             .. math::
                 \theta = 2\mathrm{arctan}(\|\boldsymbol{\nu}\|/w),~\|\boldsymbol{\nu}\|
-                = \sin(\theta/2), 
+                = \sin(\theta/2),
 
         The unit rotation axis :math:`\mathbf{n}` can be obtained as :math:`\mathbf{n} =
         \frac{\boldsymbol{\nu}}{{\|\boldsymbol{\nu}\|}}`.
-        Hence, the corresponding rotation vector is 
+        Hence, the corresponding rotation vector is
 
             .. math::
                 \theta \mathbf{n} = 2\frac{\mathrm{arctan}
@@ -1785,7 +1785,7 @@ def Log(input):
         More details about :math:`^s\mathbf{W}_i` in :obj:`Sim3_type` can be found in Eq. (5.7):
 
         * H. Strasdat, `Local accuracy and global consistency for efficient visual SLAM
-          <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.640.199&rep=rep1&type=pdf>`_, 
+          <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.640.199&rep=rep1&type=pdf>`_,
           Dissertation. Department of Computing, Imperial College London, 2012.
 
     Example:
@@ -1924,7 +1924,7 @@ def Inv(x):
         of :math:`\mathbf{x}_i`, respectively;  :math:`\mathbf{y}` be the output.
 
         .. math::
-            \mathbf{y}_i = \left[-\mathrm{Inv}(^s\mathbf{q}_i)*\mathbf{t}_i, 
+            \mathbf{y}_i = \left[-\mathrm{Inv}(^s\mathbf{q}_i)*\mathbf{t}_i,
             \mathrm{Inv}(^s\mathbf{q}_i) \right]
 
     * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`so3_type` or :obj:`se3_type` or
@@ -2049,7 +2049,7 @@ def Retr(X, a):
     .. math::
         Y_i = \mathrm{Exp}(a_i) * X_i,
 
-    where :math:`\mathrm{Exp}` means the exponetial map. See :obj:`pypose.Exp` for more details. 
+    where :math:`\mathrm{Exp}` means the exponetial map. See :obj:`pypose.Exp` for more details.
 
     Args:
         X (LieTensor): the input LieTensor to retract (Lie Group)
@@ -2154,7 +2154,7 @@ def Act(X, p):
 @assert_ltype
 def Adj(input, p):
     r"""
-    The dot product between the Adjoint matrix at the point given by an input (Lie Group) and 
+    The dot product between the Adjoint matrix at the point given by an input (Lie Group) and
     the second point (Lie Algebra).
 
     .. math::
@@ -2195,7 +2195,7 @@ def Adj(input, p):
           - :math:`(\mathcal{G}\in\mathbb{R}^{*\times5}, \mathcal{g}\in\mathbb{R}^{*\times4})`
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
-          - :obj:`rxso3_type` 
+          - :obj:`rxso3_type`
 
     Let the input be (:math:`\mathbf{x}`, :math:`\mathbf{p}`), :math:`\mathbf{y}` be the output.
 
@@ -2211,7 +2211,7 @@ def Adj(input, p):
       The adjoint transformation is given by:
 
         .. math::
-            \mathrm{Adj}(\mathbf{x}_i) = \mathbf{x}_i 
+            \mathrm{Adj}(\mathbf{x}_i) = \mathbf{x}_i
 
         In the case of :math:`\textrm{SO3}`, the adjoint transformation for an element is the same
         rotation matrix used to represent the element. Rotating a tangent vector by an element
@@ -2228,7 +2228,7 @@ def Adj(input, p):
 
         .. math::
             \mathrm{Adj}(\mathbf{x}_i) = \left[
-                                \begin{array}{cc} 
+                                \begin{array}{cc}
                                     \mathbf{R}_i & \mathbf{t}_{i\times}\mathbf{R}_i \\
                                     0 & \mathbf{R}_i
                                 \end{array}
@@ -2238,11 +2238,11 @@ def Adj(input, p):
 
         .. math::
             \mathbf{x}_i = \left[
-                                \begin{array}{cc} 
+                                \begin{array}{cc}
                                     \mathbf{R}_i& \mathbf{t}_i \\
                                     0 & 1
                                 \end{array}
-                             \right] \in \mathrm{SE(3)}  
+                             \right] \in \mathrm{SE(3)}
 
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`Sim3_type` and
       :obj:`sim3_type` (input :math:`\mathbf{x}` is an instance of :meth:`Sim3`, :math:`\mathbf{p}`
@@ -2254,7 +2254,7 @@ def Adj(input, p):
 
         .. math::
             \mathrm{Adj}(\mathbf{x}_i) = \left[
-                        \begin{array}{cc} 
+                        \begin{array}{cc}
                             s_i\mathbf{R}_i& \mathbf{t}_{i\times}\mathbf{R}_i& -\mathbf{t}_i \\
                             0 & \mathbf{R}_i& 0 \\
                             0 & 0 & 1
@@ -2265,11 +2265,11 @@ def Adj(input, p):
 
         .. math::
             \mathbf{x}_i = \left[
-                                \begin{array}{cc} 
+                                \begin{array}{cc}
                                     s_i\mathbf{R}_i & \mathbf{t}_i \\
                                     0 & 1
                                 \end{array}
-                             \right] \in \textrm{Sim(3)}    
+                             \right] \in \textrm{Sim(3)}
 
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`RxSO3_type`
       and :obj:`rxso3_type` (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`,
@@ -2279,7 +2279,7 @@ def Adj(input, p):
 
         .. math::
             \mathrm{Adj}(\mathbf{x}_i) = \left[
-                                \begin{array}{cc} 
+                                \begin{array}{cc}
                                     \mathbf{R}_i & 0 \\
                                     0 & 1
                                 \end{array}
@@ -2289,7 +2289,7 @@ def Adj(input, p):
 
         .. math::
             \mathbf{x}_i = \left[
-                                \begin{array}{cc} 
+                                \begin{array}{cc}
                                     s_i\mathbf{R}_i & 0 \\
                                     0 & 1
                                 \end{array}
@@ -2304,15 +2304,15 @@ def Adj(input, p):
         :math:`\mathbf{x} \in \mathcal{G}` to the left tangent space.
 
         .. math::
-            \mathrm{Exp}(\mathrm{Adj}(\mathbf{x}) \mathbf{p}) * \mathbf{x} 
+            \mathrm{Exp}(\mathrm{Adj}(\mathbf{x}) \mathbf{p}) * \mathbf{x}
             = \mathbf{x} * \mathrm{Exp}(\mathbf{p})
-        
+
         It can be easily verified:
 
             >>> x, p = pp.randn_SO3(), pp.randn_so3()
             >>> torch.allclose(x*p.Exp(), x.Adj(p).Exp()*x)
             True
-        
+
         One can refer to Eq. (8) of the following paper:
 
         * Zachary Teed et al., `Tangent Space Backpropagation for 3D Transformation Groups
@@ -2328,10 +2328,10 @@ def Adj(input, p):
           robotics <https://arxiv.org/abs/1812.01537>`_, arXiv preprint arXiv:1812.01537 (2018).
 
         The following thesis and the tutorial serve as a good reading material to learn more
-        about deriving the adjoint matrices for different transformation groups. 
+        about deriving the adjoint matrices for different transformation groups.
 
         * Strasdat, H., 2012. `Local accuracy and global consistency for efficient visual SLAM
-          <https://www.doc.ic.ac.uk/~ajd/Publications/Strasdat-H-2012-PhD-Thesis.pdf>`_, 
+          <https://www.doc.ic.ac.uk/~ajd/Publications/Strasdat-H-2012-PhD-Thesis.pdf>`_,
           (Doctoral dissertation, Department of Computing, Imperial College London).
 
         * `Lie Groups for 2D and 3D Transformations.
@@ -2435,7 +2435,7 @@ def Jinvp(input, p):
             \mathbf{y}_i = \mathbf{J}^{-1}_i(\mathbf{x}_i)\mathbf{p}_i,
 
         where :math:`\mathbf{J}^{-1}_i(\mathbf{x}_i)` is the inverse of left Jacobian of
-        :math:`\mathbf{x}_i`. 
+        :math:`\mathbf{x}_i`.
 
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`SO3_type`
       and :obj:`so3_type` (input :math:`\mathbf{x}` is an instance of :meth:`SO3`,
@@ -2449,12 +2449,12 @@ def Jinvp(input, p):
             \mathrm{coef}\boldsymbol{\Phi}_i^2
 
       where :math:`\mathbf{I}` is the identity matrix with the same dimension as
-      :math:`\boldsymbol{\Phi}_i`, and 
+      :math:`\boldsymbol{\Phi}_i`, and
 
         .. math::
             \mathrm{coef} =
                 \left\{
-                \begin{array}{ll} 
+                \begin{array}{ll}
                     \frac{1}{\theta_i^2} -
                     \frac{\cos{\frac{\theta_i}{2}}}{2\theta\sin{\frac{\theta_i}{2}}},
                     \quad \|\theta_i\| > \text{eps}, \\
@@ -2474,35 +2474,35 @@ def Jinvp(input, p):
         .. math::
             \mathbf{J}^{-1}_i(\mathbf{x}_i) =
                 \left[
-                \begin{array}{cc} 
-                    \mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i) & 
+                \begin{array}{cc}
+                    \mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i) &
                             - \mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i)
-                    \mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i) 
+                    \mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i)
                         \mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i) \\
                     \mathbf{0} & \mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i)
                 \end{array}
                 \right]
 
         where :math:`\mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i)` is the inverse of left Jacobian
-        of the SO3 part of :math:`\mathbf{x}_i`. 
-        :math:`\mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i)` is 
+        of the SO3 part of :math:`\mathbf{x}_i`.
+        :math:`\mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i)` is
 
         .. math::
             \begin{align*}
-                \mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i) = 
+                \mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i) =
                     \frac{1}{2}\boldsymbol{\Tau}_i &+ c_1
-                (\boldsymbol{\Phi_i\Tau_i} + \boldsymbol{\Tau_i\Phi_i} 
+                (\boldsymbol{\Phi_i\Tau_i} + \boldsymbol{\Tau_i\Phi_i}
                     + \boldsymbol{\Phi_i\Tau_i\Phi_i}) \\
-                 &+ c_2 (\boldsymbol{\Phi_i^2\Tau_i} + \boldsymbol{\Tau_i\Phi_i^2} 
+                 &+ c_2 (\boldsymbol{\Phi_i^2\Tau_i} + \boldsymbol{\Tau_i\Phi_i^2}
                     - 3\boldsymbol{\Phi_i\Tau_i\Phi_i})\\
-                 &+ c_3 (\boldsymbol{\Phi_i\Tau_i\Phi_i^2} + \boldsymbol{\Phi_i^2\Tau_i\Phi_i})  
+                 &+ c_3 (\boldsymbol{\Phi_i\Tau_i\Phi_i^2} + \boldsymbol{\Phi_i^2\Tau_i\Phi_i})
             \end{align*}
 
         where,
 
         .. math::
             c_1 = \left\{
-                    \begin{array}{ll} 
+                    \begin{array}{ll}
                         \frac{\theta_i - \sin\theta_i}{\theta_i^3},
                             \quad \|\theta_i\| > \text{eps}, \\
                         \frac{1}{6}-\frac{1}{120}\theta_i^2,
@@ -2512,7 +2512,7 @@ def Jinvp(input, p):
 
         .. math::
             c_2 = \left\{
-                    \begin{array}{ll} 
+                    \begin{array}{ll}
                         \frac{\theta_i^2 +2\cos\theta_i - 2}{2\theta_i^4},
                             \quad \|\theta_i\| > \text{eps}, \\
                         \frac{1}{24}-\frac{1}{720}\theta_i^2,
@@ -2522,13 +2522,13 @@ def Jinvp(input, p):
 
         .. math::
             c_3 = \left\{
-                    \begin{array}{ll} 
-                        \frac{2\theta_i - 3\sin\theta_i + \theta_i\cos\theta_i}{2\theta_i^5}, 
+                    \begin{array}{ll}
+                        \frac{2\theta_i - 3\sin\theta_i + \theta_i\cos\theta_i}{2\theta_i^5},
                         \quad \|\theta_i\| > \text{eps}, \\
                         \frac{1}{120}-\frac{1}{2520}\theta_i^2,
                         \quad \|\theta_i\| \leq \text{eps}
                     \end{array}
-                    \right.           
+                    \right.
 
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`Sim3_type`
       and :obj:`sim3_type` (input :math:`\mathbf{x}` is an instance of :meth:`Sim3`,
@@ -2536,7 +2536,7 @@ def Jinvp(input, p):
       be approximated as:
 
         .. math::
-            \mathbf{J}^{-1}_i(\mathbf{x}_i) = 
+            \mathbf{J}^{-1}_i(\mathbf{x}_i) =
                 \sum_{n=0}(-1)^n\frac{B_n}{n!}(\boldsymbol{\xi}_i^{\curlywedge})^n
 
         where :math:`B_n` is the Bernoulli number: :math:`B_0 = 1`, :math:`B_1 = -\frac{1}{2}`,
@@ -2547,9 +2547,9 @@ def Jinvp(input, p):
         :math:`\boldsymbol{X}_i = \mathrm{Adj}(\mathbf{x}_i)` and :math:`\mathrm{Adj}` is the
         adjoint of the Lie group :math:`\mathrm{Sim}(3)`, there is a nice property:
         :math:`\mathrm{Adj}(\mathrm{Exp}(\boldsymbol{\xi}_i^{\curlywedge})) =
-        \mathrm{Exp}(\mathrm{adj}(\boldsymbol{\xi}_i^{\wedge}))`, 
+        \mathrm{Exp}(\mathrm{adj}(\boldsymbol{\xi}_i^{\wedge}))`,
         or :math:`\boldsymbol{X}_i = \mathrm{Exp}(\boldsymbol{\xi}_i^{\curlywedge})`.
-        
+
 
     * If input (:math:`\mathbf{x}`, :math:`\mathbf{p}`)'s :obj:`ltype` are :obj:`RxSO3_type`
       and :obj:`rxso3_type` (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3`,
@@ -2561,7 +2561,7 @@ def Jinvp(input, p):
 
         .. math::
             \mathbf{J}^{-1}_i(\mathbf{x}_i) = \left[
-                                \begin{array}{cc} 
+                                \begin{array}{cc}
                                     \mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i) & \mathbf{0} \\
                                     \mathbf{0} & 1
                                 \end{array}
@@ -2578,11 +2578,11 @@ def Jinvp(input, p):
         * J. Sola et al., `A micro Lie theory for state estimation in
           robotics <https://arxiv.org/abs/1812.01537>`_, arXiv preprint arXiv:1812.01537 (2018).
 
-        In particular, Eq. (146) is the math used in the :obj:`SO3_type`, :obj:`so3_type` scenario; 
+        In particular, Eq. (146) is the math used in the :obj:`SO3_type`, :obj:`so3_type` scenario;
         Eq. (179b) and Eq. (180) are the math used in the :obj:`SE3_type`, :obj:`se3_type` scenario.
 
         For Lie groups such as :obj:`Sim3_type`, :obj:`sim3_type`,
-        there is no analytic expression for the left Jacobian and its inverse. 
+        there is no analytic expression for the left Jacobian and its inverse.
         Numerical approximation is used based on series expansion.
         One can refer to Eq. (26) of this paper for more details about the approximation:
 
