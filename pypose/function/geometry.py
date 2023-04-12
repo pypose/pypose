@@ -125,7 +125,7 @@ def point2pixel(points, intrinsics, extrinsics=None):
 
 def reprojerr(points, pixels, intrinsics, extrinsics):
     r'''
-    Calculates batched per-pixel reprojection error (distance) for points in the world
+    Calculates batched per-pixel reprojection error (pixel distance) for points in the world
     coordinate, given camera intrinsic and extrinsic parameters.
 
     Args:
