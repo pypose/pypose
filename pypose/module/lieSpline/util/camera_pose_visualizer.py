@@ -1,3 +1,4 @@
+'''Reference https://github.com/demul/extrinsic2pyramid'''
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
