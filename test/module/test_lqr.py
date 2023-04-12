@@ -109,7 +109,7 @@ class TestLQR:
         n_state, n_ctrl = 4, 3
 
         Q = torch.tile(torch.eye(n_state + n_ctrl, device=device), (n_batch, 1, 1))
-        p = torch.tensor([[-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54], 
+        p = torch.tensor([[-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54],
                           [-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54]], device=device)
         rt = torch.arange(1, T+1).view(T, 1, 1)
         A = rt * torch.tile(torch.eye(n_state, device=device), (n_batch, T, 1, 1))
@@ -120,7 +120,7 @@ class TestLQR:
                                [-1.05, -1.36,  0.43,  0.80]], device=device)
 
         class MyLTV(pp.module.LTV):
-        
+
             def __init__(self, A, B, C, D):
                 super().__init__(A, B, C, D)
 
@@ -135,7 +135,7 @@ class TestLQR:
             @property
             def C(self):
                 return self._C[...,self._t,:,:]
-        
+
             @property
             def D(self):
                 return self._D[...,self._t,:,:]
@@ -146,7 +146,7 @@ class TestLQR:
 
         torch.testing.assert_close(x_ref, x, atol=1e-5, rtol=1e-3)
         torch.testing.assert_close(u_ref, u, atol=1e-5, rtol=1e-3)
-        
+
 
 if __name__ == '__main__':
     test = TestLQR()
