@@ -1,7 +1,10 @@
+#### ADD RELATIVE IMPORTS 
 import pypose as pp
 from pypose.optim.solver import Cholesky
 from pypose.optim.functional import modjac
+####
 import torch
+from torch.autograd.function import jacobian 
 
 
 class InnerModel(torch.nn.Module):
@@ -50,27 +53,67 @@ class BLO(pp.optim._Optimizer):
 
         self.outer_model = outer_model
 
-
     ####
     def _dLdTheta(self, input):
-        return modjac(outer_model, input)
+        return modjac(self.outer_model.forward, input)
+    
+    def _dLdTau(self, input):
+        return jacobian(self.outer_model.forward, input)
 
-    def _dLdTauTheta(self, input):
-        return modjac(self._dGdTheta, input)
+    def _dJGdTau(self, input):
+        return jacobian(self.outer_model.inner_model.forward, input, retain_graph = True)
+    
+    def _dJGdTauTau(self, input):
+        return jacobian(self._dJGdTau, input)
+    
+    def _dJGdTauTheta(self, input):
+        return jacobian(self._dJGdTau, input, retain_graph = True)
 
-    def 
+    def _dGdTheta(self, input):
+        return modjac(self.outer_model.inner_model.forward, input)[1]
+    
+    def _H(self, input):
+        dJdT, dGdT = jacobian(self._dJdGtau, input, retain_graph = True)
+        return torch.add(dJdT, dGdT, alpha = self.mu_star.unsqueeze(0).transpose(0, 2))
+
+    def _dHdTheta(self, input):
+        return modjac(self._H, input)
     ####
     
     @torch.no_grad()
     def step(self, input, target = None, weight = None):
         self.scheduler.optimize()
-        tau_star, mu_star = self.inner_optimizer.tau, self.inner_optimizer.mu
-        
-        # HOW TO GET JACOBIANS EFFICIENTLY
+        self.tau_star, self.mu_star = self.inner_optimizer.tau, self.inner_optimizer.mu
 
-        # COMPUTE AND SET GRADIENTS
+        # COMPUTE GRADIENTS
+        # Solve equation (6) from pseudocode
+        dJdTT, dGdTT = self._dJdGTauTau(self.tau_star)
+        P = torch.add(dJdTT, dGdTT, alpha = self.mu_star.unsqueeze(0).transpose(0, 2))
+        Q = self._dJGdTau(self.tau_star)
+        R = self._dLdTau(self.tau_star)
+        top = torch.cat((P, Q.transpose(0, 1)), dim=1)
+        bottom = torch.cat((Q, torch.zeros(Q.size(0), Q.size(0))), dim=1)
+        LHS = torch.cat((top, bottom), dim=0)
+        RHS = torch.zeros(LHS.size(0))
+        RHS[:, R.size(0)] = R
+        lams = torch.linalg.solve(LHS, -RHS)
+        lam_tau = lams[:self.tau_star.size(0)].unsqueeze(0).unsqueeze(0), 
+        lam_mu = lams[self.tau_star.size(0)].unsqueeze(0).unsqueeze(0)
+
+        # Further compute required derivatives
+        dHdTh_times_lam = torch.mult(lam_tau.transpose(0,2), self._dHdTheta(self.tau_star))
+        dGdTh_times_lam = torch.mult(lam_mu.transpose(0,2), self._dGdTheta(self.tau_star))
+        dLdTh = self._dLdTheta(self.tau_star)
+
+        dH_plus_dG = tuple(torch.add(tensor1, tensor2) for (tensor1, tensor2) in zip(dHdTh_times_lam, dGdTh_times_lam))
+        D = tuple(torch.add(tensor1, tensor2) for (tensor1, tensor2) in zip(dLdTh, dGdTh_times_lam))
+
+
+        # SET PARAMETER GRADIENTS
+        
 
         # STEP THE OPTIMIZER
 
-        self.loss = self.outer_model.forward(tau_star, target)
-        return self.outer_model(self.tau_star)
+        # Calculate and return loss
+        self.loss = self.outer_model(self.tau_star, target)
+        return self.loss
