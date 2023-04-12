@@ -1,10 +1,10 @@
-#### ADD RELATIVE IMPORTS 
+#### ADD RELATIVE IMPORTS
 import pypose as pp
 from pypose.optim.solver import Cholesky
 from pypose.optim.functional import modjac
 ####
 import torch
-from torch.autograd.function import jacobian 
+from torch.autograd.function import jacobian
 
 
 class InnerModel(torch.nn.Module):
@@ -13,16 +13,16 @@ class InnerModel(torch.nn.Module):
     '''
     def __init__(self) -> None:
         super().__init__()
-        
+
         # Define all parameters
         self.param = torch.nn.parameter(all_params_to_optimize, requires_grad = True)
-    
+
     def forward(tau):
         r'''
         Compute the inner cost and constraint error.
         '''
         raise NotImplementedError("User needs to implement function to return inner cost and constraint error.")
-    
+
 
 class OuterModel(torch.nn.Module):
     r'''
@@ -56,22 +56,22 @@ class BLO(pp.optim._Optimizer):
     ####
     def _dLdTheta(self, input):
         return modjac(self.outer_model.forward, input)
-    
+
     def _dLdTau(self, input):
         return jacobian(self.outer_model.forward, input)
 
     def _dJGdTau(self, input):
         return jacobian(self.outer_model.inner_model.forward, input, retain_graph = True)
-    
+
     def _dJGdTauTau(self, input):
         return jacobian(self._dJGdTau, input)
-    
+
     def _dJGdTauTheta(self, input):
         return jacobian(self._dJGdTau, input, retain_graph = True)
 
     def _dGdTheta(self, input):
         return modjac(self.outer_model.inner_model.forward, input)[1]
-    
+
     def _H(self, input):
         dJdT, dGdT = jacobian(self._dJdGtau, input, retain_graph = True)
         return torch.add(dJdT, dGdT, alpha = self.mu_star.unsqueeze(0).transpose(0, 2))
@@ -79,7 +79,7 @@ class BLO(pp.optim._Optimizer):
     def _dHdTheta(self, input):
         return modjac(self._H, input)
     ####
-    
+
     @torch.no_grad()
     def step(self, input, target = None, weight = None):
         self.scheduler.optimize()
@@ -97,7 +97,7 @@ class BLO(pp.optim._Optimizer):
         RHS = torch.zeros(LHS.size(0))
         RHS[:, R.size(0)] = R
         lams = torch.linalg.solve(LHS, -RHS)
-        lam_tau = lams[:self.tau_star.size(0)].unsqueeze(0).unsqueeze(0), 
+        lam_tau = lams[:self.tau_star.size(0)].unsqueeze(0).unsqueeze(0),
         lam_mu = lams[self.tau_star.size(0)].unsqueeze(0).unsqueeze(0)
 
         # Further compute required derivatives
@@ -110,7 +110,7 @@ class BLO(pp.optim._Optimizer):
 
 
         # SET PARAMETER GRADIENTS
-        
+
 
         # STEP THE OPTIMIZER
 
