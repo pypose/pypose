@@ -137,9 +137,9 @@ class EPnP(torch.nn.Module):
         r'''
         Args:
             points (``torch.Tensor``): 3D object points in the world coordinates.
-                Shape (..., n, 3)
+                Shape (..., N, 3)
             pixels (``torch.Tensor``): 2D image points, which are the projection of
-                object points. Shape (..., n, 2)
+                object points. Shape (..., N, 2)
             intrinsics (torch.Tensor, optional): camera intrinsics. Shape (..., 3, 3).
                 Setting it to any non-``None`` value will override the default intrinsics
                 kept in the module.
@@ -212,7 +212,7 @@ class EPnP(torch.nn.Module):
     def _compute_nullv(pixels, alpha, intrinsics, least=4):
         # Construct M matrix and find its null eigenvectors with the least eigenvalues
         # Check equation 7 in paper for more details.
-        # pixels (..., point, 2); alpha (..., point, 4); intrinsics (..., 3, 3)
+        # pixels (..., N, 2); alpha (..., N, 4); intrinsics (..., 3, 3)
         batch, point = pixels.shape[:-2], pixels.shape[-2]
         u, v = pixels[..., 0], pixels[..., 1]
         fu, u0 = intrinsics[..., 0, 0, None], intrinsics[..., 0, 2, None]

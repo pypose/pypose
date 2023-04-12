@@ -49,7 +49,7 @@ def cart2homo(coordinates:torch.Tensor):
 def homo2cart(coordinates:torch.Tensor):
     r'''
     Converts batched Homogeneous coordinates to Cartesian coordinates
-    by divising the last row.
+    by dividing the last row. Size of the last dimension will be reduced by 1.
 
     Args:
         coordinates (``torch.Tensor``): the Homogeneous coordinates to be converted.
@@ -58,12 +58,10 @@ def homo2cart(coordinates:torch.Tensor):
         ``torch.Tensor``: the coordinates in Cartesian space.
 
     Example:
-        >>> points = torch.randn(2, 4)
-        tensor([[-0.5580, -1.1631, -0.5693,  0.5482],
-                [-1.4770,  0.4703, -1.1718,  0.1307]])
+        >>> points = torch.tensor([[4., 3., 2., 1.], [8., 6., 4., 2.]])
         >>> homo2cart(points)
-        tensor([[ -1.0179,  -2.1215,  -1.0385],
-                [-11.2982,   3.5974,  -8.9636]])
+        tensor([[4., 3., 2.],
+                [4., 3., 2.]])
     '''
     tiny = torch.finfo(coordinates.dtype).tiny
     denum = coordinates[..., -1:].abs().clamp_(min=tiny)
