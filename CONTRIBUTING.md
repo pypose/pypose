@@ -81,6 +81,7 @@ In the VSCode version control panel, clicking the plus sign will stage a file ch
 Afterwards, type in commit message and click the blue 
 commit button. 
 If you are unfamiliar with git usage, feel free to learn more in [this tutorial](https://www.udacity.com/course/version-control-with-git--ud123).
+
 ![image](https://user-images.githubusercontent.com/24406547/231637977-86240535-a420-442d-979f-5327ef5c71ae.png)
 
 
