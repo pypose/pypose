@@ -8,39 +8,38 @@ class ICP(nn.Module):
     Iterative Closest Point (ICP) using Singular Value Decomposition (SVD).
 
     Args:
-        max_iterations: the max iteration number
-        tolerance: the tolerance of error for early stopping
-        is_matching: whether the input points set and the target points set have been matched
+        steplim: the max step number
+        tol: the tolerance of error for early stopping
+        matched: whether the input points set and the target points set have been matched
     '''
 
-    def __init__(self, max_iterations=200, tolerance=0.0001, is_matching=False):
+    def __init__(self, steplim=200, tol=0.0001, matched=False):
         super().__init__()
-        self.max_iterations = max_iterations
-        self.tolerance = tolerance
-        self.is_matching = is_matching
+        self.steplim = steplim
+        self.tol = tol
+        self.matched = matched
 
-    def forward(self, p1, p2):
-        ori_p2 = p2.clone()
-        temp_pc = p1.clone()
-        iter_num = 0
-        prev_err = 0
-        if (not self.is_matching):
-            while iter_num <= self.max_iterations:
-                iter_num += 1
-                nn = self.nearest_neighbor(temp_pc, p2)
-                mean_err = nn.values.mean()
-                transR, transT = self.get_transform(temp_pc, ori_p2[:, nn.indices[-1], :].squeeze(-2))
-                temp_pc = temp_pc @ transR + transT
-                if (abs(prev_err - mean_err) < self.tolerance):
+    def forward(self, newpc, originpc):
+        temp = newpc.clone()
+        iteration = 0
+        err = 0
+        if (not self.matched):
+            while iteration <= self.steplim:
+                iteration += 1
+                neighbor = self.nearest_neighbor(temp, originpc)
+                errnew = neighbor.values.mean()
+                transR, transT = self.get_transform(temp, originpc[:, neighbor.indices[-1], :].squeeze(-2))
+                temp = temp @ transR + transT
+                if (abs(err - errnew) < self.tol):
                     break
-                prev_err = mean_err
+                err = errnew
 
-            transR, transT = self.get_transform(p1, temp_pc)
+            transR, transT = self.get_transform(newpc, temp)
             transT = torch.transpose(transT, 1, 2)
             T = torch.cat([transR, transT], dim=2)
             return pp.mat2SE3(T, check=False)
         else:
-            transR, transT = self.get_transform(p1, p2)
+            transR, transT = self.get_transform(newpc, originpc)
             transT = torch.transpose(transT, 1, 2)
             T = torch.cat([transR, transT], dim=2)
             return pp.mat2SE3(T)
@@ -104,6 +103,6 @@ if __name__=="__main__":
 
     output_pc = (input_pc @ transR) + transT
 
-    icpsvd = ICP(is_matching=False)
+    icpsvd = ICP(matched=False)
     result = icpsvd.forward(input_pc, output_pc)
     print("The ICP result is", result)
