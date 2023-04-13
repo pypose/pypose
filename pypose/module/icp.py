@@ -1,4 +1,5 @@
 import torch
+from . import EPnP
 from .. import mat2SE3
 
 
@@ -33,15 +34,11 @@ class ICP(torch.nn.Module):
                     break
                 err = errnew
 
-            transR, transT = self.get_transform(newpc, temppc)
-            transT = torch.transpose(transT, 1, 2)
-            T = torch.cat([transR, transT], dim=2)
-            return mat2SE3(T, check=False)
+            T = EPnP._points_transform(newpc, temppc)
+            return T
         else:
-            transR, transT = self.get_transform(newpc, originpc)
-            transT = torch.transpose(transT, 1, 2)
-            T = torch.cat([transR, transT], dim=2)
-            return mat2SE3(T)
+            T = EPnP._points_transform(newpc, originpc)
+            return T
 
     def get_transform(self, p1: torch.tensor, p2: torch.tensor):
         r'''Using SVD algorithm to calculate the transformation matrix between the corresponding points set p1, p2.
