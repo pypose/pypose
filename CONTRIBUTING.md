@@ -65,7 +65,8 @@ git pull upstream main
 ```
 
 ### 3. Commit the code and pass the unit test
-- The committed code should pass through the unit test
+
+- Changes we want to commit should pass through the unit test
 
   ```shell
   # Pass all unit tests
@@ -73,6 +74,15 @@ git pull upstream main
   ```
 
 - If the documents are modified/added, we should check the rendering result referring to [guidance](#documentation-rendering)
+
+Finally, changes need to be commited to be added into the working branch for code review. 
+We can use VSCode GUI to manage git staging area.
+In the VSCode version control panel, clicking the plus sign will stage a file change.
+Afterwards, type in commit message and click the blue 
+commit button. 
+If you are unfamiliar with git usage, feel free to learn more in [this tutorial](https://www.udacity.com/course/version-control-with-git--ud123).
+![image](https://user-images.githubusercontent.com/24406547/231637977-86240535-a420-442d-979f-5327ef5c71ae.png)
+
 
 ### 4. Push the code to remote
 
