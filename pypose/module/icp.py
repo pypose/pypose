@@ -1,9 +1,8 @@
 import torch
-import pypose as pp
-from torch import nn
+from .. import mat2SE3
 
 
-class ICP(nn.Module):
+class ICP(torch.nn.Module):
     r'''
     Iterative Closest Point (ICP) using Singular Value Decomposition (SVD).
 
@@ -20,29 +19,29 @@ class ICP(nn.Module):
         self.matched = matched
 
     def forward(self, newpc, originpc):
-        temp = newpc.clone()
-        iteration = 0
+        temppc = newpc.clone()
+        iter = 0
         err = 0
         if (not self.matched):
-            while iteration <= self.steplim:
-                iteration += 1
-                neighbor = self.nearest_neighbor(temp, originpc)
+            while iter <= self.steplim:
+                iter += 1
+                neighbor = self.nearest_neighbor(temppc, originpc)
                 errnew = neighbor.values.mean()
-                transR, transT = self.get_transform(temp, originpc[:, neighbor.indices[-1], :].squeeze(-2))
-                temp = temp @ transR + transT
+                transR, transT = self.get_transform(temppc, originpc[:, neighbor.indices[-1], :].squeeze(-2))
+                temppc = temppc @ transR + transT
                 if (abs(err - errnew) < self.tol):
                     break
                 err = errnew
 
-            transR, transT = self.get_transform(newpc, temp)
+            transR, transT = self.get_transform(newpc, temppc)
             transT = torch.transpose(transT, 1, 2)
             T = torch.cat([transR, transT], dim=2)
-            return pp.mat2SE3(T, check=False)
+            return mat2SE3(T, check=False)
         else:
             transR, transT = self.get_transform(newpc, originpc)
             transT = torch.transpose(transT, 1, 2)
             T = torch.cat([transR, transT], dim=2)
-            return pp.mat2SE3(T)
+            return mat2SE3(T)
 
     def get_transform(self, p1: torch.tensor, p2: torch.tensor):
         r'''Using SVD algorithm to calculate the transformation matrix between the corresponding points set p1, p2.
@@ -58,10 +57,10 @@ class ICP(nn.Module):
         p1_centroid = p1.mean(-2).unsqueeze(-2)
         p2_centroid = p2.mean(-2).unsqueeze(-2)
 
-        temp_p1 = (p1 - p1_centroid)
-        temp_p2 = (p2 - p2_centroid)
+        temppc_p1 = (p1 - p1_centroid)
+        temppc_p2 = (p2 - p2_centroid)
 
-        H = torch.transpose(temp_p2, 1, 2) @ temp_p1
+        H = torch.transpose(temppc_p2, 1, 2) @ temppc_p1
         u, s, vT = torch.linalg.svd(H)
         v = torch.transpose(vT, 1, 2)
         uT = torch.transpose(u, 1, 2)
@@ -91,18 +90,3 @@ class ICP(nn.Module):
         dist = torch.norm(dif, dim=-1)
         nn = dist.topk(k, largest=False)
         return nn
-
-
-if __name__=="__main__":
-    input_pc = torch.randn([10, 20, 3])
-    transT = 0.1 * torch.randn([10, 1, 3])
-    print("The ori transT is", transT)
-    transR = pp.randn_SO3(10)
-    print("The ori transR is", transR)
-    transR = transR.matrix()
-
-    output_pc = (input_pc @ transR) + transT
-
-    icpsvd = ICP(matched=False)
-    result = icpsvd.forward(input_pc, output_pc)
-    print("The ICP result is", result)
