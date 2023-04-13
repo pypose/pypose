@@ -176,23 +176,35 @@ class LQR(nn.Module):
 
     def lqr_backward(self, current_x, current_u, time):
 
-        # Q: (B*, T, N, N), p: (B*, T, N), where B* can be any batch dimensions, e.g., (2, 3)
-        B = self.p.shape[:-2]
-        ns, nc = self.system.B.size(-2), self.system.B.size(-1)
-        K = torch.zeros(B + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
-        k = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
+        # Q: (n_batch*, T, N, N), p: (n_batch*, T, N), where n_batch* can be any batch dimensions, e.g., (2, 3)
+        n_batch = self.p.shape[:-2]
+        if current_x is not None:
+            ns, nc = current_x.size(-1), current_u.size(-1)
+        else:
+            ns, nc = self.system.B.size(-2), self.system.B.size(-1)
+
+        K = torch.zeros(n_batch + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
+        k = torch.zeros(n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
 
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
                 Qt = self.Q[...,t,:,:]
                 qt = self.p[...,t,:]
             else:
-                self.system.set_refpoint(t=t)
-                F = torch.cat((self.system.A, self.system.B), dim=-1)
+                if current_x is not None:
+                    self.system.set_refpoint(state=current_x[...,t,:], input=current_u[...,t,:], t=time[t])
+                    A = self.system.A.squeeze(-2)
+                    B = self.system.B.squeeze(-1)
+                    F = torch.cat((A, B), dim=-1)
+                    c1 = None
+                else:
+                    self.system.set_refpoint(t=t)
+                    F = torch.cat((self.system.A, self.system.B), dim=-1)
+                    c1 = self.system.c1
                 Qt = self.Q[...,t,:,:] + F.mT @ V @ F
                 qt = self.p[...,t,:] + bmv(F.mT, v)
-                if self.system.c1 is not None:
-                    qt = qt + bmv(F.mT @ V, self.system.c1)
+                if c1 is not None:
+                    qt = qt + bmv(F.mT @ V, c1)
 
             Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
@@ -211,31 +223,31 @@ class LQR(nn.Module):
         assert x_init.device == K.device == k.device
         assert x_init.dtype == K.dtype == k.dtype
         assert x_init.ndim == 2, "Shape not compatible."
-        B = self.p.shape[:-2]
-        ns, nc = self.system.B.size(-2), self.system.B.size(-1)
-        u = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
-        delta_u = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
-        cost = torch.zeros(B, dtype=self.p.dtype, device=self.p.device)
+
+        # Q: (n_batch*, T, N, N), p: (n_batch*, T, N), where n_batch* can be any batch dimensions, e.g., (2, 3)
+        n_batch = self.p.shape[:-2]
+        if current_x is not None:
+            ns, nc = current_x.size(-1), current_u.size(-1)
+        else:
+            ns, nc = self.system.B.size(-2), self.system.B.size(-1)
+
+        u = torch.zeros(n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
+        delta_u = torch.zeros(n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
+        cost = torch.zeros(n_batch, dtype=self.p.dtype, device=self.p.device)
         delta_xt = torch.zeros_like(x_init, dtype=x_init.dtype, device=self.p.device)
-        x = torch.zeros(B + (self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
+        x = torch.zeros(n_batch + (self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
         x[..., 0, :] = x_init
         xt = x_init
 
-        self.system.set_refpoint(t=0)
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]
-            delta_ut = bmv(Kt, delta_xt) + kt
-            delta_u[..., t, :] = delta_ut.clone()
-            #current_ut = current_u[...,t,:].clone()
+            delta_u[..., t, :] = delta_ut = bmv(Kt, delta_xt) + kt
             if current_x is None:
                 u[...,t,:] = ut = delta_ut + bmv(Kt, xt)
             else:
-                current_ut = current_u[...,t,:].clone()
-                u[...,t,:] = ut = delta_ut + current_ut
-            #u[...,t,:] = ut.clone()
+                u[...,t,:] = ut = delta_ut + current_u[...,t,:]
             xut = torch.cat((xt, ut), dim=-1)
-            x[...,t+1,:] = self.system(xt, ut)[0]
-            xt = x[...,t+1,:].clone()
+            x[...,t+1,:] = xt = self.system(xt, ut)[0]
             cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
 
         return x[...,0:-1,:], u, cost
