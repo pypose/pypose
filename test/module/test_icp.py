@@ -14,4 +14,12 @@ if __name__=="__main__":
 
     icpsvd = pp.module.ICP(matched=False)
     result = icpsvd(input_pc, output_pc)
-    print("The ICP result is", result)
+    print("The output is", result)
+
+    # output_transT = result[:,0:3]
+    # output_transR = result[:,3:7]
+    # output_transR = output_transR.matrix()
+    # print("The ICP result is", output_transT.shape)
+    # print("The ICP result is", output_transR)
+    # # if torch.eq(output_transR, transR) :
+    # #     print("pass the test")

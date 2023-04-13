@@ -1,6 +1,6 @@
 import torch
 from . import EPnP
-from .. import mat2SE3
+from .. import homo2cart, cart2homo
 
 
 class ICP(torch.nn.Module):
@@ -28,46 +28,15 @@ class ICP(torch.nn.Module):
                 iter += 1
                 neighbor = self.nearest_neighbor(temppc, originpc)
                 errnew = neighbor.values.mean()
-                transR, transT = self.get_transform(temppc, originpc[:, neighbor.indices[-1], :].squeeze(-2))
-                temppc = temppc @ transR + transT
+                tf = EPnP._points_transform(temppc, originpc).matrix().unsqueeze(-3)
+                temppc = homo2cart((tf @ cart2homo(temppc).unsqueeze(-1)).squeeze(-1))
                 if (abs(err - errnew) < self.tol):
                     break
                 err = errnew
-
             T = EPnP._points_transform(newpc, temppc)
-            return T
         else:
             T = EPnP._points_transform(newpc, originpc)
-            return T
-
-    def get_transform(self, p1: torch.tensor, p2: torch.tensor):
-        r'''Using SVD algorithm to calculate the transformation matrix between the corresponding points set p1, p2.
-
-        Args:
-            p1: input points set
-            p2: the matched target points set
-
-        Returns:
-            R: the rotation matrix between p1 and p2
-            T: the translation matrix between p1 and p2
-        '''
-        p1_centroid = p1.mean(-2).unsqueeze(-2)
-        p2_centroid = p2.mean(-2).unsqueeze(-2)
-
-        temppc_p1 = (p1 - p1_centroid)
-        temppc_p2 = (p2 - p2_centroid)
-
-        H = torch.transpose(temppc_p2, 1, 2) @ temppc_p1
-        u, s, vT = torch.linalg.svd(H)
-        v = torch.transpose(vT, 1, 2)
-        uT = torch.transpose(u, 1, 2)
-        v[:, 2, 2] = v[:, 2, 2] * torch.det(v @ uT)
-        vT = torch.transpose(v, 1, 2)
-        RT = u @ vT
-        R = torch.transpose(RT, 1, 2)
-        t = p2_centroid - p1_centroid @ R
-
-        return R, t
+        return T
 
     def nearest_neighbor(self, p1, p2, k=1):
         r'''
