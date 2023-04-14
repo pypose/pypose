@@ -238,10 +238,11 @@ class LQR(nn.Module):
         Args:
             x_init (:obj:`Tensor`): The initial state of the system.
             current_x (:obj:`Tensor`, optinal): The current states of the system along a
-                trajectory.
+                trajectory. Default: ``None``.
             current_u (:obj:`Tensor`, optinal): The current inputs of the system along a
-                trajectory.
-            time (:obj:`Tensor`, optinal): The reference time step of the dynamical system.
+                trajectory. Default: ``None``.
+            time (:obj:`Tensor`, optinal): The reference time step of the dynamical
+                system. Default: ``None``.
 
         Returns:
             List of :obj:`Tensor`: A list of tensors including the solved state sequence
