@@ -1,7 +1,5 @@
 import torch
 from . import EPnP
-from .. import homo2cart, cart2homo
-
 
 class ICP(torch.nn.Module):
     r'''
@@ -28,8 +26,8 @@ class ICP(torch.nn.Module):
                 iter += 1
                 neighbor = self.nearest_neighbor(temppc, originpc)
                 errnew = neighbor.values.mean()
-                tf = EPnP._points_transform(temppc, originpc).matrix().unsqueeze(-3)
-                temppc = homo2cart((tf @ cart2homo(temppc).unsqueeze(-1)).squeeze(-1))
+                tf = EPnP._points_transform(temppc, originpc).unsqueeze(-2)
+                temppc = tf.Act(temppc)
                 if (abs(err - errnew) < self.tol):
                     break
                 err = errnew
