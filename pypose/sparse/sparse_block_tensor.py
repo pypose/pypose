@@ -586,7 +586,7 @@ HFS.add_op( '__get__', SBTGetOp )
 # ========== Operations for COO tensors. ==========
 
 # ========== Unary functions. ==========
-HFS.add_op( 'abs', SBTProxyNoOp )
+HFS.add_op( 'abs', SBTProxyCloneOp )
 
 # ==============================================================
 # ========== End of supported operation registration. ==========
