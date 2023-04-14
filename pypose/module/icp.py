@@ -24,8 +24,8 @@ class ICP(torch.nn.Module):
         if (not self.matched):
             while iter <= self.steplim:
                 iter += 1
-                neighbor = self.nearest_neighbor(temppc, originpc)
-                errnew = neighbor.values.mean()
+                dist = torch.norm((originpc.unsqueeze(-2) - temppc.unsqueeze(-3)),dim=-1)
+                errnew = dist.topk(1, largest=False).values.mean()
                 tf = EPnP._points_transform(temppc, originpc).unsqueeze(-2)
                 temppc = tf.Act(temppc)
                 if (abs(err - errnew) < self.tol):
@@ -35,22 +35,3 @@ class ICP(torch.nn.Module):
         else:
             T = EPnP._points_transform(newpc, originpc)
         return T
-
-    def nearest_neighbor(self, p1, p2, k=1):
-        r'''
-        Select the nearest neighbor point of p1 from p2
-        Args:
-            p1: the source points set
-            p2: the target points set
-            tolerance: the threshold of min distance
-
-        Returns:
-            distances: the min distance between point in p1 and its nearest neighbor
-            indices: the index of the nearest neighbor point in p2
-        '''
-        dif = torch.stack([p2[i].unsqueeze(-2) - p1[i]
-                           for i in range(p1.shape[0])])
-
-        dist = torch.norm(dif, dim=-1)
-        nn = dist.topk(k, largest=False)
-        return nn
