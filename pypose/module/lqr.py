@@ -88,9 +88,82 @@ class LQR(nn.Module):
             \mathbf{c} \left( \mathbf{\tau}_t \right) = \frac{1}{2}
             \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t
 
+    A discrete-time non-linear system can be described as:
+
+    .. math::
+        \begin{aligned}
+            \mathbf{x}_{t+1} &= \mathbf{f}(\mathbf{x}_t, \mathbf{u}_t, t_t) \\
+            \mathbf{y}_{t} &= \mathbf{g}(\mathbf{x}_t, \mathbf{u}_t, t_t) \\
+        \end{aligned}
+
+    For a current point :math:`\chi^*=(\mathbf{x}^*, \mathbf{u}^*, t^*)` along a
+    trajectory, consider a point :math:`\chi=(\mathbf{x}^*+\delta\mathbf{x}, \mathbf{u}^*
+    +\delta\mathbf{u}, t^*)` near :math:`\chi^*`. We could do a linear approximation:
+
+    .. math::
+            \begin{aligned}
+            \mathbf{f}(\mathbf{x}, \mathbf{u}, t^*) &\approx \mathbf{f}(\mathbf{x}^*,
+                \mathbf{u}^*, t^*) +  \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}}
+                \right|_{\chi^*} \delta \mathbf{x} + \left. \frac{\partial \mathbf{f}}
+                {\partial \mathbf{u}} \right|_{\chi^*} \delta \mathbf{u} \\
+            &= \mathbf{f}(\mathbf{x}^*, \mathbf{u}^*, t^*) + \mathbf{A} \delta \mathbf{x}
+                + \mathbf{B} \delta \mathbf{u} \\
+            \delta \mathbf{x}_{t+1} &= \mathbf{A}_t \delta \mathbf{x}_t + \mathbf{B}_t
+                \delta \mathbf{u}_t \\
+            &= \mathbf{F}_t \delta \mathbf{\tau}_t \\
+            \end{aligned}
+
+    where :math:`\delta \mathbf{\tau}_t` = :math:`\begin{bmatrix} \delta \mathbf{x}_t \\
+    \delta \mathbf{u}_t \end{bmatrix}`, :math:`\mathbf{F}_t` = :math:`\begin{bmatrix}
+    \mathbf{A}_t & \mathbf{B}_t \end{bmatrix}`.
+
+    Now we can run LQR with :math:`\delta \mathbf{x}_t` and :math:`\delta \mathbf{x}_t`.
+
+    - The backward recursion.
+
+      For :math:`t` = :math:`T` to 1:
+
+        .. math::
+            \begin{align*}
+                \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t \\
+                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1}  \\
+                \mathbf{K}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}^{-1}
+                                    \mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{x}_t} \\
+                \mathbf{k}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}^{-1}
+                                    \mathbf{q}_{\delta \mathbf{u}_t}         \\
+                \mathbf{V}_t &= \mathbf{Q}_{\delta \mathbf{x}_t, \delta \mathbf{x}_t}
+                    + \mathbf{Q}_{\delta \mathbf{x}_t, \delta \mathbf{u}_t}\mathbf{K}_t
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{x}_t}
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}
+                        \mathbf{K}_t   \\
+                \mathbf{v}_t &= \mathbf{q}_{\delta \mathbf{x}_t}
+                    + \mathbf{Q}_{\delta \mathbf{x}_t, \delta \mathbf{u}_t}\mathbf{k}_t
+                    + \mathbf{K}_t^\top\mathbf{q}_{\delta \mathbf{u}_t}
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\delta \mathbf{u}_t,
+                        \delta \mathbf{u}_t}\mathbf{k}_t   \\
+            \end{align*}
+
+    - The forward recursion.
+
+      For :math:`t` = 1 to :math:`T`:
+
+        .. math::
+            \begin{align*}
+                \delta \mathbf{u}_t &= \mathbf{K}_t \delta \mathbf{x}_t + \mathbf{k}_t \\
+                \mathbf{u}_t &= \delta \mathbf{u}_t + \mathbf{u}_t^* \\
+                \mathbf{x}_{t+1} &= \mathbf{f}(\mathbf{x}_t, \mathbf{u}_t) \\
+            \end{align*}
+
+    Then quadratic costs of the system over the time horizon:
+
+        .. math::
+            \mathbf{c} \left( \mathbf{\tau}_t \right) = \frac{1}{2}
+            \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t
+
     Note:
-        The discrete-time system to be solved by LQR could be both either linear time-invariant
-        (:meth:`LTI`) system or linear time-varying (:meth:`LTV`) system.
+        The discrete-time system to be solved by LQR could be both linear time-invariant
+        (:meth:`LTI`) system, linear time-varying (:meth:`LTV`) system or non-linear
+        (:meth:`NLS`) system.
 
     From the learning perspective, this can be interpreted as a module with unknown parameters
     :math:`\begin{Bmatrix} \mathbf{Q}, \mathbf{p}, \mathbf{F}, \mathbf{f} \end{Bmatrix}`,
@@ -164,6 +237,11 @@ class LQR(nn.Module):
 
         Args:
             x_init (:obj:`Tensor`): The initial state of the system.
+            current_x (:obj:`Tensor`, optinal): The current states of the system along a
+                trajectory.
+            current_u (:obj:`Tensor`, optinal): The current inputs of the system along a
+                trajectory.
+            time (:obj:`Tensor`, optinal): The reference time step of the dynamical system.
 
         Returns:
             List of :obj:`Tensor`: A list of tensors including the solved state sequence
