@@ -1,0 +1,14 @@
+{
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestArgs": ["test"],
+    "[python]": {
+        "editor.tabSize": 4
+    },
+    "editor.rulers": [90],
+    "files.eol": "\n",
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    "files.trimTrailingWhitespace": true,
+    "ros.distro": "noetic"
+}

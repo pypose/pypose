@@ -16,3 +16,4 @@ Modules
    module.PF
    module.LQR
    module.IMUPreintegrator
+   module.EPnP

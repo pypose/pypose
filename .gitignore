@@ -139,7 +139,7 @@ docs/source/generated
 
 # IDE config
 .idea/
-.vscode/
+.vscode/launch.json
 
 # Example data
 examples/module/imu/2011_09_26.zip
@@ -147,3 +147,10 @@ examples/module/imu/2011_09_26/*
 examples/module/imu/save/*
 
 test/unit_tests/
+
+examples/module/filter/save/*
+examples/module/dynamics/save/*
+examples/module/pgo/pgodata/*
+examples/module/pgo/save/*
+*epnp-test-data.pt*
+*__MACOSX

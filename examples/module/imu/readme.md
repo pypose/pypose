@@ -32,7 +32,15 @@ Examples of IMU [preintegrating](./imu_integrator.py) and IMU [correction](./imu
 
 # IMU Preintegration:
 
-        python imu_integrator.py --dataroot DATAROOT --datadrive 0018 0022
+```bash
+python examples/module/imu/imu_integrator.py
+```
+
+Or
+
+```bash
+python examples/module/imu/imu_integrator.py --datadrive 0018 0022 --dataroot DATAROOT
+```
 
 Note: change `DATAROOT` to the folder you select.
 
