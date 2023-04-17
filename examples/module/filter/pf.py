@@ -1,4 +1,4 @@
-import torch, argparse
+import torch, argparse, os
 from pypose.module import PF
 from bicycle import Bicycle, bicycle_plot
 
@@ -6,7 +6,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PF Example')
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
     parser.add_argument("--N", type=int, default=5000, help='The number of particle')
-    args = parser.parse_args()
+    parser.add_argument("--save", type=str, default='./examples/module/filter/save/', 
+                        help="location of png files to save")
+    parser.add_argument('--show', dest='show', action='store_true',
+                        help="show plot, default: False")
+    parser.set_defaults(show=False)
+    args = parser.parse_args(); print(args)
+    os.makedirs(os.path.join(args.save), exist_ok=True)
 
     T, N, M = 30, 3, 2  # steps, state dim, input dim
     q, r, p = 0.2, 0.2, 5  # covariance of transition noise, observation noise, and estimation
@@ -29,4 +35,4 @@ if __name__ == "__main__":
         state[i + 1], obs[i] = bicycle(state[i] + w, input[i])     # model measurement
         est[i + 1], P[i + 1] = filter(est[i], obs[i] + v, input[i], P[i])
 
-    bicycle_plot('PF', state, est, P)
+    bicycle_plot('PF', state, est, P, save=args.save, show=args.show)

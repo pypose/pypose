@@ -8,7 +8,7 @@ PyPose Documentation
    :caption: Contents:
 
    lietensor
-   basics
+   functions
    convert
    modules
    optim

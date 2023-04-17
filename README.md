@@ -18,8 +18,11 @@ Deep learning has had remarkable success in robotic perception, but its data-cen
 
 ##### [Modules](https://pypose.org/docs/main/modules/)
 
-- [`System`](https://pypose.org/docs/main/generated/pypose.module.System)
-- [`IMUPreintegration`](https://pypose.org/docs/main/generated/pypose.module.IMUPreintegrator/)
+- System: [`LTI`](https://pypose.org/docs/main/generated/pypose.module.LTI), [`LTV`](https://pypose.org/docs/main/generated/pypose.module.LTV), [`NLS`](https://pypose.org/docs/main/generated/pypose.module.NLS)
+- Filter: [`EKF`](https://pypose.org/docs/main/generated/pypose.module.EKF/), [`UKF`](https://pypose.org/docs/main/generated/pypose.module.UKF/), [`PF`](https://pypose.org/docs/main/generated/pypose.module.PF/)
+- PnP Solver: [`EPnP`](https://pypose.org/docs/main/generated/pypose.module.EPnP/)
+- Linear Quadratic Regulator: [`LQR`](https://pypose.org/docs/main/generated/pypose.module.LQR/)
+- IMU Preintegration: [`IMUPreintegrator`](https://pypose.org/docs/main/generated/pypose.module.IMUPreintegrator/)
 - ......
 
 ##### [Second-order Optimizers](https://pypose.org/docs/main/optim/)
