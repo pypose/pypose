@@ -69,8 +69,18 @@ class TestLQR:
         x_init = torch.tensor([[ 1.50, -0.34, -2.18,  0.54], [-1.05, -1.36,  0.43,  0.80]], device=device)
 
         lti = pp.module.LTI(A, B, C, D, c1, c2).to(device)
+
+        current_x = torch.zeros(n_batch, T, n_state, device=device)
+        current_u = torch.zeros(n_batch, T, n_ctrl, device=device)
+        current_x[...,0,:] = x_init
+
+        for i in range(T-1):
+            current_x[...,i+1,:], _ = lti(current_x[...,i,:], current_u[...,i,:])
+
+        time  = torch.arange(0, T, device=device)
+
         LQR = pp.module.LQR(lti, Q, p, T).to(device)
-        x, u, cost = LQR(x_init)
+        x, u, cost = LQR(x_init, current_x, current_u, time)
 
         torch.testing.assert_close(x_ref, x)
         torch.testing.assert_close(u_ref, u)
@@ -141,11 +151,22 @@ class TestLQR:
                 return self._D[...,self._t,:,:]
 
         ltv = MyLTV(A, B, C, D).to(device)
-        lqr  = pp.module.LQR(ltv, Q, p, T).to(device)
-        x, u, cost = lqr(x_init)
+
+        current_x = torch.zeros(n_batch, T, n_state, device=device)
+        current_u = torch.zeros(n_batch, T, n_ctrl, device=device)
+        current_x[...,0,:] = x_init
+
+        for i in range(T-1):
+            current_x[...,i+1,:], _ = ltv(current_x[...,i,:], current_u[...,i,:])
+
+        time  = torch.arange(0, T, device=device)
+
+        LQR  = pp.module.LQR(ltv, Q, p, T).to(device)
+        x, u, cost = LQR(x_init, current_x, current_u, time)
 
         torch.testing.assert_close(x_ref, x, atol=1e-5, rtol=1e-3)
         torch.testing.assert_close(u_ref, u, atol=1e-5, rtol=1e-3)
+
 
     def test_nlqr_cartpole(self, device='cpu'):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -153,17 +174,17 @@ class TestLQR:
         # The reference data
         x_ref = torch.tensor([
             [[ 0.0000000000000000e+00,  0.0000000000000000e+00, 3.1415927410125732e+00,  0.0000000000000000e+00],
-            [ 0.0000000000000000e+00,  7.8318604209925979e-05, 3.1415927410125732e+00,  3.9155012927949429e-05],
-            [ 7.8318601026694523e-07, -1.5194457955658436e-04, 3.1415932178497314e+00, -7.5980868132319301e-05],
-            [-7.3625972163426923e-07, -3.7045811768621206e-04, 3.1415925025939941e+00, -1.8526532221585512e-04],
-            [-4.4408407120499760e-06, -6.9732154952362180e-04, 3.1415905952453613e+00, -3.4868964576162398e-04]]],
+             [ 0.0000000000000000e+00,  7.8299985034391284e-05, 3.1415927410125732e+00,  3.9145703340182081e-05],
+             [ 7.8299984807017609e-07, -1.5641693607904017e-04, 3.1415932178497314e+00, -7.8217039117589593e-05],
+             [-7.8116948998285807e-07, -3.8382178172469139e-04, 3.1415925025939941e+00, -1.9194713968317956e-04],
+             [-4.6193872549338266e-06, -7.2401645593345165e-04, 3.1415905952453613e+00, -3.6203706986270845e-04]]],
             device=device)
 
-        u_ref = torch.tensor([[[1.7622329294681549e-01],
-                            [-5.1808577775955200e-01],
-                            [-4.9161392450332642e-01],
-                            [-7.3545390367507935e-01],
-                            [-4.6510662883520126e-02]]],device=device)
+        u_ref = torch.tensor([[[1.7618140578269958e-01],
+                              [-5.2810668945312500e-01],
+                              [-5.1161938905715942e-01],
+                              [-7.6544916629791260e-01],
+                              [-8.6499989032745361e-02]]],device=device)
 
         class CartPole(pp.module.NLS):
             def __init__(self, dt, length, cartmass, polemass, gravity):

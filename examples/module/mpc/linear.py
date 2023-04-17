@@ -60,8 +60,16 @@ class TrainMPC:
 
         x_init = torch.randn(n_batch, n_state, device=device)
         lti = pp.module.LTI(expert['A'], expert['B'], C, D, c1, c2)
+
+        current_x = torch.zeros(n_batch, T, n_state, device=device)
+        current_u = torch.zeros(n_batch, T, n_ctrl, device=device)
+        current_x[...,0,:] = x_init
+        for i in range(T-1):
+            current_x[...,i+1,:], _ = lti(current_x[...,i,:], current_u[...,i,:])
+        time_expert  = torch.arange(0, T, device=device)
+
         mpc_expert = pp.module.MPC(lti, T, step=1)
-        x_true, u_true, cost_true = mpc_expert.forward(expert['Q'], expert['p'], x_init)
+        x_true, u_true, cost_true = mpc_expert.forward(expert['Q'], expert['p'], x_init, current_x, current_u, time_expert)
 
         torch.manual_seed(args.seed)
         A = (torch.eye(n_state, device=device) + 0.2 * torch.randn(n_state, n_state, device=device))\
@@ -79,8 +87,14 @@ class TrainMPC:
 
         def get_loss(x_init, _A, _B):
             lti_ = pp.module.LTI(_A, _B, C, D, c1, c2)
+            current_x_ = torch.zeros(n_batch, T, n_state, device=device)
+            current_u_ = torch.zeros(n_batch, T, n_ctrl, device=device)
+            current_x_[...,0,:] = x_init
+            for i in range(T-1):
+                current_x_[...,i+1,:], _ = lti_(current_x_[...,i,:], current_u_[...,i,:])
+            time_agent  = torch.arange(0, T, device=device)
             mpc_agent = pp.module.MPC(lti_, T, step=1)
-            x_pred, u_pred, cost_pred = mpc_agent.forward(expert['Q'], expert['p'], x_init)
+            x_pred, u_pred, cost_pred = mpc_agent.forward(expert['Q'], expert['p'], x_init, current_x_, current_u_, time_agent)
 
             traj_loss = torch.mean((u_true - u_pred)**2) \
                 + torch.mean((x_true - x_pred)**2)

@@ -126,7 +126,7 @@ def main():
 
     opt = optim.RMSprop((len, m_cart, m_pole), lr=1e-2)
 
-    for i in range(10):
+    for i in range(100):
         traj_loss = get_loss(len, m_cart, m_pole)
         opt.zero_grad()
         traj_loss.backward()

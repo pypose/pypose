@@ -12,20 +12,20 @@ class MPC(nn.Module):
         self.step = step
         self.eps = eps
 
-    def forward(self, Q, p, x_init, current_x=None, current_u=None, time=None):
+    def forward(self, Q, p, x_init, current_x, current_u, time):
 
         best = None
+        x, u = current_x, current_u
 
         for i in range(self.step):
-            if current_x is not None:
-                current_u.requires_grad = False
-                if not current_u.requires_grad:
-                    current_u = current_u
-                else:
-                    current_u = current_u.detach()
+            current_u.requires_grad = False
+            if not current_u.requires_grad:
+                current_u = current_u
+            else:
+                current_u = current_u.detach()
 
             lqr = pp.module.LQR(self.system, Q, p, self.T)
-            x, u, cost = lqr(x_init, current_x, current_u, time)
+            x, u, cost = lqr(x_init, x, u, time)
             assert x.ndim == u.ndim == 3
 
             if best is None:
@@ -39,13 +39,7 @@ class MPC(nn.Module):
                     best['u']= u
                     best['cost'] = cost
 
-            current_x = x
-            current_u = u
-
-        if self.step == 1:
-            current_x = None
-            current_u = None
-        else:
+        if self.step > 1:
             current_x = best['x']
             current_u = best['u']
 

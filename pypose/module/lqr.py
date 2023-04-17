@@ -111,13 +111,23 @@ class LQR(nn.Module):
             \delta \mathbf{x}_{t+1} &= \mathbf{A}_t \delta \mathbf{x}_t + \mathbf{B}_t
                 \delta \mathbf{u}_t \\
             &= \mathbf{F}_t \delta \mathbf{\tau}_t \\
+            \mathbf{c} \left( \mathbf{\tau}, t^* \right) &\approx
+                \mathbf{c} \left( \mathbf{\tau}^*, t^* \right) + \frac{1}{2} \delta
+                \mathbf{\tau}^\top \nabla^2_{\mathbf{\tau}} \mathbf{c} \left( \mathbf{\tau}^*,
+                t^* \right) \delta \mathbf{\tau} + \nabla_{\mathbf{\tau}}
+                \mathbf{c} \left( \mathbf{\tau}^*, t^* \right)^\top \delta \mathbf{\tau} \\
+            \bar{\mathbf{c}} \left( \delta \mathbf{\tau} \right) &= \frac{1}{2} \delta
+                \mathbf{\tau}_t^\top \bar{\mathbf{Q}}_t \delta \mathbf{\tau}_t +
+                \bar{\mathbf{p}}_t^\top \delta \mathbf{\tau}_t \\
             \end{aligned}
 
     where :math:`\delta \mathbf{\tau}_t` = :math:`\begin{bmatrix} \delta \mathbf{x}_t \\
     \delta \mathbf{u}_t \end{bmatrix}`, :math:`\mathbf{F}_t` = :math:`\begin{bmatrix}
-    \mathbf{A}_t & \mathbf{B}_t \end{bmatrix}`.
+    \mathbf{A}_t & \mathbf{B}_t \end{bmatrix}`, :math:`\bar{\mathbf{Q}}_t` = :math:`\mathbf{Q}_t`,
+    :math:`\bar{\mathbf{p}}_t` = :math:`\mathbf{Q}_t \mathbf{\tau}^*_t + \mathbf{p}_t`.
 
-    Now we can run LQR with :math:`\delta \mathbf{x}_t` and :math:`\delta \mathbf{x}_t`.
+    Now we can run LQR with :math:`\delta \mathbf{\tau}_t`, :math:`\mathbf{F}_t`,
+    :math:`\bar{\mathbf{Q}}_t` and :math:`\bar{\mathbf{p}}_t`.
 
     - The backward recursion.
 
@@ -125,8 +135,9 @@ class LQR(nn.Module):
 
         .. math::
             \begin{align*}
-                \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t \\
-                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1}  \\
+                \mathbf{Q}_t &= \bar{\mathbf{Q}}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}
+                                    \mathbf{F}_t \\
+                \mathbf{q}_t &= \bar{\mathbf{q}}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1}  \\
                 \mathbf{K}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}^{-1}
                                     \mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{x}_t} \\
                 \mathbf{k}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}^{-1}
@@ -174,6 +185,7 @@ class LQR(nn.Module):
         <http://rll.berkeley.edu/deeprlcourse/f17docs/lecture_8_model_based_planning.pdf>`_.
 
     Example:
+        >>> torch.manual_seed(0)
         >>> n_batch, T = 2, 5
         >>> n_state, n_ctrl = 4, 3
         >>> n_sc = n_state + n_ctrl
@@ -188,31 +200,37 @@ class LQR(nn.Module):
         >>> c1 = torch.tile(torch.randn(n_state), (n_batch, 1))
         >>> c2 = torch.tile(torch.zeros(n_state), (n_batch, 1))
         >>> x_init = torch.randn(n_batch, n_state)
-        >>>
+        >>> current_x = torch.zeros(n_batch, T, n_state, device=device)
+        >>> current_u = torch.zeros(n_batch, T, n_ctrl, device=device)
+        >>> current_x[...,0,:] = x_init
         >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
+        >>> for i in range(T-1):
+        >>>     current_x[...,i+1,:], _ = lti(current_x[...,i,:], current_u[...,i,:])
+        >>> time = torch.arange(0, T, device=device)
         >>> LQR = pp.module.LQR(lti, Q, p, T)
         >>> x, u, cost = LQR(x_init)
+        >>> print("x = ", x)
         >>> print("u = ", u)
-        x =  tensor([[[-0.2633, -0.3466,  2.3803, -0.0423],
-                      [ 0.1849, -1.3884,  1.0898, -1.6229],
-                      [ 1.2138, -0.7161,  0.2954, -0.6819],
-                      [ 1.4840, -1.1249, -1.0302,  0.9805],
-                      [-0.3477, -1.7063,  4.6494,  2.6780]],
-                     [[-0.9744,  0.4976,  0.0603, -0.5258],
-                      [-0.6356,  0.0539,  0.7264, -0.5048],
-                      [-0.2275, -0.1649,  0.3872, -0.4614],
-                      [ 0.2697, -0.3576,  0.0999, -0.4594],
-                      [ 0.3916, -2.0832,  0.0701, -0.5407]]])
-        u =  tensor([[[ 1.0405,  0.1586, -0.1282],
-                      [-1.4845, -0.5745,  0.2523],
-                      [-0.6322, -0.3281, -0.3620],
-                      [-1.6768,  2.4054, -0.1047],
-                      [-1.7948,  3.5269,  9.0703]],
-                     [[-0.1795,  0.9153,  1.7066],
-                      [ 0.0814,  0.4004,  0.7114],
-                      [ 0.0435,  0.5782,  1.0127],
-                      [-0.3017, -0.2897,  0.7251],
-                      [-0.0728,  0.7290, -0.3117]]])
+        x = tensor([[[-0.2633, -0.3466,  2.3803, -0.0423],
+                     [ 0.1849, -1.3884,  1.0898, -1.6229],
+                     [ 1.2138, -0.7161,  0.2954, -0.6819],
+                     [ 1.4840, -1.1249, -1.0302,  0.9805],
+                     [-0.3477, -1.7063,  4.6494,  2.6780]],
+                    [[-0.9744,  0.4976,  0.0603, -0.5258],
+                     [-0.6356,  0.0539,  0.7264, -0.5048],
+                     [-0.2275, -0.1649,  0.3872, -0.4614],
+                     [ 0.2697, -0.3577,  0.0999, -0.4594],
+                     [ 0.3916, -2.0832,  0.0701, -0.5407]]])
+        u = tensor([[[ 1.0405,  0.1586, -0.1282],
+                     [-1.4845, -0.5745,  0.2523],
+                     [-0.6322, -0.3281, -0.3620],
+                     [-1.6768,  2.4054, -0.1047],
+                     [-1.7948,  3.5269,  9.0703]],
+                    [[-0.1795,  0.9153,  1.7066],
+                     [ 0.0814,  0.4004,  0.7114],
+                     [ 0.0436,  0.5782,  1.0127],
+                     [-0.3017, -0.2897,  0.7251],
+                     [-0.0728,  0.7290, -0.3117]]])
     '''
     def __init__(self, system, Q, p, T):
         super().__init__()
@@ -231,18 +249,18 @@ class LQR(nn.Module):
         assert self.Q.device == self.p.device, "device not compatible."
         assert self.Q.dtype == self.p.dtype, "tensor data type not compatible."
 
-    def forward(self, x_init, current_x=None, current_u=None, time=None):
+    def forward(self, x_init, current_x, current_u, time):
         r'''
         Performs LQR for the linear system.
 
         Args:
             x_init (:obj:`Tensor`): The initial state of the system.
             current_x (:obj:`Tensor`, optinal): The current states of the system along a
-                trajectory. Default: ``None``.
+                trajectory.
             current_u (:obj:`Tensor`, optinal): The current inputs of the system along a
-                trajectory. Default: ``None``.
+                trajectory.
             time (:obj:`Tensor`, optinal): The reference time step of the dynamical
-                system. Default: ``None``.
+                system.
 
         Returns:
             List of :obj:`Tensor`: A list of tensors including the solved state sequence
@@ -257,18 +275,20 @@ class LQR(nn.Module):
 
         # Q: (n_batch*, T, N, N), p: (n_batch*, T, N), where n_batch* can be any batch dimensions, e.g., (2, 3)
         n_batch = self.p.shape[:-2]
-        if current_x is not None:
-            ns, nc = current_x.size(-1), current_u.size(-1)
-        else:
-            ns, nc = self.system.B.size(-2), self.system.B.size(-1)
+        ns, nc = current_x.size(-1), current_u.size(-1)
 
         K = torch.zeros(n_batch + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
         k = torch.zeros(n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
+        p_new = torch.zeros(n_batch + (self.T, ns+nc), dtype=self.p.dtype, device=self.p.device)
+
+        for i in range(self.T):
+            current_xut = torch.cat((current_x[...,i,:], current_u[...,i,:]), dim=-1)
+            p_new[...,i,:]= (bmv(self.Q[...,i,:,:], current_xut) + self.p[...,i,:]).detach()
 
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
                 Qt = self.Q[...,t,:,:]
-                qt = self.p[...,t,:]
+                qt = p_new[...,t,:]
             else:
                 if current_x is not None:
                     self.system.set_refpoint(state=current_x[...,t,:], input=current_u[...,t,:], t=time[t])
@@ -281,7 +301,7 @@ class LQR(nn.Module):
                     F = torch.cat((self.system.A, self.system.B), dim=-1)
                     c1 = self.system.c1
                 Qt = self.Q[...,t,:,:] + F.mT @ V @ F
-                qt = self.p[...,t,:] + bmv(F.mT, v)
+                qt = p_new[...,t,:] + bmv(F.mT, v)
                 if c1 is not None:
                     qt = qt + bmv(F.mT @ V, c1)
 
@@ -305,10 +325,7 @@ class LQR(nn.Module):
 
         # Q: (n_batch*, T, N, N), p: (n_batch*, T, N), where n_batch* can be any batch dimensions, e.g., (2, 3)
         n_batch = self.p.shape[:-2]
-        if current_x is not None:
-            ns, nc = current_x.size(-1), current_u.size(-1)
-        else:
-            ns, nc = self.system.B.size(-2), self.system.B.size(-1)
+        ns, nc = current_x.size(-1), current_u.size(-1)
 
         u = torch.zeros(n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
         delta_u = torch.zeros(n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
@@ -321,12 +338,11 @@ class LQR(nn.Module):
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]
             delta_u[..., t, :] = delta_ut = bmv(Kt, delta_xt) + kt
-            if current_x is None:
-                u[...,t,:] = ut = delta_ut + bmv(Kt, xt)
-            else:
-                u[...,t,:] = ut = delta_ut + current_u[...,t,:]
+            u[...,t,:] = ut = delta_ut + current_u[...,t,:]
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
+            if t < self.T-1:
+                delta_xt = (xt - current_x[...,t+1,:]).detach()
             cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
 
         return x[...,0:-1,:], u, cost
