@@ -98,7 +98,6 @@ def point2pixel(points, intrinsics, extrinsics=None):
         ...                        [1., 0., 1.],
         ...                        [5., 5., 3.]])
         >>> pixels = pp.point2pixel(object, intrinsics)
-        >>> pixels
         tensor([[6.5000, 4.5000],
                 [5.5000, 4.5000],
                 [4.5000, 6.5000],
@@ -107,7 +106,6 @@ def point2pixel(points, intrinsics, extrinsics=None):
                 [7.8333, 7.8333]])
         >>> pose = pp.SE3([ 0., -8,  0.,  0., -0.3827,  0.,  0.9239])
         >>> pixels = pp.point2pixel(object, intrinsics, pose)
-        >>> pixels
         tensor([[  4.4999,  -1.1568],
                 [  3.8332,  -3.0425],
                 [  2.4998, -15.2997],
@@ -117,26 +115,30 @@ def point2pixel(points, intrinsics, extrinsics=None):
     '''
     assert points.size(-1) == 3, "Points shape incorrect"
     assert intrinsics.size(-1) == intrinsics.size(-2) == 3, "Intrinsics shape incorrect."
-    if extrinsics is not None:
+    if extrinsics is None:
+        broadcast_shapes(points.shape[:-2], intrinsics.shape[:-2])
+    else:
         assert is_lietensor(extrinsics) and extrinsics.shape[-1] == 7, "Type incorrect."
+        broadcast_shapes(points.shape[:-2], intrinsics.shape[:-2], extrinsics.shape[:-1])
         points = extrinsics.unsqueeze(-2) @ points
     return homo2cart(points @ intrinsics.mT)
 
 
-def reprojerr(points, pixels, intrinsics, extrinsics):
+def reprojerr(points, pixels, intrinsics, extrinsics=None):
     r'''
-    Calculates batched per-pixel reprojection error (pixel distance) for points in the world
-    coordinate, given camera intrinsic and extrinsic parameters.
+    Calculates batched per-pixel reprojection error (pixel distance) for points either in
+    the camera or world frame given camera intrinsics or extrinsics, respectively.
 
     Args:
-        points (``torch.Tensor``): The object points in world coordinate.
+        points (``torch.Tensor``): The 3D coordinate of points. Assumed to be in the
+            camera frame if ``extrinsics`` is ``None``, otherwiwse in the world frame.
             The shape has to be (..., N, 3).
         pixels (``torch.Tensor``): The image points. The associated pixel.
             The shape has to be (..., N, 2).
         intrinsics (``torch.Tensor``): intrinsic matrices.
             The shape has to be (..., 3, 3).
-        extrinsics (``LieTensor``): The camera extrinsics.
-            The shape has to be (..., 7).
+        extrinsics (``LieTensor``, optional): The camera extrinsics.
+            The shape has to be (..., 7). Default: ``None``.
     Returns:
         Per-pixel reprojection error. The shape is (..., N).
 
@@ -150,12 +152,10 @@ def reprojerr(points, pixels, intrinsics, extrinsics):
         >>> pose = pp.randn_SE3()
         >>> pixels = pp.point2pixel(object, intrinsics, pose)
         >>> err = pp.reprojerr(object, pixels, intrinsics, pose)
-        >>> err
         tensor([0., 0., 0., 0., 0., 0.])
     '''
-    broadcast_shapes(points.shape[:-2], pixels.shape[:-2], \
-                     extrinsics.shape[:-1], intrinsics.shape[:-2])
-    assert points.size(-1) == 3 and pixels.size(-1) == 2 and is_lietensor(extrinsics) \
-        and intrinsics.size(-1) == intrinsics.size(-2) == 3, "Shape not compatible."
+    broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
+    assert points.size(-1) == 3 and pixels.size(-1) == 2 and \
+           intrinsics.size(-1) == intrinsics.size(-2) == 3, "Shape not compatible."
     img_repj = point2pixel(points, intrinsics, extrinsics)
     return (img_repj - pixels).norm(dim=-1)
