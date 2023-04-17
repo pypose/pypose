@@ -29,13 +29,9 @@ def test_matmul_between_coo_coo():
          [2, 0, 2]]
     v = [3, 4, 5]
 
-    test_entries = [
-        { 'device': 'cpu' },
-        { 'device': 'cuda' },
-    ]
-    
-    
-    
+    test_entries = [dict(device='cpu'),]
+    if torch.cuda.is_available(): test_entries.append(dict(device='cuda'))
+
     for entry in test_entries:
         print(f'entry = {entry}')
         device = entry['device']
