@@ -71,16 +71,16 @@ def homo2cart(coordinates:torch.Tensor):
 
 def point2pixel(points, intrinsics, extrinsics=None):
     r'''
-    Project a set of points (either in camera or world frame) to pixels.
+    Project batched sets of points (either in camera or world frame) to pixels.
 
     Args:
-        points (``torch.Tensor``): The object points in camera coordinate.
+        points (``torch.Tensor``): The 3D coordinate of points. Assumed to be in the
+            camera frame if ``extrinsics`` is ``None``, otherwiwse in the world frame.
             The shape has to be (..., N, 3).
         intrinsics (``torch.Tensor``): The intrinsic parameters of cameras.
             The shape has to be (..., 3, 3).
         extrinsics (``pypose.LieTensor``, optional): The extrinsic parameters of cameras.
-            The shape has to be (..., 7). If ``None``, the points are assumed to be in
-            the camera frame, otherwise in the world frame. Default: ``None``.
+            The shape has to be (..., 7). Default: ``None``.
 
     Returns:
         ``torch.Tensor``: The associated pixel with shape (..., N, 2).
