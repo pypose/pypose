@@ -4,7 +4,6 @@ from . import EPnP
 class ICP(torch.nn.Module):
     r'''
     Iterative Closest Point (ICP) using Singular Value Decomposition (SVD).
-
     Args:
         steplim: the max step number
         tol: the tolerance of error for early stopping
@@ -16,22 +15,42 @@ class ICP(torch.nn.Module):
         self.steplim = steplim
         self.tol = tol
         self.matched = matched
+        
+    def nearest_neighbor(self, p1, p2, k=1):
+        r'''
+        Select the nearest neighbor point of p1 from p2
+        Args:
+            p1: the source points set
+            p2: the target points set
+            tolerance: the threshold of min distance
 
-    def forward(self, newpc, originpc):
-        temppc = newpc.clone()
+        Returns:
+            distances: the min distance between point in p1 and its nearest neighbor
+            indices: the index of the nearest neighbor point in p2
+        '''
+        dif = torch.stack([p2[i].unsqueeze(-2) - p1[i]
+                           for i in range(p1.shape[0])])
+        dist = torch.norm(dif, dim=-1)
+        nn = dist.topk(k, largest=False)
+        return nn
+
+    
+    def forward(self, p1, p2):
+        temppc = p1.clone()
         iter = 0
         err = 0
         if (not self.matched):
             while iter <= self.steplim:
                 iter += 1
-                dist = torch.norm((originpc.unsqueeze(-2) - temppc.unsqueeze(-3)),dim=-1)
-                errnew = dist.topk(1, largest=False).values.mean()
-                tf = EPnP._points_transform(temppc, originpc).unsqueeze(-2)
-                temppc = tf.Act(temppc)
+                nn = self.nearest_neighbor(temppc.mT, p2.mT)
+                errnew = sum(sum(nn.values) / len(nn.values))
+                T = EPnP._points_transform(temppc.mT, p2[:, :,nn.indices[-1]].squeeze(-1).mT).matrix()
+                temppc = T[:,0:3,0:3] @ temppc + T[:, 0:3,[3]]
                 if (abs(err - errnew) < self.tol):
                     break
                 err = errnew
-            T = EPnP._points_transform(newpc, temppc)
+            T = EPnP._points_transform(p1.mT, p2.mT)
+            return T
         else:
-            T = EPnP._points_transform(newpc, originpc)
-        return T
+            T = EPnP._points_transform(p1.mT, p2.mT)
+            return T
