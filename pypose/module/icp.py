@@ -1,6 +1,3 @@
-import torch
-from . import EPnP
-
 class ICP(torch.nn.Module):
     r'''
     Iterative Closest Point (ICP) using Singular Value Decomposition (SVD).
@@ -42,14 +39,14 @@ class ICP(torch.nn.Module):
         if (not self.matched):
             while iter <= self.steplim:
                 iter += 1
-                nn = self.nearest_neighbor(temppc.mT, p2.mT)
+                nn = self.nearest_neighbor(temppc, p2)
                 errnew = sum(sum(nn.values) / len(nn.values))
-                T = EPnP._points_transform(temppc.mT, p2[:, :,nn.indices[-1]].squeeze(-1).mT).matrix()
-                temppc = T[:,0:3,0:3] @ temppc + T[:, 0:3,[3]]
+                T = EPnP._points_transform(temppc, p2[:, nn.indices[-1],:].squeeze(-2))
+                temppc = T.rotation().unsqueeze(-2).Act(temppc)+T.translation().unsqueeze(-2)
                 if (abs(err - errnew) < self.tol):
                     break
                 err = errnew
-            T = EPnP._points_transform(p1.mT, p2.mT)
+            T = EPnP._points_transform(p1, temppc)
             return T
         else:
             T = EPnP._points_transform(p1.mT, p2.mT)
