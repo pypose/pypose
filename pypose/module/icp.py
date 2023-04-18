@@ -16,25 +16,6 @@ class ICP(torch.nn.Module):
         self.tol = tol
         self.matched = matched
 
-    def nearest_neighbor(self, p1, p2, k=1):
-        r'''
-        Select the nearest neighbor point of p1 from p2
-        Args:
-            p1: the source points set
-            p2: the target points set
-            tolerance: the threshold of min distance
-
-        Returns:
-            distances: the min distance between point in p1 and its nearest neighbor
-            indices: the index of the nearest neighbor point in p2
-        '''
-        dif = torch.stack([p2[i].unsqueeze(-2) - p1[i]
-                           for i in range(p1.shape[0])])
-        dist = torch.norm(dif, dim=-1)
-        nn = dist.topk(k, largest=False)
-        return nn
-
-
     def forward(self, p1, p2):
         temppc = p1.clone()
         iter = 0
@@ -42,7 +23,7 @@ class ICP(torch.nn.Module):
         if (not self.matched):
             while iter <= self.steplim:
                 iter += 1
-                nn = self.nearest_neighbor(temppc, p2)
+                nn = self._k_nearest_neighbor(temppc, p2)
                 errnew = sum(sum(nn.values) / len(nn.values))
                 T = EPnP._points_transform(temppc, p2[:, nn.indices[-1],:].squeeze(-2))
                 temppc = T.unsqueeze(-2).Act(temppc)
@@ -54,3 +35,28 @@ class ICP(torch.nn.Module):
         else:
             T = EPnP._points_transform(p1, p2)
             return T
+
+    @staticmethod
+    def _k_nearest_neighbor(pc1, pc2, k = 1, norm = 2, sort: bool = True):
+        r'''
+        Select the k nearest neighbor point of pc1 from pc2
+        Args:
+            pc1: the source points set
+            pc2: the target points set
+            tolerance: the threshold of min distance
+
+        Returns:
+            distances: the min distance between point in p1 and its nearest neighbor
+            indices: the index of the nearest neighbor point in p2
+        '''
+
+        diff = pc1.unsqueeze(-2) - pc2.unsqueeze(-3)
+        if norm == 1:
+            distance = torch.sum(torch.abs(diff), dim=-1)
+        elif norm == 2:
+            distance = torch.sqrt(torch.sum(diff ** 2, dim=-1))
+        nn = distance.topk(k, largest=False)
+
+        # Will add sorted function later.
+
+        return nn
