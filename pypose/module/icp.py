@@ -1,3 +1,6 @@
+import torch
+from ..module.pnp import EPnP
+
 class ICP(torch.nn.Module):
     r'''
     Iterative Closest Point (ICP) using Singular Value Decomposition (SVD).
@@ -49,5 +52,6 @@ class ICP(torch.nn.Module):
             T = EPnP._points_transform(p1, temppc)
             return T
         else:
-            T = EPnP._points_transform(p1.mT, p2.mT)
+            T = EPnP._points_transform(p1, p2)
             return T
+        
