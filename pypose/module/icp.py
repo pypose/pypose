@@ -1,6 +1,7 @@
 import torch
 from . import EPnP
 from .. import LieTensor
+
 class ICP(torch.nn.Module):
     r'''
     Iterative Closest Point (ICP) using Singular Value Decomposition (SVD).
@@ -10,9 +11,9 @@ class ICP(torch.nn.Module):
         matched: whether the input points set and the target points set have been matched
     '''
 
-    def __init__(self, steplim=200, tol=0.0001, init_transform =None):
+    def __init__(self, steplim=200, tol=1e-6, init_transform =None):
         super().__init__()
-        assert type(init_transform) == LieTensor
+        #assert type(init_transform) == LieTensor
         self.steplim = steplim
         self.tol = tol
         self.init_transform = init_transform
@@ -56,10 +57,8 @@ class ICP(torch.nn.Module):
         '''
 
         diff = pc1.unsqueeze(-2) - pc2.unsqueeze(-3)
-        if norm == 1:
-            distance = torch.sum(torch.abs(diff), dim=-1)
-        elif norm == 2:
-            distance = torch.sqrt(torch.sum(diff ** 2, dim=-1))
+        if norm == 1 or 2:
+            distance = torch.linalg.norm(diff, dim=-1, ord=norm)
         else:
             raise ValueError("Invalid norm. Only 1-norm and 2-norm are supported.")
 
