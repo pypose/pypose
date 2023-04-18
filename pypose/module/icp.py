@@ -1,5 +1,5 @@
 import torch
-from ..module.pnp import EPnP
+from . import EPnP
 
 class ICP(torch.nn.Module):
     r'''
