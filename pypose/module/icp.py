@@ -57,10 +57,30 @@ class ICP(torch.nn.Module):
         '''
 
         diff = pc1.unsqueeze(-2) - pc2.unsqueeze(-3)
+
+        print("pc1",pc1)
+        print(pc2)
+
+        print(diff)
+
+        distance_new = torch.linalg.norm(diff, dim=-1, ord=norm)
+        print(distance_new)
+
+        distance_new1 = torch.linalg.vector_norm(diff, dim=-1)
+        #print(distance_new1)
+
+        distance_new2 = torch.norm(diff, dim=-1)
+        #print(distance_new2)
+
         if norm == 1 or 2:
-            distance = torch.linalg.norm(diff, dim=-1, ord=norm)
+            distance = torch.sum(torch.abs(diff), dim=-1)
+        elif norm == 2:
+            distance = torch.sqrt(torch.sum(diff ** 2, dim=-1))
         else:
             raise ValueError("Invalid norm. Only 1-norm and 2-norm are supported.")
+
+        print(distance)
+
 
         knn = distance.topk(k, largest=False)
 
