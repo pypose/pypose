@@ -26,9 +26,12 @@ input_poses = pp.LieTensor([[[0., 4., 0., angle1[0], angle1[1], angle1[2], angle
 
 LS = lieSpline()
 waypoints = LS.interpolateSE3(input_poses, time)
+print(waypoints.shape)
 wayposes = waypoints.matrix()
+print(wayposes.shape)
 ax = None
 for pose in wayposes[0, :, :, :]:
+
     R = pose[0:3, 0:3]
     p = pose[0:3, 3]
     ax = plot_basis(ax=ax, s=0.15, R=R, p=p)
