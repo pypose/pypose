@@ -28,10 +28,10 @@ class lieSpline(nn.Module):
     def interpolateSE3(self, input_poses, time, inter_begin_and_end = True):
         """ B spline interpolation in SE3
         Args:
-            input_poses: input n(n>=4) poses with [batch_size, n, 4, 4] shape
+            input_poses: input n(n>=4) poses with [batch_size, n, 7] shape
             time: k interpolation time point with [1, 1, k] shape
         Returns:
-            output_poses: output (n-3)*k poses with [batch_size, (n-3)*k, 4, 4] shape
+            output_poses: output (n-3)*k poses with [batch_size, (n-1)*k, 7 shape
         """
         input_poses = input_poses.matrix()
         if inter_begin_and_end:
