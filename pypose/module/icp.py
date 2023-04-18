@@ -37,17 +37,20 @@ class ICP(torch.nn.Module):
             return T
 
     @staticmethod
-    def _k_nearest_neighbor(pc1, pc2, k = 1, norm = 2, sort: bool = True):
+    def _k_nearest_neighbor(pc1, pc2, k = 1, norm = 2, sort: bool = False):
         r'''
         Select the k nearest neighbor point of pc1 from pc2
         Args:
             pc1: the source points set
             pc2: the target points set
-            tolerance: the threshold of min distance
+            k: the number of nearest neighbors to find
+            norm: the norm to use for distance calculation (1 or 2)
+            sort: whether to sort the k nearest neighbors by distance
 
         Returns:
-            distances: the min distance between point in p1 and its nearest neighbor
-            indices: the index of the nearest neighbor point in p2
+            distances: the distance between each point in pc1 and
+                        its k nearest neighbors in pc2
+            indices: the index of the k nearest neighbor points in pc2
         '''
 
         diff = pc1.unsqueeze(-2) - pc2.unsqueeze(-3)
@@ -55,8 +58,14 @@ class ICP(torch.nn.Module):
             distance = torch.sum(torch.abs(diff), dim=-1)
         elif norm == 2:
             distance = torch.sqrt(torch.sum(diff ** 2, dim=-1))
-        nn = distance.topk(k, largest=False)
+        else:
+            raise ValueError("Invalid norm. Only 1-norm and 2-norm are supported.")
 
-        # Will add sorted function later.
+        knn = distance.topk(k, largest=False)
 
-        return nn
+        if k > 1 and sort:
+            dist, rank= knn.values.sort(dim=-1)
+            idx = torch.gather(knn.indices, -1, rank)
+            TopK = torch.namedtuple('TopK', ['values', 'indices'])
+            knn = TopK(values=dist, indices=idx)
+        return knn
