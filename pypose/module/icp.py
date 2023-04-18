@@ -1,6 +1,6 @@
 import torch
 from . import EPnP
-
+from .. import LieTensor
 class ICP(torch.nn.Module):
     r'''
     Iterative Closest Point (ICP) using Singular Value Decomposition (SVD).
@@ -12,7 +12,7 @@ class ICP(torch.nn.Module):
 
     def __init__(self, steplim=200, tol=0.0001, init_transform =None):
         super().__init__()
-        #assert type(init_transform) == pp.LieTensor
+        assert type(init_transform) == LieTensor
         self.steplim = steplim
         self.tol = tol
         self.init_transform = init_transform
