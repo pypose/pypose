@@ -148,3 +148,4 @@ examples/module/pgo/pgodata/*
 examples/module/pgo/save/*
 *epnp-test-data.pt*
 *__MACOSX
+examples/module/pnp/data_cache_eth3d_dp/*
