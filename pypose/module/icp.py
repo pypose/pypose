@@ -1,6 +1,5 @@
 import torch
 from . import EPnP
-from .. import LieTensor
 
 class ICP(torch.nn.Module):
     r'''
@@ -11,9 +10,8 @@ class ICP(torch.nn.Module):
         matched: whether the input points set and the target points set have been matched
     '''
 
-    def __init__(self, steplim=200, tol=0.0001, init_transform =None):
+    def __init__(self, steplim=200, tol=0.0001, init_transform = None):
         super().__init__()
-        #assert type(init_transform) == LieTensor
         self.steplim = steplim
         self.tol = tol
         self.init_transform = init_transform
@@ -22,20 +20,26 @@ class ICP(torch.nn.Module):
         temppc = p1.clone()
         iter = 0
         err = None
-        if (self.init_transform != None):
-            temppc = self.init_transform.Act(temppc)
+        if self.init_transform != None:
+            if p1.shape[:-2] == self.init_transform.shape[:-1] and \
+                self.init_transform.shape[-1] == 7:
+                temppc = self.init_transform.unsqueeze(-2).Act(temppc)
+            else:
+                raise ValueError("Invalid initial transformation matrix, please use " +
+                                 "SE3 LieTensor with the same batch sizes as the " +
+                                 "input pointcloud.")
         while iter <= self.steplim:
             iter += 1
             neighbors = self._k_nearest_neighbor(temppc, p2)
             errnew = torch.mean(neighbors.values, dim=-1)
-            T = EPnP._points_transform(temppc, p2[:, neighbors.indices[-1],:].squeeze(-2))
-            temppc = T.unsqueeze(-2).Act(temppc)
             if err is None:
                 err = errnew
             else:
                 if torch.all(torch.abs((errnew - err) / err) < self.tol):
                     break
             err = errnew
+            T = EPnP._points_transform(temppc, p2[:, neighbors.indices[-1],:].squeeze(-2))
+            temppc = T.unsqueeze(-2).Act(temppc)
         T = EPnP._points_transform(p1, temppc)
         return T
 
