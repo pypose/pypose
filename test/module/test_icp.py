@@ -1,12 +1,60 @@
+import torch
 import pypose as pp
-import torch as torch
 
-# A temp test file
-if __name__=="__main__":
-    input_pc = torch.randn([10, 20, 3])
-    tf = pp.randn_SE3(10)
-    print("The true tf is", tf)
-    output_pc = tf.unsqueeze(-2).Act(input_pc)
+class TestICP:
+
+    def l_shape_wall(b, side1, side2, resolution=0.01, noise_std=0.01):
+        # Generate a Laser Scanning for an L-shape wall
+        n_points_side1 = int(side1 / resolution)
+        n_points_side2 = int(side2 / resolution)
+
+        # Generate the x and y coordinates for both sides of the wall
+        x_side1 = torch.linspace(0, side1 - resolution, n_points_side1)
+        y_side1 = torch.full((n_points_side1,), side2)
+
+        x_side2 = torch.full((n_points_side2,), side1)
+        y_side2 = torch.linspace(side2, resolution, n_points_side2)
+        y_side2 = y_side2.flip(-1)  # Reverse the tensor
+
+        # Concatenate the x and y coordinates for both sides
+        x = torch.cat((x_side1, x_side2))
+        y = torch.cat((y_side1, y_side2))
+
+        # Set the z coordinates to a constant value of 1
+        z = torch.ones_like(x)
+
+        # Stack the coordinates into a single tensor
+        pc1 = torch.stack([x, y, z], dim=1).unsqueeze(0).repeat(b, 1, 1)
+
+
+        # Add random noise to pc1 to generate pc2
+        noise = torch.normal(0, noise_std, size=pc1.shape)
+        pc2 = pc1 + noise
+
+        tf = pp.randn_SE3(b)
+        print("The true tf is", tf)
+        pc2 = tf.unsqueeze(-2).Act(pc2)
+
+        return pc1, pc2, tf
+
+    def random_point_cloud(b, num_points):
+        pc1 = torch.rand(b, num_points, 3)
+        tf = pp.randn_SE3(b)
+        print("The true tf is", tf)
+        pc2 = tf.unsqueeze(-2).Act(pc1)
+        return pc1, pc2, tf
+
+
+
+if __name__ == "__main__":
+    b = 3
+    side1 = 0.1  # Length of the first side of the L-shaped wall
+    side2 = 0.5   # Length of the second side of the L-shaped wall
+    resolution = 0.01  # Scanning resolution
+    noise_std = 0  # Standard deviation of the noise
+    num_points = 20
+    pc1, pc2, tf  = TestICP.l_shape_wall(b, side1, side2, resolution, noise_std)
+    # pc1, pc2, tf  = TestICP.random_point_cloud(b, num_points)
     icpsvd = pp.module.ICP()
-    result = icpsvd(input_pc, output_pc)
+    result = icpsvd(pc1, pc2)
     print("The output is", result)

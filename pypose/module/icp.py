@@ -11,7 +11,7 @@ class ICP(torch.nn.Module):
         matched: whether the input points set and the target points set have been matched
     '''
 
-    def __init__(self, steplim=200, tol=1e-6, init_transform =None):
+    def __init__(self, steplim=200, tol=0.0001, init_transform =None):
         super().__init__()
         #assert type(init_transform) == LieTensor
         self.steplim = steplim
