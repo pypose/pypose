@@ -53,8 +53,21 @@ if __name__ == "__main__":
     resolution = 0.01  # Scanning resolution
     noise_std = 0  # Standard deviation of the noise
     num_points = 20
-    pc1, pc2, tf  = TestICP.l_shape_wall(b, side1, side2, resolution, noise_std)
-    # pc1, pc2, tf  = TestICP.random_point_cloud(b, num_points)
+    # pc1, pc2, tf  = TestICP.l_shape_wall(b, side1, side2, resolution, noise_std)
+    pc1, pc2, tf  = TestICP.random_point_cloud(b, num_points)
     icpsvd = pp.module.ICP()
     result = icpsvd(pc1, pc2)
     print("The output is", result)
+
+
+    # import torch, pypose as pp
+    # b = torch.randint(low=1, high=10, size=())
+    # num_points1 = torch.randint(low=2, high=100, size=())
+    # num_points2 = torch.randint(low=2, high=100, size=())
+    # pc1 = torch.rand(b, num_points1, 3)
+    # pc2 = torch.rand(b, num_points2, 3)
+    # print(pc1.shape)
+    # print(pc2.shape)
+    # dist, idx = pp.module.ICP._k_nearest_neighbor(pc1, pc2, k = 5, sort = True)
+    # print(dist.shape)
+    # print(idx.shape)
