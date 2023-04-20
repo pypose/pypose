@@ -147,4 +147,5 @@ examples/module/dynamics/save/*
 examples/module/pgo/pgodata/*
 examples/module/pgo/save/*
 *epnp-test-data.pt*
+*icp-test-data.pt*
 *__MACOSX
