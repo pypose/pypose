@@ -41,7 +41,7 @@ class ICP(torch.nn.Module):
                 if torch.all(torch.abs((errnew - err) / err) < self.tol):
                     break
             err = errnew
-            T = EPnP._points_transform(temppc, p2[:, knnidx[-1],:].squeeze(-2))
+            T = EPnP._points_transform(temppc, p2[:, knnidx[-1],:])
             temppc = T.unsqueeze(-2).Act(temppc)
         T = EPnP._points_transform(p1, temppc)
         return T
