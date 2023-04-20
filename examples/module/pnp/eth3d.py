@@ -7,12 +7,8 @@ import py7zr
 import pypose as pp
 import torchdata
 from torchdata.datapipes.iter import FileOpener, HttpReader, IterableWrapper, \
-    IterDataPipe, Mapper, Zipper, IterKeyZipper
+    IterDataPipe, Zipper, IterKeyZipper
 
-collection = [
-    "multi_view_training_dslr_undistorted.7z",
-    "multi_view_test_dslr_undistorted.7z",
-]
 
 full_scenes = [
     "courtyard_dslr_undistorted.7z",
@@ -55,8 +51,8 @@ class Decompressor7z(IterDataPipe):
 
 def download_pipe(root: Union[str, Path], scenes=full_scenes):
     root = os.fspath(root)
-    url_dp = IterableWrapper([base_url + archive_name for archive_name in scenes])
     # download
+    url_dp = IterableWrapper([base_url + archive_name for archive_name in scenes])
     cache_compressed = url_dp.on_disk_cache(
         filepath_fn=lambda url: os.path.join(root, os.path.basename(url)),
     )
@@ -93,7 +89,7 @@ def demux_func(file):
 
 def load_camera(file):
     # skip first three lines of comments occur in all files
-    camera_ids = np.loadtxt(file, skiprows=3, usecols=(0,), dtype=int, ndmin=1)  # CAMERA_ID
+    camera_ids = np.loadtxt(file, skiprows=3, usecols=(0,), dtype=int, ndmin=1) #CAMERA_ID
     camera_data = np.loadtxt(file, skiprows=3, usecols=(2, 3, 4, 5, 6, 7),
                              ndmin=2)  # WIDTH HEIGHT PARAMS[fx, fy, cx, cy,]
     camera_dict = {k.item(): build_intrinsic(*(v[2:])) for k, v in
@@ -102,7 +98,7 @@ def load_camera(file):
 
 
 def load_points(file):
-    # each row defined by: POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[] as (IMAGE_ID, POINT2D_IDX)
+    # each row: POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[] as (IMAGE_ID, POINT2D_IDX)
     point3d_ids = np.loadtxt(file, usecols=(0,), dtype=int, ndmin=1)  # (N,)
     point3d_xyz = np.loadtxt(file, usecols=(1, 2, 3), dtype=np.float32, ndmin=2)  # (N, 3)
     point3d_rgb = np.loadtxt(file, usecols=(4, 5, 6), dtype=int, ndmin=2)  # (N, 3)
@@ -133,38 +129,23 @@ def parse_image(data):
                 camera_id=camera_id, pixels=pixels, point_ids=point_ids,
                 pose=colmap2lietensor(pose), camera=camera, point=point, )
 
-    # for each image, generate a batch of testing samples
-    batched_points2d, batched_points_ids, batched_points_xyz = batches_of_2d_points(
-        pixels, point_ids, point3d_xyz_dict, num_points, batch_size)
-
-    # tile rot and t to batch_size
-    batched_rot = np.tile(rot[None], (batch_size, 1, 1))
-    batched_t = np.tile(t[None], (batch_size, 1))
-    batched_camera_intrinsics = np.tile(camera_data_dict[camera_id][None],
-                                        (batch_size, 1, 1))
-
 
 def load_pipe(cache_pipe):
     camera, point, image, jpg = cache_pipe.demux(4, demux_func, drop_none=True)
-
-    # camera = Mapper(camera, load_camera)
-    # point = Mapper(point, load_points)
     image_file, image_io = FileOpener(image).unzip(2)
     annotation = Zipper(camera.map(load_camera), point.map(load_points), image_file)
     image = Zipper(annotation, image_io)
     image = image.readlines(skip_lines=4).batch(2).map(parse_image)
 
-    image_with_jpg = IterKeyZipper(image, jpg,
-                                   key_fn=lambda x: os.path.basename(x['jpg_name']),
-                                   ref_key_fn=os.path.basename,
-                                   merge_fn=lambda x, y: x | {'jpg_path': y},
-                                   keep_key=False)
-    assert len(list(image_with_jpg)) == len(list(jpg)) == len(list(image))
-    return image
+    return IterKeyZipper(image, jpg,
+                        key_fn=lambda x: os.path.basename(x['jpg_name']),
+                        ref_key_fn=os.path.basename,
+                        merge_fn=lambda x, y: x | {'jpg_path': y},
+                        keep_key=False)
 
 
 if __name__ == '__main__':
     data_root = 'data_cache_eth3d_dp'
     os.makedirs(data_root, exist_ok=True)
-    # for i in download_pipe(data_root): print(i)
     img = load_pipe(download_pipe(data_root))
+    print(len(list(img)))
