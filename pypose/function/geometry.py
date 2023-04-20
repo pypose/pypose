@@ -161,7 +161,7 @@ def reprojerr(points, pixels, intrinsics, extrinsics=None):
     return (img_repj - pixels).norm(dim=-1)
 
 
-def knn(pc1, pc2, k = 1, norm = 2, sort: bool = False):
+def knn(pc1, pc2, k = 1, norm = 2):
     r'''
     Select the k nearest neighbor points of pointcloud 1 from pointcloud 2 in each batch.
 
@@ -174,24 +174,54 @@ def knn(pc1, pc2, k = 1, norm = 2, sort: bool = False):
             k has to be k \seq N2. Default: ``1``.
         norm (``int``, optional): The norm to use for distance calculation.
             Default: ``2``.
-        sort (``bool``, optional): Whether to sort the k nearest neighbors by distance.
-            Default: ``False``.
 
     Returns:
         distance (``torch.Tensor``): The N-norm distance between each point in pc1 and
-            its k nearest neighbors in pc2.
+            its sorted k nearest neighbors in pc2.
             The shape is (..., N1, k).
         indices (``torch.Tensor``): The index of the k nearest neighbor points in pc2
             The shape is (..., N1, k).
-    '''
 
+    Example:
+        >>> import torch, pypose as pp
+        >>> pc1 = torch.tensor([[9., 2., 2.],
+        ...                     [1., 0, 2.],
+        ...                     [0., 1., 1.],
+        ...                     [5., 0., 1.],
+        ...                     [1., 0., 1.],
+        ...                     [5., 5., 3.]])
+        >>> pc2 = torch.tensor([[1., 0., 1.],
+        ...                     [1., 6., 2.],
+        ...                     [5., 1., 0.],
+        ...                     [9., 0., 2.]])
+        >>> pp.knn(pc1, pc2)
+        tensor([[2.0000],
+                [1.0000],
+                [1.4142],
+                [1.4142],
+                [0.0000],
+                [4.2426]]), tensor([[3],
+                [0],
+                [0],
+                [2],
+                [0],
+                [1]])
+        >>> pp.knn(pc1, pc2, k = 2, norm = 2)
+        tensor([[2.0000, 4.5826],
+                [1.0000, 4.5826],
+                [1.4142, 5.0990],
+                [1.4142, 4.0000],
+                [0.0000, 4.2426],
+                [4.2426, 5.0000]]), tensor([[3, 2],
+                [0, 2],
+                [0, 2],
+                [2, 0],
+                [0, 2],
+                [1, 2]])
+    '''
     diff = pc1.unsqueeze(-2) - pc2.unsqueeze(-3)
     dist = torch.linalg.norm(diff, dim=-1, ord=norm)
     knn = dist.topk(k, largest=False)
-    if k > 1 and sort:
-        distance, rank= knn.values.sort(dim=-1)
-        indices = torch.gather(knn.indices, -1, rank)
-    else:
-        distance = knn.values
-        indices = knn.indices
+    distance = knn.values
+    indices = knn.indices
     return distance, indices
