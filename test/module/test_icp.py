@@ -1,7 +1,27 @@
+import csv
 import torch
 import pypose as pp
 
 class TestICP:
+
+    def load_csv_point_cloud():
+        # Read the CSV file
+        csv_file = './test/module/icp-test-data.csv'
+
+        pc1 = []
+        pc2 = []
+
+        with open(csv_file, 'r') as file:
+            reader = csv.reader(file)
+            for row in reader:
+                pc1.append([float(row[0]), float(row[1]), 1])
+                if row[2] != '':
+                    pc2.append([float(row[2]), float(row[3]), 1])
+
+            pc1_tensor = torch.tensor(pc1)
+            pc2_tensor = torch.tensor(pc2)
+
+        return pc1_tensor, pc2_tensor
 
     def l_shape_wall(b, side1, side2, resolution=0.01, noise_std=1e-4):
         # Generate a Laser Scanning for an L-shape wall
@@ -36,6 +56,12 @@ class TestICP:
 
         return pc1, pc2, tf
 
+    def laser_scan():
+        pc1, pc2  = TestICP.load_csv_point_cloud()
+        tf = pp.randn_SE3(1)
+        pc2 = tf.unsqueeze(-2).Act(pc2)
+        return pc1, pc2, tf
+
     def random_point_cloud(b, num_points):
         pc1 = torch.rand(b, num_points, 3)
         tf = pp.randn_SE3(b)
@@ -51,9 +77,10 @@ if __name__ == "__main__":
     resolution = 0.01  # Scanning resolution
     noise_std = 0  # Standard deviation of the noise
     num_points = 20
-    pc1, pc2, tf  = TestICP.l_shape_wall(b, side1, side2, resolution, noise_std)
+    # pc1, pc2, tf  = TestICP.l_shape_wall(b, side1, side2, resolution, noise_std)
     # pc1, pc2, tf  = TestICP.random_point_cloud(b, num_points)
-    icpsvd = pp.module.ICP(tf=tf)
+    pc1, pc2, tf = TestICP.laser_scan()
+    icpsvd = pp.module.ICP()
     result = icpsvd(pc1, pc2)
     print("The true tf is", tf)
     print("The output is", result)
