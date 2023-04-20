@@ -37,7 +37,7 @@ class ICP(torch.nn.Module):
             if torch.all(torch.abs(errnew - err) < self.tol):
                 break
             err = errnew
-            batch = torch.arange(temppc.shape[0]).repeat(knnidx.shape[1],1).T.unsqueeze(-1)
+            batch = torch.arange(temppc.shape[0],dtype=knnidx.dtype, device=knnidx.device).repeat(knnidx.shape[1],1).T.unsqueeze(-1)
             batch_knnidx = torch.cat((batch, knnidx),dim =-1)
             T = EPnP._points_transform(temppc, p2[batch_knnidx[:,:,0],batch_knnidx[:,:,1],:])
             temppc = T.unsqueeze(-2).Act(temppc)
