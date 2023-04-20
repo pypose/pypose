@@ -31,8 +31,9 @@ class ICP(torch.nn.Module):
                                  "input pointcloud.")
         while iter <= self.steplim:
             iter += 1
-            knndist, knnidx = knn(temppc, p2)
-            knndist = knndist.squeeze(-1)
+            neighbors = knn(temppc, p2)
+            knndist = neighbors.values.squeeze(-1)
+            knnidx = neighbors.indices
             errnew = torch.mean(knndist, dim=-1)
             if torch.all(torch.abs(errnew - err) < self.tol):
                 break

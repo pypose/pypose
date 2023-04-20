@@ -176,10 +176,10 @@ def knn(pc1, pc2, k = 1, norm = 2):
             Default: ``2``.
 
     Returns:
-        distance (``torch.Tensor``): The N-norm distance between each point in pc1 and
-            its sorted k nearest neighbors in pc2.
-            The shape is (..., N1, k).
-        indices (``torch.Tensor``): The index of the k nearest neighbor points in pc2
+        ``torch.return_types.topk``: The named tuple that has two attributes:
+        values: A tensor containing the N-norm distance between each point in pc1 and
+            its sorted k nearest neighbors in pc2. The shape is (..., N1, k).
+        indices: A tensor containing the index of the k nearest neighbor points in pc2
             The shape is (..., N1, k).
 
     Example:
@@ -195,33 +195,42 @@ def knn(pc1, pc2, k = 1, norm = 2):
         ...                     [5., 1., 0.],
         ...                     [9., 0., 2.]])
         >>> pp.knn(pc1, pc2)
-        tensor([[2.0000],
+        torch.return_types.topk(
+        values=tensor([[2.0000],
                 [1.0000],
                 [1.4142],
                 [1.4142],
                 [0.0000],
-                [4.2426]]), tensor([[3],
+                [4.2426]]),
+        indices=tensor([[3],
                 [0],
                 [0],
                 [2],
                 [0],
-                [1]])
+                [1]]))
         >>> pp.knn(pc1, pc2, k = 2, norm = 2)
+        torch.return_types.topk(
+        values=tensor([[2.0000, 4.5826],
+                [1.0000, 4.5826],
+                [1.4142, 5.0990],
+                [1.4142, 4.0000],
+                [0.0000, 4.2426],
+                [4.2426, 5.0000]]),
+        indices=tensor([[3, 2],
+                [0, 2],
+                [0, 2],
+                [2, 0],
+                [0, 2],
+                [1, 2]]))
+        >>> print(pp.knn(pc1, pc2, k = 2, norm = 2).values)
         tensor([[2.0000, 4.5826],
                 [1.0000, 4.5826],
                 [1.4142, 5.0990],
                 [1.4142, 4.0000],
                 [0.0000, 4.2426],
-                [4.2426, 5.0000]]), tensor([[3, 2],
-                [0, 2],
-                [0, 2],
-                [2, 0],
-                [0, 2],
-                [1, 2]])
+                [4.2426, 5.0000]])
     '''
     diff = pc1.unsqueeze(-2) - pc2.unsqueeze(-3)
     dist = torch.linalg.norm(diff, dim=-1, ord=norm)
-    knn = dist.topk(k, largest=False)
-    distance = knn.values
-    indices = knn.indices
-    return distance, indices
+    neighbors = dist.topk(k, largest=False)
+    return neighbors
