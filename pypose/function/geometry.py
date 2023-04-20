@@ -188,7 +188,6 @@ def knn(pc1, pc2, k = 1, norm = 2, sort: bool = False):
     diff = pc1.unsqueeze(-2) - pc2.unsqueeze(-3)
     dist = torch.linalg.norm(diff, dim=-1, ord=norm)
     knn = dist.topk(k, largest=False)
-
     if k > 1 and sort:
         distance, rank= knn.values.sort(dim=-1)
         indices = torch.gather(knn.indices, -1, rank)
