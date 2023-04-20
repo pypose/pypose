@@ -176,10 +176,10 @@ def knn(pc1, pc2, k = 1, norm = 2):
             Default: ``2``.
 
     Returns:
-        ``torch.return_types.topk``: The named tuple that has two attributes:
-        values: A tensor containing the N-norm distance between each point in pc1 and
+        ``torch.return_types.topk``: The named tuple that has two attributes.
+        ``values``: A tensor containing the N-norm distance between each point in pc1 and
             its sorted k nearest neighbors in pc2. The shape is (..., N1, k).
-        indices: A tensor containing the index of the k nearest neighbor points in pc2
+        ``indices``: A tensor containing the index of the k nearest neighbor points in pc2
             The shape is (..., N1, k).
 
     Example:
