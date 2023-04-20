@@ -35,7 +35,6 @@ class ICP(torch.nn.Module):
             knndist = knndist.squeeze(-1)
             knnidx = knnidx.squeeze(-1)
             errnew = torch.mean(knndist, dim=-1)
-            print(errnew)
             if err is None:
                 err = errnew
             else:

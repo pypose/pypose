@@ -3,7 +3,7 @@ import pypose as pp
 
 class TestICP:
 
-    def l_shape_wall(b, side1, side2, resolution=0.01, noise_std=0.01):
+    def l_shape_wall(b, side1, side2, resolution=0.01, noise_std=1e-4):
         # Generate a Laser Scanning for an L-shape wall
         n_points_side1 = int(side1 / resolution)
         n_points_side2 = int(side2 / resolution)
@@ -32,7 +32,6 @@ class TestICP:
         pc2 = pc1 + noise
 
         tf = pp.randn_SE3(b)
-        print("The true tf is", tf)
         pc2 = tf.unsqueeze(-2).Act(pc2)
 
         return pc1, pc2, tf
@@ -40,23 +39,23 @@ class TestICP:
     def random_point_cloud(b, num_points):
         pc1 = torch.rand(b, num_points, 3)
         tf = pp.randn_SE3(b)
-        print("The true tf is", tf)
         pc2 = tf.unsqueeze(-2).Act(pc1)
         return pc1, pc2, tf
 
 
 
 if __name__ == "__main__":
-    b = 3
+    b = 2
     side1 = 0.1  # Length of the first side of the L-shaped wall
     side2 = 0.5   # Length of the second side of the L-shaped wall
     resolution = 0.01  # Scanning resolution
     noise_std = 0  # Standard deviation of the noise
     num_points = 20
-    # pc1, pc2, tf  = TestICP.l_shape_wall(b, side1, side2, resolution, noise_std)
-    pc1, pc2, tf  = TestICP.random_point_cloud(b, num_points)
-    icpsvd = pp.module.ICP()
+    pc1, pc2, tf  = TestICP.l_shape_wall(b, side1, side2, resolution, noise_std)
+    # pc1, pc2, tf  = TestICP.random_point_cloud(b, num_points)
+    icpsvd = pp.module.ICP(tf=tf)
     result = icpsvd(pc1, pc2)
+    print("The true tf is", tf)
     print("The output is", result)
 
 
