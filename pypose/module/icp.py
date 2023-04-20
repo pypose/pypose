@@ -33,7 +33,6 @@ class ICP(torch.nn.Module):
             iter += 1
             knndist, knnidx = knn(temppc, p2)
             knndist = knndist.squeeze(-1)
-            knnidx = knnidx.squeeze(-1)
             errnew = torch.mean(knndist, dim=-1)
             if torch.all(torch.abs(errnew - err) < self.tol):
                 break
