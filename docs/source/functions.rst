@@ -50,3 +50,4 @@ Functions
     cumops
     cumops_
     reprojerr
+    knn
