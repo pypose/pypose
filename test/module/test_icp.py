@@ -6,7 +6,7 @@ class TestICP:
 
     def load_point_cloud(self):
         download_and_extract_archive('https://github.com/Murphy41/laser-scan-pt/' \
-                                     'releases/download/v0.0/icp-test-data.zip',\
+                                     'releases/download/v0.0/icp-test-data.pt.zip',\
                                     './test/module')
         loaded_tensors = torch.load('./test/module/icp-test-data.pt')
         pc1 = loaded_tensors['pc1']
