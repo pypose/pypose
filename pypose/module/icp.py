@@ -20,7 +20,7 @@ class ICP(torch.nn.Module):
     def forward(self, p1, p2):
         temppc = p1.clone()
         iter = 0
-        err = None
+        err = 0
         if self.tf != None:
             if p1.shape[:-2] == self.tf.shape[:-1] and \
                 self.tf.shape[-1] == 7:
@@ -35,11 +35,8 @@ class ICP(torch.nn.Module):
             knndist = knndist.squeeze(-1)
             knnidx = knnidx.squeeze(-1)
             errnew = torch.mean(knndist, dim=-1)
-            if err is None:
-                err = errnew
-            else:
-                if torch.all(torch.abs(errnew - err) < self.tol):
-                    break
+            if torch.all(torch.abs(errnew - err) < self.tol):
+                break
             err = errnew
             T = EPnP._points_transform(temppc, p2[:, knnidx[-1],:])
             temppc = T.unsqueeze(-2).Act(temppc)
