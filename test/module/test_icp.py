@@ -14,7 +14,7 @@ class TestICP:
         return pc1, pc2
 
     def test_laser_scan(self):
-        pc1, pc2 = TestICP.load_point_cloud()
+        pc1, pc2 = self.load_point_cloud()
         tf = pp.randn_SE3(1)
         pc2 = tf.unsqueeze(-2).Act(pc2)
         icpsvd = pp.module.ICP()
@@ -34,5 +34,6 @@ class TestICP:
         print("The output is", result)
 
 if __name__ == "__main__":
-    TestICP.test_random_pc()
-    TestICP.test_laser_scan()
+    test = TestICP()
+    test.test_random_pc()
+    test.test_laser_scan()
