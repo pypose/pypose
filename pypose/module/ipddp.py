@@ -7,7 +7,7 @@ class algParam:
     r'''
     The class of algorithm parameter.
     '''
-    def __init__(self, mu=1.0, maxiter=2, tol=1.0e-7, infeas=False):
+    def __init__(self, mu=1.0, maxiter=50, tol=1.0e-7, infeas=False):
         self.mu = mu  
         self.maxiter = maxiter
         self.tol = torch.tensor(tol)
@@ -160,22 +160,23 @@ class bwdPass:
         self.f_fn = sys
         self.c_fn = cons
         self.N = horizon
-        self.n_state = n_state
-        self.n_input = n_input
-        self.n_cons = n_cons
+        self.T = horizon
+        ns = n_state
+        nc = n_input
+        ncons = n_cons
 
         self.reg = 0.0
         self.failed = False
         self.recovery = 0
         self.opterr = 0.
         self.dV = torch.zeros(1,2)
-
-        self.ky = torch.zeros(self.N,  self.n_cons, 1)
-        self.Ky = torch.zeros(self.N,  self.n_cons, self.n_state)
-        self.ks = torch.zeros(self.N,  self.n_cons, 1)
-        self.Ks = torch.zeros(self.N,  self.n_cons, self.n_state)
-        self.ku = torch.zeros(self.N,  self.n_input,1)
-        self.Ku = torch.zeros(self.N,  self.n_input,self.n_state)
+        B = (1,) # todo
+        self.ky = torch.zeros(B + (self.T, ncons))
+        self.Ky = torch.zeros(B + (self.T, ncons, ns))
+        self.ks = torch.zeros(B + (self.T, ncons))
+        self.Ks = torch.zeros(B + (self.T, ncons, ns))
+        self.ku = torch.zeros(B + (self.T, nc))
+        self.Ku = torch.zeros(B + (self.T, nc, ns))
 
     def resetreg(self):
         self.reg = 0.0
@@ -198,36 +199,30 @@ class ddpOptimizer(nn.Module):
         Initialize three key classes
         '''
         super().__init__()
-        # self.system = system
-        # self.constraint = constraint
-        # self.T = T
-        # self.Q = Q
-        # self.p = p
-        # self.constraint_flag = True
-        # self.contraction_flag = True
-        # self.W = torch.randn(2, 5, 6, 7) # todo:change
+        # self.system = sys
+        # self.constraint = cons
+        # # self.T = T
+        # # self.Q = Q
+        # # self.p = p
+        self.constraint_flag = True
+        self.contraction_flag = False # todo
+        # # self.W = torch.randn(2, 5, 6, 7) # todo:change
 
         self.alg = algParam()
         self.fp = fwdPass(sys=sys, stage_cost=stage_cost, terminal_cost=terminal_cost, cons=cons, n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon, init_traj=init_traj)
         self.bp = bwdPass(sys=sys,            cons=cons,n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon)
         self.N = horizon
 
-
     def backwardpass(self):
         r'''
         Compute controller gains for next iteration from current trajectory.
         '''
-        fp = self.fp
-        bp = self.bp
-        alg = self.alg
+        fp, bp, alg = self.fp, self.bp, self.alg
 
-        self.n_state = fp.n_state
-        self.n_input = fp.n_input
-        self.N = fp.N
-        dV = [0.0,0.0]
-        c_err = torch.tensor(0.0)
-        mu_err = torch.tensor(0.0)
-        Qu_err = torch.tensor(0.0)
+        ns = fp.n_state
+        self.T = fp.N
+
+        c_err, mu_err, qu_err = torch.tensor(0.0), torch.tensor(0.0), torch.tensor(0.0)
 
         # set regularization parameter
         if (fp.failed or bp.failed):
@@ -248,23 +243,43 @@ class ddpOptimizer(nn.Module):
         if ~fp.failed:
             fp.computeall()
         
-        x, u, c, y, s, mu = fp.x, fp.u, fp.c, fp.y, fp.s, fp.mu 
-        Vx, Vxx = fp.px, fp.pxx
-        fx,fu,fxx,fxu,fuu = fp.fx, fp.fu, fp.fxx, fp.fxu, fp.fuu
-        qx,qu,qxx,qxu,quu = fp.qx, fp.qu, fp.qxx, fp.qxu, fp.quu   
-        cx, cu = fp.cx, fp.cu
+        fp_list = [fp]
+        n_batch = len(fp_list)
+        # copy from prepare()
+        self.c, self.s = torch.stack([fp_list[batch_id].c for batch_id in range(n_batch)],dim=0).squeeze(-1), \
+                         torch.stack([fp_list[batch_id].s for batch_id in range(n_batch)],dim=0).squeeze(-1)
+        self.Qxx_terminal = torch.stack([fp_list[batch_id].pxx for batch_id in range(n_batch)],dim=0)
+        self.Qx_terminal = torch.stack([fp_list[batch_id].px.squeeze(-1) for batch_id in range(n_batch)],dim=0)
+        self.Q = torch.stack([
+                                    torch.cat([torch.cat([fp_list[batch_id].qxx, fp_list[batch_id].qxu],dim=-1),
+                                    torch.cat([fp_list[batch_id].qxu.mT, fp_list[batch_id].quu],dim=-1)], dim=-2) 
+                                        for batch_id in range(n_batch)], dim=0) 
+        self.p  = torch.stack([
+                                    torch.cat([fp_list[batch_id].qx, fp_list[batch_id].qu],dim=-2) 
+                                        for batch_id in range(n_batch)], dim=0).squeeze(-1)
+        self.W = torch.stack([
+                                    torch.cat([fp_list[batch_id].cx, fp_list[batch_id].cu],dim=-1) 
+                                        for batch_id in range(n_batch)], dim=0) 
+        self.F = torch.stack([
+                                    torch.cat([fp_list[batch_id].fx, fp_list[batch_id].fu],dim=-1) 
+                                        for batch_id in range(n_batch)], dim=0) 
+        self.G = torch.stack([
+                                    torch.cat([torch.cat([fp_list[batch_id].fxx, fp_list[batch_id].fxu],dim=-1),
+                                    torch.cat([fp_list[batch_id].fxu.mT, fp_list[batch_id].fuu],dim=-1)], dim=-2) 
+                                        for batch_id in range(n_batch)], dim=0) 
+
 
         # backward recursions, similar to iLQR backward recursion, but more variables involved
-        for i in range(self.N-1, -1, -1):
-            Qx = qx[i] + cx[i].mT.matmul(s[i]) + fx[i].mT.matmul(Vx)
-            Qu = qu[i] + cu[i].mT.matmul(s[i]) + fu[i].mT.matmul(Vx) # (5b)
+        V, v = self.Qxx_terminal, self.Qx_terminal
+        for t in range(self.T-1, -1, -1):
+            Ft = self.F[...,t,:,:]
+            Qt = self.Q[...,t,:,:] + Ft.mT @ V @ Ft
+            if self.contraction_flag: #todo
+                Qt += torch.tensordot(v.mT, self.G[...,t,:,:,:], dims=-1) # todo :check!!!!
+            qt = self.p[...,t,:] + bmv(Ft.mT, v) 
+            if self.constraint_flag:
+                qt += bmv(self.W[...,t,:,:].mT, self.s[...,t,:])
 
-            fxiVxx = fx[i].mT.matmul(Vxx)
-            Qxx = qxx[i] + fxiVxx.matmul(fx[i])  + torch.tensordot(Vx.mT,fxx[i],dims=1).squeeze(0)
-            Qxu = qxu[i] + fxiVxx.matmul(fu[i])  + torch.tensordot(Vx.mT,fxu[i],dims=1).squeeze(0)
-            Quu = quu[i] + fu[i].mT.matmul(Vxx).matmul(fu[i])  + torch.tensordot(Vx.mT,fuu[i],dims=1).squeeze(0)  # (5c-5e)
-            Quu = 0.5 * (Quu + Quu.mT)
-            Quu_reg = Quu + quu[i] * (pow(fp.reg_exp_base, bp.reg) - 1.)
 
             if (alg.infeas): #  start from infeasible/feasible trajs.
                 r = s[i] * y[i] - alg.mu
@@ -307,69 +322,50 @@ class ddpOptimizer(nn.Module):
                 Qx += cx[i].mT.matmul(tempv2)
 
             else:
-                r = s[i] *  c[i] + alg.mu
-                cinv = 1. / c[i]
-                tempv1 = s[i] * cinv
-                SCinv = torch.diag(tempv1.squeeze())
-                SCinvcui = SCinv.matmul(cu[i])
-                SCinvcxi = SCinv.matmul(cx[i])
-                cuitSCinvcui = cu[i].mT.matmul(SCinvcui)
+                Wt = self.W[...,t,:,:]
+                st, ct = self.s[...,t,:], self.c[...,t,:] 
+                r = st *  ct + alg.mu
+                cinv = 1. / ct
+                SCinv = torch.diag_embed(st * cinv)
+
+                Qt += - Wt.mT @ SCinv @ Wt
+                qt += - bmv(Wt.mT, cinv * r)
+                Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
+                Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
+                qx, qu = qt[..., :ns], qt[..., ns:]
                 
+                Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(fp.reg_exp_base, bp.reg) - 1.)
+                    
                 try:
-                    lltofQuuReg = torch.linalg.cholesky(Quu_reg - cuitSCinvcui) # compute the Cholesky decomposition 
+                    lltofQuuReg = torch.linalg.cholesky(Quu_reg) # compute the Cholesky decomposition 
                 except: 
-                    bp.failed = True
-                    bp.opterr = torch.inf
-                    self.fp = fp
-                    self.bp = bp
-                    self.alg = alg
+                    bp.failed, bp.opterr = True, torch.inf
+                    self.fp, self.bp, self.alg = fp, bp, alg
                     return
 
-                tempv2 = cinv * r
-                Qu -= cu[i].mT.matmul(tempv2) # (12b)            
-                tempQux = Qxu.mT - cu[i].mT.matmul(SCinvcxi)
-                temp = torch.hstack(( Qu, tempQux))
+                Quu_reg_inv = torch.linalg.pinv(Quu_reg)
+                bp.Ku[...,t,:,:] = Kut = - Quu_reg_inv @ Qux
+                bp.ku[...,t,:] = kut = - bmv(Quu_reg_inv, qu)
+                    
+                cx, cu = Wt[..., :ns], Wt[..., ns:]
+                bp.ks[...,t,:] = - cinv * (r + st * bmv(cu, kut))
+                bp.Ks[...,t,:,:] = - SCinv @ (cx + cu @ Kut)
+                bp.ky[...,t,:] = torch.zeros(ct.shape[0]) # omitted
+                bp.Ky[...,t,:,:] = torch.zeros(ct.shape[0], ns)       
 
-                kK = - torch.linalg.solve(Quu_reg - cuitSCinvcui, temp)
-                ku = torch.unsqueeze(kK[:,0],-1)
-                Ku = kK[:,1:]
+            V = Qxx + Qxu @ Kut + Kut.mT @ Qux + Kut.mT @ Quu @ Kut
+            v = qx  + bmv(Qxu, kut) + bmv(Kut.mT, qu) + bmv(Kut.mT @ Quu, kut)
 
-                cuiku = cu[i].matmul(ku)
-                bp.ks[i] = - cinv * (r + s[i] * cuiku)
-                bp.Ks[i] = - SCinv.matmul(cx[i] + cu[i].matmul(Ku)) # (11) checked
-                bp.ky[i] = torch.zeros(c[i].shape[0], 1)
-                bp.Ky[i] = torch.zeros(c[i].shape[0], self.n_state)       
-                Quu = Quu - cuitSCinvcui # (12e)
-                Qxu = tempQux.mT # Qxu - cx[i].transpose() * SCinvcui; // (12d)
-                Qxx -= cx[i].mT.matmul(SCinvcxi) # (12c)
-                Qx -= cx[i].mT.matmul(tempv2) # (12a)
-            
-
-            dV[0] += (ku.mT.matmul(Qu))
-
-            QxuKu = Qxu.matmul(Ku)
-            KutQuu = Ku.mT.matmul(Quu)
-
-            dV[1] += 0.5 * ku.mT.matmul(Quu).matmul(ku)
-            Vx = Qx + Ku.mT.matmul(Qu) + KutQuu.matmul(ku) + Qxu.matmul(ku) # (btw 11-12)
-            Vxx = Qxx + QxuKu.mT + QxuKu + KutQuu.matmul(Ku) # (btw 11-12)
-            Vxx = 0.5 * ( Vxx + Vxx.mT) # for symmetry
-
-            bp.ku[i] = ku
-            bp.Ku[i] = Ku
-
-            Qu_err = torch.maximum(Qu_err, torch.linalg.vector_norm(Qu, float('inf'))  )
+            qu_err = torch.maximum(qu_err, torch.linalg.vector_norm(qu, float('inf'))  )
             mu_err = torch.maximum(mu_err, torch.linalg.vector_norm(r,  float('inf'))  )
-            if (alg.infeas):
-                c_err=torch.maximum(c_err, torch.linalg.vector_norm(c[i]+y[i], float('inf')) )
+            # if (alg.infeas): 
+                #todo
+                # c_err=torch.maximum(c_err, torch.linalg.vector_norm(ct+yt, float('inf')) )
 
         bp.failed = False
-        bp.opterr = torch.maximum( torch.maximum( Qu_err, c_err), mu_err)
-        bp.dV = dV
+        bp.opterr = torch.maximum( torch.maximum( qu_err, c_err), mu_err)
 
-        self.fp = fp
-        self.bp = bp
-        self.alg = alg
+        self.fp, self.bp, self.alg = fp, bp, alg
 
     def forwardpass(self):
         r'''
@@ -504,7 +500,7 @@ class ddpOptimizer(nn.Module):
                 self.bp.resetreg()
 
             if iter == self.alg.maxiter - 1:
-                print("max iter reached, not the optimal one!")
+                print("max iter", self.alg.maxiter, "reached, not the optimal one!")
 
         return self.fp, self.bp, self.alg
 
