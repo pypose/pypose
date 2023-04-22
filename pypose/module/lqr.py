@@ -127,7 +127,7 @@ class LQR(nn.Module):
     :math:`\bar{\mathbf{p}}_t` = :math:`\mathbf{Q}_t \mathbf{\tau}^*_t + \mathbf{p}_t`.
 
     Now we can run LQR with :math:`\delta \mathbf{\tau}_t`, :math:`\mathbf{F}_t`,
-    :math:`\bar{\mathbf{Q}}_t` and :math:`\bar{\mathbf{p}}_t`.
+    :math:`\bar{\mathbf{Q}}_t` and :math:`\bar{\mathbf{p}}_t` as a linear problem.
 
     - The backward recursion.
 
@@ -290,20 +290,12 @@ class LQR(nn.Module):
                 Qt = self.Q[...,t,:,:]
                 qt = p_new[...,t,:]
             else:
-                if current_x is not None:
-                    self.system.set_refpoint(state=current_x[...,t,:], input=current_u[...,t,:], t=time[t])
-                    A = self.system.A.squeeze(-2)
-                    B = self.system.B.squeeze(-1)
-                    F = torch.cat((A, B), dim=-1)
-                    c1 = None
-                else:
-                    self.system.set_refpoint(t=t)
-                    F = torch.cat((self.system.A, self.system.B), dim=-1)
-                    c1 = self.system.c1
+                self.system.set_refpoint(state=current_x[...,t,:], input=current_u[...,t,:], t=time[t])
+                A = self.system.A.squeeze(-2)
+                B = self.system.B.squeeze(-1)
+                F = torch.cat((A, B), dim=-1)
                 Qt = self.Q[...,t,:,:] + F.mT @ V @ F
                 qt = p_new[...,t,:] + bmv(F.mT, v)
-                if c1 is not None:
-                    qt = qt + bmv(F.mT @ V, c1)
 
             Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
