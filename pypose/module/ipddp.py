@@ -341,9 +341,6 @@ class ddpOptimizer(nn.Module):
         if ~fp.failed:
             fp.computeall()
         
-        fp_list = [fp]
-        n_batch = len(fp_list)
-        # copy from prepare()
         self.c, self.s = self.fp.c, self.fp.s
         self.QT, self.qT = self.fp.pxx, self.fp.px
         self.Q = torch.cat([torch.cat([self.fp.qxx, self.fp.qxu],dim=-1),
@@ -419,24 +416,24 @@ class ddpOptimizer(nn.Module):
                 Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
                 qx, qu = qt[..., :ns], qt[..., ns:]
                 
-                Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(fp.reg_exp_base, bp.reg) - 1.)
+                Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(fp.reg_exp_base, self.reg) - 1.)
                     
                 try:
                     lltofQuuReg = torch.linalg.cholesky(Quu_reg) # compute the Cholesky decomposition 
                 except: 
-                    bp.failed, bp.opterr = True, torch.inf
-                    self.fp, self.bp, self.alg = fp, bp, alg
+                    self.bp_failed, self.opterr = True, torch.inf
+                    self.fp, self.alg = fp, alg
                     return
 
                 Quu_reg_inv = torch.linalg.pinv(Quu_reg)
-                bp.Ku[...,t,:,:] = Kut = - Quu_reg_inv @ Qux
-                bp.ku[...,t,:] = kut = - bmv(Quu_reg_inv, qu)
+                self.Ku[...,t,:,:] = Kut = - Quu_reg_inv @ Qux
+                self.ku[...,t,:] = kut = - bmv(Quu_reg_inv, qu)
                     
                 cx, cu = Wt[..., :ns], Wt[..., ns:]
-                bp.ks[...,t,:] = - cinv * (r + st * bmv(cu, kut))
-                bp.Ks[...,t,:,:] = - SCinv @ (cx + cu @ Kut)
-                bp.ky[...,t,:] = torch.zeros(ct.shape[0]) # omitted
-                bp.Ky[...,t,:,:] = torch.zeros(ct.shape[0], ns)       
+                self.ks[...,t,:] = - cinv * (r + st * bmv(cu, kut))
+                self.Ks[...,t,:,:] = - SCinv @ (cx + cu @ Kut)
+                self.ky[...,t,:] = torch.zeros(ct.shape[0]) # omitted
+                self.Ky[...,t,:,:] = torch.zeros(ct.shape[0], ns)       
 
             V = Qxx + Qxu @ Kut + Kut.mT @ Qux + Kut.mT @ Quu @ Kut
             v = qx  + bmv(Qxu, kut) + bmv(Kut.mT, qu) + bmv(Kut.mT @ Quu, kut)
@@ -447,10 +444,9 @@ class ddpOptimizer(nn.Module):
                 #todo
                 # c_err=torch.maximum(c_err, torch.linalg.vector_norm(ct+yt, float('inf')) )
 
-        bp.failed = False
-        bp.opterr = torch.maximum( torch.maximum( qu_err, c_err), mu_err)
+        self.bp_failed, self.opterr = False, torch.maximum( torch.maximum( qu_err, c_err), mu_err)
 
-        self.fp, self.bp, self.alg = fp, bp, alg
+        self.fp, self.alg = fp, alg
 
     def forwardpass(self):
         r'''
@@ -553,7 +549,7 @@ class ddpOptimizer(nn.Module):
         r'''
         Compute new trajectory from controller gains.
         '''
-        fp, bp, alg = self.fp, self.bp, self.alg
+        fp, alg = self.fp, self.alg
 
         B = fp.x.shape[:-2]
         xold, uold, yold, sold, cold=fp.x, fp.u, fp.y, fp.s, fp.c
@@ -577,8 +573,8 @@ class ddpOptimizer(nn.Module):
                     xnew[i+1] = fp.computenextx(xnew[i], unew[i])
             else:
                 for t in range(self.T): # forward recuisions
-                    Kut, kut = bp.Ku[..., t, :, :], bp.ku[..., t, :]
-                    Kst, kst = bp.Ks[..., t, :, :], bp.ks[..., t, :]
+                    Kut, kut = self.Ku[..., t, :, :], self.ku[..., t, :]
+                    Kst, kst = self.Ks[..., t, :, :], self.ks[..., t, :]
                     snew[..., t, :] = snewt = sold[..., t, :] + stepsize * kst + bmv(Kst, xnewt - xold[..., t, :])
                     unew[..., t, :] = unewt = uold[..., t, :] + stepsize * kut + bmv(Kut, xnewt - xold[..., t, :])
                     cnew[..., t, :] = cnewt = fp.c_fn(xnew[..., :-1, :], unew)[..., t, :]
@@ -622,7 +618,7 @@ class ddpOptimizer(nn.Module):
             fp.x, fp.u, fp.y, fp.s, fp.c = xnew, unew, ynew, snew, cnew 
             fp.err, fp.stepsize, fp.step, fp.failed = err, stepsize, step, False
 
-        self.fp, self.bp, self.alg = fp, bp, alg
+        self.fp, self.alg = fp, alg
 
 
     def optimizer(self):
@@ -643,7 +639,7 @@ class ddpOptimizer(nn.Module):
         for iter in range(self.alg.maxiter):
             while True: 
                 self.backwardpasscompact()
-                if ~self.bp.failed: 
+                if ~self.bp_failed: 
                     break    
                 
             self.forwardpasscompact()
@@ -668,7 +664,7 @@ class ddpOptimizer(nn.Module):
             if iter == self.alg.maxiter - 1:
                 print("max iter", self.alg.maxiter, "reached, not the optimal one!")
 
-        return self.fp, self.bp, self.alg
+        return self.fp, self.alg
 
 class ddpGrad:
 
