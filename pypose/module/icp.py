@@ -1,6 +1,5 @@
 import torch
-from . import EPnP
-from .. import knn
+from .. import knn, points_transform
 
 class ICP(torch.nn.Module):
     r'''
@@ -40,7 +39,7 @@ class ICP(torch.nn.Module):
             err = errnew
             batch = torch.arange(temppc.shape[0],dtype=knnidx.dtype, device=knnidx.device).repeat(knnidx.shape[1],1).T.unsqueeze(-1)
             batch_knnidx = torch.cat((batch, knnidx),dim =-1)
-            T = EPnP._points_transform(temppc, p2[batch_knnidx[:,:,0],batch_knnidx[:,:,1],:])
+            T = points_transform(temppc, p2[batch_knnidx[:,:,0],batch_knnidx[:,:,1],:])
             temppc = T.unsqueeze(-2).Act(temppc)
-        T = EPnP._points_transform(p1, temppc)
+        T = points_transform(p1, temppc)
         return T
