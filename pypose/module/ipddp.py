@@ -24,169 +24,94 @@ class fwdPass:
         self.p_fn = terminal_cost
         self.q_fn = stage_cost
         self.c_fn = cons
-        self.N = horizon
+        self.T = horizon
         self.n_state = n_state
         self.n_input = n_input
-        self.n_cons = n_cons
+        ncons = n_cons
 
         # initilize all the variables used in the forward pass
         # defined in dynamics function
         self.x = init_traj['state']
         self.u = init_traj['input']
-        self.c = torch.zeros(self.N, self.n_cons, 1) #todo!!!
-        self.y = 0.01*torch.ones(self.N, self.n_cons, 1)
-        self.s = 0.1*torch.ones(self.N, self.n_cons, 1)
-        self.mu = self.y*self.s
+        B = self.x.shape[:-2]
+        ns, nc = self.x.size(-1), self.u.size(-1)
+        self.c = torch.zeros(B + (self.T, ncons))
+        self.y = 0.01 * torch.ones(B + (self.T, ncons))
+        self.s = 0.1 * torch.ones(B + (self.T, ncons))
+        self.mu = self.y * self.s
 
         # terms related with terminal cost
-        self.p = torch.Tensor([0.0])
-        self.px = torch.zeros(1, self.n_state)
-        self.pxx = torch.eye(self.n_state, self.n_state)
+        self.px = torch.zeros(B + (ns,))
+        self.pxx = torch.zeros(B + (ns, ns))
 
         # terms related with system dynamics
-        self.fx = torch.zeros(self.N, self.n_state, self.n_state)
-        self.fu = torch.zeros(self.N, self.n_state, self.n_input)
-        self.fxx = torch.zeros(self.N, self.n_state, self.n_state, self.n_state)
-        self.fxu = torch.zeros(self.N, self.n_state, self.n_state, self.n_input)
-        self.fuu = torch.zeros(self.N, self.n_state, self.n_input, self.n_input)
+        self.fx = torch.zeros(B + (self.T, ns, ns))
+        self.fu = torch.zeros(B + (self.T, ns, nc))
+        self.fxx = torch.zeros(B + (self.T, ns, ns, ns))
+        self.fxu = torch.zeros(B + (self.T, ns, ns, nc))
+        self.fuu = torch.zeros(B + (self.T, ns, nc, nc))
 
         # terms related with stage cost
-        self.q = torch.zeros(self.N, 1)
-        self.qx = torch.zeros(self.N, self.n_state, 1)
-        self.qu = torch.zeros(self.N, self.n_input, 1)
-        self.qxx = torch.zeros(self.N, self.n_state, self.n_state)
-        self.qxu = torch.zeros(self.N, self.n_state, self.n_input)
-        self.quu = torch.zeros(self.N, self.n_input, self.n_input)
+        self.qx = torch.zeros(B + (self.T, ns))
+        self.qu = torch.zeros(B + (self.T, nc))
+        self.qxx = torch.zeros(B + (self.T, ns, ns))
+        self.qxu = torch.zeros(B + (self.T, ns, nc))
+        self.quu = torch.zeros(B + (self.T, nc, nc))
 
         # terms related with constraint
-        self.cx = torch.zeros(self.N, self.n_cons, self.n_state)
-        self.cu = torch.zeros(self.N, self.n_cons, self.n_input)
+        self.cx = torch.zeros(B + (self.T, ncons, ns))
+        self.cu = torch.zeros(B + (self.T, ncons, nc))
 
         self.filter = torch.Tensor([[torch.inf], [0.]])
         self.err = 0.
+        self.cost = 0.
         self.logcost = 0.
         self.step = 0
         self.failed = False
         self.stepsize = 1.0
         self.reg_exp_base = 1.6
 
-    def computenextx(self, x, u):
-        return self.f_fn(x, u)[0]
 
-    def computec(self, x, u):
-        return self.c_fn(x, u).mT
-
-    def computep(self, x):
-        return self.p_fn(x, torch.zeros(1, self.n_input)) # dummy input
-
-    def computeq(self, x, u):
-        return self.q_fn(x, u)
     
-    def computeall(self):
-        self.computeprelated()
-        self.computefrelated()
-        self.computeqrelated()
-        self.computecrelated()
-
-    def computeprelated(self): # terms related to the terminal cost
-        self.p = self.computep(self.x[-1])
-        self.p_fn.set_refpoint(state=self.x[-1], input=self.u[-1])
-        self.px = self.p_fn.cx.mT
+    def computeall(self): #todo merge this
+        self.p_fn.set_refpoint(self.x[...,-1,:], self.u[...,-1,:])
+        self.px = self.p_fn.cx
         self.pxx = self.p_fn.cxx.squeeze(0).squeeze(1)
-        return 
 
-    def computefrelated(self): # terms related with system dynamics
-        for i in range(self.N):
-            self.f_fn.set_refpoint(state=self.x[i], input=self.u[i])
-            self.fx[i] = self.f_fn.A.squeeze(0).squeeze(1)
-            self.fu[i] = self.f_fn.B.squeeze(0).squeeze(1)   
-            self.fxx[i] = self.f_fn.fxx.squeeze(0).squeeze(1).squeeze(2)
-            self.fxu[i] = self.f_fn.fxu.squeeze(0).squeeze(1).squeeze(2)
-            self.fuu[i] = self.f_fn.fuu.squeeze(0).squeeze(1).squeeze(2)
+        for t in range(self.T):
+            self.f_fn.set_refpoint(self.x[...,t,:], self.u[...,t,:])
+            self.fx[...,t,:,:] = self.f_fn.A.squeeze(0).squeeze(1)
+            self.fu[...,t,:,:] = self.f_fn.B.squeeze(0).squeeze(1)   
+            self.fxx[...,t,:,:,:] = self.f_fn.fxx.squeeze(0).squeeze(1).squeeze(2)
+            self.fxu[...,t,:,:,:] = self.f_fn.fxu.squeeze(0).squeeze(1).squeeze(2)
+            self.fuu[...,t,:,:,:] = self.f_fn.fuu.squeeze(0).squeeze(1).squeeze(2)
 
-    def computeqrelated(self): # terms related with stage cost
-        for i in range(self.N):
-            self.q[i] = self.q_fn(self.x[i], self.u[i])
-            self.q_fn.set_refpoint(state=self.x[i], input=self.u[i])
-            self.qx[i] = self.q_fn.cx.mT
-            self.qu[i] = self.q_fn.cu.mT
-            self.qxx[i] = self.q_fn.cxx # squeezed inside cxx definition
-            self.qxu[i] = self.q_fn.cxu 
-            self.quu[i] = self.q_fn.cuu
+        self.q_fn.set_refpoint(self.x[...,:-1,:], self.u)
+        self.qx = self.q_fn.cx
+        self.qu = self.q_fn.cu
+        self.qxx = self.q_fn.cxx # squeezed inside cxx definition
+        self.qxu = self.q_fn.cxu 
+        self.quu = self.q_fn.cuu
 
-    def computecrelated(self): # terms related with constraints
-        for i in range(self.N):
-            self.c[i] = self.computec(self.x[i], self.u[i])
-            self.c_fn.set_refpoint(state=self.x[i], input=self.u[i])
-            self.cx[i] = self.c_fn.gx
-            self.cu[i] = self.c_fn.gu        
-
-    def initialroll(self):
-        for i in range(self.N):
-            x_temp = self.x[i]
-            u_temp = self.u[i]
-            self.c[i] = self.computec(x_temp, u_temp)
-            self.q[i] = self.computeq(x_temp, u_temp)  #  compute cost then used in resetfilter
-            self.x[i+1] = self.computenextx(x_temp, u_temp)
-        self.cost = self.q.sum() + self.computep(self.x[-1])
-        self.costq = self.q.sum()
+        self.c = self.c_fn(self.x[...,:-1,:], self.u)
+        self.c_fn.set_refpoint(self.x[...,:-1,:], self.u)
+        self.cx = self.c_fn.gx
+        self.cu = self.c_fn.gu   
 
     def resetfilter(self, alg):
-        self.logcost = self.cost
-        self.err = torch.Tensor([0.0])
+        self.logcost, self.err = torch.zeros(self.x.shape[:-2]), torch.zeros(self.x.shape[:-2])
         if (alg.infeas):
             for i in range(self.N): 
                 self.logcost -= alg.mu * self.y[i].log().sum()
                 self.err += torch.linalg.vector_norm(self.c[i]+self.y[i], 1)
             if (self.err < alg.tol):
                 self.err = torch.Tensor([0.0])
-
         else:
-            for i in range(self.N):
-                self.logcost -= alg.mu * (-self.c[i]).log().sum()
-                self.err = torch.Tensor([0.0])
+            self.logcost = - alg.mu * (-self.c).log().sum(-1).sum(-1)
 
-        self.filter = torch.vstack((self.logcost, self.err))
+        self.filter = torch.stack((self.logcost, self.err), dim=-1).unsqueeze(-2)
         self.step = 0
         self.failed = False
-
-class bwdPass:
-    r'''
-    The class used in backwardpass 
-    here backwardpass means compute gains for next iteration from current trajectory
-    (different from the backward in neural network, which computes the gradient) 
-    '''
-    def __init__(self, sys=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=1):
-        self.f_fn = sys
-        self.c_fn = cons
-        self.N = horizon
-        self.T = horizon
-        ns = n_state
-        nc = n_input
-        ncons = n_cons
-
-        self.reg = 0.0
-        self.failed = False
-        self.recovery = 0
-        self.opterr = 0.
-        self.dV = torch.zeros(1,2)
-        B = (1,) # todo
-        self.ky = torch.zeros(B + (self.T, ncons))
-        self.Ky = torch.zeros(B + (self.T, ncons, ns))
-        self.ks = torch.zeros(B + (self.T, ncons))
-        self.Ks = torch.zeros(B + (self.T, ncons, ns))
-        self.ku = torch.zeros(B + (self.T, nc))
-        self.Ku = torch.zeros(B + (self.T, nc, ns))
-
-    def resetreg(self):
-        self.reg = 0.0
-        self.failed = False
-        self.recovery = 0
-
-    def initreg(self, regvalue=1.0):
-        self.reg = regvalue
-        self.failed = False
-        self.recovery = 0
 
 class ddpOptimizer(nn.Module):
     r'''
@@ -207,11 +132,25 @@ class ddpOptimizer(nn.Module):
         self.constraint_flag = True
         self.contraction_flag = True
         # # self.W = torch.randn(2, 5, 6, 7) # todo:change
+        self.T = horizon
 
         self.alg = algParam()
         self.fp = fwdPass(sys=sys, stage_cost=stage_cost, terminal_cost=terminal_cost, cons=cons, n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon, init_traj=init_traj)
-        self.bp = bwdPass(sys=sys,            cons=cons,n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon)
-        self.N = horizon
+        # self.bp = bwdPass(sys=sys,            cons=cons,n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon)
+        
+        B = (1,) # todo
+        ns = n_state
+        nc = n_input
+        ncons = n_cons
+
+        # quantities used in backward
+        self.ky = torch.zeros(B + (self.T, ncons))
+        self.Ky = torch.zeros(B + (self.T, ncons, ns))
+        self.ks = torch.zeros(B + (self.T, ncons))
+        self.Ks = torch.zeros(B + (self.T, ncons, ns))
+        self.ku = torch.zeros(B + (self.T, nc))
+        self.Ku = torch.zeros(B + (self.T, nc, ns))
+        self.opterr, self.reg, self.bp_failed, self.recovery = 0., 0., False, 0
 
 
     def backwardpass(self):
@@ -376,27 +315,27 @@ class ddpOptimizer(nn.Module):
         r'''
         Compute controller gains for next iteration from current trajectory.
         '''
-        fp, bp, alg = self.fp, self.bp, self.alg
+        fp, alg = self.fp, self.alg
 
         ns = fp.n_state
-        self.T = fp.N
+        self.T = fp.T
 
         c_err, mu_err, qu_err = torch.tensor(0.0), torch.tensor(0.0), torch.tensor(0.0)
 
         # set regularization parameter
-        if (fp.failed or bp.failed):
-            bp.reg += 1.0
+        if (fp.failed or self.bp_failed):
+            self.reg += 1.0
         elif (fp.step == 0):
-            bp.reg -= 1.0
+            self.reg -= 1.0
         elif (fp.step <= 3):
-            bp.reg = bp.reg
+            self.reg = self.reg
         else:
-            bp.reg += 1.0
+            self.reg += 1.0
 
-        if (bp.reg < 0.0):
-            bp.reg = 0.0
-        elif (bp.reg > 24.0):
-            bp.reg = 24.0
+        if (self.reg < 0.0):
+            self.reg = 0.0
+        elif (self.reg > 24.0):
+            self.reg = 24.0
 
         # recompute the first, second derivatives of the updated trajectory
         if ~fp.failed:
@@ -405,31 +344,18 @@ class ddpOptimizer(nn.Module):
         fp_list = [fp]
         n_batch = len(fp_list)
         # copy from prepare()
-        self.c, self.s = torch.stack([fp_list[batch_id].c for batch_id in range(n_batch)],dim=0).squeeze(-1), \
-                         torch.stack([fp_list[batch_id].s for batch_id in range(n_batch)],dim=0).squeeze(-1)
-        self.Qxx_terminal = torch.stack([fp_list[batch_id].pxx for batch_id in range(n_batch)],dim=0)
-        self.Qx_terminal = torch.stack([fp_list[batch_id].px.squeeze(-1) for batch_id in range(n_batch)],dim=0)
-        self.Q = torch.stack([
-                                    torch.cat([torch.cat([fp_list[batch_id].qxx, fp_list[batch_id].qxu],dim=-1),
-                                    torch.cat([fp_list[batch_id].qxu.mT, fp_list[batch_id].quu],dim=-1)], dim=-2) 
-                                        for batch_id in range(n_batch)], dim=0) 
-        self.p  = torch.stack([
-                                    torch.cat([fp_list[batch_id].qx, fp_list[batch_id].qu],dim=-2) 
-                                        for batch_id in range(n_batch)], dim=0).squeeze(-1)
-        self.W = torch.stack([
-                                    torch.cat([fp_list[batch_id].cx, fp_list[batch_id].cu],dim=-1) 
-                                        for batch_id in range(n_batch)], dim=0) 
-        self.F = torch.stack([
-                                    torch.cat([fp_list[batch_id].fx, fp_list[batch_id].fu],dim=-1) 
-                                        for batch_id in range(n_batch)], dim=0) 
-        self.G = torch.stack([
-                                    torch.cat([torch.cat([fp_list[batch_id].fxx, fp_list[batch_id].fxu],dim=-1),
-                                    torch.cat([fp_list[batch_id].fxu.mT, fp_list[batch_id].fuu],dim=-1)], dim=-2) 
-                                        for batch_id in range(n_batch)], dim=0) 
-
-
+        self.c, self.s = self.fp.c, self.fp.s
+        self.QT, self.qT = self.fp.pxx, self.fp.px
+        self.Q = torch.cat([torch.cat([self.fp.qxx, self.fp.qxu],dim=-1),
+                            torch.cat([self.fp.qxu.mT, self.fp.quu],dim=-1)], dim=-2)                                     
+        self.p  = torch.cat([self.fp.qx, self.fp.qu],dim=-1)
+        self.W =  torch.cat([self.fp.cx, self.fp.cu],dim=-1)
+        self.F =  torch.cat([self.fp.fx, self.fp.fu],dim=-1) 
+        self.G =  torch.cat([torch.cat([self.fp.fxx, self.fp.fxu],dim=-1),
+                            torch.cat([self.fp.fxu.mT, self.fp.fuu],dim=-1)], dim=-2) 
+                            
         # backward recursions, similar to iLQR backward recursion, but more variables involved
-        V, v = self.Qxx_terminal, self.Qx_terminal
+        V, v = self.QT, self.qT
         for t in range(self.T-1, -1, -1):
             Ft = self.F[...,t,:,:]
             Qt = self.Q[...,t,:,:] + Ft.mT @ V @ Ft
@@ -629,18 +555,13 @@ class ddpOptimizer(nn.Module):
         '''
         fp, bp, alg = self.fp, self.bp, self.alg
 
+        B = fp.x.shape[:-2]
         xold, uold, yold, sold, cold=fp.x, fp.u, fp.y, fp.s, fp.c
         xnew, unew, ynew, snew, cnew=torch.zeros_like(fp.x), torch.zeros_like(fp.u), torch.zeros_like(fp.y), torch.zeros_like(fp.s), torch.zeros_like(fp.c)
-        cost, costq, logcost = torch.Tensor([0.]), torch.Tensor([0.]), torch.Tensor([0.])
-        qnew = torch.zeros(self.N, 1)
-        stepsize = 0.
-        err = torch.Tensor([0.])
-        tau = max(0.99, 1-alg.mu)
-        steplist = pow(2.0, torch.linspace(-10, 0, 11).flip(0) )
-        failed = False
+        logcost, err = torch.zeros(B), torch.zeros(B)       
+        failed, tau, steplist = False, max(0.99, 1-alg.mu), pow(2.0, torch.linspace(-10, 0, 11).flip(0))
         for step in range(steplist.shape[0]): # line search
-            failed = False
-            stepsize = steplist[step]
+            failed, stepsize = False, steplist[step]
             xnewt = xold[..., 0, :]
             if (alg.infeas): #  start from infeasible/feasible trajs. 
                 for i in range(self.N):
@@ -656,27 +577,20 @@ class ddpOptimizer(nn.Module):
                     xnew[i+1] = fp.computenextx(xnew[i], unew[i])
             else:
                 for t in range(self.T): # forward recuisions
-                    Kut, kut = bp.Ku[...,t,:,:], bp.ku[...,t,:]
-                    Kst, kst = bp.Ks[...,t,:,:], bp.ks[...,t,:]
+                    Kut, kut = bp.Ku[..., t, :, :], bp.ku[..., t, :]
+                    Kst, kst = bp.Ks[..., t, :, :], bp.ks[..., t, :]
                     snew[..., t, :] = snewt = sold[..., t, :] + stepsize * kst + bmv(Kst, xnewt - xold[..., t, :])
                     unew[..., t, :] = unewt = uold[..., t, :] + stepsize * kut + bmv(Kut, xnewt - xold[..., t, :])
-                    cnewt = fp.computec(xnewt, unewt)
-
-                    if (    (cnewt > (1-tau) * cold[..., t, :]).any() or  
-                            (snewt < (1-tau) * sold[..., t, :]).any()   ): # check if the inequality holds, with some thresholds
+                    cnew[..., t, :] = cnewt = fp.c_fn(xnew[..., :-1, :], unew)[..., t, :]
+                    if ((cnewt > (1-tau) * cold[..., t, :]).any() or (snewt < (1-tau) * sold[..., t, :]).any()): 
+                        # check if the inequality holds, with some thresholds
                         failed = True
                         break
-                    xnewt = fp.computenextx(xnewt, unewt)
+                    xnew[..., t, :] = xnewt = fp.f_fn(xnewt, unewt)[0]
                         
             if (failed):
                 continue
             else:
-                for i in range(self.N):
-                    qnew[i] = fp.computeq(xnew[i], unew[i])
-                cost = qnew.sum() + fp.computep(xnew[-1])
-
-                logcost = cost.detach()
-                err = torch.Tensor([0.])          
                 if (alg.infeas):
                     for i in range(self.N): 
                         logcost -= alg.mu * ynew[i].log().sum()
@@ -684,29 +598,28 @@ class ddpOptimizer(nn.Module):
                         err += torch.linalg.vector_norm(cnew[i]+ynew[i], 1)
                     err = torch.maximum(alg.tol, err)
                 else:
-                    for i in range(self.N):
-                        cnew[i] = fp.computec(xnew[i], unew[i])
-                        logcost -= alg.mu * (-cnew[i]).log().sum()
-                    err=torch.Tensor([0.])
-                
+                    logcost = - alg.mu * cnew.log().sum(-1).sum(-1)
+
                 # step filter
-                candidate = torch.vstack((logcost, err))
-                # if torch.any( torch.all(candidate>=fp.filter, 0) ):
-                if torch.any( torch.all(candidate-torch.Tensor([[1e-13],[0.]])>=fp.filter, 0) ):
+                candidate = torch.stack((logcost, err), dim=-1)
+                if torch.any( torch.all(candidate-torch.tile(torch.Tensor([1e-13, 0.]), B + (1,))>=fp.filter, -1) ):
                     # relax a bit for numerical stability, strange
+                    # todo: any for each sample in a batch?
                     failed=True
                     continue                    
                 else:
-                    idx=torch.all(candidate<=fp.filter,0) 
-                    fp.filter = fp.filter[:,~idx]
-                    fp.filter=torch.hstack((fp.filter,candidate))
+                    idx=torch.all(candidate<=fp.filter,-1)
+                    fp.filter = fp.filter[~idx]
+                    if fp.filter.ndim <= 2:  # todo: change this walkaround
+                        fp.filter = fp.filter.unsqueeze(0)
+                    fp.filter=torch.cat((fp.filter, candidate.unsqueeze(-2)), dim=-2)
                     break
                   
         if (failed):
             fp.stepsize, fp.failed= 0.0, failed
         else:
-            fp.cost, fp.logcost = cost, logcost
-            fp.x, fp.u, fp.y, fp.s, fp.c, fp.q = xnew, unew, ynew, snew, cnew, qnew 
+            fp.cost = fp.q_fn(fp.x[...,:-1,:], fp.u).sum(-1) + fp.p_fn(fp.x[...,-1,:],torch.zeros_like(fp.u[...,-1,:])).sum(-1)
+            fp.x, fp.u, fp.y, fp.s, fp.c = xnew, unew, ynew, snew, cnew 
             fp.err, fp.stepsize, fp.step, fp.failed = err, stepsize, step, False
 
         self.fp, self.bp, self.alg = fp, bp, alg
@@ -717,10 +630,15 @@ class ddpOptimizer(nn.Module):
         Call forwardpass and backwardpass to solve trajectory
         '''
         time_start = time.time()
-        self.fp.initialroll()
-        self.alg.mu = self.fp.cost/self.fp.N/self.fp.s[0].shape[0]
+
+        for t in range(self.T):
+            self.fp.x[...,t+1,:], _ = self.fp.f_fn(self.fp.x[...,t,:],self.fp.u[...,t,:])
+        self.fp.c = self.fp.c_fn(self.fp.x[...,:-1,:], self.fp.u)
+        self.fp.cost = self.fp.q_fn(self.fp.x[...,:-1,:], self.fp.u).sum(-1) \
+                        + self.fp.p_fn(self.fp.x[...,-1,:],torch.zeros_like(self.fp.u[...,-1,:])).sum(-1)
+        self.alg.mu = self.fp.cost/self.fp.T/self.fp.s[0].shape[0]
         self.fp.resetfilter(self.alg)
-        self.bp.resetreg()
+        self.reg, self.bp_failed, self.recovery = 0.0, False, 0
 
         for iter in range(self.alg.maxiter):
             while True: 
@@ -738,14 +656,14 @@ class ddpOptimizer(nn.Module):
             #             iter, time_used, self.alg.mu, self.fp.cost, self.bp.opterr, self.bp.reg, self.fp.stepsize))
 
             #-----------termination conditions---------------
-            if (max(self.bp.opterr, self.alg.mu)<=self.alg.tol):
+            if (max(self.opterr, self.alg.mu)<=self.alg.tol):
                 print("~~~Optimality reached~~~")
                 break
             
-            if (self.bp.opterr <= 0.2*self.alg.mu):
+            if (self.opterr <= 0.2*self.alg.mu):
                 self.alg.mu = max(self.alg.tol/10.0, min(0.2*self.alg.mu, pow(self.alg.mu, 1.2) ) )
                 self.fp.resetfilter(self.alg)
-                self.bp.resetreg()
+                self.reg, self.bp_failed, self.recovery = 0.0, False, 0
 
             if iter == self.alg.maxiter - 1:
                 print("max iter", self.alg.maxiter, "reached, not the optimal one!")

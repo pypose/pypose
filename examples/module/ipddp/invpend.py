@@ -15,7 +15,7 @@ class InvPend(NLS): # why use NLS to inherit?
         self.gravity = gravity
 
     def state_transition(self, state, input, t=None):
-        force = input.squeeze()
+        force = input.squeeze(-1)
         _dstate = torch.stack([state[...,1], force+self.gravity/self.length[0]*torch.sin(state[...,0].clone())], dim=-1)
         return state + torch.mul(_dstate, self.tau)
 
@@ -26,7 +26,7 @@ if __name__ == "__main__":
     torch.set_default_dtype(torch.float64)
     # Create parameters for inv pendulum trajectory
     dt = 0.05   # Delta t
-    N = 5    # Number of time steps
+    T = 5    # Number of time steps
 
     # Initial state
     state = torch.tensor([[-2.,0.],
@@ -34,38 +34,38 @@ if __name__ == "__main__":
                           [-2.5, 1.]])
 
     sys = InvPend(dt) 
-    n_state = 2
-    n_input = 1 
+    ns, nc = 2, 1
     n_batch = 3
-    state_all =      torch.zeros(n_batch, N+1, n_state)
-    input_all = 0.02*torch.ones(n_batch,  N,   n_input)
+    state_all =      torch.zeros(n_batch, T+1, ns)
+    input_all = 0.02*torch.ones(n_batch,  T,   nc)
     init_traj = {'state': state_all, 
                  'input': input_all}
     state_all[...,0,:] = state
  
     # Create cost object
-    Q = torch.tile(dt*torch.eye(n_state, n_state, device=device), (n_batch, 1, 1))
-    R = torch.tile(dt*torch.eye(n_input, n_input, device=device), (n_batch, 1, 1))
-    S = torch.tile(torch.zeros(n_state, n_input, device=device), (n_batch, 1, 1))
-    c = torch.tile(torch.zeros(1, 1, device=device), (n_batch, 1, 1))
+    Q = torch.tile(dt*torch.eye(ns, ns, device=device), (n_batch, T, 1, 1))
+    R = torch.tile(dt*torch.eye(nc, nc, device=device), (n_batch, T, 1, 1))
+    S = torch.tile(torch.zeros(ns, nc, device=device), (n_batch, T, 1, 1))
+    c = torch.tile(torch.zeros(1, device=device), (n_batch, T))
     stage_cost = pp.module.QuadCost(Q, R, S, c)
-    terminal_cost = pp.module.QuadCost(10./dt*Q, R, S, c)
+    terminal_cost = pp.module.QuadCost(10./dt*Q[...,0:1,:,:], R[...,0:1,:,:], S[...,0:1,:,:], c[...,0:1]) # special stagecost with T=1
 
     # Create constraint object
-    gx = torch.zeros( 2*n_input, n_state)
-    gu = torch.vstack( (torch.eye(n_input, n_input), - torch.eye(n_input, n_input)) )
-    g = torch.hstack( (-0.25 * torch.ones(1, n_input), -0.25 * torch.ones(1, n_input)) )
+    gx = torch.tile(torch.zeros( 2*nc, ns), (n_batch, T, 1, 1))
+    gu = torch.tile(torch.vstack( (torch.eye(nc, nc), - torch.eye(nc, nc)) ), (n_batch, T, 1, 1))
+    g = torch.tile(torch.hstack( (-0.25 * torch.ones(nc), -0.25 * torch.ones(nc)) ), (n_batch, T, 1))
     lincon = pp.module.LinCon(gx, gu, g)
 
     traj_opt = [None for batch_id in range(n_batch)]
 
     for batch_id in range(n_batch): # use for loop and keep the ddpOptimizer 
-        stage_cost = pp.module.QuadCost(Q[batch_id], R[batch_id], S[batch_id], c[batch_id])
-        terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id], R[batch_id], S[batch_id], c[batch_id])
-        lincon = pp.module.LinCon(gx, gu, g)  
-        init_traj_sample = {'state': torch.unsqueeze(init_traj['state'][batch_id],1), 
-                            'input': torch.unsqueeze(init_traj['input'][batch_id],1)} 
-        solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, n_state, n_input, gx.shape[-2], N, init_traj_sample) 
+        # used class is for batched version, inside loop use batch_size = 1
+        stage_cost = pp.module.QuadCost(Q[batch_id:batch_id+1], R[batch_id:batch_id+1], S[batch_id:batch_id+1], c[batch_id:batch_id+1])
+        terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
+        lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])  
+        init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1], 
+                            'input': init_traj['input'][batch_id:batch_id+1]} 
+        solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, ns, nc, gx.shape[-2], T, init_traj_sample) 
         traj_opt[batch_id] = solver.optimizer()
 
 
