@@ -65,7 +65,7 @@ if __name__ == "__main__":
         lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])  
         init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1], 
                             'input': init_traj['input'][batch_id:batch_id+1]} 
-        solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, ns, nc, gx.shape[-2], T, init_traj_sample) 
+        solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, gx.shape[-2], init_traj_sample) 
         traj_opt[batch_id] = solver.optimizer()
 
 

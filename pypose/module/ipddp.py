@@ -9,7 +9,7 @@ class ddpOptimizer(nn.Module):
     iterates between forwardpass and backwardpass to get a final trajectory 
     '''
     # def __init__(self, system, constraint, Q, p, T):
-    def __init__(self, sys=None, stage_cost=None, terminal_cost=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=None, init_traj=None):
+    def __init__(self, sys=None, stage_cost=None, terminal_cost=None, cons=None, n_cons=0, init_traj=None):
         r'''
         Initialize three key classes
         '''
@@ -24,7 +24,7 @@ class ddpOptimizer(nn.Module):
 
         self.x, self.u = init_traj['state'], init_traj['input']
         B = self.x.shape[:-2]
-        ns, nc, ncons, self.T = self.x.size(-1), self.u.size(-1), n_cons, horizon
+        ns, nc, ncons, self.T = self.x.size(-1), self.u.size(-1), n_cons, self.u.size(-2)
                 
         # algorithm parameter
         self.mu, self.maxiter, self.tol, self.infeas = 1.0, 50, torch.tensor([1.0e-7]), False
