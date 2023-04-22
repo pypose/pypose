@@ -72,7 +72,82 @@ class fwdPass:
         self.reg_exp_base = 1.6
 
 
-    
+
+
+class ddpOptimizer(nn.Module):
+    r'''
+    The class of ipddp optimizer
+    iterates between forwardpass and backwardpass to get a final trajectory 
+    '''
+    # def __init__(self, system, constraint, Q, p, T):
+    def __init__(self, sys=None, stage_cost=None, terminal_cost=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=None, init_traj=None):
+        r'''
+        Initialize three key classes
+        '''
+        super().__init__()
+        # self.system = sys
+        # self.constraint = cons
+        # # self.T = T
+        # # self.Q = Q
+        # # self.p = p
+        self.constraint_flag = True
+        self.contraction_flag = True
+        # # self.W = torch.randn(2, 5, 6, 7) # todo:change
+
+        self.x, self.u = init_traj['state'], init_traj['input']
+        B = self.x.shape[:-2]
+        ns, nc, ncons, self.T = self.x.size(-1), self.u.size(-1), n_cons, horizon
+        
+        # self.alg = algParam()
+        # self.fp = fwdPass(sys=sys, stage_cost=stage_cost, terminal_cost=terminal_cost, cons=cons, n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon, init_traj=init_traj)
+        # self.bp = bwdPass(sys=sys,            cons=cons,n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon)
+        
+        # algorithm parameter
+        self.mu, self.maxiter, self.tol, self.infeas = 1.0, 50, torch.tensor([1.0e-7]), False
+
+        self.f_fn = sys
+        self.p_fn = terminal_cost
+        self.q_fn = stage_cost
+        self.c_fn = cons
+
+        # quantities in forward pass
+        # defined in dynamics function
+        self.c = torch.zeros(B + (self.T, ncons))
+        self.y = 0.01 * torch.ones(B + (self.T, ncons))
+        self.s = 0.1 * torch.ones(B + (self.T, ncons))
+        self.mu = self.y * self.s
+        # terms related with terminal cost
+        self.px = torch.zeros(B + (ns,))
+        self.pxx = torch.zeros(B + (ns, ns))
+        # terms related with system dynamics
+        self.fx = torch.zeros(B + (self.T, ns, ns))
+        self.fu = torch.zeros(B + (self.T, ns, nc))
+        self.fxx = torch.zeros(B + (self.T, ns, ns, ns))
+        self.fxu = torch.zeros(B + (self.T, ns, ns, nc))
+        self.fuu = torch.zeros(B + (self.T, ns, nc, nc))
+        # terms related with stage cost
+        self.qx = torch.zeros(B + (self.T, ns))
+        self.qu = torch.zeros(B + (self.T, nc))
+        self.qxx = torch.zeros(B + (self.T, ns, ns))
+        self.qxu = torch.zeros(B + (self.T, ns, nc))
+        self.quu = torch.zeros(B + (self.T, nc, nc))
+        # terms related with constraint
+        self.cx = torch.zeros(B + (self.T, ncons, ns))
+        self.cu = torch.zeros(B + (self.T, ncons, nc))
+
+        self.filter = torch.Tensor([[torch.inf], [0.]])
+        self.err, self.cost, self.logcost = torch.zeros(B), torch.zeros(B), torch.zeros(B)
+        self.step, self.fp_failed, self.stepsize, self.reg_exp_base = 0, False, 1.0, 1.6
+
+        # quantities used in backward
+        self.ky = torch.zeros(B + (self.T, ncons))
+        self.Ky = torch.zeros(B + (self.T, ncons, ns))
+        self.ks = torch.zeros(B + (self.T, ncons))
+        self.Ks = torch.zeros(B + (self.T, ncons, ns))
+        self.ku = torch.zeros(B + (self.T, nc))
+        self.Ku = torch.zeros(B + (self.T, nc, ns))
+        self.opterr, self.reg, self.bp_failed, self.recovery = 0., 0., False, 0
+
     def computeall(self): #todo merge this
         self.p_fn.set_refpoint(self.x[...,-1,:], self.u[...,-1,:])
         self.px = self.p_fn.cx
@@ -112,45 +187,6 @@ class fwdPass:
         self.filter = torch.stack((self.logcost, self.err), dim=-1).unsqueeze(-2)
         self.step = 0
         self.failed = False
-
-class ddpOptimizer(nn.Module):
-    r'''
-    The class of ipddp optimizer
-    iterates between forwardpass and backwardpass to get a final trajectory 
-    '''
-    # def __init__(self, system, constraint, Q, p, T):
-    def __init__(self, sys=None, stage_cost=None, terminal_cost=None, cons=None, n_state=1, n_input=1, n_cons=0, horizon=None, init_traj=None):
-        r'''
-        Initialize three key classes
-        '''
-        super().__init__()
-        # self.system = sys
-        # self.constraint = cons
-        # # self.T = T
-        # # self.Q = Q
-        # # self.p = p
-        self.constraint_flag = True
-        self.contraction_flag = True
-        # # self.W = torch.randn(2, 5, 6, 7) # todo:change
-
-        B = (1,) # todo
-        ns, nc, ncons, self.T = n_state, n_input, n_cons, horizon
-
-        # self.alg = algParam()
-        self.fp = fwdPass(sys=sys, stage_cost=stage_cost, terminal_cost=terminal_cost, cons=cons, n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon, init_traj=init_traj)
-        # self.bp = bwdPass(sys=sys,            cons=cons,n_state=n_state, n_input=n_input, n_cons=n_cons, horizon=horizon)
-        
-        # algorithm parameter
-        self.mu, self.maxiter, self.tol, self.infeas = 1.0, 50, torch.tensor([1.0e-7]), False
-
-        # quantities used in backward
-        self.ky = torch.zeros(B + (self.T, ncons))
-        self.Ky = torch.zeros(B + (self.T, ncons, ns))
-        self.ks = torch.zeros(B + (self.T, ncons))
-        self.Ks = torch.zeros(B + (self.T, ncons, ns))
-        self.ku = torch.zeros(B + (self.T, nc))
-        self.Ku = torch.zeros(B + (self.T, nc, ns))
-        self.opterr, self.reg, self.bp_failed, self.recovery = 0., 0., False, 0
 
     def backwardpass(self):
         r'''
@@ -314,17 +350,15 @@ class ddpOptimizer(nn.Module):
         r'''
         Compute controller gains for next iteration from current trajectory.
         '''
-        fp = self.fp
-
-        ns = fp.n_state
+        ns = self.x.shape[-1]
         c_err, mu_err, qu_err = torch.tensor(0.0), torch.tensor(0.0), torch.tensor(0.0)
 
         # set regularization parameter
-        if (fp.failed or self.bp_failed):
+        if (self.fp_failed or self.bp_failed):
             self.reg += 1.0
-        elif (fp.step == 0):
+        elif (self.step == 0):
             self.reg -= 1.0
-        elif (fp.step <= 3):
+        elif (self.step <= 3):
             self.reg = self.reg
         else:
             self.reg += 1.0
@@ -335,21 +369,19 @@ class ddpOptimizer(nn.Module):
             self.reg = 24.0
 
         # recompute the first, second derivatives of the updated trajectory
-        if ~fp.failed:
-            fp.computeall()
+        if ~self.fp_failed:
+            self.computeall()
         
-        self.c, self.s = self.fp.c, self.fp.s
-        self.QT, self.qT = self.fp.pxx, self.fp.px
-        self.Q = torch.cat([torch.cat([self.fp.qxx, self.fp.qxu],dim=-1),
-                            torch.cat([self.fp.qxu.mT, self.fp.quu],dim=-1)], dim=-2)                                     
-        self.p  = torch.cat([self.fp.qx, self.fp.qu],dim=-1)
-        self.W =  torch.cat([self.fp.cx, self.fp.cu],dim=-1)
-        self.F =  torch.cat([self.fp.fx, self.fp.fu],dim=-1) 
-        self.G =  torch.cat([torch.cat([self.fp.fxx, self.fp.fxu],dim=-1),
-                            torch.cat([self.fp.fxu.mT, self.fp.fuu],dim=-1)], dim=-2) 
+        self.Q = torch.cat([torch.cat([self.qxx, self.qxu],dim=-1),
+                            torch.cat([self.qxu.mT, self.quu],dim=-1)], dim=-2)                                     
+        self.p  = torch.cat([self.qx, self.qu],dim=-1)
+        self.W =  torch.cat([self.cx, self.cu],dim=-1)
+        self.F =  torch.cat([self.fx, self.fu],dim=-1) 
+        self.G =  torch.cat([torch.cat([self.fxx, self.fxu],dim=-1),
+                            torch.cat([self.fxu.mT, self.fuu],dim=-1)], dim=-2) 
                             
         # backward recursions, similar to iLQR backward recursion, but more variables involved
-        V, v = self.QT, self.qT
+        V, v = self.pxx, self.px
         for t in range(self.T-1, -1, -1):
             Ft = self.F[...,t,:,:]
             Qt = self.Q[...,t,:,:] + Ft.mT @ V @ Ft
@@ -413,14 +445,12 @@ class ddpOptimizer(nn.Module):
                 Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
                 qx, qu = qt[..., :ns], qt[..., ns:]
                 
-                Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(fp.reg_exp_base, self.reg) - 1.)
+                Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(self.reg_exp_base, self.reg) - 1.)
                     
                 try:
                     lltofQuuReg = torch.linalg.cholesky(Quu_reg) # compute the Cholesky decomposition 
                 except: 
                     self.bp_failed, self.opterr = True, torch.inf
-                    self.fp = fp
-                    return
 
                 Quu_reg_inv = torch.linalg.pinv(Quu_reg)
                 self.Ku[...,t,:,:] = Kut = - Quu_reg_inv @ Qux
@@ -442,7 +472,6 @@ class ddpOptimizer(nn.Module):
                 # c_err=torch.maximum(c_err, torch.linalg.vector_norm(ct+yt, float('inf')) )
 
         self.bp_failed, self.opterr = False, torch.maximum( torch.maximum( qu_err, c_err), mu_err)
-        self.fp = fp
 
     def forwardpass(self):
         r'''
@@ -545,11 +574,9 @@ class ddpOptimizer(nn.Module):
         r'''
         Compute new trajectory from controller gains.
         '''
-        fp = self.fp
-
-        B = fp.x.shape[:-2]
-        xold, uold, yold, sold, cold=fp.x, fp.u, fp.y, fp.s, fp.c
-        xnew, unew, ynew, snew, cnew=torch.zeros_like(fp.x), torch.zeros_like(fp.u), torch.zeros_like(fp.y), torch.zeros_like(fp.s), torch.zeros_like(fp.c)
+        B = self.x.shape[:-2]
+        xold, uold, yold, sold, cold=self.x, self.u, self.y, self.s, self.c
+        xnew, unew, ynew, snew, cnew=torch.zeros_like(self.x), torch.zeros_like(self.u), torch.zeros_like(self.y), torch.zeros_like(self.s), torch.zeros_like(self.c)
         logcost, err = torch.zeros(B), torch.zeros(B)       
         failed, tau, steplist = False, max(0.99, 1-self.mu), pow(2.0, torch.linspace(-10, 0, 11).flip(0))
         for step in range(steplist.shape[0]): # line search
@@ -573,12 +600,12 @@ class ddpOptimizer(nn.Module):
                     Kst, kst = self.Ks[..., t, :, :], self.ks[..., t, :]
                     snew[..., t, :] = snewt = sold[..., t, :] + stepsize * kst + bmv(Kst, xnewt - xold[..., t, :])
                     unew[..., t, :] = unewt = uold[..., t, :] + stepsize * kut + bmv(Kut, xnewt - xold[..., t, :])
-                    cnew[..., t, :] = cnewt = fp.c_fn(xnew[..., :-1, :], unew)[..., t, :]
+                    cnew[..., t, :] = cnewt = self.c_fn(xnew[..., :-1, :], unew)[..., t, :]
                     if ((cnewt > (1-tau) * cold[..., t, :]).any() or (snewt < (1-tau) * sold[..., t, :]).any()): 
                         # check if the inequality holds, with some thresholds
                         failed = True
                         break
-                    xnew[..., t, :] = xnewt = fp.f_fn(xnewt, unewt)[0]
+                    xnew[..., t, :] = xnewt = self.f_fn(xnewt, unewt)[0]
                         
             if (failed):
                 continue
@@ -594,27 +621,25 @@ class ddpOptimizer(nn.Module):
 
                 # step filter
                 candidate = torch.stack((logcost, err), dim=-1)
-                if torch.any( torch.all(candidate-torch.tile(torch.Tensor([1e-13, 0.]), B + (1,))>=fp.filter, -1) ):
+                if torch.any( torch.all(candidate-torch.tile(torch.Tensor([1e-13, 0.]), B + (1,))>=self.filter, -1) ):
                     # relax a bit for numerical stability, strange
                     # todo: any for each sample in a batch?
                     failed=True
                     continue                    
                 else:
-                    idx=torch.all(candidate<=fp.filter,-1)
-                    fp.filter = fp.filter[~idx]
-                    if fp.filter.ndim <= 2:  # todo: change this walkaround
-                        fp.filter = fp.filter.unsqueeze(0)
-                    fp.filter=torch.cat((fp.filter, candidate.unsqueeze(-2)), dim=-2)
+                    idx=torch.all(candidate<=self.filter,-1)
+                    self.filter = self.filter[~idx]
+                    if self.filter.ndim <= 2:  # todo: change this walkaround
+                        self.filter = self.filter.unsqueeze(0)
+                    self.filter=torch.cat((self.filter, candidate.unsqueeze(-2)), dim=-2)
                     break
                   
         if (failed):
-            fp.stepsize, fp.failed= 0.0, failed
+            self.stepsize, self.failed= 0.0, failed
         else:
-            fp.cost = fp.q_fn(fp.x[...,:-1,:], fp.u).sum(-1) + fp.p_fn(fp.x[...,-1,:],torch.zeros_like(fp.u[...,-1,:])).sum(-1)
-            fp.x, fp.u, fp.y, fp.s, fp.c = xnew, unew, ynew, snew, cnew 
-            fp.err, fp.stepsize, fp.step, fp.failed = err, stepsize, step, False
-
-        self.fp = fp
+            self.cost = self.q_fn(self.x[...,:-1,:], self.u).sum(-1) + self.p_fn(self.x[...,-1,:],torch.zeros_like(self.u[...,-1,:])).sum(-1)
+            self.x, self.u, self.y, self.s, self.c = xnew, unew, ynew, snew, cnew 
+            self.err, self.stepsize, self.step, self.failed = err, stepsize, step, False
 
 
     def optimizer(self):
@@ -624,12 +649,12 @@ class ddpOptimizer(nn.Module):
         time_start = time.time()
 
         for t in range(self.T):
-            self.fp.x[...,t+1,:], _ = self.fp.f_fn(self.fp.x[...,t,:],self.fp.u[...,t,:])
-        self.fp.c = self.fp.c_fn(self.fp.x[...,:-1,:], self.fp.u)
-        self.fp.cost = self.fp.q_fn(self.fp.x[...,:-1,:], self.fp.u).sum(-1) \
-                        + self.fp.p_fn(self.fp.x[...,-1,:],torch.zeros_like(self.fp.u[...,-1,:])).sum(-1)
-        self.mu = self.fp.cost/self.fp.T/self.fp.s[0].shape[0]
-        self.fp.resetfilter(self.infeas, self.mu)
+            self.x[...,t+1,:], _ = self.f_fn(self.x[...,t,:],self.u[...,t,:])
+        self.c = self.c_fn(self.x[...,:-1,:], self.u)
+        self.cost = self.q_fn(self.x[...,:-1,:], self.u).sum(-1) \
+                        + self.p_fn(self.x[...,-1,:],torch.zeros_like(self.u[...,-1,:])).sum(-1)
+        self.mu = self.cost/self.T/self.s[...,0,:].shape[-1]
+        self.resetfilter(self.infeas, self.mu)
         self.reg, self.bp_failed, self.recovery = 0.0, False, 0
 
         for iter in range(self.maxiter):
@@ -654,13 +679,13 @@ class ddpOptimizer(nn.Module):
             
             if (self.opterr <= 0.2*self.mu):
                 self.mu = max(self.tol/10.0, min(0.2*self.mu, pow(self.mu, 1.2) ) )
-                self.fp.resetfilter(self.infeas, self.mu)
+                self.resetfilter(self.infeas, self.mu)
                 self.reg, self.bp_failed, self.recovery = 0.0, False, 0
 
             if iter == self.maxiter - 1:
                 print("max iter", self.maxiter, "reached, not the optimal one!")
 
-        return self.fp
+        return self.x
 
 class ddpGrad:
 
