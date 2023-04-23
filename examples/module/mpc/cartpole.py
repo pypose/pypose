@@ -126,7 +126,7 @@ def main():
 
     opt = optim.RMSprop((len, m_cart, m_pole), lr=1e-2)
 
-    for i in range(100):
+    for i in range(1000):
         traj_loss = get_loss(len, m_cart, m_pole)
         opt.zero_grad()
         traj_loss.backward()
@@ -142,9 +142,12 @@ def main():
         plot_interval = 1
         if i % plot_interval == 0:
             os.system('./plot.py "{}" &'.format(args.save))
-            print(len, expert['len'])
-            print(m_cart, expert['m_cart'])
-            print(m_pole, expert['m_pole'])
+            print("Length of pole of the agent system = ", len)
+            print("Length of pole of the expert system = ", expert['len'])
+            print("Mass of cart of the agent system = ", m_cart)
+            print("Mass of cart of the expert system = ", expert['m_cart'])
+            print("Mass of pole of the agent system = ", m_pole)
+            print("Mass of pole of the expert system = ", expert['m_pole'])
             print('{:04d}: traj_loss: {:.8f} model_loss: {:.8f}'.format(
             i, traj_loss.item(), model_loss.item()))
 
