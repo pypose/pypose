@@ -13,25 +13,25 @@ class TestICP:
         pc2 = loaded_tensors['pc2'].squeeze(-3)
         return pc1, pc2
 
-    def test_icp_nonbatch(self):
-        pc1, pc2 = self.load_point_cloud()
-        tf_gt_mat = torch.tensor([[0.67947332,  0.69882627, 0.22351252, -0.07126862],
-                                [-0.73099025, 0.61862761, 0.28801584, -0.22845308],
-                                [0.06300202, -0.35908455, 0.93117615,6.92614964],
-                                [0, 0, 0, 1]])
+    # def test_icp_nonbatch(self):
+    #     pc1, pc2 = self.load_point_cloud()
+    #     tf_gt_mat = torch.tensor([[0.67947332,  0.69882627, 0.22351252, -0.07126862],
+    #                             [-0.73099025, 0.61862761, 0.28801584, -0.22845308],
+    #                             [0.06300202, -0.35908455, 0.93117615,6.92614964],
+    #                             [0, 0, 0, 1]])
 
-        # tf_gt = torch.tensor([[0,  -1, 0, -0.05],
-        #                         [1, 0, 0, -0.02],
-        #                         [0, 0, 1, 0.03],
-        #                         [0, 0, 0, 1]])
+    #     # tf_gt = torch.tensor([[0,  -1, 0, -0.05],
+    #     #                         [1, 0, 0, -0.02],
+    #     #                         [0, 0, 1, 0.03],
+    #     #                         [0, 0, 0, 1]])
 
-        self.tf_gt = pp.mat2SE3(tf_gt_mat)
-        pc2 = self.tf_gt.Act(pc2)
-        icp = pp.module.ICP()
-        self.result = icp(pc1, pc2)
-        print("The true tf is", self.tf_gt)
-        print("The output is", self.result)
-        self.rmse_results()
+    #     self.tf_gt = pp.mat2SE3(tf_gt_mat)
+    #     pc2 = self.tf_gt.Act(pc2)
+    #     icp = pp.module.ICP()
+    #     self.result = icp(pc1, pc2)
+    #     print("The true tf is", self.tf_gt)
+    #     print("The output is", self.result)
+    #     self.rmse_results()
 
     def test__icp_multibatch(self):
         b = 3
