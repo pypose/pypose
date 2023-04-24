@@ -241,42 +241,42 @@ def knn(pc1, pc2, k = 1, norm = 2):
     return neighbors
 
 
-def points_transform(pts_w, pts_c):
+def points_transform(pc1, pc2):
     r'''
-    Compute the rigid transformation (rotation and translation) between two sets of 3D
-    points.
+    Compute the rigid similarity transformation (rotation and translation) between two
+    sets of points.
 
     Args:
-        pts_w (``torch.Tensor``): The coordinates of the first set of 3D points.
+        pc1 (``torch.Tensor``): The coordinates of the first set of points.
             The shape has to be (..., N1, dim).
-        pts_c (``torch.Tensor``): The coordinates of the second set of 3D points.
+        pc2 (``torch.Tensor``): The coordinates of the second set of points.
             The shape has to be (..., N2, dim).
 
     Returns:
-        ``SE3Type LieTensor``: The rigid transformation matrix in SE(3) format that
+        ``LieTensor``: The rigid transformation matrix in ``SE3Type``  that
         minimizes the mean squared error between the input point sets.
 
     Example:
         >>> import torch, pypose as pp
-        >>> pts_w = torch.tensor([[0., 0., 0.],
-        ...                       [1., 0., 0.],
-        ...                       [0., 1., 0.]])
-        >>> pts_c = torch.tensor([[1., 1., 1.],
-        ...                       [2., 1., 1.],
-        ...                       [1., 2., 1.]])
-        >>> pp.points_transform(pts_w, pts_c)
+        >>> pc1 = torch.tensor([[0., 0., 0.],
+                               [1., 0., 0.],
+                               [0., 1., 0.]])
+        >>> pc2 = torch.tensor([[1., 1., 1.],
+                               [2., 1., 1.],
+                               [1., 2., 1.]])
+        >>> pp.points_transform(pc1, pc2)
         SE3Type LieTensor:
         LieTensor([1., 1., 1., 0., 0., 0., 1.])
     '''
-    Cw = pts_w.mean(dim=-2, keepdim=True)
-    Pw = pts_w - Cw
-    Cc = pts_c.mean(dim=-2, keepdim=True)
-    Pc = pts_c - Cc
-    M = bvv(Pc, Pw).sum(dim=-3)
+    pc1ctn = pc1.mean(dim=-2, keepdim=True)
+    pc2ctn = pc2.mean(dim=-2, keepdim=True)
+    pc1t = pc1 - pc1ctn
+    Pc2t = pc2 - pc2ctn
+    M = bvv(Pc2t, pc1t).sum(dim=-3)
     U, S, Vh = torch.linalg.svd(M)
     R = U @ Vh
     mask = (R.det() + 1).abs() < 1e-6
     R[mask] = - R[mask]
-    t = Cc.mT - R @ Cw.mT
+    t = pc2ctn.mT - R @ pc1ctn.mT
     T = torch.cat((R, t), dim=-1)
     return mat2SE3(T, check=False)
