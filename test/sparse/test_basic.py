@@ -35,7 +35,7 @@ def test_abs():
     print(f'type(x) = {type(x)}')
     print(f'x._s = \n{x._s}')
     print(f'x._p = \n{x._p}')
-    
+
     y = x.abs()
     print(f'y = \n{y}')
 
@@ -44,7 +44,7 @@ def test_abs():
 
     y3 = sp.abs(x)
     print(f'y3 = \n{y3}')
-    
+
     #print(x)
 
     #y = x.to_dense()
@@ -66,23 +66,23 @@ def test_mm():
     print(f'type(x) = {type(x)}')
     print(f'x._s = \n{x._s}')
     print(f'x._p = \n{x._p}')
-    
+
     # Perform matrix multiplication using the proxies.
     m = x._p @ x._p
     print(f'm = \n{m}')
-    
+
     # Perform matrix multiplication.
     y = x @ x
     print(f'y = \n{y}')
-    
+
     # Compute the true multiplication result.
     xh = hybrid_2_coo(x._s)
     print(f'xh = \n{xh.to_dense()}')
     yh0 = xh @ xh
-    
+
     # Convert our result.
     yh = hybrid_2_coo(y._s)
-    
+
     # Show and compare.
     print(f'yh0 = \n{yh0.to_dense()}')
     print(f'yh = \n{yh.to_dense()}')
@@ -96,3 +96,10 @@ def test_is_sparse():
 
     iss = x.is_sparse
     print(f'x.is_sparse = {iss}')
+
+if __name__ == '__main__':
+    #test_pypose_operation()
+    #test_sparse_coo_2_sparse_hybrid_coo()
+    #test_abs()
+    test_mm()
+    # test_is_sparse()
