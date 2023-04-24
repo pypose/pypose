@@ -51,3 +51,4 @@ Functions
     cumops_
     reprojerr
     knn
+    points_transform
