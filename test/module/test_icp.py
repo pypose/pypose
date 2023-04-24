@@ -33,7 +33,7 @@ class TestICP:
     #     print("The output is", self.result)
     #     self.rmse_results()
 
-    def test__icp_multibatch(self):
+    def test_icp_batch(self):
         b = 3
         num_points = 20
         pc1 = torch.rand(b, num_points, 3)
@@ -66,4 +66,4 @@ class TestICP:
 if __name__ == "__main__":
     test = TestICP()
     # test.test_icp_nonbatch()
-    test.test__icp_multibatch()
+    test.test_icp_batch()
