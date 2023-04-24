@@ -42,6 +42,19 @@ class ICP(torch.nn.Module):
     4. The algorithm iterates through these steps until the change in the obtained
     distance is lower than the given tolerance.
 
+    Example:
+        >>> import torch, pypose as pp
+        >>> pc1 = torch.tensor([[[0., 0., 0.],
+        ...                      [1., 0., 0.],
+        ...                      [2., 0, 0.]]])
+        >>> pc2 = torch.tensor([[[0.2, 0.1, 0.],
+        ...                      [1.1397, 0.442, 0.],
+        ...                      [2.0794, 0.7840, 0.]]])
+        >>> icp = pp.module.ICP()
+        >>> icp(pc1, pc2)
+        SE3Type LieTensor:
+        LieTensor([[0.2000, 0.1000, 0.0000, 0.0000, 0.0000, 0.1736, 0.9848]])
+
     '''
 
     def __init__(self, steplim = 200, tol = 1e-4, tf = None):
