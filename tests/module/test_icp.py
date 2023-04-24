@@ -7,8 +7,8 @@ class TestICP:
     def load_point_cloud(self):
         download_and_extract_archive('https://github.com/Murphy41/laser-scan-pt/' \
                                      'releases/download/v0.0/icp-test-data.pt.zip',\
-                                    './test/module')
-        loaded_tensors = torch.load('./test/module/icp-test-data.pt')
+                                    './tests/module')
+        loaded_tensors = torch.load('./tests/module/icp-test-data.pt')
         pc1 = loaded_tensors['pc1'].squeeze(-3)
         pc2 = loaded_tensors['pc2'].squeeze(-3)
         return pc1, pc2
@@ -60,7 +60,6 @@ class TestICP:
         torch.set_printoptions(precision=2, sci_mode=False)
         print("Pypose ICP solution, rmse of R:", rmse_rot(rot, gt_rot))
         print("Pypose ICP solution, rmse of t:", rmse_t(t, gt_t))
-
 
 
 if __name__ == "__main__":
