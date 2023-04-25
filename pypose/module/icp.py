@@ -4,14 +4,11 @@ from .. import knn, svdtf
 
 class ICP(torch.nn.Module):
     r'''
-    This class implements the batched Iterative Closest Point (ICP) algorithm to find a
-    similarity transformation ( :math:`T` ) between two sets of 3-dimensional points
-    using Singular Value Decomposition (SVD). It's important to note that the solution
-    found is only a local optimum.
+    Batched Iterative Closest Point (ICP) algorithm to find a rigid transformation
+    between two sets of points using Singular Value Decomposition (SVD).
 
     Args:
-        steplim (``int``, optional): The maximum number of ICP iteration steps.
-            Default: 200.
+        steps (``int``, optional): The maximum number of ICP iteration steps. Default: 200.
         tol (``double``, optional): The tolerance of the relative error used to terminate
             the algorithm. Default: 1e-6.
         tf (``LieTensor``, optional): The initial transformation :math:`T_{init}` in
@@ -19,17 +16,18 @@ class ICP(torch.nn.Module):
 
     The algorithm takes two input point clouds: source point cloud (psrc) and target
     point cloud (ptgt). The objective is to find the optimal similarity transformation
-    (:math:`T`) to minimize the error between the transformed source point cloud and the
+    ( :math:`T` ) to minimize the error between the transformed source point cloud and the
     target point cloud as shown in the equation:
 
     .. math::
         \begin{align*}
-            \underset{T}{\operatorname{arg\,min}} \sum_i \|ptgt_j - T \cdot psrc_i\|,
+            \underset{T}{\operatorname{arg\,min}} \sum_i \| p_{\mathrm{target, j}} -
+            T \cdot p_{\mathrm{source, i}}\|,
         \end{align*}
 
-    where `psrc_i` is the ith point in the source point cloud, and `ptgt_j`
-    is the cloest point to `psrc_i` in the target point cloud with index j. The algorithm
-    consists of the following steps:
+    where :math:`p_{\mathrm{source, i}}` is the ith point in the source point cloud, and
+    :math:`p_{\mathrm{target, j}}` is the cloest point to :math:`p_{\mathrm{source, i}}`
+    in the target point cloud with index j. The algorithm consists of the following steps:
 
     1. For each point in psrc, the nearest neighbor algorithm (knn) is used to select its
     closest point in ptgt to form the matched point pairs.
@@ -57,19 +55,21 @@ class ICP(torch.nn.Module):
         SE3Type LieTensor:
         LieTensor([[0.2000, 0.1000, 0.0000, 0.0000, 0.0000, 0.1736, 0.9848]])
 
+    Warning:
+        It's important to note that the solution found is only a local optimum.
+
     '''
-    def __init__(self, steplim=200, tol=1e-6, tf=None):
+    def __init__(self, steps=200, tol=1e-6, init=None):
         super().__init__()
-        self.steplim = steplim
+        self.steps = steps
         self.tol = tol
-        self.tf = tf
-        if tf != None:
-            assert isinstance(tf.ltype, lietensor.lietensor.SE3Type), "The input initial \
-                transformation is not of type SE3Type."
+        self.init = init
+        if init != None:
+            assert isinstance(init.ltype, lietensor.lietensor.SE3Type), "The input \
+                initial transformation is not of type SE3Type."
 
     def forward(self, psrc, ptgt):
         r'''
-
         Args:
             psrc(``torch.Tensor``): The source point cloud tensor with
                 [..., points_num, 3] shape.
@@ -80,12 +80,10 @@ class ICP(torch.nn.Module):
             ``LieTensor``: The estimated transformation (``SE3type``) from psrc to ptgt.
 
         '''
-        temppc = psrc.clone()
-        iter = 0
+        temppc = psrc
         err = 0
         dim = psrc.shape
-        while iter <= self.steplim:
-            iter += 1
+        for i in range(self.steps):
             neighbors = knn(temppc, ptgt)
             knndist = neighbors.values.squeeze(-1)
             knnidx = neighbors.indices
