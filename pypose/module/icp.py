@@ -89,7 +89,7 @@ class ICP(torch.nn.Module):
             neighbors = knn(temppc, ptgt)
             knndist = neighbors.values.squeeze(-1)
             knnidx = neighbors.indices
-            errnew = torch.mean(knndist, dim=-1)
+            errnew = knndist.mean(dim=-1)
             if torch.all(torch.abs(errnew - err) < self.tol):
                 break
             err = errnew
