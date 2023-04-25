@@ -6,3 +6,4 @@ from .pf import PF
 from .dynamics import System, LTI, LTV, NLS
 from .imu_preintegrator import IMUPreintegrator
 from .pnp import EPnP
+from .liesplinese3 import LieSpline
