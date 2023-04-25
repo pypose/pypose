@@ -1,4 +1,5 @@
 import torch
+from .. import lietensor
 from .. import knn, points_transform
 
 class ICP(torch.nn.Module):
@@ -62,6 +63,9 @@ class ICP(torch.nn.Module):
         self.steplim = steplim
         self.tol = tol
         self.tf = tf
+        if tf != None:
+            assert isinstance(tf.ltype, lietensor.lietensor.SE3Type), "The input initial \
+                transformation is not of type SE3Type."
 
     def forward(self, psrc, ptgt):
         r'''
@@ -77,18 +81,9 @@ class ICP(torch.nn.Module):
 
         '''
 
-
         temppc = psrc.clone()
         iter = 0
         err = 0
-        if self.tf != None:
-            if psrc.shape[:-2] == self.tf.shape[:-1] and \
-                self.tf.shape[-1] == 7:
-                temppc = self.tf.unsqueeze(-2).Act(temppc)
-            else:
-                raise ValueError("Invalid initial transformation matrix, please use " +
-                                 "SE3 LieTensor with the same batch sizes as the " +
-                                 "input pointcloud.")
         while iter <= self.steplim:
             iter += 1
             neighbors = knn(temppc, ptgt)
