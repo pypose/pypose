@@ -7,7 +7,7 @@ from .. import bmv, bvv
 from ..optim import GaussNewton
 from ..optim.solver import LSTSQ
 from ..optim.scheduler import StopOnPlateau
-from ..function import reprojerr, cart2homo, points_transform
+from ..function import reprojerr, cart2homo, svdtf
 
 
 class BetaObjective(torch.nn.Module):
@@ -171,7 +171,7 @@ class EPnP(torch.nn.Module):
     def _compute_solution(self, beta, nullv, alpha, points):
         bases = bmv(nullv.mT, beta)
         bases, transp, scale = self._compute_scale(bases, alpha, points)
-        pose = points_transform(points, transp)
+        pose = svdtf(points, transp)
         return pose, scale
 
     @staticmethod

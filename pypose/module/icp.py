@@ -1,6 +1,6 @@
 import torch
 from .. import lietensor
-from .. import knn, points_transform
+from .. import knn, svdtf
 
 class ICP(torch.nn.Module):
     r'''
@@ -57,7 +57,6 @@ class ICP(torch.nn.Module):
         LieTensor([[0.2000, 0.1000, 0.0000, 0.0000, 0.0000, 0.1736, 0.9848]])
 
     '''
-
     def __init__(self, steplim = 200, tol = 1e-6, tf = None):
         super().__init__()
         self.steplim = steplim
@@ -80,7 +79,6 @@ class ICP(torch.nn.Module):
             ``LieTensor``: The estimated transformation (``SE3type``) from psrc to ptgt.
 
         '''
-
         temppc = psrc.clone()
         iter = 0
         err = 0
@@ -95,7 +93,7 @@ class ICP(torch.nn.Module):
                 break
             err = errnew
             ptgtknn = torch.gather(ptgt, -2, knnidx.expand(dim))
-            T = points_transform(temppc, ptgtknn)
+            T = svdtf(temppc, ptgtknn)
             temppc = T.unsqueeze(-2).Act(temppc)
-        T = points_transform(psrc, temppc)
+        T = svdtf(psrc, temppc)
         return T

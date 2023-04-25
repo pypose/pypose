@@ -241,10 +241,10 @@ def knn(pc1, pc2, k = 1, norm = 2):
     return neighbors
 
 
-def points_transform(pc1, pc2):
+def svdtf(pc1, pc2):
     r'''
     Compute the rigid similarity transformation (rotation and translation) between two
-    sets of points.
+    sets of points using Singular Value Decomposition (SVD).
 
     Args:
         pc1 (``torch.Tensor``): The coordinates of the first set of points.
@@ -264,7 +264,7 @@ def points_transform(pc1, pc2):
         >>> pc2 = torch.tensor([[1., 1., 1.],
                                [2., 1., 1.],
                                [1., 2., 1.]])
-        >>> pp.points_transform(pc1, pc2)
+        >>> pp.svdtf(pc1, pc2)
         SE3Type LieTensor:
         LieTensor([1., 1., 1., 0., 0., 0., 1.])
     '''
