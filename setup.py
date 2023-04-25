@@ -52,7 +52,7 @@ if __name__ == '__main__':
         python_requires='>=3.6',
         setup_requires=['pytest-runner'],
         tests_require=['pytest'],
-        packages=find_packages(exclude=('docs', 'test', 'examples')),
+        packages=find_packages(exclude=('docs', 'tests', 'examples')),
         data_files=[('', ['requirements/runtime.txt', 'requirements/docs.txt'])],
         zip_safe=True,
         install_requires = load_requirements("requirements/runtime.txt"),
