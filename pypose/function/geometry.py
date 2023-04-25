@@ -163,7 +163,7 @@ def reprojerr(points, pixels, intrinsics, extrinsics=None):
     return (img_repj - pixels).norm(dim=-1)
 
 
-def knn(pc1, pc2, k = 1, norm = 2):
+def knn(pc1, pc2, k=1, norm=2):
     r'''
     Select the k nearest neighbor points of pointcloud 1 from pointcloud 2 in each batch.
 
