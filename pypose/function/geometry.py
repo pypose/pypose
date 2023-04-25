@@ -163,29 +163,41 @@ def reprojerr(points, pixels, intrinsics, extrinsics=None):
     return (img_repj - pixels).norm(dim=-1)
 
 
-def knn(pc1, pc2, k=1, norm=2):
+def knn(pc1, pc2, ord=2, k=1, dim=-1, largest=False, sorted=True):
     r'''
     Select the k nearest neighbor points of pointcloud 1 from pointcloud 2 in each batch.
 
     Args:
         pc1 (``torch.Tensor``): The coordinates of the pointcloud 1.
-            The shape has to be (..., N1, dim).
+            The shape has to be (..., N1, :).
         pc2 (``torch.Tensor``): The coordinates of the pointcloud 2.
-            The shape has to be (..., N2, dim).
-        k (``int``, optional): The number of the nearest neighbors to be selected.
-            k has to be k \seq N2. Default: ``1``.
-        norm (``int``, optional): The norm to use for distance calculation.
+            The shape has to be (..., N2, :).
+        ord (``int``, optional): The order of norm to use for distance calculation.
             Default: ``2`` (Euclidean distance).
+        k (``int``, optional): The number of the nearest neighbors to be selected.
+            k has to be k :math:`\leq` N2. Default: ``1``.
+        dim (``int``, optional): The dimension to sort along. Default: ``-1`` (The last
+            dimension).
+        largest (``bool``, optional): Return the k nearest or furthest neighbors. If
+            ``largest`` is set to ``True``, then the k furthest neighbors are returned.
+            Default: ``False``.
+        sorted (``bool``, optional): Return the sorted or unsorted k nearest neighbors. If
+            ``sorted`` is set to ``True``, it will make sure that the returned k nearest
+            neighbors are themselves sorted. Default: ``True``.
+
+    Note:
+        If ``sorted`` is set to ``False``, the output will be unordered and not
+        necessarily aligned with the index of the input point cloud.
 
     Returns:
         ``torch.return_types.topk (values: torch.Tensor, indices: torch.Tensor)``: The
         named tuple of (values, indices).
 
-            ``values``: The N-norm distance between each point in pc1 and its sorted k
-            nearest neighbors in pc2. The shape is (..., N1, k).
+        ``values``: The ord-norm distance between each point in pc1 and its sorted k
+        nearest neighbors in pc2. The shape is (..., N1, k).
 
-            ``indices``: The index of the k nearest neighbor points in pc2.
-            The shape is (..., N1, k).
+        ``indices``: The index of the k nearest neighbor points in pc2.
+        The shape is (..., N1, k).
 
     Example:
         >>> import torch, pypose as pp
@@ -213,7 +225,7 @@ def knn(pc1, pc2, k=1, norm=2):
                 [2],
                 [0],
                 [1]]))
-        >>> pp.knn(pc1, pc2, k = 2, norm = 2)
+        >>> pp.knn(pc1, pc2, k=2, ord=2)
         torch.return_types.topk(
         values=tensor([[2.0000, 4.5826],
                 [1.0000, 4.5826],
@@ -227,7 +239,7 @@ def knn(pc1, pc2, k=1, norm=2):
                 [2, 0],
                 [0, 2],
                 [1, 2]]))
-        >>> pp.knn(pc1, pc2, k = 2, norm = 2).values
+        >>> pp.knn(pc1, pc2, k=2, ord=2).values
         tensor([[2.0000, 4.5826],
                 [1.0000, 4.5826],
                 [1.4142, 5.0990],
@@ -236,15 +248,15 @@ def knn(pc1, pc2, k=1, norm=2):
                 [4.2426, 5.0000]])
     '''
     diff = pc1.unsqueeze(-2) - pc2.unsqueeze(-3)
-    dist = torch.linalg.norm(diff, dim=-1, ord=norm)
-    neighbors = dist.topk(k, largest=False)
+    dist = torch.linalg.norm(diff, dim=-1, ord=ord)
+    neighbors = dist.topk(k, dim=dim, largest=largest, sorted=sorted)
     return neighbors
 
 
 def svdtf(pc1, pc2):
     r'''
-    Compute the rigid similarity transformation (rotation and translation) between two
-    sets of points using Singular Value Decomposition (SVD).
+    Computes the rigid transformation ( :math:`SE(3)` ) between two sets of associated
+    points using Singular Value Decomposition (SVD).
 
     Args:
         pc1 (``torch.Tensor``): The coordinates of the first set of points.
