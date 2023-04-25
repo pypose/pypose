@@ -58,7 +58,7 @@ class ICP(torch.nn.Module):
         LieTensor([[0.2000, 0.1000, 0.0000, 0.0000, 0.0000, 0.1736, 0.9848]])
 
     '''
-    def __init__(self, steplim = 200, tol = 1e-6, tf = None):
+    def __init__(self, steplim=200, tol=1e-6, tf=None):
         super().__init__()
         self.steplim = steplim
         self.tol = tol
