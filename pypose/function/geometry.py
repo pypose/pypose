@@ -271,8 +271,8 @@ def points_transform(pc1, pc2):
     pc1ctn = pc1.mean(dim=-2, keepdim=True)
     pc2ctn = pc2.mean(dim=-2, keepdim=True)
     pc1t = pc1 - pc1ctn
-    Pc2t = pc2 - pc2ctn
-    M = bvv(Pc2t, pc1t).sum(dim=-3)
+    pc2t = pc2 - pc2ctn
+    M = bvv(pc2t, pc1t).sum(dim=-3)
     U, S, Vh = torch.linalg.svd(M)
     R = U @ Vh
     mask = (R.det() + 1).abs() < 1e-6
