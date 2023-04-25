@@ -5,15 +5,15 @@ from .. import knn, svdtf
 class ICP(torch.nn.Module):
     r'''
     This class implements the batched Iterative Closest Point (ICP) algorithm to find a
-    similarity transformation (:math:`T`) between two differently-sized sets of
-    3-dimensional points using Singular Value Decomposition (SVD). It's important to note
-    that the solution found is only a local optimum.
+    similarity transformation ( :math:`T` ) between two sets of 3-dimensional points
+    using Singular Value Decomposition (SVD). It's important to note that the solution
+    found is only a local optimum.
 
     Args:
         steplim (``int``, optional): The maximum number of ICP iteration steps.
             Default: 200.
         tol (``double``, optional): The tolerance of the relative error used to terminate
-            the algorithm. Default: 1e-4.
+            the algorithm. Default: 1e-6.
         tf (``LieTensor``, optional): The initial transformation :math:`T_{init}` in
             ``SE3type``. Default: None.
 
@@ -24,24 +24,25 @@ class ICP(torch.nn.Module):
 
     .. math::
         \begin{align*}
-            \operatorname{arg\,min}_T \sum_i \|ptgt_i - T \cdot psrc_j\|,
+            \underset{T}{\operatorname{arg\,min}} \sum_i \|ptgt_j - T \cdot psrc_i\|,
         \end{align*}
 
-    where :math:`ptgt_i` is the ith point in the target point cloud, and :math:`psrc_j` is
-    the jth point in the source point cloud. The algorithm consists of the following steps:
+    where `psrc_i` is the ith point in the source point cloud, and `ptgt_j`
+    is the cloest point to `psrc_i` in the target point cloud with index j. The algorithm
+    consists of the following steps:
 
-    1. For each point in psrc, the nearest neighbor algorithm is used to select its
+    1. For each point in psrc, the nearest neighbor algorithm (knn) is used to select its
     closest point in ptgt to form the matched point pairs.
 
     2. Singular value decomposition (SVD) algorithm is used to compute the rotation
     and translation matrices from the matched point pairs.
 
-    3. The source point cloud is updated using the obtained rotation and
-    translation matrices. The distance between the updated source point cloud and
-    the target point cloud is calculated.
+    3. The source point cloud (psrc) is updated using the obtained rotation and
+    translation matrices. The distance between the updated psrc and ptgt is calculated.
 
-    4. The algorithm iterates through these steps until the change in the obtained
-    distance is lower than the given tolerance.
+    4. The algorithm continues to iterate through these steps until the change in the
+    calculated distance falls below the specified tolerance level or the maximum number
+    of iteration steps is reached.
 
     Example:
         >>> import torch, pypose as pp

@@ -175,7 +175,7 @@ def knn(pc1, pc2, k = 1, norm = 2):
         k (``int``, optional): The number of the nearest neighbors to be selected.
             k has to be k \seq N2. Default: ``1``.
         norm (``int``, optional): The norm to use for distance calculation.
-            Default: ``2``.
+            Default: ``2`` (Euclidean distance).
 
     Returns:
         ``torch.return_types.topk (values: torch.Tensor, indices: torch.Tensor)``: The
@@ -248,9 +248,9 @@ def svdtf(pc1, pc2):
 
     Args:
         pc1 (``torch.Tensor``): The coordinates of the first set of points.
-            The shape has to be (..., N1, dim).
+            The shape has to be (..., N1, 3).
         pc2 (``torch.Tensor``): The coordinates of the second set of points.
-            The shape has to be (..., N2, dim).
+            The shape has to be (..., N2, 3).
 
     Returns:
         ``LieTensor``: The rigid transformation matrix in ``SE3Type``  that
@@ -259,11 +259,11 @@ def svdtf(pc1, pc2):
     Example:
         >>> import torch, pypose as pp
         >>> pc1 = torch.tensor([[0., 0., 0.],
-                               [1., 0., 0.],
-                               [0., 1., 0.]])
+        ...                     [1., 0., 0.],
+        ...                     [0., 1., 0.]])
         >>> pc2 = torch.tensor([[1., 1., 1.],
-                               [2., 1., 1.],
-                               [1., 2., 1.]])
+        ...                     [2., 1., 1.],
+        ...                     [1., 2., 1.]])
         >>> pp.svdtf(pc1, pc2)
         SE3Type LieTensor:
         LieTensor([1., 1., 1., 0., 0., 0., 1.])
