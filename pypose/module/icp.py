@@ -58,7 +58,7 @@ class ICP(torch.nn.Module):
 
     '''
 
-    def __init__(self, steplim = 200, tol = 1e-4, tf = None):
+    def __init__(self, steplim = 200, tol = 1e-6, tf = None):
         super().__init__()
         self.steplim = steplim
         self.tol = tol
@@ -84,6 +84,7 @@ class ICP(torch.nn.Module):
         temppc = psrc.clone()
         iter = 0
         err = 0
+        dim = psrc.shape
         while iter <= self.steplim:
             iter += 1
             neighbors = knn(temppc, ptgt)
@@ -93,9 +94,8 @@ class ICP(torch.nn.Module):
             if torch.all(torch.abs(errnew - err) < self.tol):
                 break
             err = errnew
-            batch = torch.arange(temppc.shape[0],dtype=knnidx.dtype, device=knnidx.device).repeat(knnidx.shape[1],1).T.unsqueeze(-1)
-            batch_knnidx = torch.cat((batch, knnidx),dim =-1)
-            T = points_transform(temppc, ptgt[batch_knnidx[:,:,0],batch_knnidx[:,:,1],:])
+            ptgtknn = torch.gather(ptgt, -2, knnidx.expand(dim))
+            T = points_transform(temppc, ptgtknn)
             temppc = T.unsqueeze(-2).Act(temppc)
         T = points_transform(psrc, temppc)
         return T
