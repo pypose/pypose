@@ -11,7 +11,7 @@ class ICP(torch.nn.Module):
         steps (``int``, optional): The maximum number of ICP iteration steps. Default: 200.
         tol (``double``, optional): The tolerance of the relative error used to terminate
             the algorithm. Default: 1e-6.
-        tf (``LieTensor``, optional): The initial transformation :math:`T_{init}` in
+        init (``LieTensor``, optional): The initial transformation :math:`T_{init}` in
             ``SE3type``. Default: None.
 
     The algorithm takes two input point clouds: source point cloud (psrc) and target
