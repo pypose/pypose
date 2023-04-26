@@ -356,7 +356,7 @@ def posediff(ref, est, aggregate=False, mode=1):
         [2.4523, 0.4169],
         [1.8392, 1.1539]])
         >>> pp.posediff(ref,est,aggregate=True)
-        tensor([[2.7045, 1.0054]])
+        tensor([1.9840, 1.9306])
         >>> pp.posediff(ref,est,mode=0)
         tensor([[ 3.1877,  0.1554,  0.1179, -0.0190,  0.9806],
         [ 3.3388, -0.0194, -0.8539,  0.0609,  0.5164],
