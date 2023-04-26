@@ -77,7 +77,7 @@ class LieSpline(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, input_poses, time, inter_begin_and_end = True):
+    def forward(self, input_poses, time, inter_begin_and_end=True):
         r'''
 
         Args:
