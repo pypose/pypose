@@ -38,9 +38,9 @@ if __name__ == "__main__":
     n_batch = 3
     state_all =      torch.zeros(n_batch, T+1, ns)
     input_all = 0.02*torch.ones(n_batch,  T,   nc)
+    state_all[...,0,:] = state
     init_traj = {'state': state_all, 
                  'input': input_all}
-    state_all[...,0,:] = state
  
     # Create cost object
     Q = torch.tile(dt*torch.eye(ns, ns, device=device), (n_batch, T, 1, 1))
