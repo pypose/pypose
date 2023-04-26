@@ -15,15 +15,13 @@ class TestICP:
 
     def test_icp_laserscan(self):
         pc1, pc2 = self.load_point_cloud()
-        tf_gt_mat = torch.tensor([[0.9950042, -0.0998334,  0.0000000, -0.05],
-                                [0.0998334,  0.9950042,  0.0000000, -0.02],
-                                [0.0000000,  0.0000000,  1.0000000, 0],
-                                [0, 0, 0, 1]])
-        self.tf_gt = pp.mat2SE3(tf_gt_mat)
+        self.tf_gt = pp.SE3([-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503])
         pc2 = self.tf_gt.Act(pc2)
         icp = pp.module.ICP()
         self.result = icp(pc1, pc2)
         error = pp.posediff(self.tf_gt,self.result,aggregate=True)
+        print("The translational error is {:.4f} and the rotational error is {:.4f}"
+              .format(error[0].item(), error[1].item()))
         assert error[0] < 0.01,  "The translational error is too large."
         assert error[1] < 0.01,  "The rotational error is too large."
 
@@ -46,7 +44,6 @@ class TestICP:
         pc2 = self.tf_gt.unsqueeze(-2).Act(pc1)
         icp = pp.module.ICP()
         self.result = icp(pc1, pc2)
-        self.rmse_results()
 
 if __name__ == "__main__":
     torch.set_printoptions(precision=4, sci_mode=False)

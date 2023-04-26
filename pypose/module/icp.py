@@ -82,7 +82,7 @@ class ICP(torch.nn.Module):
         temppc = psrc
         err = 0
         dim = psrc.shape
-        for i in range(self.steps):
+        for _ in range(self.steps):
             neighbors = knn(temppc, ptgt)
             knndist = neighbors.values.squeeze(-1)
             knnidx = neighbors.indices
