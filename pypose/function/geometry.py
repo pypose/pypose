@@ -22,7 +22,7 @@ def is_lietensor(obj):
 
 def is_SE3(obj):
     r'''
-    Check whether an instance or object is a SE3 Type LieTensor or not.
+    Check whether an instance or object is an SE3 Type LieTensor or not.
 
     Args:
         obj (``obj``): a Python object or instantance.
@@ -324,6 +324,15 @@ def posediff(ref, est, aggregate=False, mode=1):
             ``mode = 0``: Quaternions representation.
             ``mode = 1``: Axis-angle representation (Use one angle to represent the
             rotational difference in 3D space). Default: ``1``.
+
+    Note:
+        The rotation matrix to axis-angle representation refers to the theorem 2.5 and
+        2.6 in Chapter 2 [1]. The implementation of the Quaternions to axis-angle
+        representation (equation: :math:`\theta = 2 \cos^{-1}(q_0)` ) is presented at
+        the end of Chapter 2 in [1].
+
+        [1] Murray, R. M., Li, Z., Sastry, S. S., & Sastry, S. S. (1994). A mathematical introduction to robotic manipulation. CRC press.
+
 
     Returns:
         ``torch.Tensor``: The translational difference (:math:`\Delta t`) and rotational differences between two sets of transformations.
