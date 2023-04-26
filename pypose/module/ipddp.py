@@ -227,6 +227,7 @@ class ddpOptimizer(nn.Module):
         for step in range(steplist.shape[0]): # line search
             failed, stepsize = False, steplist[step]
             xnew[...,0,:] = xold[...,0,:]
+            xnewt = xnew[...,0,:]
             if (self.infeas): #  start from infeasible/feasible trajs. 
                 for t in range(self.T):
                     Kut, kut = self.Ku[...,t,:,:], self.ku[...,t,:]
@@ -243,7 +244,6 @@ class ddpOptimizer(nn.Module):
                     xnew[...,t+1,:] = xnewt = self.f_fn(xnewt, unewt)[0]
             else:
                 for t in range(self.T): # forward recuisions
-                    xnewt = xnew[...,t,:]
                     Kut, kut = self.Ku[...,t,:,:], self.ku[...,t,:]
                     Kst, kst = self.Ks[...,t,:,:], self.ks[...,t,:]
                     snew[...,t,:] = snewt = sold[...,t,:] + stepsize * kst + bmv(Kst, xnewt - xold[...,t,:])
@@ -254,7 +254,7 @@ class ddpOptimizer(nn.Module):
                         # check if the inequality holds, with some thresholds
                         failed = True
                         break
-                    xnew[...,t+1,:] = self.f_fn(xnewt, unewt)[0]
+                    xnew[...,t+1,:] = xnewt = self.f_fn(xnewt, unewt)[0]
                         
             if (failed):
                 continue
@@ -312,12 +312,12 @@ class ddpOptimizer(nn.Module):
                 
             self.forwardpasscompact()
             time_used = time.time() - time_start
-            if (iter % 5 == 1):
-                print('\n')
-                print('Iteration','Time','mu','Cost','Opt. error','Reg. power','Stepsize')
-                print('\n')
-            print('%-12d%-12.4g%-12.4g%-12.4g%-12.4g%-12d%-12.3f\n'%(
-                        iter, time_used, self.mu, self.cost, self.opterr, self.reg, self.stepsize))
+            # if (iter % 5 == 1):
+            #     print('\n')
+            #     print('Iteration','Time','mu','Cost','Opt. error','Reg. power','Stepsize')
+            #     print('\n')
+            # print('%-12d%-12.4g%-12.4g%-12.4g%-12.4g%-12d%-12.3f\n'%(
+            #             iter, time_used, self.mu, self.cost, self.opterr, self.reg, self.stepsize))
 
             #-----------termination conditions---------------
             if (max(self.opterr, self.mu)<=self.tol):
@@ -332,7 +332,7 @@ class ddpOptimizer(nn.Module):
             if iter == self.maxiter - 1:
                 print("max iter", self.maxiter, "reached, not the optimal one!")
 
-        return self.x
+        return self
 
 class ddpGrad:
 
@@ -344,54 +344,37 @@ class ddpGrad:
 
     def forward(self, fp_list, x_init):
         with torch.autograd.set_detect_anomaly(True): # for debug
-            # self.fp = fp_best #todo: uncomment
-            # self.bp = bp_best
-            # self.alg = alg_best
-            # self.fp.initialroll()
-            # x_init = self.fp.x[0]
             self.prepare(fp_list)
-            Ku, ku = self.ipddp_backward(mu=1e-3)
-            x, u, cost, cons = self.ipddp_forward(x_init, Ku, ku)
+            Ku, ku = self.ipddpgrad_backward()
+            x, u, cost, cons = self.ipddpgrad_forward(x_init, Ku, ku)
         return x, u, cost, cons
 
     def prepare(self, fp_list):
         n_batch = len(fp_list)
-        # fp = self.fp  #todo: uncomment
-        # fp.computeall()
-        self.c, self.s = torch.stack([fp_list[batch_id].c for batch_id in range(n_batch)],dim=0).squeeze(-1), \
-                         torch.stack([fp_list[batch_id].s for batch_id in range(n_batch)],dim=0).squeeze(-1)
-        # self.c = torch.randn(2, 5, 6)
-        # self.s = 0.01 * torch.ones_like(self.c) 
+        self.c, self.s = torch.cat([fp_list[batch_id].c for batch_id in range(n_batch)],dim=0), \
+                         torch.cat([fp_list[batch_id].s for batch_id in range(n_batch)],dim=0)
         with torch.no_grad(): # detach
-            self.Qxx_terminal = torch.stack([fp_list[batch_id].pxx for batch_id in range(n_batch)],dim=0)
-            self.Qx_terminal = torch.stack([fp_list[batch_id].px.squeeze(-1) for batch_id in range(n_batch)],dim=0)
-            # for t in range(self.T-1, -1, -1): 
-            self.Q = torch.stack([
-                                        torch.cat([torch.cat([fp_list[batch_id].qxx, fp_list[batch_id].qxu],dim=-1),
-                                        torch.cat([fp_list[batch_id].qxu.mT, fp_list[batch_id].quu],dim=-1)], dim=-2) 
+            self.Qxx_terminal = torch.cat([fp_list[batch_id].pxx for batch_id in range(n_batch)],dim=0)
+            self.Qx_terminal = torch.cat([fp_list[batch_id].px for batch_id in range(n_batch)],dim=0)
+            self.Q = torch.cat([torch.cat( [torch.cat([fp_list[batch_id].qxx,    fp_list[batch_id].qxu],dim=-1),
+                                            torch.cat([fp_list[batch_id].qxu.mT, fp_list[batch_id].quu],dim=-1)], dim=-2) 
+                                for batch_id in range(n_batch)], dim=0) 
+            self.p = torch.cat([ torch.cat([fp_list[batch_id].qx, fp_list[batch_id].qu],dim=-1) 
+                                            for batch_id in range(n_batch)], dim=0)
+            self.W = torch.cat([ torch.cat([fp_list[batch_id].cx, fp_list[batch_id].cu],dim=-1) 
                                             for batch_id in range(n_batch)], dim=0) 
-                # todo: vstack fp.qxx, fp.qxu, fp.quu 
-            self.p  = torch.stack([
-                                        torch.cat([fp_list[batch_id].qx, fp_list[batch_id].qu],dim=-2) 
-                                            for batch_id in range(n_batch)], dim=0).squeeze(-1)
-            # todo: vstack fp.qx, fp.qu  
-            self.W = torch.stack([
-                                        torch.cat([fp_list[batch_id].cx, fp_list[batch_id].cu],dim=-1) 
+            self.F = torch.cat([ torch.cat([fp_list[batch_id].fx, fp_list[batch_id].fu],dim=-1) 
                                             for batch_id in range(n_batch)], dim=0) 
-            # todo: vstack fp.cx, fp.cu
-            # fx,fu,fxx,fxu,fuu = fp.fx, fp.fu, fp.fxx, fp.fxu, fp.fuu
-            self.F = torch.stack([
-                                        torch.cat([fp_list[batch_id].fx, fp_list[batch_id].fu],dim=-1) 
-                                            for batch_id in range(n_batch)], dim=0) 
-             # todo concatenate A,B
-            self.G = torch.stack([
-                                        torch.cat([torch.cat([fp_list[batch_id].fxx, fp_list[batch_id].fxu],dim=-1),
-                                        torch.cat([fp_list[batch_id].fxu.mT, fp_list[batch_id].fuu],dim=-1)], dim=-2) 
-                                            for batch_id in range(n_batch)], dim=0) 
-            # todo second order dynamics
-            self.T = self.F.size(-3)
+            self.G = torch.cat([ torch.cat([torch.cat([fp_list[batch_id].fxx, fp_list[batch_id].fxu],dim=-1),
+                                            torch.cat([fp_list[batch_id].fxu.mT, fp_list[batch_id].fuu],dim=-1)], dim=-2) 
+                                 for batch_id in range(n_batch)], dim=0) 
 
-    def ipddp_backward(self, mu):
+            self.T = self.F.size(-3)
+            self.mu = torch.stack([fp_list[batch_id].mu for batch_id in range(n_batch)], dim=0) # use different mu for each sample
+            self.xold = torch.cat([fp_list[batch_id].x for batch_id in range(n_batch)], dim=0)
+            self.uold = torch.cat([fp_list[batch_id].u for batch_id in range(n_batch)], dim=0)
+
+    def ipddpgrad_backward(self):
         # Q: (B*, T, N, N), p: (B*, T, N), where B* can be any batch dimensions, e.g., (2, 3)
         B = self.p.shape[:-2]
         ns, nc = self.Qx_terminal.size(-1), self.F.size(-1) - self.Qx_terminal.size(-1)
@@ -403,16 +386,14 @@ class ddpGrad:
             Ft = self.F[...,t,:,:]
             Qt = self.Q[...,t,:,:] + Ft.mT @ V @ Ft
             qt = self.p[...,t,:] + bmv(Ft.mT, v) 
-            # if self.contraction_flag:
-            #     Qt += torch.tensordot(v.mT, self.G[...,t,:,:,:], dims=-1) # todo :check!!!!
+            if self.contraction_flag:
+                Qt += btdot(v, self.G[...,t,:,:,:]) # todo :check!!!!
             if self.constraint_flag:
                 Wt = self.W[...,t,:,:]
                 st, ct = self.s[...,t,:], self.c[...,t,:] 
-                r = st * ct + mu
-                cinv = 1. / ct
-                SCinv = torch.diag_embed(st * cinv)
-                Qt += - Wt.mT @ SCinv @ Wt
-                qt += bmv(Wt.mT, st) - bmv(Wt.mT, cinv * r)
+                SCinv = torch.diag_embed(st / ct)
+                Qt -= Wt.mT @ SCinv @ Wt
+                qt += bmv(Wt.mT, - self.mu / ct) # todo: check st - cinv * r
             # if self.system.c1 is not None: # tocheck
             #     qt = qt + bmv(Ft.mT @ V, self.system.c1)
 
@@ -429,7 +410,7 @@ class ddpGrad:
             
         return Ku, ku
 
-    def ipddp_forward(self, x_init, Ku, ku):
+    def ipddpgrad_forward(self, x_init, Ku, ku):
         assert x_init.device == Ku.device == ku.device
         assert x_init.dtype == Ku.dtype == ku.dtype
         assert x_init.ndim == 2, "Shape not compatible."
@@ -444,7 +425,7 @@ class ddpGrad:
         self.system.set_refpoint(t=torch.Tensor([0.]))
         for t in range(self.T):
             Kut, kut = Ku[...,t,:,:], ku[...,t,:]
-            u[..., t, :] = ut = bmv(Kut, xt) + kut 
+            u[..., t, :] = ut = self.uold[...,t,:] + kut + bmv(Kut, xt-self.xold[...,t,:]) # a very important bug
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
             cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
@@ -452,8 +433,8 @@ class ddpGrad:
         if self.constraint_flag:
             ncons = self.W.size(-2)
             cons = torch.zeros(B + (self.T, ncons), dtype=self.p.dtype, device=self.p.device )
-            cons = self.constraint(x[...,0:-1,:], u)
-            return x[...,0:-1,:], u, cost, cons
+            cons = self.constraint(x[...,:-1,:], u)
+            return x, u, cost, cons
         else: 
-            return x[...,0:-1,:], u, cost
+            return x, u, cost
         
