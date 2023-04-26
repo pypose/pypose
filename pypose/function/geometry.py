@@ -375,5 +375,5 @@ def posediff(ref, est, aggregate=False, mode=1):
         diff_r = 2 * torch.acos(T.tensor()[...,6])
         diff = torch.cat((diff_t, diff_r.unsqueeze(-1)), dim=-1)
     if aggregate and diff.ndim > 1:
-        diff = diff.mean(dim=tuple(range(diff.ndim - 1)), keepdim=True)
+        diff = diff.mean(dim=tuple(range(diff.ndim - 1)), keepdim=True).flatten()
     return diff
