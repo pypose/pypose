@@ -4,7 +4,7 @@ from .solver import Cholesky
 from .functional import modjac
 ####
 import torch
-from torch.autograd.function import jacobian
+from torch.autograd.functional import jacobian
 
 
 class InnerModel(torch.nn.Module):
@@ -17,11 +17,17 @@ class InnerModel(torch.nn.Module):
         # Define all parameters
         # self.param = torch.nn.parameter(all_params_to_optimize, requires_grad = True)
 
-    def forward(tau):
+    def inner_cost(self, tau):
+        raise NotImplementedError("User needs to implement function to return inner cost.")
+
+    def constraint(self, tau):
+        raise NotImplementedError("User needs to implement function to return constraint error.")
+
+    def forward(self, tau):
         r'''
-        Compute the inner cost and constraint error.
+        Compute and return the inner cost and constraint error.
         '''
-        raise NotImplementedError("User needs to implement function to return inner cost and constraint error.")
+        return self.inner_cost(tau), self.constraint(tau)
 
 
 class OuterModel(torch.nn.Module):
@@ -33,12 +39,17 @@ class OuterModel(torch.nn.Module):
 
         self.inner_model = inner_model
 
-    def forward(tau_star):
+    def outer_loss(self, tau_star):
         r'''
-        Computer outer loss.
+        Compute outer loss.
         '''
         raise NotImplementedError("User needs to implement function to return outer loss.")
 
+    def forward(self, tau_star):
+        r'''
+        Compute and return outer loss.
+        '''
+        return self.outer_loss(tau_star)
 
 class BLO(_Optimizer):
     r'''
@@ -46,7 +57,7 @@ class BLO(_Optimizer):
     '''
     def __init__(self, outer_model: torch.nn.Module, inner_optimizer: torch.optim,
                  solver = None, ) -> None:
-        super().__init__()
+        super().__init__(outer_model.parameters(), defaults = {})
 
         self.inner_optimizer = inner_optimizer
         # self.scheduler = pp.optim.scheduler.StopOnPlateau(inner_optimizer)
@@ -61,19 +72,19 @@ class BLO(_Optimizer):
         return jacobian(self.outer_model.forward, input)
 
     def _dJGdTau(self, input):
-        return jacobian(self.outer_model.inner_model.forward, input, retain_graph = True)
+        return jacobian(self.outer_model.inner_model.forward, input, create_graph = True)
 
     def _dJGdTauTau(self, input):
         return jacobian(self._dJGdTau, input)
 
     def _dJGdTauTheta(self, input):
-        return jacobian(self._dJGdTau, input, retain_graph = True)
+        return jacobian(self._dJGdTau, input, create_graph = True)
 
     def _dGdTheta(self, input):
         return modjac(self.outer_model.inner_model.forward, input)[1]
 
     def _H(self, input):
-        dJdT, dGdT = jacobian(self._dJdGtau, input, retain_graph = True)
+        dJdT, dGdT = jacobian(self._dJdGtau, input, create_graph = True)
         return torch.add(dJdT, dGdT, alpha = self.mu_star.unsqueeze(0).transpose(0, 2))
 
     def _dHdTheta(self, input):
@@ -85,12 +96,14 @@ class BLO(_Optimizer):
 
 
         # self.scheduler.optimize()
-        self.tau_star, self.mu_star = self.inner_optimizer(input)
+        self.tau_star, self.mu_star = self.inner_optimizer(self.outer_model.inner_model.A, self.outer_model.inner_model.B, self.outer_model.inner_model.C, \
+                                                           self.outer_model.inner_model.c, self.outer_model.inner_model.T, input)
 
         # COMPUTE GRADIENTS
         # Solve equation (6) from pseudocode
-        dJdTT, dGdTT = self._dJdGTauTau(self.tau_star)
-        P = torch.add(dJdTT, dGdTT, alpha = self.mu_star.unsqueeze(0).transpose(0, 2))
+        dJdTT, dGdTT = self._dJGdTauTau(self.tau_star)
+        P = torch.matmul(self.mu_star.unsqueeze(-1).unsqueeze(-1).expand(-1, 30, 30), dGdTT).sum(dim = 0)
+        P = torch.add(dJdTT, P)
         Q = self._dJGdTau(self.tau_star)
         R = self._dLdTau(self.tau_star)
         top = torch.cat((P, Q.transpose(0, 1)), dim=1)

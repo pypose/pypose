@@ -1,4 +1,7 @@
 import pypose as pp
+import pypose.optim.bilevel_optimization as ppob
+import pypose.module.lqr as LQR
+
 import torch as torch
 from torch import matmul as mult
 
@@ -8,17 +11,17 @@ class LQR_Solver(torch.nn.Module):
 
     def forward(self, A, B, C, c, T, x0):
         # Set number of inputs and outputs
-        n_state = self.A.size(0)
-        n_input = self.B.size(1)
+        n_state = A.size(0)
+        n_input = B.size(1)
         n_all = n_state + n_input
 
         # Construct cost matrix
-        cost_mat = torch.block_diag(*self.C)
+        cost_mat = torch.block_diag(*C)
 
         # Construct dynamics solver matrix
-        AB = torch.concat((self.A, self.B), dim = 1).unsqueeze(0).repeat(self.T - 1, 1, 1)
+        AB = torch.concat((A, B), dim = 1).unsqueeze(0).repeat(T - 1, 1, 1)
         AB = torch.block_diag(*AB)
-        dynamics = torch.zeros(n_state * self.T, n_all * self.T)
+        dynamics = torch.zeros(n_state * T, n_all * T)
         dynamics[:n_state,:n_state] = torch.eye(n_state)
         dynamics[n_state:n_state + AB.size(0), :AB.size(1)] = AB
         idx1c = torch.linspace(n_all, n_all * (T - 1), T - 1, dtype=int)
@@ -32,7 +35,7 @@ class LQR_Solver(torch.nn.Module):
                               torch.cat((dynamics, zero_mat),                 dim = 1)), dim = 0)
 
         # Create solution vector
-        sol = torch.zeros(self.A.size(0) * T)
+        sol = torch.zeros(A.size(0) * T)
         sol[:n_state] = x0
         sol = torch.cat((torch.zeros(cost_mat.size(0)), sol), dim = 0).unsqueeze(-1)
 
@@ -44,12 +47,12 @@ class LQR_Solver(torch.nn.Module):
 
         return tau_star, mu_star
 
-class InnerCostAndConstraints(pp.optim.InnerModel):
+class InnerCostAndConstraints(ppob.InnerModel):
     def __init__(self, A, B, C, c, T) -> None:
-        super().__init__(self)
+        super().__init__()
 
-        A = torch.nn.Parameter(A.clone(), requires_grad = True)
-        B = torch.nn.Parameter(B.clone(), requires_grad = True)
+        self.A = torch.nn.Parameter(A.clone(), requires_grad = True)
+        self.B = torch.nn.Parameter(B.clone(), requires_grad = True)
 
         self.C = C
         self.c = c
@@ -57,17 +60,19 @@ class InnerCostAndConstraints(pp.optim.InnerModel):
 
         self.x0 = None
 
-    def forward(self, input):
+    def inner_cost(self, input):
         # Calculate cost
-        cost = 0.5 * mult(mult(input, torch.block_diag((self.C)), input)) \
+        cost = 0.5 * mult(mult(input, torch.block_diag(*self.C)), input) \
                + torch.dot(input, self.c.flatten())
+        return cost
 
+    def constraint(self, input):
         # Calculate constraints
         n_state = self.A.size(0)
         n_input = self.B.size(1)
         n_all = n_state + n_input
 
-        AB = torch.concat((self.A, self.B), dim = 1).unqsueeze(0).repeat(self.T - 1, 1, 1)
+        AB = torch.concat((self.A, self.B), dim = 1).unsqueeze(0).repeat(self.T - 1, 1, 1)
         AB = torch.block_diag(*AB)
         dynamics = torch.zeros(n_state * self.T, n_all * self.T)
         dynamics[:n_state, :n_state] = torch.eye(n_state)
@@ -82,12 +87,13 @@ class InnerCostAndConstraints(pp.optim.InnerModel):
 
         return mult(dynamics, input) - b
 
-class OuterLoss(pp.optim.InnerModel):
-    def __init__(self, tau_hat, inner_model):
-        super.__init__(self, inner_model)
-        self.tau_hat = tau_hat
+class OuterLoss(ppob.OuterModel):
+    def __init__(self, inner_model, A, B, C, c, T):
+        super().__init__(inner_model)
+        self.tau_hat = None
+        self.inner_model = InnerCostAndConstraints(A, B, C, c, T)
 
-    def forward(self, tau_star):
+    def outer_loss(self, tau_star):
         return torch.sqrt(torch.sum((self.tau_hat - tau_star) ** 2))
 
 if __name__ == "__main__":
@@ -115,10 +121,19 @@ if __name__ == "__main__":
     B = torch.randn(n_state, n_ctrl)
     x0 = torch.randn(n_state)
 
-    lqrLearn = pp.optim.BLO(OuterLoss, LQR_Solver)
+
+    # Create objects of class
+    lqrsolver = LQR_Solver()
+
+    inner = InnerCostAndConstraints(A, B, C, c, T)
+    outer = OuterLoss(inner, A, B, C, c, T)
+
+
+    lqrLearn = pp.optim.BLO(outer, lqrsolver)
 
     for iter in range(0, 5000):
         x0 = torch.randn(n_state)
 
-        OuterLoss.tau_hat = LQR_Solver(dict['A'], dict['B'], dict['C'], dict['c'], T, x0)
+        outer.inner_model.x0 = x0
+        outer.tau_hat = lqrsolver(expert['A'], expert['B'], expert['C'], expert['c'], T, x0)[0]
         lqrLearn.step(x0)
