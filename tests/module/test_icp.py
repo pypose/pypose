@@ -23,9 +23,9 @@ class TestICP:
         pc2 = self.tf_gt.Act(pc2)
         icp = pp.module.ICP()
         self.result = icp(pc1, pc2)
-        print("The true tf is", self.tf_gt)
-        print("The output is", self.result)
-        self.rmse_results()
+        error = pp.posediff(self.tf_gt,self.result,aggregate=True)
+        assert error[0] < 0.01,  "The translational error is too large."
+        assert error[1] < 0.01,  "The rotational error is too large."
 
     def test_icp_batch(self):
         b = 2
@@ -35,34 +35,18 @@ class TestICP:
         pc2 = self.tf_gt.unsqueeze(-2).Act(pc1)
         icp = pp.module.ICP()
         self.result = icp(pc1, pc2)
-        self.rmse_results()
+        print(pp.posediff(self.tf_gt,self.result,aggregate=True))
 
     def test_icp_multibatch(self):
-        b1 = 2
-        b2 = 2
-        num_points = 2
+        b1 = 5
+        b2 = 3
+        num_points = 20
         pc1 = torch.rand(b1, b2, num_points, 3)
         self.tf_gt = pp.randn_SE3(b1,b2)
         pc2 = self.tf_gt.unsqueeze(-2).Act(pc1)
         icp = pp.module.ICP()
         self.result = icp(pc1, pc2)
         self.rmse_results()
-
-    def rmse_results(self):
-        rot = self.result.rotation().matrix()
-        t = self.result.translation()
-        gt_rot = self.tf_gt.rotation().matrix()
-        gt_t = self.tf_gt.translation()
-
-        def rmse_rot(pred, gt):
-            return torch.linalg.norm((pred - gt), dim=-1, ord=2).mean()
-
-        def rmse_t(pred, gt):
-            return torch.linalg.norm((pred - gt), dim=-1, ord=2).mean()
-
-        print("Pypose ICP solution, rmse of R:", rmse_rot(rot, gt_rot))
-        print("Pypose ICP solution, rmse of t:", rmse_t(t, gt_t))
-
 
 if __name__ == "__main__":
     torch.set_printoptions(precision=4, sci_mode=False)
