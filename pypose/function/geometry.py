@@ -331,15 +331,18 @@ def posediff(ref, est, aggregate=False, mode=1):
         representation (equation: :math:`\theta = 2 \cos^{-1}(q_0)` ) is presented at
         the end of Chapter 2 in [1].
 
-        [1] Murray, R. M., Li, Z., Sastry, S. S., & Sastry, S. S. (1994). A mathematical introduction to robotic manipulation. CRC press.
+        [1] Murray, R. M., Li, Z., & Sastry, S. S. (1994). A mathematical introduction to
+        robotic manipulation. CRC press.
 
 
     Returns:
-        ``torch.Tensor``: The translational difference (:math:`\Delta t`) and rotational differences between two sets of transformations.
+        ``torch.Tensor``: The translational difference (:math:`\Delta t`) and rotational
+        differences between two sets of transformations.
 
         If ``aggregate = True``: The output batch will be 1.
 
-        If ``mode = 0``: The values in each batch is :math:`[ \Delta t, \Delta q_x, \Delta q_y, \Delta q_z, \Delta q_w ]`
+        If ``mode = 0``: The values in each batch is :math:`[ \Delta t, \Delta q_x,
+        \Delta q_y, \Delta q_z, \Delta q_w ]`
 
         If ``mode = 1``: The values in each batch is :math:`[ \Delta t, \Delta \theta ]`
 
