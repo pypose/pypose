@@ -1,6 +1,6 @@
 import torch
 from .. import lietensor
-from .. import knn, svdtf
+from .. import knn, svdtf, is_SE3
 
 class ICP(torch.nn.Module):
     r'''
@@ -65,8 +65,7 @@ class ICP(torch.nn.Module):
         self.tol = tol
         self.init = init
         if init != None:
-            assert isinstance(init.ltype, lietensor.lietensor.SE3Type), "The input \
-                initial transformation is not of type SE3Type."
+            assert is_SE3(init), "The input initial transformation is not SE3Type."
 
     def forward(self, psrc, ptgt):
         r'''

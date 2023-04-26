@@ -1,7 +1,9 @@
+import math
 import torch
 from . import bvv
 from .. import mat2SE3
 from ..basics import pm
+from .. import lietensor
 from .. import LieTensor
 from torch import broadcast_shapes
 
@@ -17,6 +19,18 @@ def is_lietensor(obj):
         ``bool``: ``True`` if obj is a LieTensor object otherwise ``False``.
     '''
     return True if isinstance(obj, LieTensor) else False
+
+def is_SE3(obj):
+    r'''
+    Check whether an instance or object is a SE3 Type LieTensor or not.
+
+    Args:
+        obj (``obj``): a Python object or instantance.
+
+    Return:
+        ``bool``: ``True`` if obj is a SE3 Type LieTensor object otherwise ``False``.
+    '''
+    return True if isinstance(obj.ltype, lietensor.lietensor.SE3Type) else False
 
 
 def cart2homo(coordinates:torch.Tensor):
@@ -316,10 +330,25 @@ def posediff(ref, est, aggregate=False, mode=1):
 
         If ``aggregate = True``: The output batch will be 1.
 
-        If ``mode = 0``: The values in each batch is :math:`[ \Delta t, \Delta q_w, \Delta q_x, \Delta q_y, \Delta q_z ]`
+        If ``mode = 0``: The values in each batch is :math:`[ \Delta t, \Delta q_x, \Delta q_y, \Delta q_z, \Delta q_w, ]`
 
         If ``mode = 1``: The values in each batch is :math:`[ \Delta t, \Delta \theta ]`
 
     Example:
         TBA.
     '''
+    assert is_SE3(ref), "The input reference transformation is not SE3Type."
+    assert is_SE3(est), "The input estimated transformation is not SE3Type."
+    assert mode in (0, 1), "Mode number is invalid."
+    T = ref * est.Inv()
+    diff_t = torch.linalg.norm(T.translation(), dim=-1, ord=2).unsqueeze(-1)
+    if mode == 0:
+        diff_r = T.rotation().tensor()
+        diff = torch.cat((diff_t, diff_r), dim=-1)
+    else:
+        diff_r = 2 * torch.acos(T.tensor()[...,6])
+        diff = torch.cat((diff_t, diff_r.unsqueeze(-1)), dim=-1)
+    print(diff)
+    if aggregate and diff.ndim > 1:
+        diff = diff.mean(dim=tuple(range(diff.ndim - 1)), keepdim=True)
+    return diff
