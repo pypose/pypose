@@ -335,7 +335,21 @@ def posediff(ref, est, aggregate=False, mode=1):
         If ``mode = 1``: The values in each batch is :math:`[ \Delta t, \Delta \theta ]`
 
     Example:
-        TBA.
+        >>> import torch, pypose as pp
+        >>> ref = pp.randn_SE3(4)
+        >>> est = pp.randn_SE3(4)
+        >>> pp.posediff(ref,est)
+        tensor([[3.1877, 0.3945],
+        [3.3388, 2.0563],
+        [2.4523, 0.4169],
+        [1.8392, 1.1539]])
+        >>> pp.posediff(ref,est,aggregate=True)
+        tensor([[2.7045, 1.0054]])
+        >>> pp.posediff(ref,est,mode=0)
+        tensor([[ 3.1877,  0.1554,  0.1179, -0.0190,  0.9806],
+        [ 3.3388, -0.0194, -0.8539,  0.0609,  0.5164],
+        [ 2.4523,  0.0495, -0.1739,  0.1006,  0.9784],
+        [ 1.8392, -0.5451, -0.0075,  0.0192,  0.8381]])
     '''
     assert is_SE3(ref), "The input reference transformation is not SE3Type."
     assert is_SE3(est), "The input estimated transformation is not SE3Type."
@@ -348,7 +362,6 @@ def posediff(ref, est, aggregate=False, mode=1):
     else:
         diff_r = 2 * torch.acos(T.tensor()[...,6])
         diff = torch.cat((diff_t, diff_r.unsqueeze(-1)), dim=-1)
-    print(diff)
     if aggregate and diff.ndim > 1:
         diff = diff.mean(dim=tuple(range(diff.ndim - 1)), keepdim=True)
     return diff
