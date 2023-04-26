@@ -330,7 +330,7 @@ def posediff(ref, est, aggregate=False, mode=1):
 
         If ``aggregate = True``: The output batch will be 1.
 
-        If ``mode = 0``: The values in each batch is :math:`[ \Delta t, \Delta q_x, \Delta q_y, \Delta q_z, \Delta q_w, ]`
+        If ``mode = 0``: The values in each batch is :math:`[ \Delta t, \Delta q_x, \Delta q_y, \Delta q_z, \Delta q_w ]`
 
         If ``mode = 1``: The values in each batch is :math:`[ \Delta t, \Delta \theta ]`
 

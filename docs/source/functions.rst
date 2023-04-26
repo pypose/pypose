@@ -9,6 +9,7 @@ Functions
 
     :template: autosummary/class.rst
     is_lietensor
+    is_SE3
     add
     add_
     mul
