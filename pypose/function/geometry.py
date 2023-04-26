@@ -292,3 +292,34 @@ def svdtf(pc1, pc2):
     t = pc2ctn.mT - R @ pc1ctn.mT
     T = torch.cat((R, t), dim=-1)
     return mat2SE3(T, check=False)
+
+
+def posediff(ref, est, aggregate=False, mode=1):
+    r'''
+    Computes the translatinal and rotational error between two batched transformations
+    ( :math:`SE(3)` ).
+
+    Args:
+        ref (``LieTensor``): The reference transformation :math:`T_{ref}` in
+            ``SE3type``. The shape is [..., 7].
+        est (``LieTensor``): The estimated transformation :math:`T_{est}` in
+            ``SE3type``. The shape is [..., 7].
+        aggregate (``bool``, optional): Average the batched differences to a singleton
+            dimension. Default: ``False``.
+        mode (``int``, optional): Calculate the rotational difference in different mode.
+            ``mode = 0``: Quaternions representation.
+            ``mode = 1``: Axis-angle representation (Use one angle to represent the
+            rotational difference in 3D space). Default: ``1``.
+
+    Returns:
+        ``torch.Tensor``: The translational difference (:math:`\Delta t`) and rotational differences between two sets of transformations.
+
+        If ``aggregate = True``: The output batch will be 1.
+
+        If ``mode = 0``: The values in each batch is :math:`[ \Delta t, \Delta q_w, \Delta q_x, \Delta q_y, \Delta q_z ]`
+
+        If ``mode = 1``: The values in each batch is :math:`[ \Delta t, \Delta \theta ]`
+
+    Example:
+        TBA.
+    '''

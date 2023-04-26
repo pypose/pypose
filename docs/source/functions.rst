@@ -52,3 +52,4 @@ Functions
     reprojerr
     knn
     svdtf
+    posediff
