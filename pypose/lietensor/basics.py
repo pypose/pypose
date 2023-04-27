@@ -35,10 +35,11 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
     """
     v = input.tensor() if hasattr(input, 'ltype') else input
     assert v.shape[-1] == 3, "Last dim should be 3"
-    O = torch.zeros(v.shape[:-1], device=v.device, dtype=v.dtype, requires_grad=v.requires_grad)
-    return torch.stack([torch.stack([        O, -v[...,2],  v[...,1]], dim=-1),
-                        torch.stack([ v[...,2],         O, -v[...,0]], dim=-1),
-                        torch.stack([-v[...,1],  v[...,0],         O], dim=-1)], dim=-2)
+    skew = torch.zeros(v.shape + (3,), device=v.device, dtype=v.dtype)
+    skew[..., 0, 1], skew[..., 0, 2] = -v[..., 2],   v[..., 1]
+    skew[..., 1, 0], skew[..., 1, 2] =  v[..., 2],  -v[..., 0]
+    skew[..., 2, 0], skew[..., 2, 1] = -v[..., 1],   v[..., 0]
+    return skew
 
 
 def add_(input, other, alpha=1):
@@ -145,7 +146,7 @@ def mul(input, other):
     Return:
         :obj:`Tensor`/:obj:`LieTensor`: the product of ``input`` and ``other``.
 
-    .. list-table:: List of :obj:`pypose.mul` cases 
+    .. list-table:: List of :obj:`pypose.mul` cases
         :widths: 25 30 25
         :header-rows: 1
 
@@ -162,10 +163,10 @@ def mul(input, other):
           - :obj:`Tensor` :math:`\in \mathbb{R^{*\times4}}`
           - :obj:`Tensor`
         * - Lie Group
-          - :obj:`Lie Group` 
+          - :obj:`Lie Group`
           - :obj:`Lie Group`
 
-    When multiplying a Lie Group by another Lie Group, they must have the 
+    When multiplying a Lie Group by another Lie Group, they must have the
     same Lie type.
 
     Note:
@@ -173,7 +174,7 @@ def mul(input, other):
         - When ``other`` is a number and ``input`` is a Lie Algebra, this operator performs
           simple element-wise multiplication.
         - When ``input`` is a Lie Group, more details are shown below.
-   
+
     * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`SO3_type`
       (input :math:`\bm{x}` is an instance of :meth:`SO3`):
 
@@ -185,17 +186,17 @@ def mul(input, other):
               q_i^wq_i^{z'} + q_i^xq_i^{y'} -q_i^yq_i^{x'} + q_i^zq_i^{w'}
               \end{bmatrix}
         }^T},
-    
+
       where :math:`\bm{x}_i = [q_i^x, q_i^y, q_i^z, q_i^w]` and
       :math:`\bm{a}_i = [q_i^{x'}, q_i^{y'}, q_i^{z'}, q_i^{w'}]` are the ``input``
       and ``other`` LieTensor, respectively.
-        
+
     Note:
         :math:`\mathbf{y}_i` can be simply derived by taking the complex number multiplication.
 
-        .. math:: 
-            \bm{y}_i = 
-            (q_i^x\mathbf{i} + q_i^y\mathbf{j} + q_i^z\mathbf{k} + q_i^w) \ast 
+        .. math::
+            \bm{y}_i =
+            (q_i^x\mathbf{i} + q_i^y\mathbf{j} + q_i^z\mathbf{k} + q_i^w) \ast
             (q_i^{x'}\mathbf{i} + q_i^{y'}\mathbf{j} + q_i^{z'}\mathbf{k} + q_i^{w'}),
 
         where and :math:`\mathbf{i}` :math:`\mathbf{j}`, and :math:`\mathbf{k}` are the imaginary
@@ -210,14 +211,14 @@ def mul(input, other):
         .. math::
             \bm{y}_i = [\mathbf{q}_i * \mathbf{t}_i' + \mathbf{t}_i,
                         \mathbf{q}_i * \mathbf{q}_i']
-        
+
         where :math:`\bm{x}_i = [\mathbf{t}_i, \mathbf{q}_i]` and
         :math:`\bm{a}_i = [\mathbf{t}_i', \mathbf{q}_i']` are the ``input`` and ``other``
         LieTensor, respectively; :math:`\mathbf{t}_i`, :math:`\mathbf{t}_i'` and
         :math:`\mathbf{q}_i`, :math:`\mathbf{q}_i'` are their translation and :obj:`SO3`
         parts, respectively; the operator :math:`\ast` denotes the obj:`SO3_type`
         multiplication introduced above.
-            
+
     * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`RxSO3_type`
       (input :math:`\bm{x}` is an instance of :meth:`RxSO3`)
 
@@ -232,7 +233,7 @@ def mul(input, other):
 
         .. math::
             \bm{y}_i = [\mathbf{q}_i * \mathbf{t}_i' + \mathbf{t}_i,
-                            \mathbf{q}_i * \mathbf{q}_i', s_is_i'] 
+                            \mathbf{q}_i * \mathbf{q}_i', s_is_i']
 
         where :math:`\bm{x}_i = [\mathbf{t}_i, \mathbf{q}_i, s_i]` and
         :math:`\bm{a}_i = [\mathbf{t}_i', \mathbf{q}_i', s_i']` are the ``input`` and
@@ -265,7 +266,7 @@ def mul(input, other):
             >>> x * a
             tensor([ 0.9089,  1.6984, -0.5969])
             >>> a = torch.randn(4)
-            >>> a 
+            >>> a
             tensor([ 1.5236, -1.2757, -0.7140,  0.2467])
             >>> x * a
             tensor([ 1.6588, -0.4687, -1.2196,  0.2467]
