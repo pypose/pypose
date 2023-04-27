@@ -216,7 +216,7 @@ def knn(pc1, pc2, ord=2, k=1, dim=-1, largest=False, sorted=True):
     Example:
         >>> import torch, pypose as pp
         >>> pc1 = torch.tensor([[9., 2., 2.],
-        ...                     [1., 0, 2.],
+        ...                     [1., 0., 2.],
         ...                     [0., 1., 1.],
         ...                     [5., 0., 1.],
         ...                     [1., 0., 1.],
