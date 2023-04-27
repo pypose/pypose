@@ -177,7 +177,7 @@ def reprojerr(points, pixels, intrinsics, extrinsics=None):
     return (img_repj - pixels).norm(dim=-1)
 
 
-def knn(pc1, pc2, ord=2, k=1, dim=-1, largest=False, sorted=True):
+def knn(pc1, pc2, dim=-1, ord=2, k=1, largest=False, sorted=True):
     r'''
     Select the k nearest neighbor points of pointcloud 1 from pointcloud 2 in each batch.
 
@@ -186,12 +186,13 @@ def knn(pc1, pc2, ord=2, k=1, dim=-1, largest=False, sorted=True):
             The shape has to be (..., N1, :).
         pc2 (``torch.Tensor``): The coordinates of the pointcloud 2.
             The shape has to be (..., N2, :).
+        dim (``int``, optional): The dimension encompassing the point cloud coordinates,
+            utilized for calculating distance and sorting.
+            Default: ``-1`` (The last dimension).
         ord (``int``, optional): The order of norm to use for distance calculation.
             Default: ``2`` (Euclidean distance).
         k (``int``, optional): The number of the nearest neighbors to be selected.
             k has to be k :math:`\leq` N2. Default: ``1``.
-        dim (``int``, optional): The dimension to sort along. Default: ``-1`` (The last
-            dimension).
         largest (``bool``, optional): Return the k nearest or furthest neighbors. If
             ``largest`` is set to ``True``, then the k furthest neighbors are returned.
             Default: ``False``.
@@ -262,7 +263,7 @@ def knn(pc1, pc2, ord=2, k=1, dim=-1, largest=False, sorted=True):
                 [4.2426, 5.0000]])
     '''
     diff = pc1.unsqueeze(-2) - pc2.unsqueeze(-3)
-    dist = torch.linalg.norm(diff, dim=-1, ord=ord)
+    dist = torch.linalg.norm(diff, dim=dim, ord=ord)
     neighbors = dist.topk(k, dim=dim, largest=largest, sorted=sorted)
     return neighbors
 
