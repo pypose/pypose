@@ -1,7 +1,8 @@
 
+import pytest
 import torch
 import pypose as pp
-from pypose.sparse import sparse_block_tensor, coo_2_hybrid, hybrid_2_coo
+from pypose.sparse import sparse_block_tensor, coo_2_hybrid, hybrid_2_coo, SparseBlockTensor
 import pypose.sparse as sp
 
 def test_pypose_operation():
@@ -15,49 +16,56 @@ def test_pypose_operation():
     print(f'e = \n{e}')
 
 def test_sparse_coo_2_sparse_hybrid_coo():
-    print()
-
     i = [[0, 1, 2],[2, 0, 2]]
-    v = torch.Tensor([[3, 4], [-5, -6], [7, 8]]).to(dtype=torch.float32)
+    v = torch.tensor([[3, 4], [-5, -6], [7, 8]], dtype=torch.float32)
     x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
 
     print(f'type(x) = {type(x)}')
     print(f'x._s = \n{x._s}')
     print(f'x._p = \n{x._p}')
 
-def test_abs():
-    print()
 
-    i = [[0, 1, 2],[2, 0, 2]]
-    v = torch.Tensor([[3, 4], [-5, -6], [7, 8]]).to(dtype=torch.float32)
-    x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
+def random_sbt(proxy_shape, block_shape):
+    proxy = torch.randn(proxy_shape) > 0.5
+    indices = proxy.nonzero().T  # (dim, nnz)
+    values = torch.randn((indices.shape[1], *block_shape))
+    return sparse_block_tensor(indices, values, size=proxy_shape)
 
-    print(f'type(x) = {type(x)}')
-    print(f'x._s = \n{x._s}')
-    print(f'x._p = \n{x._p}')
 
-    y = x.abs()
-    print(f'y = \n{y}')
+@pytest.mark.parametrize('meta', [
+    (sp.abs, torch.abs, 1, 'identical'),
+    (torch.abs, torch.abs, 1, 'identical'),
+    (SparseBlockTensor.__add__, torch.add, 2, 'identical'),
+    (torch.add, torch.add, 2, 'identical'),
+    (SparseBlockTensor.__sub__, torch.sub, 2, 'identical'),
+    (SparseBlockTensor.__matmul__, torch.matmul, 2, 'identical_square'),],
+    )
+def test_universal(meta, dim=2):
+    op, dense_op, num_operands, shape_mode = meta
 
-    y2 = torch.abs(x)
-    print(f'y2 = \n{y2}')
+    if shape_mode == 'identical':
+        proxy_shape = torch.Size(torch.randint(1, 10, (dim,)))
+        block_shape = torch.randint(1, 10, (dim,))
+        proxy_shapes = [proxy_shape for _ in range(num_operands)]
+        block_shapes = [block_shape for _ in range(num_operands)]
+    elif shape_mode == 'identical_square':
+        proxy_shape = torch.Size(torch.randint(1, 10, (1,))) * 2
+        block_shape = torch.Size(torch.randint(1, 10, (1,))) * 2
+        proxy_shapes = [proxy_shape for _ in range(num_operands)]
+        block_shapes = [block_shape for _ in range(num_operands)]
+    else:
+        raise ValueError(f'Unknown shape_mode: {shape_mode}')
+    args = [random_sbt(proxy_shape, block_shape) for _ in zip(proxy_shapes, block_shapes)]
+    y_sbt = op(*args)
 
-    y3 = sp.abs(x)
-    print(f'y3 = \n{y3}')
+    # dense reference
+    args_dense = [hybrid_2_coo(x._s).to_dense() for x in args]
+    y_dense = dense_op(*args_dense)
 
-    #print(x)
+    torch.testing.assert_allclose(hybrid_2_coo(y_sbt._s).to_dense(), y_dense)
 
-    #y = x.to_dense()
-    #print(y)
-
-    # z = x @ x
-    #print(z)
-    #print(f'z = {z}')
-    #print(f'type(z) = {type(z)}')
 
 def test_mm():
-    print()
-
     i = [[0, 0, 1, 2],[0, 2, 1, 2]]
     v = torch.arange(16).view((-1, 2, 2)).to(dtype=torch.float32)
     x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
@@ -87,6 +95,7 @@ def test_mm():
     print(f'yh0 = \n{yh0.to_dense()}')
     print(f'yh = \n{yh.to_dense()}')
 
+
 def test_is_sparse():
     print()
 
@@ -94,12 +103,23 @@ def test_is_sparse():
     v = torch.arange(16).view((-1, 2, 2)).to(dtype=torch.float32)
     x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
 
-    iss = x.is_sparse
-    print(f'x.is_sparse = {iss}')
+    assert x.is_sparse
+
 
 if __name__ == '__main__':
-    #test_pypose_operation()
-    #test_sparse_coo_2_sparse_hybrid_coo()
-    #test_abs()
-    test_mm()
-    # test_is_sparse()
+    i = [[0, 0, 1, 2],[0, 2, 1, 2]]
+    v = torch.arange(16).view((4, 2, 2)).to(dtype=torch.float32)
+    x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
+    x = hybrid_2_coo(x._s)
+
+    import time
+    start = time.time()
+    for i in range(10000):
+        x @ x
+    end = time.time()
+    print(f'elapsed time = {end - start}')
+
+    from tqdm import tqdm
+    mm_config = (SparseBlockTensor.__matmul__, torch.matmul, 2, 'identical_square')
+    for i in tqdm(range(10000)):
+        test_universal(mm_config)
