@@ -191,19 +191,9 @@ def coo_2_hybrid(coo, proxy):
     block_seq = repeated_value_as_hybrid_value(proxy, b_dim, mode='sequence')
     block_seq = hybrid_2_coo(block_seq).coalesce()
 
-    # Create a temporary Hybrid tensor for the placeholders.
-    block_phd = repeated_value_as_hybrid_value(proxy, b_dim, mode='zeros', dtype=coo.dtype)
-    # PyTorch may has a bug here. If one of the tensors is coalesced, the the add operation will
-    # result in a coalesced tensor, no matter whether the other tensor is coalesced or not.
-    # block_phd = hybrid_2_coo(block_phd).coalesce()
-    block_phd = hybrid_2_coo(block_phd)
-
-    # Pad the input COO tensor to have the same non-zero struture as block_seq and block_phd.
-    coo = coo + block_phd
     coo = coo.coalesce()
-
     # Compute the indices of every element of coo inside their own respective blocks.
-    b_dim_t = torch.tensor(b_dim).to(dtype=torch.int64, device=coo.device).view((2, 1))
+    b_dim_t = torch.tensor(b_dim, dtype=torch.int64, device=coo.device).unsqueeze(-1)
     in_block_indices = coo.indices() % b_dim_t
 
     # Index into a temporary tensor.
@@ -553,7 +543,6 @@ class SparseBlockTensor(torch.Tensor):
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs={}):
         # Debug use.
-        print(f'func.__name__ = {func.__name__}')
 
         if not HFS.is_handled(func.__name__):
             raise Exception(
@@ -638,9 +627,21 @@ class SparseBlockTensor(torch.Tensor):
         r'''
         return the corresponding sparse matrix and index matrix
         '''
-        print(f'>>> Debug matmtl. ')
         return torch.matmul(self, other)
 
+    @HFS.register(OpType(op_type=SBTProxySameOpAsStorage, func_name='add'))
+    def __add__(self, other):
+        r'''
+        return the corresponding sparse matrix and index matrix
+        '''
+        return torch.add(self, other)
+
+    @HFS.register(OpType(op_type=SBTProxySameOpAsStorage, func_name='sub'))
+    def __sub__(self, other):
+        r'''
+        return the corresponding sparse matrix and index matrix
+        '''
+        return torch.sub(self, other)
     # NOTE: for torch operations that need special treatment, place an override here. Then call
     # the corresponding function of PyTorch to begin the dispatching. E.g.:
     # def abs(self):
