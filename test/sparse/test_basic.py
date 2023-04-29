@@ -110,7 +110,8 @@ if __name__ == '__main__':
     i = [[0, 0, 1, 2],[0, 2, 1, 2]]
     v = torch.arange(16).view((4, 2, 2)).to(dtype=torch.float32)
     x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
-    x = hybrid_2_coo(x._s)
+    # if testing dense / sparse, set the following
+    # x = hybrid_2_coo(x._s)
 
     import time
     start = time.time()
