@@ -177,42 +177,40 @@ def reprojerr(points, pixels, intrinsics, extrinsics=None):
     return (img_repj - pixels).norm(dim=-1)
 
 
-def knn(pc1, pc2, dim=-1, ord=2, k=1, largest=False, sorted=True):
+def knn(pc1, pc2, k=1, ord=2, dim=-1, largest=False, sorted=True):
     r'''
     Select the k nearest neighbor points of pointcloud 1 from pointcloud 2 in each batch.
 
     Args:
-        pc1 (``torch.Tensor``): The coordinates of the pointcloud 1.
+        pc1 (``torch.Tensor``): the coordinates of the pointcloud 1.
             The shape has to be (..., N1, :).
-        pc2 (``torch.Tensor``): The coordinates of the pointcloud 2.
+        pc2 (``torch.Tensor``): the coordinates of the pointcloud 2.
             The shape has to be (..., N2, :).
-        dim (``int``, optional): The dimension encompassing the point cloud coordinates,
+        k (``int``, optional): the number of the nearest neighbors to be selected.
+            k has to be k :math:`\leq` N2. Default: ``1``.
+        ord (``int``, optional): the order of norm to use for distance calculation.
+            Default: ``2`` (Euclidean distance).
+        dim (``int``, optional): the dimension encompassing the point cloud coordinates,
             utilized for calculating distance and sorting.
             Default: ``-1`` (The last dimension).
-        ord (``int``, optional): The order of norm to use for distance calculation.
-            Default: ``2`` (Euclidean distance).
-        k (``int``, optional): The number of the nearest neighbors to be selected.
-            k has to be k :math:`\leq` N2. Default: ``1``.
-        largest (``bool``, optional): Return the k nearest or furthest neighbors. If
-            ``largest`` is set to ``True``, then the k furthest neighbors are returned.
-            Default: ``False``.
-        sorted (``bool``, optional): Return the sorted or unsorted k nearest neighbors. If
-            ``sorted`` is set to ``True``, it will make sure that the returned k nearest
-            neighbors are themselves sorted. Default: ``True``.
-
-    Note:
-        If ``sorted`` is set to ``False``, the output will be unordered and not
-        necessarily aligned with the index of the input point cloud.
+        largest (``bool``, optional): controls whether to return largest or smallest
+            neighbors.  Default: ``False``.
+        sorted (``bool``, optional): controls whether to return the neighbors in sorted
+            order. Default: ``True``.
 
     Returns:
-        ``torch.return_types.topk (values: torch.Tensor, indices: torch.Tensor)``: The
-        named tuple of (values, indices).
+        ``torch.return_types.topk(values: torch.Tensor, indices: torch.LongTensor)``:
+        The named tuple of (values, indices).
 
         ``values``: The ord-norm distance between each point in pc1 and its sorted k
         nearest neighbors in pc2. The shape is (..., N1, k).
 
-        ``indices``: The index of the k nearest neighbor points in pc2.
-        The shape is (..., N1, k).
+        ``indices``: The index of the k nearest neighbor points in pc2. The shape is
+        (..., N1, k).
+
+    Note:
+        If ``sorted`` is set to ``False``, the output will be unordered and not
+        necessarily aligned with the index of the input point cloud.
 
     Example:
         >>> import torch, pypose as pp
@@ -264,8 +262,7 @@ def knn(pc1, pc2, dim=-1, ord=2, k=1, largest=False, sorted=True):
     '''
     diff = pc1.unsqueeze(-2) - pc2.unsqueeze(-3)
     dist = torch.linalg.norm(diff, dim=dim, ord=ord)
-    neighbors = dist.topk(k, dim=dim, largest=largest, sorted=sorted)
-    return neighbors
+    return dist.topk(k, dim=dim, largest=largest, sorted=sorted)
 
 
 def svdtf(pc1, pc2):
