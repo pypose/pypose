@@ -275,13 +275,16 @@ def svdtf(pc1, pc2):
 
     Args:
         pc1 (``torch.Tensor``): The coordinates of the first set of points.
-            The shape has to be (..., N1, 3).
+            The shape has to be (..., N, 3).
         pc2 (``torch.Tensor``): The coordinates of the second set of points.
-            The shape has to be (..., N2, 3).
+            The shape has to be (..., N, 3).
 
     Returns:
         ``LieTensor``: The rigid transformation matrix in ``SE3Type``  that
         minimizes the mean squared error between the input point sets.
+
+    Warning:
+        The number of points N has to be the same for both point clouds.
 
     Example:
         >>> import torch, pypose as pp
@@ -295,6 +298,7 @@ def svdtf(pc1, pc2):
         SE3Type LieTensor:
         LieTensor([1., 1., 1., 0., 0., 0., 1.])
     '''
+    assert pc1.size(-2) == pc2.size(-2), "The number of the points N has to be the same."
     pc1ctn = pc1.mean(dim=-2, keepdim=True)
     pc2ctn = pc2.mean(dim=-2, keepdim=True)
     pc1t = pc1 - pc1ctn
