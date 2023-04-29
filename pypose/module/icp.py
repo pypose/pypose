@@ -61,37 +61,32 @@ class ICP(torch.nn.Module):
     '''
     def __init__(self, steps=200, tol=1e-6, init=None):
         super().__init__()
-        self.steps = steps
-        self.tol = tol
+        self.steps, self.tol = steps, tol
         self.init = init
         if init != None:
             assert is_SE3(init), "The input initial transformation is not SE3Type."
 
-    def forward(self, psrc, ptgt):
+    def forward(self, source, target, ord=2, dim=-1):
         r'''
         Args:
-            psrc(``torch.Tensor``): The source point cloud tensor with
-                [..., points_num, 3] shape.
-            ptgt(``torch.Tensor``): The target point cloud tensor with
-                [..., points_num, 3] shape.
+            source(``torch.Tensor``): The source point clouds with shape
+                (..., points_num, 3).
+            target(``torch.Tensor``): The target point clouds with shape
+                (..., points_num, 3).
 
         Returns:
-            ``LieTensor``: The estimated transformation (``SE3type``) from psrc to ptgt.
+            ``LieTensor``: The estimated transformation (``SE3type``) from source to
+                target point cloud.
 
         '''
-        temppc = psrc
-        err = 0
-        dim = psrc.shape
+        temporal, errlast = source, 0
         for _ in range(self.steps):
-            neighbors = knn(temppc, ptgt)
-            knndist = neighbors.values.squeeze(-1)
-            knnidx = neighbors.indices
-            errnew = knndist.mean(dim=-1)
-            if torch.all(torch.abs(errnew - err) < self.tol):
+            knndist, knnidx = knn(temporal, target, k=1, ord=ord, dim=dim)
+            errnew = knndist.squeeze(-1).mean(dim=-1)
+            if torch.all((errnew - errlast).abs() < self.tol):
                 break
-            err = errnew
-            ptgtknn = torch.gather(ptgt, -2, knnidx.expand(dim))
-            T = svdtf(temppc, ptgtknn)
-            temppc = T.unsqueeze(-2).Act(temppc)
-        T = svdtf(psrc, temppc)
-        return T
+            errlast = errnew
+            ptgtknn = torch.gather(target, -2, knnidx.expand(source.shape))
+            T = svdtf(temporal, ptgtknn)
+            temporal = T.unsqueeze(-2).Act(temporal)
+        return svdtf(source, temporal)
