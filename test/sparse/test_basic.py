@@ -62,7 +62,7 @@ def test_universal(meta, dim=2):
     args_dense = [hybrid_2_coo(x._s).to_dense() for x in args]
     y_dense = dense_op(*args_dense)
 
-    torch.testing.assert_allclose(hybrid_2_coo(y_sbt._s).to_dense(), y_dense)
+    torch.testing.assert_close(hybrid_2_coo(y_sbt._s).to_dense(), y_dense)
 
 
 def test_mm():
