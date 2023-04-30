@@ -63,8 +63,6 @@ class ICP(torch.nn.Module):
         super().__init__()
         self.steps, self.tol = steps, tol
         self.init = init
-        if init != None:
-            assert is_SE3(init), "The input initial transformation is not SE3Type."
 
     def forward(self, source, target, ord=2, dim=-1):
         r'''
@@ -80,6 +78,9 @@ class ICP(torch.nn.Module):
 
         '''
         temporal, errlast = source, 0
+        if self.init != None:
+            assert is_SE3(self.init), "The input initial transformation is not SE3Type."
+            temporal = self.init.unsqueeze(-2).Act(temporal)
         for _ in range(self.steps):
             knndist, knnidx = knn(temporal, target, k=1, ord=ord, dim=dim)
             errnew = knndist.squeeze(-1).mean(dim=-1)
