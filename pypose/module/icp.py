@@ -78,7 +78,7 @@ class ICP(torch.nn.Module):
 
         Returns:
             ``LieTensor``: The estimated transformation (``SE3type``) from source to
-                target point cloud.
+            target point cloud.
 
         '''
         temporal, errlast = source, 0
