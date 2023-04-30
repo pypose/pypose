@@ -1,6 +1,5 @@
 import math
 import torch
-from . import bvv
 from .. import mat2SE3
 from ..basics import pm
 from .. import lietensor
@@ -301,7 +300,7 @@ def svdtf(source, target):
     ctntarget = target.mean(dim=-2, keepdim=True)
     source = source - ctnsource
     target = target - ctntarget
-    M = bvv(target, source).sum(dim=-3)
+    M = torch.einsum('...Na, ...Nb -> ...ab', pc2t, pc1t)
     U, S, Vh = torch.linalg.svd(M)
     R = U @ Vh
     mask = (R.det() + 1).abs() < 1e-6
