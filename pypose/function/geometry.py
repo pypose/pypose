@@ -265,15 +265,15 @@ def knn(pc1, pc2, k=1, ord=2, dim=-1, largest=False, sorted=True):
     return dist.topk(k, dim=dim, largest=largest, sorted=sorted)
 
 
-def svdtf(pc1, pc2):
+def svdtf(source, target):
     r'''
     Computes the rigid transformation ( :math:`SE(3)` ) between two sets of associated
-    points using Singular Value Decomposition (SVD).
+    point clouds (source and target) using Singular Value Decomposition (SVD).
 
     Args:
-        pc1 (``torch.Tensor``): The coordinates of the first set of points.
+        source (``torch.Tensor``): The coordinates of the source point cloud.
             The shape has to be (..., N, 3).
-        pc2 (``torch.Tensor``): The coordinates of the second set of points.
+        target (``torch.Tensor``): The coordinates of the target point cloud.
             The shape has to be (..., N, 3).
 
     Returns:
@@ -295,17 +295,17 @@ def svdtf(pc1, pc2):
         SE3Type LieTensor:
         LieTensor([1., 1., 1., 0., 0., 0., 1.])
     '''
-    assert pc1.size(-2) == pc2.size(-2), {
+    assert source.size(-2) == target.size(-2), {
         "The number of points N has to be the same for both point clouds."}
-    pc1ctn = pc1.mean(dim=-2, keepdim=True)
-    pc2ctn = pc2.mean(dim=-2, keepdim=True)
-    pc1t = pc1 - pc1ctn
-    pc2t = pc2 - pc2ctn
-    M = bvv(pc2t, pc1t).sum(dim=-3)
+    ctnsource = source.mean(dim=-2, keepdim=True)
+    ctntarget = target.mean(dim=-2, keepdim=True)
+    source = source - ctnsource
+    target = target - ctntarget
+    M = bvv(target, source).sum(dim=-3)
     U, S, Vh = torch.linalg.svd(M)
     R = U @ Vh
     mask = (R.det() + 1).abs() < 1e-6
     R[mask] = - R[mask]
-    t = pc2ctn.mT - R @ pc1ctn.mT
+    t = ctntarget.mT - R @ ctnsource.mT
     T = torch.cat((R, t), dim=-1)
     return mat2SE3(T, check=False)
