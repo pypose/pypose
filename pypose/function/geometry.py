@@ -300,7 +300,7 @@ def svdtf(source, target):
     ctntarget = target.mean(dim=-2, keepdim=True)
     source = source - ctnsource
     target = target - ctntarget
-    M = torch.einsum('...Na, ...Nb -> ...ab', pc2t, pc1t)
+    M = torch.einsum('...Na, ...Nb -> ...ab', target, source)
     U, S, Vh = torch.linalg.svd(M)
     R = U @ Vh
     mask = (R.det() + 1).abs() < 1e-6
