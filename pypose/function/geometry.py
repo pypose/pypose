@@ -177,14 +177,14 @@ def reprojerr(points, pixels, intrinsics, extrinsics=None):
     return (img_repj - pixels).norm(dim=-1)
 
 
-def knn(pc1, pc2, k=1, ord=2, dim=-1, largest=False, sorted=True):
+def knn(ref, nbr, k=1, ord=2, dim=-1, largest=False, sorted=True):
     r'''
-    Select the k nearest neighbor points of pointcloud 1 from pointcloud 2 in each batch.
+    Select the k nearest neighbor points of reference from neighbors in each batch.
 
     Args:
-        pc1 (``torch.Tensor``): the coordinates of the pointcloud 1.
+        ref (``torch.Tensor``): the coordinates of the reference point sets.
             The shape has to be (..., N1, :).
-        pc2 (``torch.Tensor``): the coordinates of the pointcloud 2.
+        nbr (``torch.Tensor``): the coordinates of the neighbors point sets.
             The shape has to be (..., N2, :).
         k (``int``, optional): the number of the nearest neighbors to be selected.
             k has to be k :math:`\leq` N2. Default: ``1``.
@@ -193,8 +193,8 @@ def knn(pc1, pc2, k=1, ord=2, dim=-1, largest=False, sorted=True):
         dim (``int``, optional): the dimension encompassing the point cloud coordinates,
             utilized for calculating distance and sorting.
             Default: ``-1`` (The last dimension).
-        largest (``bool``, optional): controls whether to return largest or smallest
-            neighbors.  Default: ``False``.
+        largest (``bool``, optional): controls whether to return largest (furthest) or
+            smallest (nearest) neighbors. Default: ``False``.
         sorted (``bool``, optional): controls whether to return the neighbors in sorted
             order. Default: ``True``.
 
@@ -202,14 +202,14 @@ def knn(pc1, pc2, k=1, ord=2, dim=-1, largest=False, sorted=True):
         ``torch.return_types.topk(values: torch.Tensor, indices: torch.LongTensor)``:
         The named tuple of (values, indices).
 
-        ``values``: The ord-norm distance between each point in pc1 and its sorted k
-        nearest neighbors in pc2. The shape is (..., N1, k).
+        ``values``: The ord-norm distance between each point in ref and its sorted k
+        nearest neighbors in nbr. The shape is (..., N1, k).
 
-        ``indices``: The index of the k nearest neighbor points in pc2. The shape is
-        (..., N1, k).
+        ``indices``: The index of the k nearest neighbor points in neighbors point sets
+        (nbr). The shape is (..., N1, k).
 
     Note:
-        If ``sorted`` is set to ``False``,  the output will be unspecified and not
+        If ``sorted`` is set to ``False``, the output will be unspecified and not
         necessarily sorted along the index of the input point cloud.
 
     Example:
@@ -260,7 +260,7 @@ def knn(pc1, pc2, k=1, ord=2, dim=-1, largest=False, sorted=True):
                 [0.0000, 4.2426],
                 [4.2426, 5.0000]])
     '''
-    diff = pc1.unsqueeze(-2) - pc2.unsqueeze(-3)
+    diff = ref.unsqueeze(-2) - nbr.unsqueeze(-3)
     dist = torch.linalg.norm(diff, dim=dim, ord=ord)
     return dist.topk(k, dim=dim, largest=largest, sorted=sorted)
 
