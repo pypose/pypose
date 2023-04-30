@@ -6,8 +6,8 @@ class TestICP:
 
     def test_icp_laserscan_data(self):
         # pc1 and pc2 has different numbers of points
-        download_and_extract_archive('https://github.com/Murphy41/laser-scan-pt/' \
-                                     'releases/download/v0.0/icp-test-data.pt.zip',\
+        download_and_extract_archive('https://github.com/pypose/pypose/releases/'\
+                                     'download/v0.4.2/icp-test-data.pt.zip',\
                                      './tests/module')
         loaded_tensors = torch.load('./tests/module/icp-test-data.pt')
         pc1 = loaded_tensors['pc1'].squeeze(-3)
