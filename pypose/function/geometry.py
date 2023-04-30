@@ -295,7 +295,8 @@ def svdtf(pc1, pc2):
         SE3Type LieTensor:
         LieTensor([1., 1., 1., 0., 0., 0., 1.])
     '''
-    assert pc1.size(-2) == pc2.size(-2), "The number of the points N has to be the same."
+    assert pc1.size(-2) == pc2.size(-2), {
+        "The number of points N has to be the same for both point clouds."}
     pc1ctn = pc1.mean(dim=-2, keepdim=True)
     pc2ctn = pc2.mean(dim=-2, keepdim=True)
     pc1t = pc1 - pc1ctn
@@ -308,74 +309,3 @@ def svdtf(pc1, pc2):
     t = pc2ctn.mT - R @ pc1ctn.mT
     T = torch.cat((R, t), dim=-1)
     return mat2SE3(T, check=False)
-
-
-def posediff(ref, est, aggregate=False, mode=1):
-    r'''
-    Computes the translatinal and rotational error between two batched transformations
-    ( :math:`SE(3)` ).
-
-    Args:
-        ref (``LieTensor``): The reference transformation :math:`T_{ref}` in
-            ``SE3type``. The shape is [..., 7].
-        est (``LieTensor``): The estimated transformation :math:`T_{est}` in
-            ``SE3type``. The shape is [..., 7].
-        aggregate (``bool``, optional): Average the batched differences to a singleton
-            dimension. Default: ``False``.
-        mode (``int``, optional): Calculate the rotational difference in different mode.
-            ``mode = 0``: Quaternions representation.
-            ``mode = 1``: Axis-angle representation (Use one angle to represent the
-            rotational difference in 3D space). Default: ``1``.
-
-    Note:
-        The rotation matrix to axis-angle representation refers to the theorem 2.5 and
-        2.6 in Chapter 2 [1]. The implementation of the Quaternions to axis-angle
-        representation (equation: :math:`\theta = 2 \cos^{-1}(q_0)` ) is presented at
-        the end of Chapter 2 in [1].
-
-        [1] Murray, R. M., Li, Z., & Sastry, S. S. (1994). A mathematical introduction to
-        robotic manipulation. CRC press.
-
-
-    Returns:
-        ``torch.Tensor``: The translational difference (:math:`\Delta t`) and rotational
-        differences between two sets of transformations.
-
-        If ``aggregate = True``: The output batch will be 1.
-
-        If ``mode = 0``: The values in each batch is :math:`[ \Delta t, \Delta q_x,
-        \Delta q_y, \Delta q_z, \Delta q_w ]`
-
-        If ``mode = 1``: The values in each batch is :math:`[ \Delta t, \Delta \theta ]`
-
-    Example:
-        >>> import torch, pypose as pp
-        >>> ref = pp.randn_SE3(4)
-        >>> est = pp.randn_SE3(4)
-        >>> pp.posediff(ref,est)
-        tensor([[3.1877, 0.3945],
-        [3.3388, 2.0563],
-        [2.4523, 0.4169],
-        [1.8392, 1.1539]])
-        >>> pp.posediff(ref,est,aggregate=True)
-        tensor([1.9840, 1.9306])
-        >>> pp.posediff(ref,est,mode=0)
-        tensor([[ 3.1877,  0.1554,  0.1179, -0.0190,  0.9806],
-        [ 3.3388, -0.0194, -0.8539,  0.0609,  0.5164],
-        [ 2.4523,  0.0495, -0.1739,  0.1006,  0.9784],
-        [ 1.8392, -0.5451, -0.0075,  0.0192,  0.8381]])
-    '''
-    assert is_SE3(ref), "The input reference transformation is not SE3Type."
-    assert is_SE3(est), "The input estimated transformation is not SE3Type."
-    assert mode in (0, 1), "Mode number is invalid."
-    T = ref * est.Inv()
-    diff_t = torch.linalg.norm(T.translation(), dim=-1, ord=2).unsqueeze(-1)
-    if mode == 0:
-        diff_r = T.rotation().tensor()
-        diff = torch.cat((diff_t, diff_r), dim=-1)
-    else:
-        diff_r = 2 * torch.acos(T.tensor()[...,6])
-        diff = torch.cat((diff_t, diff_r.unsqueeze(-1)), dim=-1)
-    if aggregate and diff.ndim > 1:
-        diff = diff.mean(dim=tuple(range(diff.ndim - 1)), keepdim=True).flatten()
-    return diff
