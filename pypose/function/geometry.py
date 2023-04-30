@@ -209,8 +209,8 @@ def knn(pc1, pc2, k=1, ord=2, dim=-1, largest=False, sorted=True):
         (..., N1, k).
 
     Note:
-        If ``sorted`` is set to ``False``, the output will be unordered and not
-        necessarily aligned with the index of the input point cloud.
+        If ``sorted`` is set to ``False``,  the output will be unspecified and not
+        necessarily sorted along the index of the input point cloud.
 
     Example:
         >>> import torch, pypose as pp
