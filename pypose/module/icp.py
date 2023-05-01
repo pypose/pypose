@@ -11,7 +11,7 @@ class ICP(torch.nn.Module):
         tol (``double``, optional): the tolerance of the relative error used to terminate
             the algorithm. Default: 1e-6.
         init (``LieTensor``, optional): the initial transformation :math:`T_{init}` in
-            ``SE3type``. Default: None.
+            ``SE3type``. Default: ``None``.
 
     The algorithm takes two input point clouds: source point cloud and target point cloud.
     The objective is to find the optimal similarity transformation ( :math:`T` ) to
@@ -28,7 +28,7 @@ class ICP(torch.nn.Module):
     :math:`p_{\mathrm{target, j}}` is the cloest point to :math:`p_{\mathrm{source, i}}`
     in the target point cloud with index j. The algorithm consists of the following steps:
 
-    1. For each point in source, the nearest neighbor algorithm (knn) is used to select
+    1. For each point in source, the nearest neighbor algorithm (KNN) is used to select
     its closest point in target to form the matched point pairs.
 
     2. Singular value decomposition (SVD) algorithm is used to compute the rotation
@@ -43,27 +43,26 @@ class ICP(torch.nn.Module):
 
     Example:
         >>> import torch, pypose as pp
-        >>> pc1 = torch.tensor([[[0., 0., 0.],
-        ...                      [1., 0., 0.],
-        ...                      [2., 0, 0.]]])
-        >>> pc2 = torch.tensor([[[0.2, 0.1, 0.],
-        ...                      [1.1397, 0.442, 0.],
-        ...                      [2.0794, 0.7840, 0.]]])
+        >>> source = torch.tensor([[[0., 0., 0.],
+        ...                         [1., 0., 0.],
+        ...                         [2.,  0, 0.]]])
+        >>> target = torch.tensor([[[0.2,      0.1,  0.],
+        ...                         [1.1397, 0.442,  0.],
+        ...                         [2.0794, 0.7840, 0.]]])
         >>> icp = pp.module.ICP()
-        >>> icp(pc1, pc2)
+        >>> icp(source, target)
         SE3Type LieTensor:
         LieTensor([[0.2000, 0.1000, 0.0000, 0.0000, 0.0000, 0.1736, 0.9848]])
 
     Warning:
-        It's important to note that the solution found is only a local optimum.
-
+        It's important to note that the solution is sensitive to the initialization.
     '''
     def __init__(self, steps=200, tol=1e-6, init=None):
         super().__init__()
-        self.steps, self.tol = steps, tol
-        self.init = init
+        assert init is None or is_SE3(init), "The initial transformation is not SE3Type."
+        self.steps, self.tol, self.init = steps, tol, init
 
-    def forward(self, source, target, ord=2, dim=-1):
+    def forward(self, source, target, ord=2, dim=-1, init=None):
         r'''
         Args:
             source (``torch.Tensor``): the source point clouds with shape
@@ -75,16 +74,19 @@ class ICP(torch.nn.Module):
             dim (``int``, optional): the dimension encompassing the point cloud
                 coordinates, utilized for calculating distance.
                 Default: ``-1`` (The last dimension).
+            init (``LieTensor``, optional): the initial transformation :math:`T_{init}` in
+                ``SE3type``. If not ``None``, it will suppress the ``init`` given by the
+                class constructor. Default: ``None``.
 
         Returns:
             ``LieTensor``: The estimated transformation (``SE3type``) from source to
             target point cloud.
-
         '''
         temporal, errlast = source, 0
-        if self.init != None:
-            assert is_SE3(self.init), "The input initial transformation is not SE3Type."
-            temporal = self.init.unsqueeze(-2).Act(temporal)
+        init = init if init is not None else self.init
+        if init is not None:
+            assert is_SE3(init), "The initial transformation is not SE3Type."
+            temporal = init.unsqueeze(-2) @ temporal
         for _ in range(self.steps):
             knndist, knnidx = knn(temporal, target, k=1, ord=ord, dim=dim)
             errnew = knndist.squeeze(-1).mean(dim=-1)
@@ -93,5 +95,5 @@ class ICP(torch.nn.Module):
             errlast = errnew
             knntarget = torch.gather(target, -2, knnidx.expand(source.shape))
             T = svdtf(temporal, knntarget)
-            temporal = T.unsqueeze(-2).Act(temporal)
+            temporal = T.unsqueeze(-2) @ temporal
         return svdtf(source, temporal)
