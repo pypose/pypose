@@ -4,7 +4,7 @@ from torchvision.datasets.utils import download_and_extract_archive
 
 class TestICP:
 
-    def __init__(self):
+    def load_data(self):
         # pc1 and pc2 has different numbers of points
         download_and_extract_archive('https://github.com/pypose/pypose/releases/'\
                                      'download/v0.4.2/icp-test-data.pt.zip',\
@@ -14,6 +14,7 @@ class TestICP:
         self.pc2 = loaded_tensors['pc2'].squeeze(-3)
 
     def test_icp_laserscan_data(self):
+        self.load_data()
         source = self.pc1
         tf = pp.SE3([-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503])
         target = tf.Act(self.pc2)
@@ -60,10 +61,11 @@ class TestICP:
         assert error[1] < 0.1,  "The rotational error is too large."
 
     def test_icp_broadcasting1(self):
+        self.load_data()
         source = self.pc1
         tf = pp.SE3([[-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503],
                [-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503]])
-        target = tf.unsqueeze(-2).Act(source)
+        target = tf.unsqueeze(-2).Act(self.pc2)
         icp = pp.module.ICP()
         result = icp(source, target)
         error = _posediff(tf,result,aggregate=True)
@@ -74,11 +76,11 @@ class TestICP:
         assert error[1] < 0.1,  "The rotational error is too large."
 
     def test_icp_broadcasting2(self):
-        temporal = self.pc1
+        self.load_data()
         target = self.pc2
         tf = pp.SE3([[-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503],
                [-0.0100, -0.0300,  0.0000, 0, 0, 0.0499792, 0.9987503]])
-        source = tf.unsqueeze(-2).Act(temporal)
+        source = tf.unsqueeze(-2).Act(self.pc1)
         icp = pp.module.ICP()
         result = icp(source, target)
         error = _posediff(tf.Inv(),result,aggregate=True)
