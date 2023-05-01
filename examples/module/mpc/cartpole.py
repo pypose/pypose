@@ -86,13 +86,9 @@ def main():
     with open(fname, 'wb') as fi:
         pkl.dump(expert, fi)
 
-    current_x = torch.zeros(1, T, n_state, device=device)
     current_u = torch.sin(time).unsqueeze(1).unsqueeze(0)
-    x_init = torch.tensor([[0, 0, torch.pi*0.5, 0]], device=device)
-    current_x[...,0,:] = x_init
+    x_init = torch.tensor([[0, 0, torch.pi, 0]], device=device)
     expert_cartPoleSolver = CartPole(dt, expert['len'], expert['m_cart'], expert['m_pole'], g).to(device)
-    for i in range(T-1):
-        current_x[...,i+1,:], _ = expert_cartPoleSolver(current_x[...,i,:], current_u[...,i,:])
 
     torch.manual_seed(args.seed)
     len = torch.tensor(1.55).to(device).requires_grad_()
@@ -105,19 +101,13 @@ def main():
     loss_f.flush()
 
     mpc_expert = pp.module.MPC(expert_cartPoleSolver, T, step=15).to(device)
-    x_true, u_true, cost_true = mpc_expert(expert['Q'], expert['p'], x_init, current_x, current_u, time)
+    x_true, u_true, cost_true = mpc_expert(expert['Q'], expert['p'], x_init, time, current_u)
 
     def get_loss(_len, _m_cart, _m_pole):
-        current_x = torch.zeros(1, T, n_state, device=device)
-        current_u = torch.sin(time).unsqueeze(1).unsqueeze(0)
-        x_init = torch.tensor([[0, 0, torch.pi*0.5, 0]], device=device)
-        current_x[...,0,:] = x_init
+        x_init = torch.tensor([[0, 0, torch.pi, 0]], device=device)
         agent_cartPoleSolver = CartPole(dt, _len, _m_cart, _m_pole, g).to(device)
-        for i in range(T-1):
-            current_x[...,i+1,:], _ = agent_cartPoleSolver(current_x[...,i,:], current_u[...,i,:])
-
         mpc_agent = pp.module.MPC(agent_cartPoleSolver, T, step=15).to(device)
-        x_pred, u_pred, cost_pred = mpc_agent(expert['Q'], expert['p'], x_init, current_x, current_u, time)
+        x_pred, u_pred, cost_pred = mpc_agent(expert['Q'], expert['p'], x_init, time, current_u)
 
         traj_loss = torch.mean((u_true - u_pred)**2) \
             + torch.mean((x_true - x_pred)**2)
