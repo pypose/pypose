@@ -247,6 +247,8 @@ class LQR(nn.Module):
         super().__init__()
         self.system = system
         self.Q, self.p, self.T = Q, p, T
+        self.current_x = None
+        self.current_u = None
 
         if self.Q.ndim == 3:
             self.Q = torch.tile(self.Q.unsqueeze(-3), (1, self.T, 1, 1))
@@ -263,9 +265,9 @@ class LQR(nn.Module):
         assert self.Q.device == self.p.device, "device not compatible."
         assert self.Q.dtype == self.p.dtype, "tensor data type not compatible."
 
-    def forward(self, x_init, current_x, current_u, time):
+    def forward(self, x_init, time, current_u=None):
         r'''
-        Performs LQR for the linear system.
+        Performs LQR for the discrete system.
 
         Args:
             x_init (:obj:`Tensor`): The initial state of the system.
@@ -281,22 +283,36 @@ class LQR(nn.Module):
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the associated
             quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
-        K, k = self.lqr_backward(current_x, current_u, time)
-        x, u, cost = self.lqr_forward(x_init, current_x, current_u, K, k)
+        K, k = self.lqr_backward(x_init, time, current_u)
+        x, u, cost = self.lqr_forward(x_init, K, k)
         return x, u, cost
 
-    def lqr_backward(self, current_x, current_u, time):
+    def lqr_backward(self, x_init, time, current_u):
 
-        # Q: (n_batch*, T, N, N), p: (n_batch*, T, N), where n_batch* can be any batch dimensions, e.g., (2, 3)
-        ns, nc = current_x.size(-1), current_u.size(-1)
+        ns, nsc = x_init.size(-1), self.p.size(-1)
+        nc = nsc - ns
+
+        if current_u is None:
+            current_u = torch.zeros(self.n_batch + (self.T, nc), device=self.p.device)
+        else:
+            current_u = current_u
+        current_u = current_u.detach()
+
+        current_x = torch.zeros(self.n_batch + (self.T, ns), device=self.p.device)
+        current_x[...,0,:] = x_init
+        for i in range(self.T-1):
+            current_x[...,i+1,:], _ = self.system(current_x[...,i,:], current_u[...,i,:])
+
+        self.current_x = current_x
+        self.current_u = current_u
 
         K = torch.zeros(self.n_batch + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
         k = torch.zeros(self.n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
-        p_new = torch.zeros(self.n_batch + (self.T, ns+nc), dtype=self.p.dtype, device=self.p.device)
+        p_new = torch.zeros(self.n_batch + (self.T, nsc), dtype=self.p.dtype, device=self.p.device)
 
         for i in range(self.T):
             current_xut = torch.cat((current_x[...,i,:], current_u[...,i,:]), dim=-1)
-            p_new[...,i,:]= torch.tensor(bmv(self.Q[...,i,:,:], current_xut) + self.p[...,i,:])
+            p_new[...,i,:]= (bmv(self.Q[...,i,:,:], current_xut) + self.p[...,i,:]).detach()
 
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
@@ -322,13 +338,13 @@ class LQR(nn.Module):
 
         return K, k
 
-    def lqr_forward(self, x_init, current_x, current_u, K, k):
+    def lqr_forward(self, x_init, K, k):
 
         assert x_init.device == K.device == k.device
         assert x_init.dtype == K.dtype == k.dtype
         assert x_init.ndim == 2, "Shape not compatible."
 
-        ns, nc = current_x.size(-1), current_u.size(-1)
+        ns, nc = self.current_x.size(-1), self.current_u.size(-1)
 
         u = torch.zeros(self.n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
         delta_u = torch.zeros(self.n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
@@ -341,11 +357,11 @@ class LQR(nn.Module):
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]
             delta_u[..., t, :] = delta_ut = bmv(Kt, delta_xt) + kt
-            u[...,t,:] = ut = delta_ut + current_u[...,t,:]
+            u[...,t,:] = ut = delta_ut + self.current_u[...,t,:]
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
             if t < self.T-1:
-                delta_xt = (xt - current_x[...,t+1,:]).detach()
-            cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
+                delta_xt = (xt - self.current_x[...,t+1,:]).detach()
+                cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
 
         return x[...,0:-1,:], u, cost
