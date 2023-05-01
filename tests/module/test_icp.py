@@ -4,18 +4,21 @@ from torchvision.datasets.utils import download_and_extract_archive
 
 class TestICP:
 
-    def test_icp_laserscan_data(self):
+    def __init__(self):
         # pc1 and pc2 has different numbers of points
         download_and_extract_archive('https://github.com/pypose/pypose/releases/'\
                                      'download/v0.4.2/icp-test-data.pt.zip',\
                                      './tests/module')
         loaded_tensors = torch.load('./tests/module/icp-test-data.pt')
-        pc1 = loaded_tensors['pc1'].squeeze(-3)
-        pc2 = loaded_tensors['pc2'].squeeze(-3)
+        self.pc1 = loaded_tensors['pc1'].squeeze(-3)
+        self.pc2 = loaded_tensors['pc2'].squeeze(-3)
+
+    def test_icp_laserscan_data(self):
+        source = self.pc1
         tf = pp.SE3([-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503])
-        pc2 = tf.Act(pc2)
+        target = tf.Act(self.pc2)
         icp = pp.module.ICP()
-        result = icp(pc1, pc2)
+        result = icp(source, target)
         error = _posediff(tf,result,aggregate=True)
         print("Test 1 (real laser scan data test): The translational error is {:.4f} and "
               "the rotational error is {:.4f}".format(error[0].item(), error[1].item()))
@@ -43,14 +46,43 @@ class TestICP:
         z_curve = torch.zeros(n_points) + torch.randn(n_points) * noise_std_dev
         points_set_2 = torch.stack((x_curve, y_curve, z_curve), dim=1)
         # Test ICP
-        pc1 = torch.stack((points_set_1, points_set_2), dim=0)
+        source = torch.stack((points_set_1, points_set_2), dim=0)
         tf = pp.SE3([[-5.05, -3.02,  0.02, 0, 0, 0.0499792, 0.9987503],
                [-2, 1, 1, 0.1304815, 0.0034168, -0.025953, 0.9911051]])
-        pc2 = tf.unsqueeze(-2).Act(pc1)
+        target = tf.unsqueeze(-2).Act(source)
         icp = pp.module.ICP()
-        result = icp(pc1, pc2)
+        result = icp(source, target)
         error = _posediff(tf,result,aggregate=True)
         print("Test 2 (batched generated data test): The translational error is {:.4f} "
+              "and the rotational error is {:.4f}"
+              .format(error[0].item(), error[1].item()))
+        assert error[0] < 0.1,  "The translational error is too large."
+        assert error[1] < 0.1,  "The rotational error is too large."
+
+    def test_icp_broadcasting1(self):
+        source = self.pc1
+        tf = pp.SE3([[-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503],
+               [-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503]])
+        target = tf.unsqueeze(-2).Act(source)
+        icp = pp.module.ICP()
+        result = icp(source, target)
+        error = _posediff(tf,result,aggregate=True)
+        print("Test 3 (broadcasting test 1): The translational error is {:.4f} "
+              "and the rotational error is {:.4f}"
+              .format(error[0].item(), error[1].item()))
+        assert error[0] < 0.1,  "The translational error is too large."
+        assert error[1] < 0.1,  "The rotational error is too large."
+
+    def test_icp_broadcasting2(self):
+        temporal = self.pc1
+        target = self.pc2
+        tf = pp.SE3([[-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503],
+               [-0.0100, -0.0300,  0.0000, 0, 0, 0.0499792, 0.9987503]])
+        source = tf.unsqueeze(-2).Act(temporal)
+        icp = pp.module.ICP()
+        result = icp(source, target)
+        error = _posediff(tf.Inv(),result,aggregate=True)
+        print("Test 4 (broadcasting test 2): The translational error is {:.4f} "
               "and the rotational error is {:.4f}"
               .format(error[0].item(), error[1].item()))
         assert error[0] < 0.1,  "The translational error is too large."
@@ -120,7 +152,8 @@ def _posediff(ref, est, aggregate=False, mode=1):
         diff_r = T.rotation().tensor()
         diff = torch.cat((diff_t, diff_r), dim=-1)
     else:
-        diff_r = 2 * torch.acos(T.tensor()[...,6])
+        qw = torch.clamp(T.tensor()[...,6], min=-1, max=1) # floating-point inaccuracies
+        diff_r = 2 * torch.acos(qw)
         diff = torch.cat((diff_t, diff_r.unsqueeze(-1)), dim=-1)
     if aggregate and diff.ndim > 1:
         diff = diff.mean(dim=tuple(range(diff.ndim - 1)), keepdim=True).flatten()
@@ -132,3 +165,5 @@ if __name__ == "__main__":
     test = TestICP()
     test.test_icp_laserscan_data()
     test.test_icp_batch()
+    test.test_icp_broadcasting1()
+    test.test_icp_broadcasting2()
