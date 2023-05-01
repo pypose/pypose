@@ -120,6 +120,6 @@ if __name__ == '__main__':
     print(f'elapsed time = {end - start}')
 
     from tqdm import tqdm
-    mm_config = (SparseBlockTensor.__matmul__, torch.matmul, 2, 'identical_square')
+    mm_config = (SparseBlockTensor.__matmul__, torch.matmul, 2, 'identical_square', 0.7)
     for i in tqdm(range(10000)):
         test_universal(*mm_config)

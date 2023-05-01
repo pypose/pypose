@@ -228,21 +228,14 @@ def coo_2_hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
         block_seq = block_seq[block_indices[0], block_indices[1]]
     else:
         # ravel multiple index into one.
-        # coeff = torch.cat([b_dim_t, torch.ones((1, ), dtype=b_dim_t.dtype, device=b_dim_t.device)], dim=0)
-        # coeff = coeff[1:].flipud().cumprod(dim=0).flipud()
-        # proxy_indices = (proxy.indices() * coeff.unsqueeze(-1)).sum(0, keepdim=True)
-        # block_seq = torch.sparse_coo_tensor(
-        #         proxy_indices,
-        #         torch.arange(proxy.values().shape[0]), size=(numel_proxy,)
-        #     )
-        # block_seq = block_seq.index_select(0, (block_indices * coeff.unsqueeze(-1)).sum(0)).to_dense()
-
-        proxy_indices = proxy.indices()
+        coeff = torch.tensor(s_dim+[1, ], dtype=b_dim_t.dtype, device=b_dim_t.device)
+        coeff = coeff[1:].flipud().cumprod(dim=0).flipud()
+        proxy_indices = (proxy.indices() * coeff.unsqueeze(-1)).sum(0, keepdim=True)
         block_seq = torch.sparse_coo_tensor(
-                ravel_multi_index(proxy_indices, s_dim),
+                proxy_indices,
                 torch.arange(proxy.values().shape[0]), size=(numel_proxy,)
             )
-        block_seq = block_seq.index_select(0, ravel_multi_index(block_indices, s_dim).squeeze()).to_dense()
+        block_seq = block_seq.index_select(0, (block_indices * coeff.unsqueeze(-1)).sum(0)).to_dense()
 
     # Index into a temporary tensor.
     blocks = torch.sparse_coo_tensor(
