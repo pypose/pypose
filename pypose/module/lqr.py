@@ -55,7 +55,7 @@ class LQR(nn.Module):
         .. math::
             \begin{align*}
                 \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t \\
-                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}
+                \mathbf{q}_t &= \mathbf{p}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}
                                         \mathbf{c}_{1t} + \mathbf{F}_t^\top\mathbf{v}_{t+1}  \\
                 \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}
                                                      \mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} \\
@@ -138,7 +138,7 @@ class LQR(nn.Module):
             \begin{align*}
                 \mathbf{Q}_t &= \bar{\mathbf{Q}}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}
                                     \mathbf{F}_t \\
-                \mathbf{q}_t &= \bar{\mathbf{q}}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1}  \\
+                \mathbf{q}_t &= \bar{\mathbf{p}}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1}  \\
                 \mathbf{K}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}^{-1}
                                     \mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{x}_t} \\
                 \mathbf{k}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}^{-1}
@@ -154,6 +154,12 @@ class LQR(nn.Module):
                     + \mathbf{K}_t^\top\mathbf{Q}_{\delta \mathbf{u}_t,
                         \delta \mathbf{u}_t}\mathbf{k}_t   \\
             \end{align*}
+
+    Note:
+        Because we made a linear approximation, here :math:`\bar{\mathbf{p}}_t` leads to a
+        difference with :math:`{\mathbf{q}}_t` and :math:`{\mathbf{k}}_t` relative to the
+        linear backward recursion, and this change will be compensated back by
+        :math:`\mathbf{u}_t^*` in the forward recursion.
 
     - The forward recursion.
 
