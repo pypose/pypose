@@ -269,9 +269,9 @@ def svdtf(source, target):
     point clouds (source and target) using Singular Value Decomposition (SVD).
 
     Args:
-        source (``torch.Tensor``): The coordinates of the source point cloud.
+        source (``torch.Tensor``): the coordinates of the source point cloud.
             The shape has to be (..., N, 3).
-        target (``torch.Tensor``): The coordinates of the target point cloud.
+        target (``torch.Tensor``): the coordinates of the target point cloud.
             The shape has to be (..., N, 3).
 
     Returns:
