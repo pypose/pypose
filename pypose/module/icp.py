@@ -93,7 +93,9 @@ class ICP(torch.nn.Module):
             if torch.all((errnew - errlast).abs() < self.tol):
                 break
             errlast = errnew
-            knntarget = torch.gather(target, -2, knnidx.expand(source.shape))
+            target = target.view(*([1] * (knnidx.dim() - target.dim())), *target.shape)
+            target = target.expand(*knnidx.shape[:-2], target.size(-2),target.size(-1))
+            knntarget = torch.gather(target, -2, knnidx.expand(*knnidx.shape[:-1], source.size(-1)))
             T = svdtf(temporal, knntarget)
             temporal = T.unsqueeze(-2) @ temporal
         return svdtf(source, temporal)
