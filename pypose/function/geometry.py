@@ -4,7 +4,6 @@ from .. import mat2SE3
 from ..basics import pm
 from .. import lietensor
 from .. import LieTensor
-from torch import broadcast_shapes
 
 
 def is_lietensor(obj):
@@ -131,10 +130,10 @@ def point2pixel(points, intrinsics, extrinsics=None):
     assert points.size(-1) == 3, "Points shape incorrect"
     assert intrinsics.size(-1) == intrinsics.size(-2) == 3, "Intrinsics shape incorrect."
     if extrinsics is None:
-        broadcast_shapes(points.shape[:-2], intrinsics.shape[:-2])
+        torch.broadcast_shapes(points.shape[:-2], intrinsics.shape[:-2])
     else:
         assert is_lietensor(extrinsics) and extrinsics.shape[-1] == 7, "Type incorrect."
-        broadcast_shapes(points.shape[:-2], intrinsics.shape[:-2], extrinsics.shape[:-1])
+        torch.broadcast_shapes(points.shape[:-2], intrinsics.shape[:-2], extrinsics.shape[:-1])
         points = extrinsics.unsqueeze(-2) @ points
     return homo2cart(points @ intrinsics.mT)
 
@@ -169,7 +168,7 @@ def reprojerr(points, pixels, intrinsics, extrinsics=None):
         >>> err = pp.reprojerr(object, pixels, intrinsics, pose)
         tensor([0., 0., 0., 0., 0., 0.])
     '''
-    broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
+    torch.broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
     assert points.size(-1) == 3 and pixels.size(-1) == 2 and \
            intrinsics.size(-1) == intrinsics.size(-2) == 3, "Shape not compatible."
     img_repj = point2pixel(points, intrinsics, extrinsics)
