@@ -88,7 +88,8 @@ class LQR(nn.Module):
             \mathbf{c} \left( \mathbf{\tau}_t \right) = \frac{1}{2}
             \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t
 
-    A discrete-time non-linear system can be described as:
+    For the **non-linear system**, sometimes people want to solve MPC problem with **iterative
+    LQR**. A discrete-time non-linear system can be described as:
 
     .. math::
         \begin{aligned}
@@ -172,17 +173,27 @@ class LQR(nn.Module):
             \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t
 
     Note:
-        The discrete-time system to be solved by LQR could be both linear time-invariant
-        (:meth:`LTI`) system, linear time-varying (:meth:`LTV`) system or non-linear
-        (:meth:`NLS`) system.
+        The discrete-time system to be solved by LQR could be either linear time-invariant
+        (:meth:`LTI`) system, or linear time-varying (:meth:`LTV`) system. For the non-linear
+        system, we can approximate it as a linear system via Taylor expansion, using iterative
+        LQR algorithm for MPC. Here we provide the convenience and general format.
 
     From the learning perspective, this can be interpreted as a module with unknown parameters
     :math:`\begin{Bmatrix} \mathbf{Q}, \mathbf{p}, \mathbf{F}, \mathbf{f} \end{Bmatrix}`,
     which can be integrated into a larger end-to-end learning system.
 
     Note:
-        The implementation is based on page 24-32 of `Optimal Control and Planning
-        <http://rll.berkeley.edu/deeprlcourse/f17docs/lecture_8_model_based_planning.pdf>`_.
+        The implementation of LQR is based on page 24-32 of the slides:
+
+        * `Optimal Control and Planning
+          <http://rll.berkeley.edu/deeprlcourse/f17docs/lecture_8_model_based_planning.pdf>`_.
+
+        The implementation of iterative LQR is based on Eq. (1)~(19) of this paper:
+
+        * Li Weiwei, and Emanuel Todorov, `Iterative linear quadratic regulator design for
+          nonlinear biological movement systems
+          <https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=dfc73c664f85562956e4b98b3102ebd7e41906ae>`_,
+          ICINCO (1), 2004.
 
     Example:
         >>> torch.manual_seed(0)
@@ -243,6 +254,9 @@ class LQR(nn.Module):
         if self.p.ndim == 2:
             self.p = torch.tile(self.p.unsqueeze(-2), (1, self.T, 1))
 
+        # Q: (n_batch*, T, N, N), p: (n_batch*, T, N), where n_batch* can be any batch dimensions, e.g., (2, 3)
+        self.n_batch = self.p.shape[:-2]
+
         assert self.Q.shape[:-1] == self.p.shape, "Shape not compatible."
         assert self.Q.size(-1) == self.Q.size(-2), "Shape not compatible."
         assert self.Q.ndim == 4 or self.p.ndim == 3, "Shape not compatible."
@@ -274,16 +288,15 @@ class LQR(nn.Module):
     def lqr_backward(self, current_x, current_u, time):
 
         # Q: (n_batch*, T, N, N), p: (n_batch*, T, N), where n_batch* can be any batch dimensions, e.g., (2, 3)
-        n_batch = self.p.shape[:-2]
         ns, nc = current_x.size(-1), current_u.size(-1)
 
-        K = torch.zeros(n_batch + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
-        k = torch.zeros(n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
-        p_new = torch.zeros(n_batch + (self.T, ns+nc), dtype=self.p.dtype, device=self.p.device)
+        K = torch.zeros(self.n_batch + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
+        k = torch.zeros(self.n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
+        p_new = torch.zeros(self.n_batch + (self.T, ns+nc), dtype=self.p.dtype, device=self.p.device)
 
         for i in range(self.T):
             current_xut = torch.cat((current_x[...,i,:], current_u[...,i,:]), dim=-1)
-            p_new[...,i,:]= (bmv(self.Q[...,i,:,:], current_xut) + self.p[...,i,:]).detach()
+            p_new[...,i,:]= torch.tensor(bmv(self.Q[...,i,:,:], current_xut) + self.p[...,i,:])
 
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
@@ -315,15 +328,13 @@ class LQR(nn.Module):
         assert x_init.dtype == K.dtype == k.dtype
         assert x_init.ndim == 2, "Shape not compatible."
 
-        # Q: (n_batch*, T, N, N), p: (n_batch*, T, N), where n_batch* can be any batch dimensions, e.g., (2, 3)
-        n_batch = self.p.shape[:-2]
         ns, nc = current_x.size(-1), current_u.size(-1)
 
-        u = torch.zeros(n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
-        delta_u = torch.zeros(n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
-        cost = torch.zeros(n_batch, dtype=self.p.dtype, device=self.p.device)
+        u = torch.zeros(self.n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
+        delta_u = torch.zeros(self.n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
+        cost = torch.zeros(self.n_batch, dtype=self.p.dtype, device=self.p.device)
         delta_xt = torch.zeros_like(x_init, dtype=x_init.dtype, device=self.p.device)
-        x = torch.zeros(n_batch + (self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
+        x = torch.zeros(self.n_batch + (self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
         x[..., 0, :] = x_init
         xt = x_init
 
