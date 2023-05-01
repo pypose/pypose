@@ -212,17 +212,17 @@ def knn(ref, nbr, k=1, ord=2, dim=-1, largest=False, sorted=True):
 
     Example:
         >>> import torch, pypose as pp
-        >>> pc1 = torch.tensor([[9., 2., 2.],
+        >>> ref = torch.tensor([[9., 2., 2.],
         ...                     [1., 0., 2.],
         ...                     [0., 1., 1.],
         ...                     [5., 0., 1.],
         ...                     [1., 0., 1.],
         ...                     [5., 5., 3.]])
-        >>> pc2 = torch.tensor([[1., 0., 1.],
+        >>> nbr = torch.tensor([[1., 0., 1.],
         ...                     [1., 6., 2.],
         ...                     [5., 1., 0.],
         ...                     [9., 0., 2.]])
-        >>> pp.knn(pc1, pc2)
+        >>> pp.knn(ref, nbr)
         torch.return_types.topk(
         values=tensor([[2.0000],
                 [1.0000],
@@ -236,7 +236,7 @@ def knn(ref, nbr, k=1, ord=2, dim=-1, largest=False, sorted=True):
                 [2],
                 [0],
                 [1]]))
-        >>> pp.knn(pc1, pc2, k=2, ord=2)
+        >>> pp.knn(ref, nbr, k=2, ord=2)
         torch.return_types.topk(
         values=tensor([[2.0000, 4.5826],
                 [1.0000, 4.5826],
@@ -250,7 +250,7 @@ def knn(ref, nbr, k=1, ord=2, dim=-1, largest=False, sorted=True):
                 [2, 0],
                 [0, 2],
                 [1, 2]]))
-        >>> pp.knn(pc1, pc2, k=2, ord=2).values
+        >>> pp.knn(ref, nbr, k=2, ord=2).values
         tensor([[2.0000, 4.5826],
                 [1.0000, 4.5826],
                 [1.4142, 5.0990],
@@ -283,13 +283,13 @@ def svdtf(source, target):
 
     Example:
         >>> import torch, pypose as pp
-        >>> pc1 = torch.tensor([[0., 0., 0.],
+        >>> source = torch.tensor([[0., 0., 0.],
         ...                     [1., 0., 0.],
         ...                     [0., 1., 0.]])
-        >>> pc2 = torch.tensor([[1., 1., 1.],
+        >>> target = torch.tensor([[1., 1., 1.],
         ...                     [2., 1., 1.],
         ...                     [1., 2., 1.]])
-        >>> pp.svdtf(pc1, pc2)
+        >>> pp.svdtf(source, target)
         SE3Type LieTensor:
         LieTensor([1., 1., 1., 0., 0., 0., 1.])
     '''
