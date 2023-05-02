@@ -84,6 +84,7 @@ class ICP(torch.nn.Module):
         '''
         temporal, errlast = source, 0
         init = init if init is not None else self.init
+        batch = torch.broadcast_shapes(source.shape[:-2], target.shape[:-2])
         if init is not None:
             assert is_SE3(init), "The initial transformation is not SE3Type."
             temporal = init.unsqueeze(-2) @ temporal
@@ -93,10 +94,8 @@ class ICP(torch.nn.Module):
             if torch.all((errnew - errlast).abs() < self.tol):
                 break
             errlast = errnew
-            target = target.view(*([1] * (knnidx.dim() - target.dim())), *target.shape)
-            target = target.expand(*knnidx.shape[:-2], target.size(-2),target.size(-1))
-            knntarget = torch.gather(target, -2, knnidx.expand(*knnidx.shape[:-1],
-                                                               source.size(-1)))
+            target = target.expand(batch + target.shape[-2:])
+            knntarget = torch.gather(target, -2, knnidx.expand(batch + source.shape[-2:]))
             T = svdtf(temporal, knntarget)
             temporal = T.unsqueeze(-2) @ temporal
         return svdtf(source, temporal)
