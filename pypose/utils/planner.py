@@ -17,7 +17,7 @@ class _Planner(object):
 
 class ReduceToBason(_Planner):
     r'''
-    A scheduler to stop a loop when no relative loss 'decreasing' is seen for a 'patience'
+    A planner to stop a loop when no relative loss 'decreasing' is seen for a 'patience'
     number of steps.
 
     Args:
@@ -31,21 +31,21 @@ class ReduceToBason(_Planner):
             Default: ``False``.
 
     Warning:
-        Remember to call `scheduler.reset()` if you want to re-use a scheduler.
+        Remember to call `planner.reset()` if you want to re-use a planner.
 
     Example:
-        >>> from pypose.module import ReduceToPlateau
+        >>> from pypose.module import ReduceToBason
         >>> x = torch.tensor(0.9)
-        >>> scheduler = ReduceToPlateau(steps=5, patience=2, decreasing=0.1, verbose=True)
-        >>> while scheduler.continual():
+        >>> planner = ReduceToBason(steps=5, patience=2, decreasing=0.1, verbose=True)
+        >>> while planner.continual():
         ...     x = x ** 2
-        ...     scheduler.step(x)
-        ReduceToPlateau step 0 loss 8.099999e-01.
-        ReduceToPlateau step 1 loss 6.560999e-01.
-        ReduceToPlateau step 2 loss 4.304671e-01.
-        ReduceToPlateau step 3 loss 1.853019e-01.
-        ReduceToPlateau step 4 loss 3.433681e-02.
-        ReduceToPlateau: Maximum steps reached, Quiting..
+        ...     planner.step(x)
+        ReduceToBason step 0 loss 8.099999e-01.
+        ReduceToBason step 1 loss 6.560999e-01.
+        ReduceToBason step 2 loss 4.304671e-01.
+        ReduceToBason step 3 loss 1.853019e-01.
+        ReduceToBason step 4 loss 3.433681e-02.
+        ReduceToBason: Maximum steps reached, Quiting..
     '''
     def __init__(self, steps, patience=5, decreasing=1e-3, verbose=False):
         super().__init__(steps, verbose)
@@ -54,7 +54,7 @@ class ReduceToBason(_Planner):
 
     def step(self, loss):
         r'''
-        Performs a scheduler step.
+        Performs a planner step.
 
         Args:
             loss (``float`` or ``torch.Tensor``): the model loss after one loop.
@@ -62,7 +62,7 @@ class ReduceToBason(_Planner):
                 satisfy the condition to stop a loop.
         '''
         if self.verbose:
-            print('ReduceToPlateau step', self.steps, 'loss', loss)
+            print('ReduceToBason step', self.steps, 'loss', loss)
 
         if not torch.is_tensor(loss):
             loss = torch.tensor(loss)
@@ -72,7 +72,7 @@ class ReduceToBason(_Planner):
         if self.steps >= self.max_steps:
             self._continual = False
             if self.verbose:
-                print("ReduceToPlateau: Maximum steps reached, Quiting..")
+                print("ReduceToBason: Maximum steps reached, Quiting..")
 
         if torch.all((self.last - loss)/loss < self.decreasing):
             self.patience_count = self.patience_count + 1
@@ -84,4 +84,4 @@ class ReduceToBason(_Planner):
         if self.patience_count >= self.patience:
             self._continual = False
             if self.verbose:
-                print("ReduceToPlateau: Maximum patience steps reached, Quiting..")
+                print("ReduceToBason: Maximum patience steps reached, Quiting..")

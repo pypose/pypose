@@ -38,7 +38,7 @@ class ICP(torch.nn.Module):
     3. The source point cloud is updated using the obtained transformation.
        The distance between the updated source and target is calculated.
 
-    4. The algorithm continues to iterate through these steps until the ``scheduler``
+    4. The algorithm continues to iterate through these steps until the ``planner``
        condition is satisfied.
 
     Example:
@@ -49,7 +49,7 @@ class ICP(torch.nn.Module):
         >>> target = torch.tensor([[[0.2,      0.1,  0.],
         ...                         [1.1397, 0.442,  0.],
         ...                         [2.0794, 0.7840, 0.]]])
-        >>> planner = pp.module.ReduceToPlateau(steps=10, verbose=True)
+        >>> planner = pp.utils.ReduceToBason(steps=10, verbose=True)
         >>> icp = pp.module.ICP(planner=planner)
         >>> icp(source, target)
         ReduceToBason step 0 loss tensor([0.4917])

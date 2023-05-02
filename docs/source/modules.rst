@@ -18,4 +18,3 @@ Modules
    module.IMUPreintegrator
    module.EPnP
    module.ICP
-   module.ReduceToPlateau
