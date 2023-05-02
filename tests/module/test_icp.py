@@ -14,19 +14,21 @@ class TestICP:
         self.pc2 = loaded_tensors['pc2'].squeeze(-3)
 
     def test_icp_laserscan_data(self):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.load_data()
-        source = self.pc1
+        source = self.pc1.to(device)
         tf = pp.SE3([-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503])
-        target = tf.Act(self.pc2)
-        icp = pp.module.ICP()
+        target = tf.Act(self.pc2).to(device)
+        icp = pp.module.ICP().to(device)
         result = icp(source, target)
-        error = _posediff(tf,result,aggregate=True)
+        error = _posediff(tf.to(device),result,aggregate=True)
         print("Test 1 (real laser scan data test): The translational error is {:.4f} and "
               "the rotational error is {:.4f}".format(error[0].item(), error[1].item()))
         assert error[0] < 0.1,  "The translational error is too large."
         assert error[1] < 0.1,  "The rotational error is too large."
 
     def test_icp_batch(self):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         n_points = 1000
         # Generate points on the L shape wall with x = 0:10, y = 20, and x = 10, y = 20:0
         x_line_1 = torch.linspace(0, 10, n_points // 2)
@@ -47,11 +49,11 @@ class TestICP:
         z_curve = torch.zeros(n_points) + torch.randn(n_points) * noise_std_dev
         points_set_2 = torch.stack((x_curve, y_curve, z_curve), dim=1)
         # Test ICP
-        source = torch.stack((points_set_1, points_set_2), dim=0)
+        source = torch.stack((points_set_1, points_set_2), dim=0).to(device)
         tf = pp.SE3([[-5.05, -3.02,  0.02,         0,         0, 0.0499792, 0.9987503],
-                     [   -2,      1,    1, 0.1304815, 0.0034168, -0.025953, 0.9911051]])
-        target = tf.unsqueeze(-2).Act(source)
-        icp = pp.module.ICP()
+                     [   -2,      1,    1, 0.1304815, 0.0034168, -0.025953, 0.9911051]]).to(device)
+        target = tf.unsqueeze(-2).Act(source).to(device)
+        icp = pp.module.ICP().to(device)
         result = icp(source, target)
         error = _posediff(tf,result,aggregate=True)
         print("Test 2 (batched generated data test): The translational error is {:.4f} "
