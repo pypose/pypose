@@ -1,6 +1,6 @@
 import torch
 from .. import knn, svdtf, is_SE3
-from .scheduler import ReduceToPlateau
+from ..utils.planner import ReduceToBason
 
 
 class ICP(torch.nn.Module):
@@ -11,8 +11,8 @@ class ICP(torch.nn.Module):
     Args:
         init (``LieTensor``, optional): the initial transformation :math:`T_{\text{init}}`
             in ``SE3type LieTensor``. Default: ``None``.
-        scheduler (``Scheduler``, optional): the scheduler to stop a loop. If ``None``,
-            the ``pypose.module.ReduceToPlateau`` with a maximum of 200 steps are used.
+        planner (``Planner``, optional): the planner to stop a loop. If ``None``,
+            the ``pypose.utils.ReduceToBason`` with a maximum of 200 steps are used.
             Default: ``None``.
 
     The algorithm takes two input point clouds (source and target) and finds the optimal
@@ -49,23 +49,23 @@ class ICP(torch.nn.Module):
         >>> target = torch.tensor([[[0.2,      0.1,  0.],
         ...                         [1.1397, 0.442,  0.],
         ...                         [2.0794, 0.7840, 0.]]])
-        >>> scheduler = pp.module.ReduceToPlateau(steps=10, verbose=True)
-        >>> icp = pp.module.ICP()
+        >>> planner = pp.module.ReduceToPlateau(steps=10, verbose=True)
+        >>> icp = pp.module.ICP(planner=planner)
         >>> icp(source, target)
-        ReduceToPlateau step 0 loss tensor([0.4917])
-        ReduceToPlateau step 1 loss tensor([7.4711e-08])
-        ReduceToPlateau step 2 loss tensor([1.0450e-07])
-        ReduceToPlateau step 3 loss tensor([2.8322e-07])
-        ReduceToPlateau: Maximum patience steps reached, Quiting..
+        ReduceToBason step 0 loss tensor([0.4917])
+        ReduceToBason step 1 loss tensor([7.4711e-08])
+        ReduceToBason step 2 loss tensor([1.0450e-07])
+        ReduceToBason step 3 loss tensor([2.8322e-07])
+        ReduceToBason: Maximum patience steps reached, Quiting..
         SE3Type LieTensor:
         LieTensor([[0.2000, 0.1000, 0.0000, 0.0000, 0.0000, 0.1736, 0.9848]])
 
     Warning:
         It's important to note that the solution is sensitive to the initialization.
     '''
-    def __init__(self, init=None, scheduler=None):
+    def __init__(self, init=None, planner=None):
         super().__init__()
-        self.scheduler = ReduceToPlateau(steps=200) if scheduler is None else scheduler
+        self.planner = ReduceToBason(steps=200) if planner is None else planner
         assert init is None or is_SE3(init), "The initial transformation is not SE3Type."
         self.init = init
 
@@ -89,14 +89,14 @@ class ICP(torch.nn.Module):
             ``LieTensor``: The estimated transformation (``SE3type``) from source to
             target point cloud.
         '''
-        temporal, errlast = source, 0
+        temporal = source
         init = init if init is not None else self.init
         if init is not None:
             assert is_SE3(init), "The initial transformation is not SE3Type LieTensor."
             temporal = init.unsqueeze(-2) @ temporal
         batch = torch.broadcast_shapes(source.shape[:-2], target.shape[:-2])
-        self.scheduler.reset()
-        while self.scheduler.continual():
+        self.planner.reset()
+        while self.planner.continual():
             knndist, knnidx = knn(temporal, target, k=1, ord=ord, dim=dim)
             error = knndist.squeeze(-1).mean(dim=-1)
             target = target.expand(batch + target.shape[-2:])
@@ -104,6 +104,6 @@ class ICP(torch.nn.Module):
             knntarget = torch.gather(target, -2, knnidx)
             T = svdtf(temporal, knntarget)
             temporal = T.unsqueeze(-2) @ temporal
-            self.scheduler.step(error)
+            self.planner.step(error)
 
         return svdtf(source, temporal)

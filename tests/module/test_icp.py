@@ -83,9 +83,9 @@ class TestICP:
         tf = pp.SE3([[-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503],
                      [-0.0100, -0.0300,  0.0000, 0, 0, 0.0499792, 0.9987503]])
         source = tf.unsqueeze(-2).Act(self.pc1)
-        scheduler = pp.module.ReduceToPlateau(steps=100, patience=3, verbose=True)
+        planner = pp.utils.ReduceToBason(steps=100, patience=3, verbose=True)
         torch.set_printoptions(precision=7)
-        icp = pp.module.ICP(scheduler=scheduler)
+        icp = pp.module.ICP(planner=planner)
         result = icp(source, target)
         error = _posediff(tf.Inv(),result,aggregate=True)
         print("Test 4 (broadcasting test 2): The translational error is {:.4f} "

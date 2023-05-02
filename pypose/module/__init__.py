@@ -7,4 +7,3 @@ from .dynamics import System, LTI, LTV, NLS
 from .imu_preintegrator import IMUPreintegrator
 from .pnp import EPnP
 from .icp import ICP
-from .scheduler import ReduceToPlateau

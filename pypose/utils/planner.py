@@ -1,7 +1,7 @@
 import torch
 
 
-class _Scheduler(object):
+class _Planner(object):
 
     def __init__(self, max_steps, verbose=False):
         self.max_steps, self.verbose = max_steps, verbose
@@ -15,7 +15,7 @@ class _Scheduler(object):
         self.steps, self._continual = 0, True
 
 
-class ReduceToPlateau(_Scheduler):
+class ReduceToBason(_Planner):
     r'''
     A scheduler to stop a loop when no relative loss 'decreasing' is seen for a 'patience'
     number of steps.
