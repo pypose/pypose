@@ -1,7 +1,7 @@
 import torch
 
 
-class _Planner(object):
+class _Stepper(object):
 
     def __init__(self, max_steps, verbose=False):
         self.max_steps, self.verbose = max_steps, verbose
@@ -15,9 +15,9 @@ class _Planner(object):
         self.steps, self._continual = 0, True
 
 
-class ReduceToBason(_Planner):
+class ReduceToBason(_Stepper):
     r'''
-    A planner to stop a loop when no relative loss 'decreasing' is seen for a 'patience'
+    A stepper to stop a loop when no relative loss 'decreasing' is seen for a 'patience'
     number of steps.
 
     Args:
@@ -31,15 +31,15 @@ class ReduceToBason(_Planner):
             Default: ``False``.
 
     Warning:
-        Remember to call `planner.reset()` if you want to re-use a planner.
+        Remember to call `stepper.reset()` if you want to re-use a stepper.
 
     Example:
-        >>> from pypose.module import ReduceToBason
-        >>> x = torch.tensor(0.9)
-        >>> planner = ReduceToBason(steps=5, patience=2, decreasing=0.1, verbose=True)
-        >>> while planner.continual():
+        >>> from pypose.utils import ReduceToBason
+        >>> x = 0.9
+        >>> stepper = ReduceToBason(steps=5, patience=2, decreasing=0.1, verbose=True)
+        >>> while stepper.continual():
         ...     x = x ** 2
-        ...     planner.step(x)
+        ...     stepper.step(x)
         ReduceToBason step 0 loss 8.099999e-01.
         ReduceToBason step 1 loss 6.560999e-01.
         ReduceToBason step 2 loss 4.304671e-01.
@@ -54,7 +54,7 @@ class ReduceToBason(_Planner):
 
     def step(self, loss):
         r'''
-        Performs a planner step.
+        Performs a stepper step.
 
         Args:
             loss (``float`` or ``torch.Tensor``): the model loss after one loop.

@@ -1,6 +1,6 @@
 import torch
 from .. import knn, svdtf, is_SE3
-from ..utils.planner import ReduceToBason
+from ..utils.stepper import ReduceToBason
 
 
 class ICP(torch.nn.Module):
@@ -11,7 +11,7 @@ class ICP(torch.nn.Module):
     Args:
         init (``LieTensor``, optional): the initial transformation :math:`T_{\text{init}}`
             in ``SE3type LieTensor``. Default: ``None``.
-        planner (``Planner``, optional): the planner to stop a loop. If ``None``,
+        stepper (``Planner``, optional): the stepper to stop a loop. If ``None``,
             the ``pypose.utils.ReduceToBason`` with a maximum of 200 steps are used.
             Default: ``None``.
 
@@ -38,7 +38,7 @@ class ICP(torch.nn.Module):
     3. The source point cloud is updated using the obtained transformation.
        The distance between the updated source and target is calculated.
 
-    4. The algorithm continues to iterate through these steps until the ``planner``
+    4. The algorithm continues to iterate through these steps until the ``stepper``
        condition is satisfied.
 
     Example:
@@ -49,8 +49,8 @@ class ICP(torch.nn.Module):
         >>> target = torch.tensor([[[0.2,      0.1,  0.],
         ...                         [1.1397, 0.442,  0.],
         ...                         [2.0794, 0.7840, 0.]]])
-        >>> planner = pp.utils.ReduceToBason(steps=10, verbose=True)
-        >>> icp = pp.module.ICP(planner=planner)
+        >>> stepper = pp.utils.ReduceToBason(steps=10, verbose=True)
+        >>> icp = pp.module.ICP(stepper=stepper)
         >>> icp(source, target)
         ReduceToBason step 0 loss tensor([0.4917])
         ReduceToBason step 1 loss tensor([7.4711e-08])
@@ -63,9 +63,9 @@ class ICP(torch.nn.Module):
     Warning:
         It's important to note that the solution is sensitive to the initialization.
     '''
-    def __init__(self, init=None, planner=None):
+    def __init__(self, init=None, stepper=None):
         super().__init__()
-        self.planner = ReduceToBason(steps=200) if planner is None else planner
+        self.stepper = ReduceToBason(steps=200) if stepper is None else stepper
         assert init is None or is_SE3(init), "The initial transformation is not SE3Type."
         self.init = init
 
@@ -95,8 +95,8 @@ class ICP(torch.nn.Module):
             assert is_SE3(init), "The initial transformation is not SE3Type LieTensor."
             temporal = init.unsqueeze(-2) @ temporal
         batch = torch.broadcast_shapes(source.shape[:-2], target.shape[:-2])
-        self.planner.reset()
-        while self.planner.continual():
+        self.stepper.reset()
+        while self.stepper.continual():
             knndist, knnidx = knn(temporal, target, k=1, ord=ord, dim=dim)
             error = knndist.squeeze(-1).mean(dim=-1)
             target = target.expand(batch + target.shape[-2:])
@@ -104,6 +104,6 @@ class ICP(torch.nn.Module):
             knntarget = torch.gather(target, -2, knnidx)
             T = svdtf(temporal, knntarget)
             temporal = T.unsqueeze(-2) @ temporal
-            self.planner.step(error)
+            self.stepper.step(error)
 
         return svdtf(source, temporal)
