@@ -15,8 +15,8 @@ class Pointcloud():
     def load_pointcloud():
         download_and_extract_archive('https://github.com/pypose/pypose/releases/'\
                                      'download/v0.4.2/icp-test-data.pt.zip',\
-                                     './tests/module')
-        loaded_tensors = torch.load('./tests/module/icp-test-data.pt')
+                                     './examples/module/pcr/data')
+        loaded_tensors = torch.load('./examples/module/pcr/data/icp-test-data.pt')
         pc1 = loaded_tensors['pc1'].squeeze(-3)
         pc2 = loaded_tensors['pc2'].squeeze(-3)
         return pc1, pc2
