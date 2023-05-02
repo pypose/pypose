@@ -1,5 +1,7 @@
 import torch
 from .. import knn, svdtf, is_SE3
+from .scheduler import ReduceToPlateau
+
 
 class ICP(torch.nn.Module):
     r'''
@@ -7,16 +9,15 @@ class ICP(torch.nn.Module):
     between two sets of points using Singular Value Decomposition (SVD).
 
     Args:
-        steps (``int``, optional): the maximum number of ICP iteration steps. Default: 200.
-        tol (``double``, optional): the tolerance of the relative error used to terminate
-            the algorithm. Default: 1e-6.
-        init (``LieTensor``, optional): the initial transformation :math:`T_{init}` in
-            ``SE3type``. Default: ``None``.
+        init (``LieTensor``, optional): the initial transformation :math:`T_{\text{init}}`
+            in ``SE3type LieTensor``. Default: ``None``.
+        scheduler (``Scheduler``, optional): the scheduler to stop a loop. If ``None``,
+            the ``pypose.module.ReduceToPlateau`` with a maximum of 200 steps are used.
+            Default: ``None``.
 
-    The algorithm takes two input point clouds: source point cloud and target point cloud.
-    The objective is to find the optimal similarity transformation ( :math:`T` ) to
-    minimize the error between the transformed source point cloud and the target
-    point cloud as shown in the equation:
+    The algorithm takes two input point clouds (source and target) and finds the optimal
+    transformation ( :math:`T` ) to minimize the error between the transformed source
+    point cloud and the target point cloud:
 
     .. math::
         \begin{align*}
@@ -24,22 +25,21 @@ class ICP(torch.nn.Module):
             T \cdot p_{\mathrm{source, i}}\|,
         \end{align*}
 
-    where :math:`p_{\mathrm{source, i}}` is the ith point in the source point cloud, and
-    :math:`p_{\mathrm{target, j}}` is the cloest point to :math:`p_{\mathrm{source, i}}`
-    in the target point cloud with index j. The algorithm consists of the following steps:
+    where :math:`p_{\mathrm{source, i}}` is the i-th point in the source point cloud, and
+    :math:`p_{\mathrm{target, j}}` is the cloest point of :math:`p_{\mathrm{source, i}}`
+    in the target point clouds with index j. The algorithm consists of the following steps:
 
     1. For each point in source, the nearest neighbor algorithm (KNN) is used to select
-    its closest point in target to form the matched point pairs.
+       its closest point in target to form the matched point pairs.
 
-    2. Singular value decomposition (SVD) algorithm is used to compute the rotation
-    and translation matrices from the matched point pairs.
+    2. Singular value decomposition (SVD) algorithm is used to compute the transformation
+       from the matched point pairs.
 
-    3. The source point cloud is updated using the obtained rotation and translation
-    matrices. The distance between the updated source and target is calculated.
+    3. The source point cloud is updated using the obtained transformation.
+       The distance between the updated source and target is calculated.
 
-    4. The algorithm continues to iterate through these steps until the change in the
-    calculated distance falls below the specified tolerance level or the maximum number
-    of iteration steps is reached.
+    4. The algorithm continues to iterate through these steps until the ``scheduler``
+       condition is satisfied.
 
     Example:
         >>> import torch, pypose as pp
@@ -49,18 +49,25 @@ class ICP(torch.nn.Module):
         >>> target = torch.tensor([[[0.2,      0.1,  0.],
         ...                         [1.1397, 0.442,  0.],
         ...                         [2.0794, 0.7840, 0.]]])
+        >>> scheduler = pp.module.ReduceToPlateau(steps=10, verbose=True)
         >>> icp = pp.module.ICP()
         >>> icp(source, target)
+        ReduceToPlateau step 0 loss tensor([0.4917])
+        ReduceToPlateau step 1 loss tensor([7.4711e-08])
+        ReduceToPlateau step 2 loss tensor([1.0450e-07])
+        ReduceToPlateau step 3 loss tensor([2.8322e-07])
+        ReduceToPlateau: Maximum patience steps reached, Quiting..
         SE3Type LieTensor:
         LieTensor([[0.2000, 0.1000, 0.0000, 0.0000, 0.0000, 0.1736, 0.9848]])
 
     Warning:
         It's important to note that the solution is sensitive to the initialization.
     '''
-    def __init__(self, steps=200, tol=1e-6, init=None):
+    def __init__(self, init=None, scheduler=None):
         super().__init__()
+        self.scheduler = ReduceToPlateau(steps=200) if scheduler is None else scheduler
         assert init is None or is_SE3(init), "The initial transformation is not SE3Type."
-        self.steps, self.tol, self.init = steps, tol, init
+        self.init = init
 
     def forward(self, source, target, ord=2, dim=-1, init=None):
         r'''
@@ -84,18 +91,19 @@ class ICP(torch.nn.Module):
         '''
         temporal, errlast = source, 0
         init = init if init is not None else self.init
-        batch = torch.broadcast_shapes(source.shape[:-2], target.shape[:-2])
         if init is not None:
-            assert is_SE3(init), "The initial transformation is not SE3Type."
+            assert is_SE3(init), "The initial transformation is not SE3Type LieTensor."
             temporal = init.unsqueeze(-2) @ temporal
-        for _ in range(self.steps):
+        batch = torch.broadcast_shapes(source.shape[:-2], target.shape[:-2])
+        self.scheduler.reset()
+        while self.scheduler.continual():
             knndist, knnidx = knn(temporal, target, k=1, ord=ord, dim=dim)
-            errnew = knndist.squeeze(-1).mean(dim=-1)
-            if torch.all((errnew - errlast).abs() < self.tol):
-                break
-            errlast = errnew
+            error = knndist.squeeze(-1).mean(dim=-1)
             target = target.expand(batch + target.shape[-2:])
-            knntarget = torch.gather(target, -2, knnidx.expand(batch + source.shape[-2:]))
+            knnidx = knnidx.expand(batch + source.shape[-2:])
+            knntarget = torch.gather(target, -2, knnidx)
             T = svdtf(temporal, knntarget)
             temporal = T.unsqueeze(-2) @ temporal
+            self.scheduler.step(error)
+
         return svdtf(source, temporal)

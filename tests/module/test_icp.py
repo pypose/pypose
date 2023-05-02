@@ -48,8 +48,8 @@ class TestICP:
         points_set_2 = torch.stack((x_curve, y_curve, z_curve), dim=1)
         # Test ICP
         source = torch.stack((points_set_1, points_set_2), dim=0)
-        tf = pp.SE3([[-5.05, -3.02,  0.02, 0, 0, 0.0499792, 0.9987503],
-               [-2, 1, 1, 0.1304815, 0.0034168, -0.025953, 0.9911051]])
+        tf = pp.SE3([[-5.05, -3.02,  0.02,         0,         0, 0.0499792, 0.9987503],
+                     [   -2,      1,    1, 0.1304815, 0.0034168, -0.025953, 0.9911051]])
         target = tf.unsqueeze(-2).Act(source)
         icp = pp.module.ICP()
         result = icp(source, target)
@@ -64,7 +64,7 @@ class TestICP:
         self.load_data()
         source = self.pc1
         tf = pp.SE3([[-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503],
-               [-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503]])
+                     [-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503]])
         target = tf.unsqueeze(-2).Act(self.pc2)
         icp = pp.module.ICP()
         result = icp(source, target)
@@ -79,9 +79,11 @@ class TestICP:
         self.load_data()
         target = self.pc2
         tf = pp.SE3([[-0.0500, -0.0200,  0.0000, 0, 0, 0.0499792, 0.9987503],
-               [-0.0100, -0.0300,  0.0000, 0, 0, 0.0499792, 0.9987503]])
+                     [-0.0100, -0.0300,  0.0000, 0, 0, 0.0499792, 0.9987503]])
         source = tf.unsqueeze(-2).Act(self.pc1)
-        icp = pp.module.ICP()
+        scheduler = pp.module.ReduceToPlateau(steps=100, patience=3, verbose=True)
+        torch.set_printoptions(precision=7)
+        icp = pp.module.ICP(scheduler=scheduler)
         result = icp(source, target)
         error = _posediff(tf.Inv(),result,aggregate=True)
         print("Test 4 (broadcasting test 2): The translational error is {:.4f} "
