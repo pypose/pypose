@@ -21,7 +21,7 @@ class ReduceToBason(_Stepper):
     number of steps.
 
     Args:
-        steps (int): Maximum number of iterations optimizer will step.
+        steps (int): Maximum number of iterations a loop will step.
         patience (int): Number of steps with no loss 'decreasing' is seen. For example, if
             ``patience = 2``, then it ignores the first 2 steps with no improvement, and
             stop the loop after the 3rd step if the loss has no decerasing. Default: 5.
