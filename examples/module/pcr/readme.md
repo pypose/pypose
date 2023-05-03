@@ -15,7 +15,7 @@ python examples/module/pcr/icp.py
 
 Or
 ```bash
-python examples/module/pcr/icp.py --device cpu --steps 200 --patience 5 --decreasing 1e-5 --verbose --show
+python examples/module/pcr/icp.py --verbose --show --device cpu --steps 100
 ```
 
 * Other supported arguments:

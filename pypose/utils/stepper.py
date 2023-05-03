@@ -21,14 +21,17 @@ class ReduceToBason(_Stepper):
     number of steps.
 
     Args:
-        steps (int): Maximum number of iterations a loop will step.
-        patience (int): Number of steps with no loss 'decreasing' is seen. For example, if
-            ``patience = 2``, then it ignores the first 2 steps with no improvement, and
-            stop the loop after the 3rd step if the loss has no decerasing. Default: 5.
-        decreasing (float): relative loss decreasing used to count the number of patience
-            steps. Default: 1e-3.
-        verbose (bool): if ``True``, prints a message to stdout for each step.
-            Default: ``False``.
+        steps (``int``): Maximum number of iterations a loop will step.
+        patience (``int``, optional): Number of steps with no loss 'decreasing' is seen.
+            For example, if ``patience = 2``, then it ignores the first 2 steps with no
+            improvement, and stop the loop after the 3rd step if the loss has no
+            decerasing. Default: 5.
+        decreasing (``float``, optional): relative loss decreasing used to count the
+            number of patience steps. Default: 1e-3.
+        tol (``float``, optional): the minimum loss tolerance to stop a loop.
+            Default: 1e-5.
+        verbose (``bool``, optional): if ``True``, prints a message to stdout for each
+            step. Default: ``False``.
 
     Warning:
         Remember to call `stepper.reset()` if you want to re-use a stepper.
@@ -47,9 +50,9 @@ class ReduceToBason(_Stepper):
         ReduceToBason step 4 loss 3.433681e-02.
         ReduceToBason: Maximum steps reached, Quiting..
     '''
-    def __init__(self, steps, patience=5, decreasing=1e-3, verbose=False):
+    def __init__(self, steps, patience=5, decreasing=1e-3, tol=1e-5, verbose=False):
         super().__init__(steps, verbose)
-        self.decreasing = decreasing
+        self.decreasing, self.tol = decreasing, tol
         self.patience, self.patience_count = patience, 0
 
     def step(self, loss):
@@ -68,6 +71,11 @@ class ReduceToBason(_Stepper):
             loss = torch.tensor(loss)
 
         self.steps = self.steps + 1
+
+        if torch.all(loss < self.tol):
+            self._continual = False
+            if self.verbose:
+                print("ReduceToBason: Loss tol reached, Quiting..")
 
         if self.steps >= self.max_steps:
             self._continual = False
