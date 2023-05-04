@@ -145,7 +145,11 @@ examples/module/imu/save/*
 examples/module/filter/save/*
 examples/module/dynamics/save/*
 examples/module/pgo/pgodata/*
+examples/module/pgo/data/*
 examples/module/pgo/save/*
+examples/module/pcr/data/*
+examples/module/pcr/save/*
 *epnp-test-data.pt*
+*icp-test-data.pt*
 *__MACOSX
 examples/module/pnp/data_cache_eth3d_dp/*

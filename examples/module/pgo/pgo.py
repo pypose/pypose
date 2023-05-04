@@ -11,7 +11,7 @@ import pypose.optim.corrector as ppoc
 import pypose.optim.strategy as ppost
 from pypose.optim.scheduler import StopOnPlateau
 
- 
+
 class PoseGraph(nn.Module):
 
     def __init__(self, nodes):
@@ -43,13 +43,18 @@ def plot_and_save(points, pngname, title='', axlim=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Pose Graph Optimization')
-    parser.add_argument("--device", type=str, default='cuda:0', help="cuda or cpu")
+    parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
     parser.add_argument("--radius", type=float, default=1e4, help="trust region radius")
-    parser.add_argument("--save", type=str, default='./examples/module/pgo/save/', help="files location to save")
-    parser.add_argument("--dataroot", type=str, default='./examples/module/pgo/pgodata', help="dataset location")
-    parser.add_argument("--dataname", type=str, default='parking-garage.g2o', help="dataset name")
-    parser.add_argument('--no-vectorize', dest='vectorize', action='store_false', help="to save memory")
-    parser.add_argument('--vectorize', action='store_true', help='to accelerate computation')
+    parser.add_argument("--save", type=str, default='./examples/module/pgo/save/', \
+                        help="files location to save")
+    parser.add_argument("--dataroot", type=str, default='./examples/module/pgo/data', \
+                        help="dataset location")
+    parser.add_argument("--dataname", type=str, default='parking-garage.g2o', \
+                        help="dataset name")
+    parser.add_argument('--no-vectorize', dest='vectorize', action='store_false', \
+                        help="to save memory")
+    parser.add_argument('--vectorize', action='store_true', \
+                        help='to accelerate computation')
     parser.set_defaults(vectorize=True)
     args = parser.parse_args(); print(args)
     os.makedirs(os.path.join(args.save), exist_ok=True)
