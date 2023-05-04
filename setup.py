@@ -31,7 +31,7 @@ def load_requirements(filename: str):
 
 
 requirements_extras = {
-    "runtime": load_requirements("requirements/runtime.txt"), 
+    "runtime": load_requirements("requirements/runtime.txt"),
     "docs": load_requirements("requirements/docs.txt"),}
 
 requirements_extras["all"] = list(set(sum(requirements_extras.values(), [])))
@@ -39,9 +39,9 @@ requirements_extras["all"] = list(set(sum(requirements_extras.values(), [])))
 if __name__ == '__main__':
     setup(
         name = 'pypose',
-        author = 'Chen Wang',
+        author = 'Chen Wang and PyPose Team',
         version = VERSION,
-        author_email = 'chenwang@dr.com',
+        author_email = 'admin@pypose.org',
         url = 'https://pypose.org',
         download_url = 'https://github.com/pypose/pypose',
         license = 'Apache License 2.0',
