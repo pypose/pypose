@@ -25,11 +25,11 @@ class ReduceToBason(_Stepper):
         patience (``int``, optional): Number of steps with no loss 'decreasing' is seen.
             For example, if ``patience = 2``, then it ignores the first 2 steps with no
             improvement, and stop the loop after the 3rd step if the loss has no
-            decerasing. Default: 5.
+            decerasing. Default: ``5``.
         decreasing (``float``, optional): relative loss decreasing used to count the
-            number of patience steps. Default: 1e-3.
+            number of patience steps. Default: ``1e-3``.
         tol (``float``, optional): the minimum loss tolerance to stop a loop.
-            Default: 1e-5.
+            Default: ``1e-5``.
         verbose (``bool``, optional): if ``True``, prints a message to stdout for each
             step. Default: ``False``.
 
