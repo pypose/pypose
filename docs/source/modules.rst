@@ -17,4 +17,5 @@ Modules
    module.LQR
    module.IMUPreintegrator
    module.EPnP
+   module.ICP
    module.LieSpline
