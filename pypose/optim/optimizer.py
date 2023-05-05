@@ -32,12 +32,13 @@ class RobustModel(nn.Module):
         self.model = model
         self.kernel = Trivial() if kernel is None else kernel
 
-        if auto:
-            self.register_forward_hook(self.kernel_forward)
+        # if auto:
+        #     self.register_forward_hook(self.kernel_forward)
 
     def forward(self, input, target):
         output = self.model_forward(input)
-        return self.residual(output, target)
+        return self.merge_data_list(self.residuals(output, target))
+        # return self.residual(output, target)
 
     def model_forward(self, input):
         if isinstance(input, tuple):
@@ -45,19 +46,37 @@ class RobustModel(nn.Module):
         else:
             return self.model(input)
 
+    def merge_data_list(self, data_list):
+        if data_list is None:
+            return None
+        data_list = [data.reshape(-1) for data in data_list]
+        return torch.cat(data_list)
+
     def residual(self, output, target):
         return output if target is None else output - target
 
+    def residuals(self, output, target):
+        if isinstance(output, (tuple, list)):
+            target = [None for i in range(len(output))] if target is None else target
+            return [self.residual(output[i], target[i]) for i in range(len(output))]
+        return [self.residual(output, target)]
+
     def kernel_forward(self, module, input, output):
         # eps is to prevent grad of sqrt() from being inf
+        print(output.shape)
         assert torch.is_floating_point(output), "model output have to be float type."
         eps = finfo(output.dtype).eps
         return self.kernel(output.square().sum(-1)).clamp(min=eps).sqrt()
 
     def loss(self, input, target):
         output = self.model_forward(input)
-        residual = self.residual(output, target)
-        return self.kernel(residual.square().sum(-1)).sum()
+        residual_list = self.residuals(output, target)
+        if isinstance(self.kernel, nn.ModuleList):
+            residuals = [k(r.square().sum(-1)).sum() for k, r in zip(self.kernel, residual_list)]
+        else:
+            residuals = [self.kernel(r.square().sum(-1)).sum() for r in residual_list]
+        return sum(residuals)
+        # return self.kernel(residual.square().sum(-1)).sum()
 
 
 class _Optimizer(Optimizer):
@@ -66,7 +85,7 @@ class _Optimizer(Optimizer):
     '''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-    
+
     def update_parameter(self, params, step):
         r'''
         params will be updated by calling this function
@@ -82,7 +101,7 @@ class GaussNewton(_Optimizer):
     Tensor/LieTensor or a tuple of Tensors/LieTensors.
 
     .. math::
-        \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
+        \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i
             \rho\left((\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)^T \mathbf{W}_i
             (\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\right),
 
@@ -149,7 +168,7 @@ class GaussNewton(_Optimizer):
           Conference on Computer Vision (ECCV), 2014.
 
         **Therefore, the users need to keep the last dimension of model output and target to
-        1, even if the model residual is a scalar. If the users flatten all sample residuals 
+        1, even if the model residual is a scalar. If the users flatten all sample residuals
         into a vector (residual inner product will be a scalar), the model Jacobian will be a
         row vector, instead of a matrix, which loses sample-level structural information,
         although computing Jacobian vector is faster.**
@@ -254,7 +273,7 @@ class LevenbergMarquardt(_Optimizer):
     Tensor/LieTensor or a tuple of Tensors/LieTensors.
 
     .. math::
-        \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
+        \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i
             \rho\left((\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)^T \mathbf{W}_i
             (\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\right),
 
@@ -431,11 +450,12 @@ class LevenbergMarquardt(_Optimizer):
         Note:
             More practical examples, e.g., pose graph optimization (PGO), can be found at
             `examples/module/pgo
-            <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.    
+            <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.
         '''
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
             R = self.model(input, target)
+            print("R = {}".format(R))
             J = modjac(self.model, input=(input, target), **self.jackwargs)
             R, J = self.corrector(R = R, J = J)
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
