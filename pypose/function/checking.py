@@ -1,4 +1,4 @@
-import torch
+import torch, math
 from .. import lietensor
 from .. import LieTensor
 
@@ -29,14 +29,31 @@ def is_SE3(obj):
     return True if isinstance(obj.ltype, lietensor.lietensor.SE3Type) else False
 
 
-def hasnan(L:list):
+def hasnan(obj:list):
     r'''
     Checks whether a deep nested list of tensors contains Nan or not.
+
+    Args:
+        obj (``obj``): a Python object that can be a list of nested list.
+
+    Return:
+        ``bool``: ``True`` if the list contains a tensor with ``Nan`` otherwise ``False``.
+
+    Example:
+        >>> L1 = [[1, 3], [4, [5, 6]], 7, [8, torch.tensor([0, -1.0999])]]
+        >>> hasnan(L1)
+        False
+        >>> L2 = [[torch.tensor([float('nan'), -1.0999]), 3], [4, [5, 6]], 7, [8, 9]]
+        >>> hasnan(L2)
+        True
+        >>> L3 = [[torch.tensor([1, -1.0999]), 3], [4, [float('nan'), 6]], 7, [8, 9]]
+        >>> hasnan(L3)
+        True
     '''
-    if isinstance(L, list) or isinstance(L, tuple):
-        for l in L:
+    if isinstance(obj, list) or isinstance(obj, tuple):
+        for l in obj:
             if hasnan(l):
                 return True
         return False
     else:
-        return torch.isnan(L).any() if torch.is_tensor(L) else False
+        return torch.isnan(obj).any() if torch.is_tensor(obj) else math.isnan(obj)

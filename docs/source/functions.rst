@@ -10,6 +10,7 @@ Functions
     :template: autosummary/class.rst
     is_lietensor
     is_SE3
+    hasnan
     add
     add_
     mul
