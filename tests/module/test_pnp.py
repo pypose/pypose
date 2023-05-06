@@ -6,9 +6,9 @@ class TestEPnP:
 
     def load_data(self):
         download_and_extract_archive('https://github.com/pypose/pypose/releases/'\
-                                    'download/v0.3.6/epnp-test-data.pt.zip', \
-                                    './test/module')
-        return torch.load('./test/module/epnp-test-data.pt')
+                                     'download/v0.3.6/epnp-test-data.pt.zip', \
+                                     './tests/module')
+        return torch.load('./tests/module/epnp-test-data.pt')
 
     def test_epnp_nonbatch(self):
         data = self.load_data()
