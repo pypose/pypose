@@ -316,6 +316,25 @@ class TestOptim:
         assert idx < 9, "Optimization requires too many steps."
 
 
+    def test_modjac(self):
+        class PoseInv(nn.Module):
+            def __init__(self, *dim):
+                super().__init__()
+                self.pose = pp.Parameter(pp.randn_SE3(*dim))
+
+            def forward(self, inputs):
+                error = (self.pose @ inputs).Log().tensor()
+                constraint = self.pose.Log().tensor().sum(-1)
+                return error, constraint
+
+        B1, B2, M, N = 2, 3, 2, 2
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        inputs = pp.randn_SE3(B2, B1, M, N, sigma=0.0001).to(device)
+        invnet = PoseInv(M, N).to(device)
+        jackwargs = {'vectorize': True, 'flatten': False}
+        J = pp.optim.functional.modjac(invnet, input=inputs, **jackwargs)
+
+
 if __name__ == '__main__':
     test = TestOptim()
     # test.test_optim_liealgebra()
@@ -326,4 +345,5 @@ if __name__ == '__main__':
     # test.test_optim_trustregion()
     # test.test_optim_multiparameter()
     # test.test_optim_anybatch()
-    test.test_optim_multi_input()
+    # test.test_optim_multi_input()
+    test.test_modjac()

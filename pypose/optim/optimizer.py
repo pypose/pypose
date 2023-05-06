@@ -36,8 +36,9 @@ class RobustModel(nn.Module):
         #     self.register_forward_hook(self.kernel_forward)
 
     def forward(self, input, target):
-        output = self.model_forward(input)
-        return self.merge_data_list(self.residuals(output, target))
+        return self.model_forward(input)
+        # output = self.model_forward(input)
+        # return self.merge_data_list(self.residuals(output, target))
         # return self.residual(output, target)
 
     def model_forward(self, input):
@@ -455,7 +456,7 @@ class LevenbergMarquardt(_Optimizer):
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
             R = self.model(input, target)
-            print("R = {}".format(R))
+            print("R = {}".format(len(R)))
             J = modjac(self.model, input=(input, target), **self.jackwargs)
             R, J = self.corrector(R = R, J = J)
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
