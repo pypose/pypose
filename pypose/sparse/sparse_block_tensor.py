@@ -45,7 +45,14 @@ Attributes:
 
 '''
 
-
+def unravel_index(index, shape: List[int]):
+    dims = len(shape)
+    out = torch.empty((dims, index.shape[0]), dtype=index.dtype, device=index.device)
+    for dim_idx in range(dims-1, 0-1, -1):
+        dim = shape[dim_idx]
+        out[dim_idx] = (index % dim)
+        index = index // dim
+    return out
 
 @jit.script
 def make_coo_indices_and_dims_from_hybrid(hybrid):
@@ -64,32 +71,33 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
     hybrid = hybrid.coalesce()
 
     # The block dimension.
-    b_dim = hybrid.shape[-2:]
+    assert len(hybrid.shape) % 2 == 0
+    b_dim = len(hybrid.shape) // 2
+    b_shape = hybrid.shape[b_dim:]
+    p_shape = hybrid.shape[:b_dim]
     assert hybrid.dim() >= 4, f'hybrid.shape = {hybrid.shape}. '
-    n_block_elem = b_dim[0] * b_dim[1] # Number of elements per block.
+    n_block_elem = b_shape[0] * b_shape[1]
 
     # === Compose target coo indices. ===
 
     # Index shift in block
-    shift_row = torch.arange(b_dim[0], dtype=torch.int64, device=hybrid.device)
-    shift_col = torch.arange(b_dim[1], dtype=torch.int64, device=hybrid.device)
-    index_shift_row, index_shift_col = torch.meshgrid(shift_row, shift_col, indexing='ij')
-    index_shift_row = index_shift_row.contiguous().flatten()
-    index_shift_col = index_shift_col.contiguous().flatten()
-    index_shift = torch.stack((index_shift_row, index_shift_col), dim=0) # (2,n_block_elem)
+    # index_shift = torch.cartesian_prod(*[torch.arange(i) for i in b_shape]).T
+    index_shift = unravel_index(torch.arange(n_block_elem), b_shape)
 
     # Shift the original indices.
-    indices_ori = hybrid.indices() # (2, n_block)
-    indices_rp = indices_ori.unsqueeze(-1).repeat(1, 1, n_block_elem) #(2,n_block,n_block_elem)
+    indices_ori = hybrid.indices() # (p_dim, n_block)
+    indices_rp = indices_ori.unsqueeze(-1).repeat(1, 1, n_block_elem) #(p_dim,n_block_elem)
 
     # Compute the new indices by multiplying the block shape and adding the index shift.
-    index_scale = torch.tensor(list(b_dim), dtype=torch.int64, device=hybrid.device)
+    index_scale = torch.tensor(b_shape, dtype=torch.int64, device=hybrid.device)
     # (2, n_block, n_block_elem)
     indices_new = indices_rp * index_scale[:, None, None] + index_shift[:, None, :]
     indices_new = indices_new.flatten(1, 2)
 
     # === The sparse dimension of the target coo matrix. ===
-    coo_dim = [hybrid.shape[-4]*b_dim[0], hybrid.shape[-3]*b_dim[1]]
+    coo_dim: List[int] = []
+    for i in range(b_dim):
+        coo_dim.append(p_shape[i] * b_shape[i])
     return indices_new, coo_dim
 
 
@@ -121,13 +129,9 @@ def repeated_value_as_hybrid_value(coo: torch.Tensor,
     Example:
         # TODO
     '''
-    # Make sure we have ordered values.
     coo = coo.coalesce()
-
-    # Number of block and number of elements per block.
     n_block = coo.values().shape[0]
 
-    # Prepare the sequence number.
     if mode == 'zeros':
         val = torch.zeros(n_block, device=coo.device, dtype=dtype)
     elif mode == 'ones':
@@ -138,7 +142,7 @@ def repeated_value_as_hybrid_value(coo: torch.Tensor,
         raise ValueError(f'Unknown mode: {mode}')
     val = val[..., None, None].tile(block_shape)
 
-    s_dim: List[int] = list(coo.shape[-2:])
+    s_dim: List[int] = list(coo.shape)
 
     return torch.sparse_coo_tensor(
             coo.indices(), val, size=s_dim + block_shape
@@ -182,10 +186,10 @@ def coo_2_hybrid(coo, proxy):
     proxy = proxy.coalesce()
 
     # Figure out the shape of the target Hybrid tensor.
-    s_dim = proxy.shape[-2:]
-    assert coo.shape[0] % s_dim[0] == 0 and coo.shape[1] % s_dim[1] == 0, \
+    s_dim = proxy.shape
+    assert all(coo.shape[i] % s_dim[i] == 0 for i in range(proxy.dim())), \
         f'coo and s_dim are not compatible: coo.shape = {coo.shape}, s_dim = {s_dim}. '
-    b_dim: List[int] = [ coo.shape[0] // s_dim[0], coo.shape[1] // s_dim[1] ] # block dimension.
+    b_dim: List[int] = [coo.shape[i] // s_dim[i] for i in range(proxy.dim())] # block dimension.
 
     # Create a temporary Hybrid tensor to represent the block sequence.
     block_seq = repeated_value_as_hybrid_value(proxy, b_dim, mode='sequence')
