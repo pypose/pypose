@@ -25,14 +25,15 @@ def test_sparse_coo_2_sparse_hybrid_coo():
     print(f'x._p = \n{x._p}')
 
 
-def random_sbt(proxy_shape, block_shape):
+def random_sbt(proxy_shape, block_shape, dense_zero_prob=0.):
     proxy = torch.randn(proxy_shape) > 0.5
     indices = proxy.nonzero().T  # (dim, nnz)
     values = torch.randn((indices.shape[1], *block_shape))
+    values[torch.rand(values.shape) < dense_zero_prob] = 0
     return sparse_block_tensor(indices, values, size=proxy_shape)
 
-
-@pytest.mark.parametrize('meta', [
+@pytest.mark.parametrize('dense_zero_prob', [0., 0.7])
+@pytest.mark.parametrize('op,dense_op,num_operands,shape_mode', [
     (sp.abs, torch.abs, 1, 'identical'),
     (torch.abs, torch.abs, 1, 'identical'),
     (SparseBlockTensor.__add__, torch.add, 2, 'identical'),
@@ -40,9 +41,7 @@ def random_sbt(proxy_shape, block_shape):
     (SparseBlockTensor.__sub__, torch.sub, 2, 'identical'),
     (SparseBlockTensor.__matmul__, torch.matmul, 2, 'identical_square'),],
     )
-def test_universal(meta, dim=2):
-    op, dense_op, num_operands, shape_mode = meta
-
+def test_universal(op, dense_op, num_operands, shape_mode, dense_zero_prob, dim=2):
     if shape_mode == 'identical':
         proxy_shape = torch.Size(torch.randint(1, 10, (dim,)))
         block_shape = torch.randint(1, 10, (dim,))
@@ -55,7 +54,7 @@ def test_universal(meta, dim=2):
         block_shapes = [block_shape for _ in range(num_operands)]
     else:
         raise ValueError(f'Unknown shape_mode: {shape_mode}')
-    args = [random_sbt(proxy_shape, block_shape) for _ in zip(proxy_shapes, block_shapes)]
+    args = [random_sbt(proxy_shape, block_shape, dense_zero_prob) for _ in zip(proxy_shapes, block_shapes)]
     y_sbt = op(*args)
 
     # dense reference
@@ -121,6 +120,6 @@ if __name__ == '__main__':
     print(f'elapsed time = {end - start}')
 
     from tqdm import tqdm
-    mm_config = (SparseBlockTensor.__matmul__, torch.matmul, 2, 'identical_square')
+    mm_config = (SparseBlockTensor.__matmul__, torch.matmul, 2, 'identical_square', 0.7)
     for i in tqdm(range(10000)):
-        test_universal(mm_config)
+        test_universal(*mm_config)
