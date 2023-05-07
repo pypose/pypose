@@ -91,26 +91,23 @@ class LieSpline(nn.Module):
         '''
         if inter_begin_and_end:
             input_poses = torch.cat(
-                [torch.cat([input_poses[:, [0], :], input_poses], dim=1), input_poses[:, [-1], :]], dim=1)
-
+                [torch.cat([input_poses[..., [0], :], input_poses], dim=1), input_poses[..., [-1], :]], dim=1)
         timeSize = time.shape[-1]
         batchSize = input_poses.shape[0]
         posesSize = input_poses.shape[1]
-        w = self.compute_weights(time)
-        w0 = w[0, :, 0, :].T
-        w1 = w[0, :, 1, :].T
-        w2 = w[0, :, 2, :].T
-
-        posesTensor = torch.stack([input_poses[:, i:i + 4, :] for i in range(posesSize - 3)], dim=1)
-
-        T_delta = input_poses[:, 0:-3, :]
+        w = self.compute_weights(time).squeeze(0)
+        w0 = w[..., 0, :].T
+        w1 = w[..., 1, :].T
+        w2 = w[..., 2, :].T
+        posesTensor = torch.stack([input_poses[..., i:i + 4, :] for i in range(posesSize - 3)], dim=1)
+        T_delta = input_poses[..., 0:-3, :]
         T_delta = T_delta.unsqueeze(2)
         T_delta = T_delta.repeat(1, 1, timeSize, 1)
-        A0 = ((posesTensor[:, :, [0], :].Inv()*(posesTensor[:, :, [1], :])).Log() * w0).Exp()
-        A1 = ((posesTensor[:, :, [1], :].Inv()*(posesTensor[:, :, [2], :])).Log() * w1).Exp()
-        A2 = ((posesTensor[:, :, [2], :].Inv()*(posesTensor[:, :, [3], :])).Log() * w2).Exp()
-        output_poses = (T_delta * A0 * A1* A2).reshape((batchSize, timeSize * (posesSize - 3),7))
-        return output_poses
+        A0 = ((posesTensor[..., [0], :].Inv() * (posesTensor[..., [1], :])).Log() * w0).Exp()
+        A1 = ((posesTensor[..., [1], :].Inv() * (posesTensor[..., [2], :])).Log() * w1).Exp()
+        A2 = ((posesTensor[..., [2], :].Inv() * (posesTensor[..., [3], :])).Log() * w2).Exp()
+        wayposes = (T_delta * A0 * A1 * A2).reshape((batchSize, timeSize * (posesSize - 3), 7))
+        return wayposes
 
     def compute_weights(self, time):
         alpha = torch.arange(4, dtype=time.dtype, device=time.device)
