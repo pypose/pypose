@@ -211,7 +211,7 @@ def coo_2_hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
     proxy = proxy.coalesce()
 
     # Figure out the shape of the target Hybrid tensor.
-    s_dim = proxy.shape
+    s_dim = list(proxy.shape)
     assert all(coo.shape[i] % s_dim[i] == 0 for i in range(proxy.dim())), \
         f'coo and s_dim are not compatible: coo.shape = {coo.shape}, s_dim = {s_dim}. '
     b_dim: List[int] = [coo.shape[i] // s_dim[i] for i in range(proxy.dim())] # block dimension.
