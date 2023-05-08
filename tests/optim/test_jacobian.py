@@ -15,7 +15,7 @@ class TestJacobian:
         params_dict = dict(mod.named_parameters())
         params_names = params_dict.keys()
         params_values = tuple(params_dict.values())
-        
+
         stateless_mod = copy.deepcopy(mod)
         stateless_mod.to('meta')
 
@@ -97,9 +97,29 @@ class TestJacobian:
         J = pp.optim.functional.modjac(model, input=None, flatten=True)
         assert not torch.any(torch.isnan(J))
 
+    def test_modjac(self):
+
+        class PoseInv(nn.Module):
+            def __init__(self, *dim):
+                super().__init__()
+                self.pose = pp.Parameter(pp.randn_SE3(*dim))
+
+            def forward(self, inputs):
+                error = (self.pose @ inputs).Log().tensor()
+                constraint = self.pose.Log().tensor().sum(-1)
+                return error, constraint
+
+        B1, B2, M, N = 2, 3, 2, 2
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        inputs = pp.randn_SE3(B2, B1, M, N, sigma=0.0001).to(device)
+        invnet = PoseInv(M, N).to(device)
+        jackwargs = {'vectorize': True, 'flatten': False}
+        J = pp.optim.functional.modjac(invnet, input=inputs, **jackwargs)
+        assert not pp.hasnan(J)
 
 if __name__ == '__main__':
     test = TestJacobian()
     test.test_tensor_jacobian_single_param()
     test.test_tensor_jacobian_multi_param()
     test.test_lietensor_jacobian()
+    test.test_modjac()

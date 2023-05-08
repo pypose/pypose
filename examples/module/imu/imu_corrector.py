@@ -31,9 +31,9 @@ class IMUCorrector(nn.Module):
             acc = corrected_acc, rot = data['gt_rot'].contiguous())
 
 
-def get_loss(inte_state, data):
-    pos_loss = torch.nn.functional.mse_loss(inte_state['pos'][:,-1,:], data['gt_pos'][:,-1,:])
-    rot_loss = (data['gt_rot'][:,-1,:] * inte_state['rot'][:,-1,:].Inv()).Log().norm()
+def get_loss(state, data):
+    pos_loss = torch.nn.functional.mse_loss(state['pos'][:,-1,:], data['gt_pos'][:,-1,:])
+    rot_loss = (data['gt_rot'][:,-1,:] * state['rot'][:,-1,:].Inv()).Log().norm()
 
     loss = pos_loss + rot_loss
     return loss, {'pos_loss': pos_loss, 'rot_loss': rot_loss}
@@ -50,7 +50,7 @@ def train(network, train_loader, epoch, optimizer, device="cuda:0"):
     for i, data in enumerate(t_range):
         data = move_to(data, device)
         init_state = {
-            "pos": data['init_pos'], 
+            "pos": data['init_pos'],
             "rot": data['init_rot'][:,:1,:],
             "vel": data['init_vel'],}
         state = network(data, init_state)
@@ -73,7 +73,7 @@ def test(network, loader, device = "cuda:0"):
         for i, data in enumerate(tqdm.tqdm(loader)):
             data = move_to(data, device)
             init_state = {
-            "pos": data['init_pos'], 
+            "pos": data['init_pos'],
             "rot": data['init_rot'][:,:1,:],
             "vel": data['init_vel'],}
             state = network(data, init_state)
@@ -92,24 +92,30 @@ if __name__ == '__main__':
     parser.add_argument("--device", type=str, default=device, help="cuda or cpu")
     parser.add_argument("--batch-size", type=int, default=4, help="batch size")
     parser.add_argument("--max_epoches", type=int, default=100, help="max_epoches")
-    parser.add_argument("--dataroot", type=str, default='./examples/module/imu', help="dataset location downloaded")
+    parser.add_argument("--dataroot", type=str, default='./examples/module/imu', \
+                        help="dataset location downloaded")
     parser.add_argument("--dataname", type=str, default='2011_09_26', help="dataset name")
-    parser.add_argument("--datadrive", nargs='+', type=str, default=[ "0001"], help="data sequences")
+    parser.add_argument("--datadrive", nargs='+', type=str, default=[ "0001"], \
+                        help="data sequences")
     parser.add_argument('--load_ckpt', default=False, action="store_true")
     args = parser.parse_args(); print(args)
 
-    train_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0], duration=10, mode='train', download=True)
-    test_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0],  duration=10, mode='test', download=True)
-    train_loader = Data.DataLoader(dataset=train_dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=True)
-    test_loader = Data.DataLoader(dataset=test_dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=False)
+    train_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0],
+                              duration=10, mode='train', download=True)
+    test_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0],
+                             duration=10, mode='test', download=True)
+    train_loader = Data.DataLoader(dataset=train_dataset, batch_size=args.batch_size,
+                                   collate_fn=imu_collate, shuffle=True)
+    test_loader = Data.DataLoader(dataset=test_dataset, batch_size=args.batch_size,
+                                  collate_fn=imu_collate, shuffle=False)
 
     ## optimizer
     network = IMUCorrector().to(args.device)
-    optimizer = torch.optim.Adam(network.parameters(), lr = 5e-6)  # to use with ViTs
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor = 0.1, patience = 10)# default setup
+    optimizer = torch.optim.Adam(network.parameters(), lr=5e-6)  # to use with ViTs
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.1, patience=10)
 
-    for epoch_i in range(args.max_epoches):
-        train_loss = train(network, train_loader, epoch_i, optimizer, device = args.device)
+    for epoch in range(args.max_epoches):
+        train_loss = train(network, train_loader, epoch, optimizer, device = args.device)
         test_loss = test(network, test_loader, device = args.device)
         scheduler.step(train_loss)
         print("train loss: %f test loss: %f "%(train_loss, test_loss))
