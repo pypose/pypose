@@ -78,6 +78,20 @@ def unravel_index(index, shape: List[int]):
         index = index // dim
     return out
 
+def prod(l: List[int]) -> int:
+    '''Compute the product of a list of integers.
+
+    Args:
+        l (list of int): The list of integers.
+
+    Returns:
+        int: The product of the list.
+    '''
+    p = 1
+    for i in l:
+        p *= i
+    return p
+
 @jit.script
 def make_coo_indices_and_dims_from_hybrid(hybrid):
     '''Create index and dimension info for converting a Hybrid tensor to a COO tensor.
@@ -100,7 +114,7 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
     b_shape = hybrid.shape[b_dim:]
     p_shape = hybrid.shape[:b_dim]
     assert hybrid.dim() >= 4, f'hybrid.shape = {hybrid.shape}. '
-    n_block_elem = b_shape[0] * b_shape[1]
+    n_block_elem = prod(b_shape)
 
     # === Compose target coo indices. ===
 

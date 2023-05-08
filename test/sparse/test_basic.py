@@ -48,8 +48,10 @@ def test_universal(op, dense_op, num_operands, shape_mode, dense_zero_prob, dim=
         proxy_shapes = [proxy_shape for _ in range(num_operands)]
         block_shapes = [block_shape for _ in range(num_operands)]
     elif shape_mode == 'identical_square':
-        proxy_shape = torch.Size(torch.randint(1, 10, (1,))) * 2
-        block_shape = torch.Size(torch.randint(1, 10, (1,))) * 2
+        proxy_shape = torch.Size(torch.randint(1, 10, (dim-1,)))
+        proxy_shape = proxy_shape + proxy_shape[-1:]
+        block_shape = torch.Size(torch.randint(1, 10, (dim-1,)))
+        block_shape = block_shape + block_shape[-1:]
         proxy_shapes = [proxy_shape for _ in range(num_operands)]
         block_shapes = [block_shape for _ in range(num_operands)]
     else:
