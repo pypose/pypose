@@ -9,3 +9,4 @@ from .pnp import EPnP
 
 from .lqr_ls import LQRLS
 from .mpc import MPC
+from .icp import ICP

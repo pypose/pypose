@@ -12,6 +12,7 @@ PyPose Documentation
    convert
    modules
    optim
+   utils
 
 
 Indices and tables
