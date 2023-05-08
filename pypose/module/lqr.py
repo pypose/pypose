@@ -313,6 +313,7 @@ class LQR(nn.Module):
         K = torch.zeros(self.n_batch + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
         k = torch.zeros(self.n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
         p_new = torch.zeros(self.n_batch + (self.T, nsc), dtype=self.p.dtype, device=self.p.device)
+        #use detach here
 
         for i in range(self.T):
             current_xut = torch.cat((current_x[...,i,:], current_u[...,i,:]), dim=-1)
@@ -366,6 +367,7 @@ class LQR(nn.Module):
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
             if t < self.T-1:
                 delta_xt = (xt - self.current_x[...,t+1,:]).detach()
+                #use detach here
                 cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
 
         return x[...,0:-1,:], u, cost
