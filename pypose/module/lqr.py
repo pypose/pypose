@@ -271,7 +271,7 @@ class LQR(nn.Module):
         assert self.Q.device == self.p.device, "device not compatible."
         assert self.Q.dtype == self.p.dtype, "tensor data type not compatible."
 
-    def forward(self, x_init, time, current_u=None):
+    def forward(self, x_init, dt, current_u=None):
         r'''
         Performs LQR for the discrete system.
 
@@ -289,20 +289,18 @@ class LQR(nn.Module):
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the associated
             quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
-        K, k = self.lqr_backward(x_init, time, current_u)
+        K, k = self.lqr_backward(x_init, dt, current_u)
         x, u, cost = self.lqr_forward(x_init, K, k)
         return x, u, cost
 
-    def lqr_backward(self, x_init, time, current_u):
+    def lqr_backward(self, x_init, dt, current_u):
 
         ns, nsc = x_init.size(-1), self.p.size(-1)
         nc = nsc - ns
+        time = torch.arange(0, self.T, device=self.p.device) * dt
 
         if current_u is None:
             current_u = torch.zeros(self.n_batch + (self.T, nc), device=self.p.device)
-        else:
-            current_u = current_u
-        current_u = current_u.detach()
 
         current_x = torch.zeros(self.n_batch + (self.T, ns), device=self.p.device)
         current_x[...,0,:] = x_init

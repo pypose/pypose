@@ -52,7 +52,7 @@ class MPC(nn.Module):
         self.step = step
         self.eps = eps
 
-    def forward(self, Q, p, x_init, time, current_u=None):
+    def forward(self, Q, p, x_init, dt, current_u=None):
         r'''
         Performs MPC for the discrete system.
 
@@ -75,8 +75,14 @@ class MPC(nn.Module):
 
         for i in range(self.step):
 
+            if u is not None:
+                u = u.detach()
+
+            #x_init = x_init.detach()
+            #Q, p = Q.detach(), p.detach()
+
             lqr = pp.module.LQR(self.system, Q, p, self.T)
-            x, u, cost = lqr(x_init, time, u)
+            x, u, cost = lqr(x_init, dt, u)
             assert x.ndim == u.ndim == 3
 
             if best is None:
@@ -92,6 +98,6 @@ class MPC(nn.Module):
             current_u = best['u']
 
         _lqr = pp.module.LQR(self.system, Q, p, self.T)
-        x, u, cost= _lqr(x_init, time, current_u)
+        x, u, cost= _lqr(x_init, dt, current_u)
 
         return x, u, cost

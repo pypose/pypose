@@ -101,13 +101,13 @@ def main():
     loss_f.flush()
 
     mpc_expert = pp.module.MPC(expert_cartPoleSolver, T, step=15).to(device)
-    x_true, u_true, cost_true = mpc_expert(expert['Q'], expert['p'], x_init, time, current_u)
+    x_true, u_true, cost_true = mpc_expert(expert['Q'], expert['p'], x_init, dt, current_u)
 
     def get_loss(_len, _m_cart, _m_pole):
         x_init = torch.tensor([[0, 0, torch.pi, 0]], device=device)
         agent_cartPoleSolver = CartPole(dt, _len, _m_cart, _m_pole, g).to(device)
         mpc_agent = pp.module.MPC(agent_cartPoleSolver, T, step=15).to(device)
-        x_pred, u_pred, cost_pred = mpc_agent(expert['Q'], expert['p'], x_init, time, current_u)
+        x_pred, u_pred, cost_pred = mpc_agent(expert['Q'], expert['p'], x_init, dt, current_u)
 
         traj_loss = torch.mean((u_true - u_pred)**2) \
             + torch.mean((x_true - x_pred)**2)

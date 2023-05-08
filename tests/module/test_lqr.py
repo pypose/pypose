@@ -34,6 +34,7 @@ class TestLQR:
 
         n_batch, T = 2, 5
         n_state, n_ctrl = 4, 3
+        dt = 1
 
         Q = torch.tile(torch.eye(n_state + n_ctrl, device=device), (n_batch, T, 1, 1))
         p = torch.tensor([
@@ -70,10 +71,8 @@ class TestLQR:
 
         lti = pp.module.LTI(A, B, C, D, c1, c2).to(device)
 
-        time  = torch.arange(0, T, device=device)
-
         LQR = pp.module.LQR(lti, Q, p, T).to(device)
-        x, u, cost = LQR(x_init, time)
+        x, u, cost = LQR(x_init, dt)
 
         torch.testing.assert_close(x_ref, x)
         torch.testing.assert_close(u_ref, u)
@@ -110,6 +109,7 @@ class TestLQR:
 
         n_batch, T = 2, 5
         n_state, n_ctrl = 4, 3
+        dt = 1
 
         Q = torch.tile(torch.eye(n_state + n_ctrl, device=device), (n_batch, 1, 1))
         p = torch.tensor([[-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54],
@@ -145,10 +145,8 @@ class TestLQR:
 
         ltv = MyLTV(A, B, C, D).to(device)
 
-        time  = torch.arange(0, T, device=device)
-
         LQR  = pp.module.LQR(ltv, Q, p, T).to(device)
-        x, u, cost = LQR(x_init, time)
+        x, u, cost = LQR(x_init, dt)
 
         torch.testing.assert_close(x_ref, x, atol=1e-5, rtol=1e-3)
         torch.testing.assert_close(u_ref, u, atol=1e-5, rtol=1e-3)
