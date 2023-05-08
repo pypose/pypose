@@ -1,12 +1,11 @@
-import torch
 import os.path
 import argparse
 import pypose as pp
 import matplotlib.pyplot as plt
 from pytransform3d.rotations import plot_basis
-from pypose.module.liesplinese3 import LieSpline
+from pypose.module.liesplinese3 import *
 
-def plot_result(wayposes, x_range, y_range, z_range, k = 0, save=None, show=None):
+def plot_result(wayposes, x_range, y_range, z_range, k = 0, oriposes = None, save=None, show=None):
     assert k < wayposes.shape[0]
     wayposes = wayposes.matrix()
     ax = None
@@ -17,6 +16,12 @@ def plot_result(wayposes, x_range, y_range, z_range, k = 0, save=None, show=None
     ax.set_xlim(x_range)
     ax.set_ylim(y_range)
     ax.set_zlim(z_range)
+    if oriposes != None:
+        oriposes = oriposes.matrix()
+        for pose in oriposes[k, :, :, :]:
+            R = pose[0:3, 0:3]
+            p = pose[0:3, 3]
+            ax = plot_basis(ax=ax, s=0.3, R=R, p=p, color="b")
     if save is not None:
         file_path = os.path.join(save, 'liespline.png')
         plt.savefig(file_path)
@@ -31,7 +36,7 @@ if __name__=="__main__":
                         help="location of png files to save")
     parser.add_argument('--show', dest='show', action='store_true',
                         help="show plot, default: False")
-    parser.set_defaults(show=False)
+    parser.set_defaults(show=True)
     args = parser.parse_args()
     os.makedirs(os.path.join(args.save), exist_ok=True)
     print(args)
@@ -55,6 +60,6 @@ if __name__=="__main__":
                                  [2., 0., 4., angle2[0], angle2[1], angle2[2], angle2[3]],
                                  [3., 0., 5., angle2[0], angle2[1], angle2[2], angle2[3]]]], ltype=pp.SE3_type)
 
-    ls = LieSpline()
-    wayposes = ls(input_poses, time)
-    plot_result(wayposes, [0, 5.], [0, 5.], [0, 1.2], save=args.save, show=args.show)
+
+    wayposes = BSlpineSE3(input_poses, time)
+    plot_result(wayposes, [0, 5.], [0, 5.], [0, 1.2], oriposes= input_poses, save=args.save, show=args.show)
