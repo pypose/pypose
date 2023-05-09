@@ -245,7 +245,6 @@ class Tolerant(nn.Module):
         super().__init__()
         assert a > 0, ValueError("a has to be positive: {}".format(a))
         assert b < 0, ValueError("b has to be negative: {}".format(b))
-        self.offset = b * math.log((1 + math.exp(-a / b)))
         self.a, self.b = a, b
 
     def forward(self, input: Tensor) -> Tensor:
@@ -255,7 +254,8 @@ class Tolerant(nn.Module):
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
         res = self.b * (1 + ((input-self.a) / self.b).exp()).log()
-        return res - self.offset
+        offset = self.b * math.log((1 + math.exp(-self.a / self.b)))
+        return res - offset
 
 
 class Scale(nn.Module):
