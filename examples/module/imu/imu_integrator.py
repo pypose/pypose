@@ -27,32 +27,44 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='IMU Preintegration')
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
-    parser.add_argument("--integrating-step", type=int, default=1, help="number of integrated steps")
-    parser.add_argument("--batch-size", type=int, default=1, help="batch size, only support 1 now")
-    parser.add_argument("--step-size", type=int, default=2, help="the size of the integration for one interval")
-    parser.add_argument("--save", type=str, default='./examples/module/imu/save/', help="location of png files to save")
-    parser.add_argument("--dataroot", type=str, default='./examples/module/imu/', help="dataset location downloaded")
+    parser.add_argument("--integrating-step", type=int, default=1,
+                        help="number of integrated steps")
+    parser.add_argument("--batch-size", type=int, default=1,
+                        help="batch size, only support 1 now")
+    parser.add_argument("--step-size", type=int, default=2,
+                        help="the size of the integration for one interval")
+    parser.add_argument("--save", type=str, default='./examples/module/imu/save/',
+                        help="location of png files to save")
+    parser.add_argument("--dataroot", type=str, default='./examples/module/imu/',
+                        help="dataset location downloaded")
     parser.add_argument("--dataname", type=str, default='2011_09_26', help="dataset name")
-    parser.add_argument("--datadrive", nargs='+', type=str, default=["0001","0002","0005","0009","0011",
-                        "0013","0014","0015","0017","0018","0019","0020","0022","0005"], help="data sequences")
-    parser.add_argument('--plot3d', dest='plot3d', action='store_true', help="plot in 3D space, default: False")
+    parser.add_argument("--datadrive", nargs='+', type=str,
+                        default=["0001","0002","0005","0009","0011","0013","0014",
+                                 "0015","0017","0018","0019","0020","0022","0005"],
+                                 help="data sequences")
+    parser.add_argument('--plot3d', dest='plot3d', action='store_true',
+                        help="plot in 3D space, default: False")
     parser.set_defaults(plot3d=False)
     args = parser.parse_args(); print(args)
     os.makedirs(os.path.join(args.save), exist_ok=True)
     torch.set_default_tensor_type(torch.DoubleTensor)
 
     for drive in args.datadrive:
-        dataset = KITTI_IMU(args.dataroot, args.dataname, drive, duration=args.step_size, step_size=args.step_size, mode='evaluate', download=True)
-        loader = Data.DataLoader(dataset=dataset, batch_size=args.batch_size, collate_fn=imu_collate, shuffle=False)
+        dataset = KITTI_IMU(args.dataroot, args.dataname, drive, duration=args.step_size,
+                            step_size=args.step_size, mode='evaluate', download=True)
+        loader = Data.DataLoader(dataset=dataset, batch_size=args.batch_size,
+                                 collate_fn=imu_collate, shuffle=False)
         init = dataset.get_init_value()
-        integrator = pp.module.IMUPreintegrator(init['pos'], init['rot'], init['vel'], reset=False).to(args.device)
+        integrator = pp.module.IMUPreintegrator(init['pos'], init['rot'], init['vel'],
+                                                reset=False).to(args.device)
 
         poses, poses_gt = [init['pos']], [init['pos']]
         covs = [torch.zeros(9, 9)]
         for idx, data in enumerate(loader):
             data = move_to(data, args.device)
 
-            state = integrator(dt=data['dt'], gyro=data['gyro'], acc=data['acc'], rot=data['init_rot'])
+            state = integrator(dt=data['dt'], gyro=data['gyro'],
+                               acc=data['acc'], rot=data['init_rot'])
             poses_gt.append(data['gt_pos'][..., -1, :].cpu())
             poses.append(state['pos'][..., -1, :].cpu())
             covs.append(state['cov'][..., -1, :, :].cpu())
