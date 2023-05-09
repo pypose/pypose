@@ -69,7 +69,21 @@ def ravel_multi_index(coords: torch.Tensor, shape: List[int]) -> torch.Tensor:
     coefs = shape[1:].flipud().cumprod(dim=0).flipud()
 
     return (coords * coefs.unsqueeze(-1)).sum(dim=0, keepdim=True)
+
+
 def unravel_index(index, shape: List[int]):
+    '''
+    This is a `torch` implementation of `numpy.unravel_index`.
+    Converts a flat index or array of flat indices into a tuple of coordinate arrays.
+    Args:
+        index (Tensor): An integer array whose elements are indices into the flattened
+        version of an array of dimensions shape.
+        shape (List[int]): The shape of the array to use for unraveling index.
+    Returns:
+        Tensor: Each row in the tensor has the same shape as the index tensor.
+        Each column in the tensor corresponds to the dimension in shape.
+        Shape: (dim, numel)
+    '''
     dims = len(shape)
     out = torch.empty((dims, index.shape[0]), dtype=index.dtype, device=index.device)
     for dim_idx in range(dims-1, 0-1, -1):
@@ -78,7 +92,7 @@ def unravel_index(index, shape: List[int]):
         index = index // dim
     return out
 
-def prod(l: List[int]) -> int:
+def prod(xs: List[int]) -> int:
     '''Compute the product of a list of integers.
 
     Args:
@@ -88,9 +102,10 @@ def prod(l: List[int]) -> int:
         int: The product of the list.
     '''
     p = 1
-    for i in l:
-        p *= i
+    for x in xs:
+        p *= x
     return p
+
 
 @jit.script
 def make_coo_indices_and_dims_from_hybrid(hybrid):
@@ -109,27 +124,29 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
     hybrid = hybrid.coalesce()
 
     # The block dimension.
-    assert len(hybrid.shape) % 2 == 0
-    b_dim = len(hybrid.shape) // 2
-    b_shape = hybrid.shape[b_dim:]
-    p_shape = hybrid.shape[:b_dim]
-    assert hybrid.dim() >= 4, f'hybrid.shape = {hybrid.shape}. '
-    n_block_elem = prod(b_shape)
+    assert len(hybrid.shape) % 2 == 0, 'The hybrid tensor must have even number of dims, ' \
+                                        'but got {}'.format(len(hybrid.shape))
+    assert hybrid.dim() >= 4, f'hybrid should have dims >= 4, but got {hybrid.dim()}'
+    b_dim = len(hybrid.shape) // 2  # Total number of the sparse dimensions.
+    b_shape = hybrid.shape[b_dim:]  # Desne/block shape.
+    p_shape = hybrid.shape[:b_dim]  # Sparse/proxy shape.
+    numel_block = prod(b_shape)
 
     # === Compose target coo indices. ===
 
     # Index shift in block
     # index_shift = torch.cartesian_prod(*[torch.arange(i) for i in b_shape]).T
-    index_shift = unravel_index(torch.arange(n_block_elem), b_shape)
+    index_shift = unravel_index(torch.arange(numel_block), b_shape)
 
     # Shift the original indices.
-    indices_ori = hybrid.indices().unsqueeze(-1)  # (2, n_block, 1)
-    indices_rp = indices_ori.expand(-1, -1, n_block_elem)  # (2, n_block, n_block_elem)
+    indices_ori = hybrid.indices().unsqueeze(-1)  # (b_dim, n_block, 1)
+    indices_rp = indices_ori.expand(-1, -1, numel_block)  # (b_dim, n_block, numel_block)
     # change to expand saves 0.3s for 10000 runs.
 
     # Compute the new indices by multiplying the block shape and adding the index shift.
     index_scale = torch.tensor(b_shape, dtype=torch.int64, device=hybrid.device)
-    # (2, n_block, n_block_elem)
+    # index_scale, index_shift, indices_rp are all used in the form:
+    # (b_dim, n_block, numel_block)
     indices_new = indices_rp * index_scale[:, None, None] + index_shift[:, None, :]
     indices_new = indices_new.flatten(1, 2)
 
