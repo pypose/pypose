@@ -71,7 +71,5 @@ if __name__=="__main__":
                                  [2., 0., 3., angle2[0], angle2[1], angle2[2], angle2[3]],
                                  [2., 0., 4., angle2[0], angle2[1], angle2[2], angle2[3]],
                                  [3., 0., 5., angle2[0], angle2[1], angle2[2], angle2[3]]]], ltype=pp.SE3_type)
-
-
     wayposes = BSlpineSE3(input_poses, time)
     plot_result(wayposes, [0, 5.], [0, 5.], [0, 1.2], oriposes= input_poses, save=args.save, show=args.show)
