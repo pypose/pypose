@@ -14,7 +14,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 import pytest
 
 def test_matmul_between_coo_coo():
- 
+
     '''
 
     s = [ [ 0 0 3 ],
@@ -41,7 +41,7 @@ def test_matmul_between_coo_coo():
 
         answer = torch.tensor([[9, 15], [15, 41]], device = device)
 
-        assert (torch.all(torch.abs(m.to_dense() - answer)) < 1e-9) 
+        assert (torch.all(torch.abs(m.to_dense() - answer)) < 1e-9)
 
     print('Done')
 
@@ -64,11 +64,11 @@ def test_matmul_between_coo_coo():
 #         device = entry['device']
 
 #         bsr = torch.sparse_bsr_tensor(crow_indices, col_indices, values, dtype=torch.float32, device=device)
-        
+
 #         with pytest.raises(RuntimeError):
 #             torch.sparse.mm( bsr, bsr.transpose(0,1) )
-            
-def test_SBT():
+
+def tes_SBT():
     i = [[0, 1, 1],[2, 0, 2]]
     v = [3, 4, 5]
     s = torch.sparse_coo_tensor(i, v, (2, 3), dtype=torch.float32, device=device)

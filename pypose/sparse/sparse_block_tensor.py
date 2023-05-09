@@ -45,6 +45,30 @@ Attributes:
 
 '''
 
+DENSE_SAFE_PROXY_THRES = 0
+
+
+@jit.script
+def ravel_multi_index(coords: torch.Tensor, shape: List[int]) -> torch.Tensor:
+    """Converts a tensor of coordinate vectors into a tensor of flat indices.
+    This function is not used in the current implementation, because instantiating
+    a tensor is time-consuming (0.5s latency for 10000 runs).
+    It is kept here for future reference.
+
+    This is a `torch` implementation of `numpy.ravel_multi_index`.
+
+    Args:
+        coords: A tensor of coordinate vectors, (*, D).
+        shape: The source shape.
+
+    Returns:
+        The raveled indices, (*,).
+    """
+
+    shape = torch.tensor(shape + [1,], dtype=coords.dtype, device=coords.device)
+    coefs = shape[1:].flipud().cumprod(dim=0).flipud()
+
+    return (coords * coefs.unsqueeze(-1)).sum(dim=0, keepdim=True)
 
 
 @jit.script
@@ -79,8 +103,9 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
     index_shift = torch.stack((index_shift_row, index_shift_col), dim=0) # (2,n_block_elem)
 
     # Shift the original indices.
-    indices_ori = hybrid.indices() # (2, n_block)
-    indices_rp = indices_ori.unsqueeze(-1).repeat(1, 1, n_block_elem) #(2,n_block,n_block_elem)
+    indices_ori = hybrid.indices().unsqueeze(-1)  # (2, n_block, 1)
+    indices_rp = indices_ori.expand(-1, -1, n_block_elem)  # (2, n_block, n_block_elem)
+    # change to expand saves 0.3s for 10000 runs.
 
     # Compute the new indices by multiplying the block shape and adding the index shift.
     index_scale = torch.tensor(list(b_dim), dtype=torch.int64, device=hybrid.device)
@@ -163,7 +188,7 @@ def hybrid_2_coo(hybrid):
     return torch.sparse_coo_tensor(indices_new, hybrid.values().flatten(), size=sparse_dim)
 
 @jit.script
-def coo_2_hybrid(coo, proxy):
+def coo_2_hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
     '''Convert a COO tensor to a Hybrid tensor by referring to the proxy.
 
     A proxy is a COO tensor. Any non-zero element in proxy indicates a block of the Hybrid tensor.
@@ -182,38 +207,44 @@ def coo_2_hybrid(coo, proxy):
     proxy = proxy.coalesce()
 
     # Figure out the shape of the target Hybrid tensor.
-    s_dim = proxy.shape[-2:]
+    s_dim = list(proxy.shape[-2:])
     assert coo.shape[0] % s_dim[0] == 0 and coo.shape[1] % s_dim[1] == 0, \
         f'coo and s_dim are not compatible: coo.shape = {coo.shape}, s_dim = {s_dim}. '
     b_dim: List[int] = [ coo.shape[0] // s_dim[0], coo.shape[1] // s_dim[1] ] # block dimension.
 
     # Create a temporary Hybrid tensor to represent the block sequence.
-    block_seq = repeated_value_as_hybrid_value(proxy, b_dim, mode='sequence')
-    block_seq = hybrid_2_coo(block_seq).coalesce()
-
-    # Create a temporary Hybrid tensor for the placeholders.
-    block_phd = repeated_value_as_hybrid_value(proxy, b_dim, mode='zeros', dtype=coo.dtype)
-    # PyTorch may has a bug here. If one of the tensors is coalesced, the the add operation will
-    # result in a coalesced tensor, no matter whether the other tensor is coalesced or not.
-    # block_phd = hybrid_2_coo(block_phd).coalesce()
-    block_phd = hybrid_2_coo(block_phd)
-
-    # Pad the input COO tensor to have the same non-zero struture as block_seq and block_phd.
-    coo = coo + block_phd
     coo = coo.coalesce()
-
-    # Compute the indices of every element of coo inside their own respective blocks.
-    b_dim_t = torch.tensor(b_dim).to(dtype=torch.int64, device=coo.device).view((2, 1))
+    # in-block indices.
+    b_dim_t = torch.tensor(b_dim, dtype=torch.int64, device=coo.device).unsqueeze(-1)
     in_block_indices = coo.indices() % b_dim_t
+    # block indices.
+    block_indices = coo.indices() // b_dim_t
+    numel_proxy = torch.numel(proxy)
+    if numel_proxy < dense_proxy_thres:  # check the *dense* shape
+        block_seq = torch.sparse_coo_tensor(
+                proxy.indices(), torch.arange(proxy.values().shape[0]), size=proxy.shape
+            )
+        block_seq = block_seq.to_dense()  # dense is fast in indexing
+        block_seq = block_seq[block_indices[0], block_indices[1]]
+    else:
+        # ravel multiple index into one.
+        coeff = torch.tensor(s_dim+[1, ], dtype=b_dim_t.dtype, device=b_dim_t.device)
+        coeff = coeff[1:].flipud().cumprod(dim=0).flipud()
+        proxy_indices = (proxy.indices() * coeff.unsqueeze(-1)).sum(0, keepdim=True)
+        block_seq = torch.sparse_coo_tensor(
+                proxy_indices,
+                torch.arange(proxy.values().shape[0]), size=(numel_proxy,)
+            )
+        block_seq = block_seq.index_select(0, (block_indices * coeff.unsqueeze(-1)).sum(0)).to_dense()
 
     # Index into a temporary tensor.
-    n_block = proxy.values().shape[0]
-    blocks = torch.zeros( [n_block,] + b_dim, dtype=coo.dtype, device=coo.device )
-    blocks[ block_seq.values(), in_block_indices[0], in_block_indices[1] ] = coo.values()
+    blocks = torch.sparse_coo_tensor(
+        indices=torch.cat([block_seq.unsqueeze(0), in_block_indices]),
+        values=coo.values(),
+        size=torch.Size([proxy.values().shape[0]] + b_dim)).to_dense()
 
     # Create the sparse hybrid COO tensor.
-    return torch.sparse_coo_tensor(
-        proxy.indices(), blocks.view([n_block,] + b_dim), size=list(s_dim) + b_dim )
+    return torch.sparse_coo_tensor(proxy.indices(), blocks, size=list(s_dim) + b_dim)
 
 
 class SBTOperation(object):
@@ -552,13 +583,12 @@ class SparseBlockTensor(torch.Tensor):
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs={}):
-        # Debug use.
-        print(f'func.__name__ = {func.__name__}')
+        '''The main entry point for all operations on SparseBlockTensor.'''
 
         if not HFS.is_handled(func.__name__):
             raise Exception(
                 f'All operations on SparseBlockTensor must be handled. '
-                f'\n{func.__name__} is not. ' )
+                f'\n{func.__name__} is not.')
 
         sbt_op = HFS.HANDLED_FUNCS[func.__name__]
 
@@ -638,9 +668,21 @@ class SparseBlockTensor(torch.Tensor):
         r'''
         return the corresponding sparse matrix and index matrix
         '''
-        print(f'>>> Debug matmtl. ')
         return torch.matmul(self, other)
 
+    @HFS.register(OpType(op_type=SBTProxySameOpAsStorage, func_name='add'))
+    def __add__(self, other):
+        r'''
+        return the corresponding sparse matrix and index matrix
+        '''
+        return torch.add(self, other)
+
+    @HFS.register(OpType(op_type=SBTProxySameOpAsStorage, func_name='sub'))
+    def __sub__(self, other):
+        r'''
+        return the corresponding sparse matrix and index matrix
+        '''
+        return torch.sub(self, other)
     # NOTE: for torch operations that need special treatment, place an override here. Then call
     # the corresponding function of PyTorch to begin the dispatching. E.g.:
     # def abs(self):
