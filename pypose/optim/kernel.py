@@ -253,9 +253,9 @@ class Tolerant(nn.Module):
             input (torch.Tensor): the input tensor (non-negative).
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
-        res = self.b * (1 + ((input-self.a) / self.b).exp()).log()
-        offset = self.b * math.log((1 + math.exp(-self.a / self.b)))
-        return res - offset
+        result = self.b * (1 + ((input-self.a) / self.b).exp()).log()
+        offset = self.b * math.log((1 + math.exp(-self.a / self.b))) # constant, no grad.
+        return result - offset
 
 
 class Scale(nn.Module):
