@@ -7,3 +7,5 @@ from .nlqr import NLQR
 from .nlmpc import NLMPC
 from .dynamics import System, LTI, LTV, NLS
 from .imu_preintegrator import IMUPreintegrator
+from .pnp import EPnP
+from .icp import ICP
