@@ -297,15 +297,16 @@ class LQR(nn.Module):
 
         ns, nsc = x_init.size(-1), self.p.size(-1)
         nc = nsc - ns
-        time = torch.arange(0, self.T, device=self.p.device) * dt
 
         if current_u is None:
             current_u = torch.zeros(self.n_batch + (self.T, nc), device=self.p.device)
 
         current_x = torch.zeros(self.n_batch + (self.T, ns), device=self.p.device)
         current_x[...,0,:] = x_init
+        current_xt = x_init
+
         for i in range(self.T-1):
-            current_x[...,i+1,:], _ = self.system(current_x[...,i,:], current_u[...,i,:])
+            current_x[...,i+1,:] = current_xt = self.system(current_xt, current_u[...,i,:])[0]
 
         self.current_x = current_x
         self.current_u = current_u
@@ -317,14 +318,15 @@ class LQR(nn.Module):
 
         for i in range(self.T):
             current_xut = torch.cat((current_x[...,i,:], current_u[...,i,:]), dim=-1)
-            p_new[...,i,:]= (bmv(self.Q[...,i,:,:], current_xut) + self.p[...,i,:]).detach()
+            p_new[...,i,:] = bmv(self.Q[...,i,:,:], current_xut) + self.p[...,i,:]
 
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
                 Qt = self.Q[...,t,:,:]
                 qt = p_new[...,t,:]
             else:
-                self.system.set_refpoint(state=current_x[...,t,:], input=current_u[...,t,:], t=time[t])
+                self.system.set_refpoint(state=current_x[...,t,:], input=current_u[...,t,:],
+                                         t=torch.tensor(t*dt))
                 A = self.system.A.squeeze(-2)
                 B = self.system.B.squeeze(-1)
                 F = torch.cat((A, B), dim=-1)
@@ -354,20 +356,17 @@ class LQR(nn.Module):
         u = torch.zeros(self.n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
         delta_u = torch.zeros(self.n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
         cost = torch.zeros(self.n_batch, dtype=self.p.dtype, device=self.p.device)
-        delta_xt = torch.zeros_like(x_init, dtype=x_init.dtype, device=self.p.device)
         x = torch.zeros(self.n_batch + (self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
         x[..., 0, :] = x_init
         xt = x_init
 
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]
+            delta_xt = xt - self.current_x[...,t,:]
             delta_u[..., t, :] = delta_ut = bmv(Kt, delta_xt) + kt
             u[...,t,:] = ut = delta_ut + self.current_u[...,t,:]
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
-            if t < self.T-1:
-                delta_xt = (xt - self.current_x[...,t+1,:]).detach()
-                #use detach here
-                cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
+            cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
 
         return x[...,0:-1,:], u, cost

@@ -91,7 +91,7 @@ class TrainMPC:
 
         opt = optim.RMSprop((A, B), lr=1e-2)
 
-        for i in range(20):
+        for i in range(150):
             t1 = time.time()
             traj_loss = get_loss(x_init, A, B)
             opt.zero_grad()
