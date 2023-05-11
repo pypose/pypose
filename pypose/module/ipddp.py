@@ -113,41 +113,45 @@ class ddpOptimizer(nn.Module):
         self.step = 0
         self.failed = False
 
-    def backwardpasscompact(self):
+    def backwardpasscompact(self, lastIterFlag=False):
         r'''
         Compute controller gains for next iteration from current trajectory.
         '''
         B = self.x.shape[:-2]
         ns = self.x.shape[-1]
-        c_err, mu_err, qu_err = torch.zeros(B), torch.zeros(B), torch.zeros(B)
+        if ~lastIterFlag:
+            c_err, mu_err, qu_err = torch.zeros(B), torch.zeros(B), torch.zeros(B)
 
-        # set regularization parameter
-        if (self.fp_failed or self.bp_failed):
-            self.reg += 1.0
-        elif (self.step == 0):
-            self.reg -= 1.0
-        elif (self.step <= 3):
-            self.reg = self.reg
+            # set regularization parameter
+            if (self.fp_failed or self.bp_failed):
+                self.reg += 1.0
+            elif (self.step == 0):
+                self.reg -= 1.0
+            elif (self.step <= 3):
+                self.reg = self.reg
+            else:
+                self.reg += 1.0
+
+            if (self.reg < 0.0):
+                self.reg = 0.0
+            elif (self.reg > 24.0):
+                self.reg = 24.0
+
+            # recompute the first, second derivatives of the updated trajectory
+            if ~self.fp_failed:
+                self.computeall()
+                                    
+            # backward recursions, similar to iLQR backward recursion, but more variables involved
+            V, v = self.pxx, self.px
         else:
-            self.reg += 1.0
+            V, v = self.Qxx_terminal, self.Qx_terminal
 
-        if (self.reg < 0.0):
-            self.reg = 0.0
-        elif (self.reg > 24.0):
-            self.reg = 24.0
-
-        # recompute the first, second derivatives of the updated trajectory
-        if ~self.fp_failed:
-            self.computeall()
-                                  
-        # backward recursions, similar to iLQR backward recursion, but more variables involved
-        V, v = self.pxx, self.px
         for t in range(self.T-1, -1, -1):
             Ft = self.F[...,t,:,:]
             Qt = self.Q[...,t,:,:] + Ft.mT @ V @ Ft
+            qt = self.p[...,t,:] + bmv(Ft.mT, v) 
             if self.contraction_flag: 
                 Qt += btdot(v, self.G[...,t,:,:,:]) # todo :check!!!!
-            qt = self.p[...,t,:] + bmv(Ft.mT, v) 
             if self.constraint_flag:
                 qt += bmv(self.W[...,t,:,:].mT, self.s[...,t,:])
 
@@ -187,35 +191,40 @@ class ddpOptimizer(nn.Module):
                 qt -= bmv(Wt.mT, cinv * r)
                 Qxx, Qxu = Qt[...,:ns,:ns], Qt[...,:ns,ns:]
                 Qux, Quu = Qt[...,ns:,:ns], Qt[...,ns:,ns:]
-                qx, qu = qt[...,:ns], qt[..., ns:]                
-                Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(self.reg_exp_base, self.reg) - 1.) #todo:check
-                    
-                try: #todo check batch output?
-                    lltofQuuReg = torch.linalg.cholesky(Quu_reg) # compute the Cholesky decomposition 
-                except: 
-                    self.bp_failed, self.opterr = True, torch.inf
+                qx, qu = qt[...,:ns], qt[..., ns:] 
+                
+                if ~lastIterFlag:                
+                    Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(self.reg_exp_base, self.reg) - 1.) #todo:check     
+                    try: #todo check batch output?
+                        lltofQuuReg = torch.linalg.cholesky(Quu_reg) # compute the Cholesky decomposition 
+                    except: 
+                        self.bp_failed, self.opterr = True, torch.inf
+                else:
+                    Quu_reg = Quu
 
                 Quu_reg_inv = torch.linalg.pinv(Quu_reg)
                 self.Ku[...,t,:,:] = Kut = - Quu_reg_inv @ Qux
                 self.ku[...,t,:] = kut = - bmv(Quu_reg_inv, qu)
-                    
-                cx, cu = Wt[...,:ns], Wt[...,ns:]
-                self.ks[...,t,:] = - cinv * (r + st * bmv(cu, kut))
-                self.Ks[...,t,:,:] = - SCinv @ (cx + cu @ Kut)
-                self.ky[...,t,:] = torch.zeros(ct.shape[-1]) # omitted
-                self.Ky[...,t,:,:] = torch.zeros(ct.shape[-1], ns)       
+
+                if ~lastIterFlag:    
+                    cx, cu = Wt[...,:ns], Wt[...,ns:]
+                    self.ks[...,t,:] = - cinv * (r + st * bmv(cu, kut))
+                    self.Ks[...,t,:,:] = - SCinv @ (cx + cu @ Kut)
+                    self.ky[...,t,:] = torch.zeros(ct.shape[-1]) # omitted
+                    self.Ky[...,t,:,:] = torch.zeros(ct.shape[-1], ns)       
 
             V = Qxx + Qxu @ Kut + Kut.mT @ Qux + Kut.mT @ Quu @ Kut
             v = qx  + bmv(Qxu, kut) + bmv(Kut.mT, qu) + bmv(Kut.mT @ Quu, kut)
 
-            qu_err = torch.maximum(qu_err, torch.linalg.vector_norm(qu, float('inf'), dim=-1)  )
-            mu_err = torch.maximum(mu_err, torch.linalg.vector_norm(r,  float('inf'), dim=-1)  )
-            if (self.infeas): 
-                c_err=torch.maximum(c_err, torch.linalg.vector_norm(ct+yt, float('inf'), dim=-1) )
+            if ~lastIterFlag:
+                qu_err = torch.maximum(qu_err, torch.linalg.vector_norm(qu, float('inf'), dim=-1)  )
+                mu_err = torch.maximum(mu_err, torch.linalg.vector_norm(r,  float('inf'), dim=-1)  )
+                if (self.infeas): 
+                    c_err=torch.maximum(c_err, torch.linalg.vector_norm(ct+yt, float('inf'), dim=-1) )
+        if ~lastIterFlag:
+            self.bp_failed, self.opterr = False, torch.maximum(torch.maximum(qu_err, c_err), mu_err)
 
-        self.bp_failed, self.opterr = False, torch.maximum(torch.maximum(qu_err, c_err), mu_err)
-
-    def forwardpasscompact(self):
+    def forwardpasscompact(self, lastIterFlag=False, x_init=None, Ku=None, ku=None):
         r'''
         Compute new trajectory from controller gains.
         '''
@@ -334,19 +343,11 @@ class ddpOptimizer(nn.Module):
 
         return self
 
-class ddpGrad:
-
-    def __init__(self, sys, cons):
-        self.system = sys
-        self.constraint_flag = True
-        self.constraint = cons
-        self.contraction_flag = True
-
     def forward(self, fp_list, x_init):
         with torch.autograd.set_detect_anomaly(True): # for debug
             self.prepare(fp_list)
-            Ku, ku = self.ipddpgrad_backward()
-            x, u, cost, cons = self.ipddpgrad_forward(x_init, Ku, ku)
+            self.backwardpasscompact(lastIterFlag=True) #todo: check if Ku, ku require_grad
+            x, u, cost, cons = self.forwardpasscompact(lastIterFlag=True,x_init=x_init, Ku=Ku, ku=ku)
         return x, u, cost, cons
 
     def prepare(self, fp_list):
