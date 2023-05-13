@@ -301,8 +301,12 @@ class ddpOptimizer(nn.Module):
                     else:
                         idx = torch.all(candidate<=self.filter,-1)
                         
-                        ### todo: bug here!!! self.filter[torch.logical_not(idx)]
-                        self.filter = self.filter[~idx]
+                        ### fixed: 
+                        # todo: bug here!!! 
+                        # wrong: self.filter[torch.logical_not(idx)]
+                        # wrong: self.filter = self.filter[~idx]
+                        # one walkaround: self.filter[idx] = torch.inf 
+                        self.filter = self.filter[torch.logical_not(idx)]
                         if self.filter.ndim <= 2:  # todo: change this walkaround
                             self.filter = self.filter.unsqueeze(0)
                         self.filter=torch.cat((self.filter, candidate.unsqueeze(-2)), dim=-2)
