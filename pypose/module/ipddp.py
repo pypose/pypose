@@ -118,8 +118,14 @@ class ddpOptimizer(nn.Module):
         Compute controller gains for next iteration from current trajectory.
         '''
         B = self.x.shape[:-2]
+        if lastIterFlag: 
+            B = self.p.shape[:-2]
+            ns, nc = self.Qx_terminal.size(-1), self.F.size(-1) - self.Qx_terminal.size(-1)
+            self.Ku = torch.zeros(B + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
+            self.ku = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
+
         ns = self.x.shape[-1]
-        if ~lastIterFlag:
+        if not lastIterFlag:
             c_err, mu_err, qu_err = torch.zeros(B), torch.zeros(B), torch.zeros(B)
 
             # set regularization parameter
@@ -138,7 +144,7 @@ class ddpOptimizer(nn.Module):
                 self.reg = 24.0
 
             # recompute the first, second derivatives of the updated trajectory
-            if ~self.fp_failed:
+            if not self.fp_failed:
                 self.computeall()
                                     
             # backward recursions, similar to iLQR backward recursion, but more variables involved
@@ -193,7 +199,7 @@ class ddpOptimizer(nn.Module):
                 Qux, Quu = Qt[...,ns:,:ns], Qt[...,ns:,ns:]
                 qx, qu = qt[...,:ns], qt[..., ns:] 
                 
-                if ~lastIterFlag:                
+                if not lastIterFlag:                
                     Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(self.reg_exp_base, self.reg) - 1.) #todo:check     
                     try: #todo check batch output?
                         lltofQuuReg = torch.linalg.cholesky(Quu_reg) # compute the Cholesky decomposition 
@@ -206,7 +212,7 @@ class ddpOptimizer(nn.Module):
                 self.Ku[...,t,:,:] = Kut = - Quu_reg_inv @ Qux
                 self.ku[...,t,:] = kut = - bmv(Quu_reg_inv, qu)
 
-                if ~lastIterFlag:    
+                if not lastIterFlag:    
                     cx, cu = Wt[...,:ns], Wt[...,ns:]
                     self.ks[...,t,:] = - cinv * (r + st * bmv(cu, kut))
                     self.Ks[...,t,:,:] = - SCinv @ (cx + cu @ Kut)
@@ -216,23 +222,29 @@ class ddpOptimizer(nn.Module):
             V = Qxx + Qxu @ Kut + Kut.mT @ Qux + Kut.mT @ Quu @ Kut
             v = qx  + bmv(Qxu, kut) + bmv(Kut.mT, qu) + bmv(Kut.mT @ Quu, kut)
 
-            if ~lastIterFlag:
+            if not lastIterFlag:
                 qu_err = torch.maximum(qu_err, torch.linalg.vector_norm(qu, float('inf'), dim=-1)  )
                 mu_err = torch.maximum(mu_err, torch.linalg.vector_norm(r,  float('inf'), dim=-1)  )
                 if (self.infeas): 
                     c_err=torch.maximum(c_err, torch.linalg.vector_norm(ct+yt, float('inf'), dim=-1) )
-        if ~lastIterFlag:
+        if not lastIterFlag:
             self.bp_failed, self.opterr = False, torch.maximum(torch.maximum(qu_err, c_err), mu_err)
 
-    def forwardpasscompact(self, lastIterFlag=False, x_init=None, Ku=None, ku=None):
+    def forwardpasscompact(self, lastIterFlag=False):
         r'''
         Compute new trajectory from controller gains.
         '''
-        B = self.x.shape[:-2]
         xold, uold, yold, sold, cold = self.x, self.u, self.y, self.s, self.c
-        xnew, unew, ynew, snew, cnew = torch.zeros_like(self.x), torch.zeros_like(self.u), torch.zeros_like(self.y), torch.zeros_like(self.s), torch.zeros_like(self.c)
+        if not lastIterFlag:
+            tau, steplist = torch.maximum(1.-self.mu,torch.Tensor([0.99])), pow(2.0, torch.linspace(-10, 0, 11).flip(0))
+            B = self.x.shape[:-2]
+        else: 
+            steplist = torch.ones((1)) # skip linesearch
+            B = self.p.shape[:-2]
+            xold, uold = self.xold, self.uold
+
+        xnew, unew, ynew, snew, cnew = torch.zeros_like(xold), torch.zeros_like(uold), torch.zeros_like(yold), torch.zeros_like(sold), torch.zeros_like(cold)
         logcost, err = torch.zeros(B), torch.zeros(B)       
-        failed, tau, steplist = False, max(0.99, 1-self.mu), pow(2.0, torch.linspace(-10, 0, 11).flip(0))
         for step in range(steplist.shape[0]): # line search
             failed, stepsize = False, steplist[step]
             xnew[...,0,:] = xold[...,0,:]
@@ -254,43 +266,47 @@ class ddpOptimizer(nn.Module):
             else:
                 for t in range(self.T): # forward recuisions
                     Kut, kut = self.Ku[...,t,:,:], self.ku[...,t,:]
-                    Kst, kst = self.Ks[...,t,:,:], self.ks[...,t,:]
-                    snew[...,t,:] = snewt = sold[...,t,:] + stepsize * kst + bmv(Kst, xnewt - xold[...,t,:])
                     unew[...,t,:] = unewt = uold[...,t,:] + stepsize * kut + bmv(Kut, xnewt - xold[...,t,:])
-                    cnew[...,t,:] = cnewt = self.c_fn(xnew[...,:-1,:], unew)[...,t,:]
-                    if ((cnewt > (1-tau) * cold[...,t,:]).any() or (snewt < (1-tau) * sold[...,t,:]).any()): 
-                        # todo: check
-                        # check if the inequality holds, with some thresholds
-                        failed = True
-                        break
+                    if not lastIterFlag:
+                        Kst, kst = self.Ks[...,t,:,:], self.ks[...,t,:]
+                        snew[...,t,:] = snewt = sold[...,t,:] + stepsize * kst + bmv(Kst, xnewt - xold[...,t,:])
+                        cnew[...,t,:] = cnewt = self.c_fn(xnew[...,:-1,:], unew)[...,t,:]
+                        if ((cnewt > (1-tau) * cold[...,t,:]).any() or (snewt < (1-tau) * sold[...,t,:]).any()): 
+                            # todo: check
+                            # check if the inequality holds, with some thresholds
+                            failed = True
+                            break
                     xnew[...,t+1,:] = xnewt = self.f_fn(xnewt, unewt)[0]
                         
             if (failed):
                 continue
             else:
                 cost = self.q_fn(xnew[...,:-1,:], unew).sum(-1) + self.p_fn(xnew[...,-1,:],torch.zeros_like(unew[...,-1,:])).sum(-1)
-                if (self.infeas):
-                    logcost = cost - self.mu * ynew.log().sum(-1).sum(-1)
-                    cnew = self.c_fn(xnew[...,:-1,:], unew)
-                    err = torch.linalg.vector_norm(cnew + ynew, 1, dim=-1).sum(-1)
-                    err = torch.maximum(self.tol, err)
-                else:
-                    logcost = cost - self.mu * (-cnew).log().sum(-1).sum(-1)
-                    err = torch.zeros(B)
-                # step filter
-                candidate = torch.stack((logcost, err), dim=-1)
-                if torch.any( torch.all(candidate-torch.tile(torch.Tensor([1e-13, 0.]), B + (1,))>=self.filter, -1) ):
-                    # relax a bit for numerical stability, strange
-                    # todo: any for each sample in a batch?
-                    failed=True
-                    continue                    
-                else:
-                    idx = torch.all(candidate<=self.filter,-1)
-                    self.filter = self.filter[~idx]
-                    if self.filter.ndim <= 2:  # todo: change this walkaround
-                        self.filter = self.filter.unsqueeze(0)
-                    self.filter=torch.cat((self.filter, candidate.unsqueeze(-2)), dim=-2)
-                    break
+                if not lastIterFlag:
+                    if (self.infeas):
+                        logcost = cost - self.mu * ynew.log().sum(-1).sum(-1)
+                        cnew = self.c_fn(xnew[...,:-1,:], unew)
+                        err = torch.linalg.vector_norm(cnew + ynew, 1, dim=-1).sum(-1)
+                        err = torch.maximum(self.tol, err)
+                    else:
+                        logcost = cost - self.mu * (-cnew).log().sum(-1).sum(-1)
+                        err = torch.zeros(B)
+                    # step filter
+                    candidate = torch.stack((logcost, err), dim=-1)
+                    if torch.any( torch.all(candidate-torch.tile(torch.Tensor([1e-13, 0.]), B + (1,))>=self.filter, -1) ):
+                        # relax a bit for numerical stability, strange
+                        # todo: any for each sample in a batch?
+                        failed=True
+                        continue                    
+                    else:
+                        idx = torch.all(candidate<=self.filter,-1)
+                        
+                        ### todo: bug here!!! self.filter[torch.logical_not(idx)]
+                        self.filter = self.filter[~idx]
+                        if self.filter.ndim <= 2:  # todo: change this walkaround
+                            self.filter = self.filter.unsqueeze(0)
+                        self.filter=torch.cat((self.filter, candidate.unsqueeze(-2)), dim=-2)
+                        break
                   
         if (failed):
             self.stepsize, self.failed= 0.0, failed
@@ -316,7 +332,7 @@ class ddpOptimizer(nn.Module):
         for iter in range(self.maxiter):
             while True: 
                 self.backwardpasscompact()
-                if ~self.bp_failed: 
+                if not self.bp_failed: 
                     break    
                 
             self.forwardpasscompact()
@@ -343,12 +359,13 @@ class ddpOptimizer(nn.Module):
 
         return self
 
-    def forward(self, fp_list, x_init):
+    def forward(self, fp_list):
         with torch.autograd.set_detect_anomaly(True): # for debug
             self.prepare(fp_list)
-            self.backwardpasscompact(lastIterFlag=True) #todo: check if Ku, ku require_grad
-            x, u, cost, cons = self.forwardpasscompact(lastIterFlag=True,x_init=x_init, Ku=Ku, ku=ku)
-        return x, u, cost, cons
+            self.infeas = False
+            self.backwardpasscompact(lastIterFlag=True)
+            self.forwardpasscompact(lastIterFlag=True)
+        return self.x, self.u, self.cost
 
     def prepare(self, fp_list):
         n_batch = len(fp_list)
@@ -374,68 +391,3 @@ class ddpOptimizer(nn.Module):
             self.mu = torch.stack([fp_list[batch_id].mu for batch_id in range(n_batch)], dim=0) # use different mu for each sample
             self.xold = torch.cat([fp_list[batch_id].x for batch_id in range(n_batch)], dim=0)
             self.uold = torch.cat([fp_list[batch_id].u for batch_id in range(n_batch)], dim=0)
-
-    def ipddpgrad_backward(self):
-        # Q: (B*, T, N, N), p: (B*, T, N), where B* can be any batch dimensions, e.g., (2, 3)
-        B = self.p.shape[:-2]
-        ns, nc = self.Qx_terminal.size(-1), self.F.size(-1) - self.Qx_terminal.size(-1)
-        Ku = torch.zeros(B + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
-        ku = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
-
-        V, v = self.Qxx_terminal, self.Qx_terminal
-        for t in range(self.T-1, -1, -1): 
-            Ft = self.F[...,t,:,:]
-            Qt = self.Q[...,t,:,:] + Ft.mT @ V @ Ft
-            qt = self.p[...,t,:] + bmv(Ft.mT, v) 
-            if self.contraction_flag:
-                Qt += btdot(v, self.G[...,t,:,:,:]) # todo :check!!!!
-            if self.constraint_flag:
-                Wt = self.W[...,t,:,:]
-                st, ct = self.s[...,t,:], self.c[...,t,:] 
-                SCinv = torch.diag_embed(st / ct)
-                Qt -= Wt.mT @ SCinv @ Wt
-                qt += bmv(Wt.mT, - self.mu / ct) # todo: check st - cinv * r
-            # if self.system.c1 is not None: # tocheck
-            #     qt = qt + bmv(Ft.mT @ V, self.system.c1)
-
-            Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
-            Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
-            qx, qu = qt[..., :ns], qt[..., ns:]
-
-            Quu_inv = torch.linalg.pinv(Quu)
-            Ku[...,t,:,:] = Kut = - Quu_inv @ Qux
-            ku[...,t,:] = kut = - bmv(Quu_inv, qu)
-
-            V = Qxx + Qxu @ Kut + Kut.mT @ Qux + Kut.mT @ Quu @ Kut
-            v = qx  + bmv(Qxu, kut) + bmv(Kut.mT, qu) + bmv(Kut.mT @ Quu, kut)
-            
-        return Ku, ku
-
-    def ipddpgrad_forward(self, x_init, Ku, ku):
-        assert x_init.device == Ku.device == ku.device
-        assert x_init.dtype == Ku.dtype == ku.dtype
-        assert x_init.ndim == 2, "Shape not compatible."
-        B = self.p.shape[:-2]
-        ns, nc = self.Qx_terminal.size(-1), self.F.size(-1) - self.Qx_terminal.size(-1)
-        u = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
-        cost = torch.zeros(B, dtype=self.p.dtype, device=self.p.device)
-        x = torch.zeros(B + (self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
-        x[..., 0, :] = x_init
-        xt = x_init
-
-        self.system.set_refpoint(t=torch.Tensor([0.]))
-        for t in range(self.T):
-            Kut, kut = Ku[...,t,:,:], ku[...,t,:]
-            u[..., t, :] = ut = self.uold[...,t,:] + kut + bmv(Kut, xt-self.xold[...,t,:]) # a very important bug
-            xut = torch.cat((xt, ut), dim=-1)
-            x[...,t+1,:] = xt = self.system(xt, ut)[0]
-            cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
-        
-        if self.constraint_flag:
-            ncons = self.W.size(-2)
-            cons = torch.zeros(B + (self.T, ncons), dtype=self.p.dtype, device=self.p.device )
-            cons = self.constraint(x[...,:-1,:], u)
-            return x, u, cost, cons
-        else: 
-            return x, u, cost
-        

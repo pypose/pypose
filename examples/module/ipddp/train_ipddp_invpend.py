@@ -8,7 +8,7 @@ import pypose as pp
 import pickle as pkl
 import torch.optim as optim
 from invpend import InvPend
-from pypose.module.ipddp import ddpOptimizer, ddpGrad
+from pypose.module.ipddp import ddpOptimizer
 
 def main():
     torch.set_default_dtype(torch.float64)
@@ -95,7 +95,7 @@ def main():
         sys_ = InvPend(dt, length=_param)
         _ipddp_list = [None for batch_id in range(n_batch)]
         _fp_best_list = [None for batch_id in range(n_batch)]
-        batch_ddpgrad = ddpGrad(sys_, batch_lincon)
+        # batch_ddpgrad = ddpGrad(sys_, batch_lincon)
         for batch_id in range(n_batch):
             stage_cost = pp.module.QuadCost(Q[batch_id:batch_id+1], R[batch_id:batch_id+1], S[batch_id:batch_id+1], c[batch_id:batch_id+1])
             terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
@@ -107,10 +107,9 @@ def main():
             # detached version to solve the best traj
             with torch.no_grad():            
                 _fp_best_list[batch_id] = _ipddp_list[batch_id].optimizer()
-        x_init = init_traj['state'][...,0,:]
-        x_pred, u_pred, _, _ = batch_ddpgrad.forward(_fp_best_list, x_init) # todo: last iteration should use batch computation.
-        print('x_pred solved')
 
+        x_pred, u_pred, _ = _ipddp_list[0].forward(_fp_best_list) # call any one class instantiation to perform batch grad computation
+        print('x_pred solved')
         sys = InvPend(dt, length=expert['param'])
         ipddp_list = [None for batch_id in range(n_batch)]
         fp_list = [None for batch_id in range(n_batch)]
