@@ -108,58 +108,52 @@ class ddpOptimizer(nn.Module):
             \mathbf{cost} \left( \mathbf{\tau}_t \right) = \sum\limits_{t=0}^{T-1}q(\mathbf{\tau}_t) + p(\mathbf{\tau}_T) 
 
     Note:
-        Some additional tricks such as regularization, filter were used.
-        The discrete-time system to be solved by LQR could be both either linear time-invariant
-        (:meth:`LTI`) system or linear time-varying (:meth:`LTV`) system.
+        Some additional tricks were used in the implementation, i.e., egularization in the backwardpass,
+        filter, line search in the forwardpass.
 
-    From the learning perspective, this can be interpreted as a module with unknown parameters
-    :math:`\begin{Bmatrix} \mathbf{Q}, \mathbf{p}, \mathbf{F}, \mathbf{f} \end{Bmatrix}`, 
+    From the learning perspective, this can be interpreted as a module with unknown parameters in
+    :math:`\begin{Bmatrix} \mathbf{f}, \mathbf{c}, q, p \end{Bmatrix}`, 
     which can be integrated into a larger end-to-end learning system.
 
     Note:
-        The implementation is based on page 24-32 of `Optimal Control and Planning 
-        <http://rll.berkeley.edu/deeprlcourse/f17docs/lecture_8_model_based_planning.pdf>`_.
+        The implementation is based on paper `Interior Point Differential Dynamic Programming 
+        <https://arxiv.org/pdf/2004.12710.pdf>`_.
 
     Example:
-        >>> n_batch, T = 2, 5
-        >>> n_state, n_ctrl = 4, 3
-        >>> n_sc = n_state + n_ctrl
-        >>> Q = torch.randn(n_batch, T, n_sc, n_sc)
-        >>> Q = torch.matmul(Q.mT, Q)
-        >>> p = torch.randn(n_batch, T, n_sc)
-        >>> r = 0.2 * torch.randn(n_state, n_state)
-        >>> A = torch.tile(torch.eye(n_state) + r, (n_batch, 1, 1))
-        >>> B = torch.randn(n_batch, n_state, n_ctrl)
-        >>> C = torch.tile(torch.eye(n_state), (n_batch, 1, 1))
-        >>> D = torch.tile(torch.zeros(n_state, n_ctrl), (n_batch, 1, 1))
-        >>> c1 = torch.tile(torch.randn(n_state), (n_batch, 1))
-        >>> c2 = torch.tile(torch.zeros(n_state), (n_batch, 1))
-        >>> x_init = torch.randn(n_batch, n_state)
+
+        >>> dt = 0.05   # Delta t
+        >>> T = 5    # Number of time steps
+        >>> state = torch.tensor([[-2.,0.], [-1., 0.], [-2.5, 1.]])
         >>> 
-        >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
-        >>> LQR = pp.module.LQR(lti, Q, p, T)
-        >>> x, u, cost = LQR(x_init)
-        >>> print("u = ", u)
-        x =  tensor([[[-0.2633, -0.3466,  2.3803, -0.0423],
-                      [ 0.1849, -1.3884,  1.0898, -1.6229],
-                      [ 1.2138, -0.7161,  0.2954, -0.6819],
-                      [ 1.4840, -1.1249, -1.0302,  0.9805],
-                      [-0.3477, -1.7063,  4.6494,  2.6780]],
-                     [[-0.9744,  0.4976,  0.0603, -0.5258],
-                      [-0.6356,  0.0539,  0.7264, -0.5048],
-                      [-0.2275, -0.1649,  0.3872, -0.4614],
-                      [ 0.2697, -0.3576,  0.0999, -0.4594],
-                      [ 0.3916, -2.0832,  0.0701, -0.5407]]])
-        u =  tensor([[[ 1.0405,  0.1586, -0.1282],
-                      [-1.4845, -0.5745,  0.2523],
-                      [-0.6322, -0.3281, -0.3620],
-                      [-1.6768,  2.4054, -0.1047],
-                      [-1.7948,  3.5269,  9.0703]],
-                     [[-0.1795,  0.9153,  1.7066],
-                      [ 0.0814,  0.4004,  0.7114],
-                      [ 0.0435,  0.5782,  1.0127],
-                      [-0.3017, -0.2897,  0.7251],
-                      [-0.0728,  0.7290, -0.3117]]])
+        >>> sys = InvPend(dt) 
+        >>> ns, nc = 2, 1
+        >>> n_batch = 3
+        >>> state_all =      torch.zeros(n_batch, T+1, ns)
+        >>> input_all = 0.02*torch.ones(n_batch,  T,   nc)
+        >>> state_all[...,0,:] = state
+        >>> init_traj = {'state': state_all, 'input': input_all}
+        >>> 
+        >>> Q = torch.tile(dt*torch.eye(ns, ns, device=device), (n_batch, T, 1, 1))
+        >>> R = torch.tile(dt*torch.eye(nc, nc, device=device), (n_batch, T, 1, 1))
+        >>> S = torch.tile(torch.zeros(ns, nc, device=device), (n_batch, T, 1, 1))
+        >>> c = torch.tile(torch.zeros(1, device=device), (n_batch, T))
+        >>> stage_cost = pp.module.QuadCost(Q, R, S, c)
+        >>> terminal_cost = pp.module.QuadCost(10./dt*Q[...,0:1,:,:], R[...,0:1,:,:], S[...,0:1,:,:], c[...,0:1]) # special stagecost with T=1
+        >>> 
+        >>> gx = torch.tile(torch.zeros( 2*nc, ns), (n_batch, T, 1, 1))
+        >>> gu = torch.tile(torch.vstack( (torch.eye(nc, nc), - torch.eye(nc, nc)) ), (n_batch, T, 1, 1))
+        >>> g = torch.tile(torch.hstack( (-0.25 * torch.ones(nc), -0.25 * torch.ones(nc)) ), (n_batch, T, 1))
+        >>> lincon = pp.module.LinCon(gx, gu, g)
+        >>> 
+        >>> traj_opt = [None for batch_id in range(n_batch)]
+        >>> for batch_id in range(n_batch): # use for loop and keep the ddpOptimizer 
+        >>>     stage_cost = pp.module.QuadCost(Q[batch_id:batch_id+1], R[batch_id:batch_id+1], S[batch_id:batch_id+1], c[batch_id:batch_id+1])
+        >>>     terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
+        >>>     lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])  
+        >>>     init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1], 'input': init_traj['input'][batch_id:batch_id+1]} 
+        >>>     solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, gx.shape[-2], init_traj_sample) 
+        >>>     traj_opt[batch_id] = solver.optimizer()
+
     '''
     def __init__(self, sys=None, stage_cost=None, terminal_cost=None, cons=None, n_cons=0, init_traj=None):
         super().__init__()
@@ -514,18 +508,19 @@ class ddpOptimizer(nn.Module):
 
     def forward(self, fp_list):
         r'''
-        Performs LQR for the linear system.
+        Performs IPDDP for the general nonlinear system.
 
         Args:
-            x_init (:obj:`Tensor`): The initial state of the system.
+            fp_list (List of :obj:`Class ddpOptimizer`): The list of ddpOptimizer class instances.
 
         Returns:
-            List of :obj:`Tensor`: A list of tensors including the solved state sequence
-            :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the associated
-            quadratic costs :math:`\mathbf{c}` over the time horizon.
+            Tensors (:obj:`Tensor`) including 
+            :math:`\mathbf{x}` (:obj:`Tensor`): The solved state sequence.
+            :math:`\mathbf{u}` (:obj:`Tensor`): The solved input sequence. 
+            :math:`\mathbf{cost}` (:obj:`Tensor`):  The associated costs over the time horizon.
         '''
         with torch.autograd.set_detect_anomaly(True): # for debug
-            self.prepare(fp_list)
+            self.prepare(fp_list) # collect into batch
             self.infeas = False
             self.backwardpasscompact(lastIterFlag=True)
             self.forwardpasscompact(lastIterFlag=True)
