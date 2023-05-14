@@ -19,3 +19,4 @@ Modules
    module.QuadCost
    module.Constraint
    module.LinCon
+   module.ddpOptimizer

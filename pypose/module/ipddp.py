@@ -19,50 +19,50 @@ class ddpOptimizer(nn.Module):
 
     .. math::
         \begin{align*}
-            \mathbf{x}_{t+1} &= \mathbf{A}_t\mathbf{x}_t + \mathbf{B}_t\mathbf{u}_t 
-                                                         + \mathbf{c}_{1t}          \\
-            \mathbf{y}_t &= \mathbf{C}_t\mathbf{x}_t + \mathbf{D}_t\mathbf{u}_t
-                                                     + \mathbf{c}_{2t}              \\
+            \mathbf{x}_{t+1} &= \mathbf{f}(\mathbf{x}_{t}, \mathbf{u}_{t}, t)              \\
         \end{align*}
 
-    where :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state and input of the linear system; 
-    :math:`\mathbf{y}` is the observation of the linear system; :math:`\mathbf{A}`,
-    :math:`\mathbf{B}` are the state matrix and input matrix of the linear system;
-    :math:`\mathbf{C}`, :math:`\mathbf{D}` are the output matrix and observation matrix of the
-    linear system; :math:`\mathbf{c}_{1}`, :math:`\mathbf{c}_{2}` are the constant input and
-    constant output of the linear system. The subscript :math:`\cdot_{t}` denotes the time step.
+    where :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state and input of the general nonlinear system. 
+    The subscript :math:`\cdot_{t}` denotes the time step.
 
-    LQR finds the optimal nominal trajectory :math:`\mathbf{\tau}_{1:T}^*` = 
-    :math:`\begin{Bmatrix} \mathbf{x}_t, \mathbf{u}_t \end{Bmatrix}_{1:T}` 
-    for the linear system of the optimization problem:
+    IPDDP finds the optimal nominal trajectory :math:`\mathbf{\tau}^*` = 
+    :math:`\begin{Bmatrix} \mathbf{x}_t, \mathbf{u}_t \end{Bmatrix}_{0:T-1} \cup \begin{Bmatrix} \mathbf{x}_T \end{Bmatrix}` 
+    for the following optimization problem:
 
     .. math::
         \begin{align*}
-          \mathbf{\tau}_{1:T}^* = \mathop{\arg\min}\limits_{\tau_{1:T}} \sum\limits_t\frac{1}{2}
-          \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t \\
-          \mathrm{s.t.} \quad \mathbf{x}_1 = \mathbf{x}_{\text{init}}, \\
-          \mathbf{x}_{t+1} = \mathbf{F}_t\mathbf{\tau}_t + \mathbf{c}_{1t} \\
+          \mathbf{\tau}^* = \mathop{\arg\min}\limits_{\tau} & \sum\limits_{t=0}^{T-1}q(\mathbf{\tau}_t) + p(\mathbf{\tau}_T) \\
+          \mathrm{s.t.} \quad \mathbf{x}_0 &= \mathbf{x}_{\text{init}}, \\
+          \mathbf{x}_{t+1} &= \mathbf{f}(\mathbf{x}_{t}, \mathbf{u}_{t}, t),  \\
+          \mathbf{c}(\mathbf{\tau}_t) &\leq \mathbf{0}.
         \end{align*}
 
     where :math:`\mathbf{\tau}_t` = :math:`\begin{bmatrix} \mathbf{x}_t \\ \mathbf{u}_t
-    \end{bmatrix}`, :math:`\mathbf{F}_t` = :math:`\begin{bmatrix} \mathbf{A}_t & \mathbf{B}_t
-    \end{bmatrix}`.
+    \end{bmatrix}`; :math:`q` and :math:`p` denote the stage and terminal costs, respectively; 
+    :math:`\mathbf{c}` is the stage-wise inequality constraints.
 
-    The LQR process can be summarised as a backward and a forward recursion.
+    The IPDDP process can be summarised as iterative backward and forward recursions.
 
     - The backward recursion.
         
-      For :math:`t` = :math:`T` to 1:
+      For :math:`t` = :math:`T-1` to 0:
 
         .. math::
             \begin{align*}
-                \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t \\
-                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}
-                                        \mathbf{c}_{1t} + \mathbf{F}_t^\top\mathbf{v}_{t+1}  \\
+                \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t 
+                                    + \mathbf{v}_{t+1} \odot \mathbf{G}_t 
+                                    - \mathbf{W}_t^\top \mathbf{S}_t \mathbf{C}_t^{-1} \mathbf{W}_t   \\
+                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1}
+                                          + \mathbf{W}_t^\top\mathbf{s}_t 
+                                          - \mathbf{W}_t^\top \mathbf{C}_t^{-1}\mathbf{r}_t\\
                 \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1} 
                                                      \mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} \\
                 \mathbf{k}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1} 
                                                            \mathbf{q}_{\mathbf{u}_t}         \\
+                \mathbf{K}_t^{\mathbf{s}} &= - \mathbf{S}_t\mathbf{C}_t^{-1} (\mathbf{c}_{\mathbf{x}_t}  
+                                        + \mathbf{c}_{\mathbf{u}_t} \mathbf{K}_t) \\                   
+                \mathbf{k}_t^{\mathbf{s}} &= - \mathbf{C}_t^{-1} (\mathbf{r}_t + \mathbf{S}_t 
+                                                    \mathbf{c}_{\mathbf{u}_t} \mathbf{k}_t) \\
                 \mathbf{V}_t &= \mathbf{Q}_{\mathbf{x}_t, \mathbf{x}_t} 
                     + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{K}_t 
                     + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} 
@@ -73,24 +73,42 @@ class ddpOptimizer(nn.Module):
                     + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{k}_t   \\
             \end{align*}
 
-    - The forward recursion.
-
-      For :math:`t` = 1 to :math:`T`:
+      where :math:`\odot` denotes the tensor contraction and 
 
         .. math::
             \begin{align*}
-                \mathbf{u}_t &= \mathbf{K}_t\mathbf{x}_t + \mathbf{k}_t \\
-                \mathbf{x}_{t+1} &= \mathbf{A}_t\mathbf{x}_t + \mathbf{B}_t\mathbf{u}_t 
-                                                             + \mathbf{c}_{1t} \\
+                \mathbf{V}_T &= p_{\mathbf{x}_T, \mathbf{x}_T} \\ 
+                \mathbf{v}_T &= p_{\mathbf{x}_T} \\ 
+                \mathbf{F}_t &= \begin{bmatrix} \mathbf{f}_{\mathbf{x}_t} \\ 
+                                \mathbf{f}_{\mathbf{u}_t} \end{bmatrix} \\
+                \mathbf{W}_t &= \begin{bmatrix} \mathbf{c}_{\mathbf{x}_t} \\ 
+                                \mathbf{c}_{\mathbf{u}_t} \end{bmatrix} \\   
+                \mathbf{G}_t &= \begin{bmatrix} \mathbf{f}_{\mathbf{x}_t, \mathbf{x}_t}, \mathbf{f}_{\mathbf{x}_t, \mathbf{u}_t}\\ 
+                                \mathbf{f}_{\mathbf{u}_t, \mathbf{x}_t}, \mathbf{f}_{\mathbf{u}_t, \mathbf{u}_t}\\  \end{bmatrix} \\
+                \mathbf{S}_t &= \mathbf{diag}(\mathbf{s}_t) \\
+                \mathbf{C}_t &= \mathbf{diag}(\mathbf{c}_t) \\  
+                \mathbf{r}_t &= \mathbf{S}_t \mathbf{c}_t + \mu  \mathbf{1}  \\                                                                         
             \end{align*}
 
-    Then quadratic costs of the system over the time horizon:
+            
+    - The forward recursion.
+
+      For :math:`t` = 0 to :math:`T-1`:
 
         .. math::
-            \mathbf{c} \left( \mathbf{\tau}_t \right) = \frac{1}{2}
-            \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t
+            \begin{align*}
+                \mathbf{u}_t &= \mathbf{K}_t(\mathbf{x}_t - \mathbf{x}_t^{-}) + \mathbf{k}_t + \mathbf{u}_t^{-}\\
+                \mathbf{s}_t &= \mathbf{K}_t^{\mathbf{s}}(\mathbf{x}_t - \mathbf{x}_t^{-}) + \mathbf{k}_t^{\mathbf{s}}  + \mathbf{s}_t^{-}\\
+                \mathbf{x}_{t+1} &= \mathbf{f}(\mathbf{x}_t,\mathbf{u}_t,t)  \\
+            \end{align*}
+
+    Then cost of the system over the time horizon:
+
+        .. math::
+            \mathbf{cost} \left( \mathbf{\tau}_t \right) = \sum\limits_{t=0}^{T-1}q(\mathbf{\tau}_t) + p(\mathbf{\tau}_T) 
 
     Note:
+        Some additional tricks such as regularization, filter were used.
         The discrete-time system to be solved by LQR could be both either linear time-invariant
         (:meth:`LTI`) system or linear time-varying (:meth:`LTV`) system.
 
