@@ -104,9 +104,9 @@ def BSlpineSE3(input_poses, time, extrapolate = True):
     posesSize = input_poses.shape[1]
     alpha = torch.arange(4, dtype=time.dtype, device=time.device)
     tt = time[:, None, :] ** alpha[None, :, None]
-    B = torch.tensor([[5, 3, -3, 1],
-                        [1, 3, 3, -2],
-                        [0, 0, 0, 1]], dtype=time.dtype, device=time.device) / 6
+    B = torch.tensor([[5, 3,-3, 1],
+                      [1, 3, 3,-2],
+                      [0, 0, 0, 1]], dtype=time.dtype, device=time.device) / 6
     w = (B @ tt).squeeze(0)
     w0 = w[..., 0, :].T
     w1 = w[..., 1, :].T
