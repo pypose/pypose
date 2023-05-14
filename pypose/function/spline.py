@@ -120,6 +120,6 @@ def BSlpineSE3(input_poses, time, extrapolate = True):
             (posesTensor[..., [2], :])).Log() * w1).Exp()
     A2 = ((posesTensor[..., [2], :].Inv() *
             (posesTensor[..., [3], :])).Log() * w2).Exp()
-    wayposes = (T_delta * A0 * A1 * A2)
-    wayposes = wayposes.reshape((-1, timeSize * (posesSize - 3), 7))
+    interPosesSize = timeSize * (posesSize - 3)
+    interPoses = (T_delta * A0 * A1 * A2).reshape((-1, interPoseSize, 7))
     return wayposes
