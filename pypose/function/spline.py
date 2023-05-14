@@ -95,7 +95,9 @@ def BSlpineSE3(input_poses, time, extrapolate = True):
 
           Fig. 1. Result of LieSpline Interpolation
     """
-
+    assert is_SE3(input_poses), "The input poses are not SE3Type."
+    assert time.shape[0]==time.shape[1]==1, "The time has wrong shape."
+    assert type(extrapolate) == bool, "The extrapolate should be bool type."
     if extrapolate:
         input_poses = torch.cat(
             [torch.cat([input_poses[..., [0], :], input_poses], dim=1),
