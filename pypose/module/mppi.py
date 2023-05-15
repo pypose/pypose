@@ -249,9 +249,9 @@ class MPPI():
 
         # allow propagation of a sample of states (ex. to carry a distribution), or to start with a single state
         if self.state.shape == (K, self.nx):
-            state = self.state
+            state = self.state.clone()
         else:
-            state = self.state.view(1, -1).repeat(K, 1)
+            state = self.state.view(1, -1).repeat(K, 1).clone()
 
         # rollout action trajectory M times to estimate expected cost
         state = state.repeat(self.M, 1, 1)
