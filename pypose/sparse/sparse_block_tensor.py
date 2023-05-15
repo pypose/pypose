@@ -125,10 +125,10 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
     hybrid = hybrid.coalesce()
 
     # The block dimension.
-    assert len(hybrid.shape) % 2 == 0, 'The hybrid tensor must have even number of dims, ' \
-                                        'but got {}'.format(len(hybrid.shape))
+    assert hybrid.dim() % 2 == 0, 'The hybrid tensor must have even number of dims, ' \
+                                        'but got {}'.format(hybrid.dim())
     assert hybrid.dim() >= 4, f'hybrid should have dims >= 4, but got {hybrid.dim()}'
-    num_dim = len(hybrid.shape) // 2  # Total number of the sparse dimensions.
+    num_dim = hybrid.dim() // 2  # Total number of the sparse dimensions.
     shape_b = hybrid.shape[num_dim:]  # Desne/block shape.
     shape_p = hybrid.shape[:num_dim]  # Sparse/proxy shape.
     numel_b = prod(shape_b)  # Number of elements per block.
@@ -256,7 +256,7 @@ def coo_2_hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
     inblock_indices = coo.indices() % shape_b_t
     # block indices.
     indices_b = coo.indices() // shape_b_t
-    numel_p = torch.numel(proxy)
+    numel_p = torch.numel(proxy)  # dense number of elements
     if numel_p < dense_proxy_thres:  # check the *dense* shape
         block_seq = torch.sparse_coo_tensor(
                 proxy.indices(), torch.arange(proxy.values().shape[0]), size=proxy.shape
