@@ -54,4 +54,3 @@ Functions
     reprojerr
     knn
     svdtf
-    BSlpineSE3
