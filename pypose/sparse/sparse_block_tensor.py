@@ -71,6 +71,43 @@ def ravel_multi_index(coords: torch.Tensor, shape: List[int]) -> torch.Tensor:
     return (coords * coefs.unsqueeze(-1)).sum(dim=0, keepdim=True)
 
 
+def unravel_index(index, shape: List[int]):
+    '''
+    This is a `torch` implementation of `numpy.unravel_index`.
+    Converts a flat index or array of flat indices into a tuple of coordinate arrays.
+    Args:
+        index (Tensor): An integer array whose elements are indices into the flattened
+        version of an array of dimensions shape.
+        shape (List[int]): The shape of the array to use for unraveling index.
+    Returns:
+        Tensor: Each row in the tensor has the same shape as the index tensor.
+        Each column in the tensor corresponds to the dimension in shape.
+        Shape: (dim, numel)
+    '''
+    dims = len(shape)
+    out = torch.empty((dims, index.shape[0]), dtype=index.dtype, device=index.device)
+    for dim_idx in range(dims-1, 0-1, -1):
+        dim = shape[dim_idx]
+        out[dim_idx] = (index % dim)
+        index = index // dim
+    return out
+
+
+def prod(xs: List[int]) -> int:
+    '''Compute the product of a list of integers.
+
+    Args:
+        l (list of int): The list of integers.
+
+    Returns:
+        int: The product of the list.
+    '''
+    p = 1
+    for x in xs:
+        p *= x
+    return p
+
+
 @jit.script
 def make_coo_indices_and_dims_from_hybrid(hybrid):
     '''Create index and dimension info for converting a Hybrid tensor to a COO tensor.
@@ -88,45 +125,48 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
     hybrid = hybrid.coalesce()
 
     # The block dimension.
-    b_dim = hybrid.shape[-2:]
-    assert hybrid.dim() >= 4, f'hybrid.shape = {hybrid.shape}. '
-    n_block_elem = b_dim[0] * b_dim[1] # Number of elements per block.
+    assert hybrid.dim() % 2 == 0, 'The hybrid tensor must have even number of dims, ' \
+                                        'but got {}'.format(hybrid.dim())
+    assert hybrid.dim() >= 4, f'hybrid should have dims >= 4, but got {hybrid.dim()}'
+    num_dim = hybrid.dim() // 2  # Total number of the sparse dimensions.
+    shape_b = hybrid.shape[num_dim:]  # Desne/block shape.
+    shape_p = hybrid.shape[:num_dim]  # Sparse/proxy shape.
+    numel_b = prod(shape_b)  # Number of elements per block.
 
     # === Compose target coo indices. ===
 
     # Index shift in block
-    shift_row = torch.arange(b_dim[0], dtype=torch.int64, device=hybrid.device)
-    shift_col = torch.arange(b_dim[1], dtype=torch.int64, device=hybrid.device)
-    index_shift_row, index_shift_col = torch.meshgrid(shift_row, shift_col, indexing='ij')
-    index_shift_row = index_shift_row.contiguous().flatten()
-    index_shift_col = index_shift_col.contiguous().flatten()
-    index_shift = torch.stack((index_shift_row, index_shift_col), dim=0) # (2,n_block_elem)
+    # the same as torch.cartesian_prod(*[torch.arange(i) for i in shape_b]).T
+    index_shift = unravel_index(torch.arange(numel_b), shape_b)
 
     # Shift the original indices.
-    indices_ori = hybrid.indices().unsqueeze(-1)  # (2, n_block, 1)
-    indices_rp = indices_ori.expand(-1, -1, n_block_elem)  # (2, n_block, n_block_elem)
+    indices_ori = hybrid.indices().unsqueeze(-1)  # (num_dim, num_b, 1)
+    indices_rp = indices_ori.expand(-1, -1, numel_b)  # (num_dim, num_b, numel_b)
     # change to expand saves 0.3s for 10000 runs.
 
     # Compute the new indices by multiplying the block shape and adding the index shift.
-    index_scale = torch.tensor(list(b_dim), dtype=torch.int64, device=hybrid.device)
-    # (2, n_block, n_block_elem)
+    index_scale = torch.tensor(shape_b, dtype=torch.int64, device=hybrid.device)
+    # index_scale, index_shift, indices_rp are all used in the form:
+    # (num_dim, num_b, numel_b)
     indices_new = indices_rp * index_scale[:, None, None] + index_shift[:, None, :]
     indices_new = indices_new.flatten(1, 2)
 
     # === The sparse dimension of the target coo matrix. ===
-    coo_dim = [hybrid.shape[-4]*b_dim[0], hybrid.shape[-3]*b_dim[1]]
-    return indices_new, coo_dim
+    shape_coo: List[int] = []
+    for i in range(num_dim):
+        shape_coo.append(shape_p[i] * shape_b[i])
+    return indices_new, shape_coo
 
 
 @jit.script
 def repeated_value_as_hybrid_value(coo: torch.Tensor,
-                                   block_shape: List[int],
+                                   shape_b: List[int],
                                    mode: str = 'zeros',
                                    dtype: Optional[torch.dtype] = None,
                                    ):
     '''Create a Hybrid tensor based on a COO tensor and the mode value argument.
     The resulting hybrid tensor will have the same spatial structure as coo:
-    any non-zero element of coo indicates existence of a block of size block_shape.
+    any non-zero element of coo indicates existence of a block of size shape_b.
     Each block is filled by repeating an element value generated by the mode argument.
 
     For example, when setting `mode` to `"sequence"`, it create a Hybrid tensor based
@@ -136,7 +176,7 @@ def repeated_value_as_hybrid_value(coo: torch.Tensor,
 
     Args:
         coo (torch.Tensor): The COO tensor.
-        block_shape (List[int]): The block shape of the output Hybrid tensor.
+        shape_b (List[int]): The block shape of the output Hybrid tensor.
         mode (str): Value to be repeated.
         dtype (torch.dtype): dtype of the created tensor.
 
@@ -146,27 +186,23 @@ def repeated_value_as_hybrid_value(coo: torch.Tensor,
     Example:
         # TODO
     '''
-    # Make sure we have ordered values.
     coo = coo.coalesce()
+    num_b = coo.values().shape[0]
 
-    # Number of block and number of elements per block.
-    n_block = coo.values().shape[0]
-
-    # Prepare the sequence number.
     if mode == 'zeros':
-        val = torch.zeros(n_block, device=coo.device, dtype=dtype)
+        val = torch.zeros(num_b, device=coo.device, dtype=dtype)
     elif mode == 'ones':
-        val = torch.ones(n_block, device=coo.device, dtype=dtype)
+        val = torch.ones(num_b, device=coo.device, dtype=dtype)
     elif mode == 'sequence':
-        val = torch.arange(n_block, device=coo.device, dtype=dtype)
+        val = torch.arange(num_b, device=coo.device, dtype=dtype)
     else:
         raise ValueError(f'Unknown mode: {mode}')
-    val = val[..., None, None].tile(block_shape)
+    val = val[..., None, None].tile(shape_b)
 
-    s_dim: List[int] = list(coo.shape[-2:])
+    shape_coo: List[int] = list(coo.shape)
 
     return torch.sparse_coo_tensor(
-            coo.indices(), val, size=s_dim + block_shape
+            coo.indices(), val, size=shape_coo + shape_b
         ).coalesce()
 
 
@@ -184,14 +220,15 @@ def hybrid_2_coo(hybrid):
 
     '''
     hybrid = hybrid.coalesce()
-    indices_new, sparse_dim = make_coo_indices_and_dims_from_hybrid(hybrid)
-    return torch.sparse_coo_tensor(indices_new, hybrid.values().flatten(), size=sparse_dim)
+    indices, shape_coo = make_coo_indices_and_dims_from_hybrid(hybrid)
+    return torch.sparse_coo_tensor(indices, hybrid.values().flatten(), size=shape_coo)
 
 @jit.script
 def coo_2_hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
     '''Convert a COO tensor to a Hybrid tensor by referring to the proxy.
 
-    A proxy is a COO tensor. Any non-zero element in proxy indicates a block of the Hybrid tensor.
+    A proxy is a COO tensor. Any non-zero element in proxy indicates a block of the
+    Hybrid tensor.
 
     Args:
         coo (torch.Tensor): The COO tensor.
@@ -207,44 +244,45 @@ def coo_2_hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
     proxy = proxy.coalesce()
 
     # Figure out the shape of the target Hybrid tensor.
-    s_dim = list(proxy.shape[-2:])
-    assert coo.shape[0] % s_dim[0] == 0 and coo.shape[1] % s_dim[1] == 0, \
-        f'coo and s_dim are not compatible: coo.shape = {coo.shape}, s_dim = {s_dim}. '
-    b_dim: List[int] = [ coo.shape[0] // s_dim[0], coo.shape[1] // s_dim[1] ] # block dimension.
+    shape_p = list(proxy.shape)
+    assert all(coo.shape[i] % shape_p[i] == 0 for i in range(proxy.dim())), \
+        f'coo and proxy shape are not compatible: coo.shape={coo.shape}, shape_p={shape_p}. '
+    shape_b: List[int] = [coo.shape[i] // shape_p[i] for i in range(proxy.dim())]
 
     # Create a temporary Hybrid tensor to represent the block sequence.
     coo = coo.coalesce()
     # in-block indices.
-    b_dim_t = torch.tensor(b_dim, dtype=torch.int64, device=coo.device).unsqueeze(-1)
-    in_block_indices = coo.indices() % b_dim_t
+    shape_b_t = torch.tensor(shape_b, dtype=torch.int64, device=coo.device).unsqueeze(-1)
+    inblock_indices = coo.indices() % shape_b_t
     # block indices.
-    block_indices = coo.indices() // b_dim_t
-    numel_proxy = torch.numel(proxy)
-    if numel_proxy < dense_proxy_thres:  # check the *dense* shape
+    indices_b = coo.indices() // shape_b_t
+    numel_p = torch.numel(proxy)  # dense number of elements
+    if numel_p < dense_proxy_thres:  # check the *dense* shape
         block_seq = torch.sparse_coo_tensor(
                 proxy.indices(), torch.arange(proxy.values().shape[0]), size=proxy.shape
             )
         block_seq = block_seq.to_dense()  # dense is fast in indexing
-        block_seq = block_seq[block_indices[0], block_indices[1]]
+        block_seq = block_seq[indices_b[0], indices_b[1]]
     else:
         # ravel multiple index into one.
-        coeff = torch.tensor(s_dim+[1, ], dtype=b_dim_t.dtype, device=b_dim_t.device)
+        coeff = torch.tensor(shape_p+[1, ], dtype=shape_b_t.dtype, device=shape_b_t.device)
         coeff = coeff[1:].flipud().cumprod(dim=0).flipud()
-        proxy_indices = (proxy.indices() * coeff.unsqueeze(-1)).sum(0, keepdim=True)
+        indices_p = (proxy.indices() * coeff.unsqueeze(-1)).sum(0, keepdim=True)
         block_seq = torch.sparse_coo_tensor(
-                proxy_indices,
-                torch.arange(proxy.values().shape[0]), size=(numel_proxy,)
+                indices_p,
+                torch.arange(proxy.values().shape[0]), size=(numel_p,)
             )
-        block_seq = block_seq.index_select(0, (block_indices * coeff.unsqueeze(-1)).sum(0)).to_dense()
+        block_seq = block_seq.index_select(
+            0, (indices_b * coeff.unsqueeze(-1)).sum(0)).to_dense()
 
     # Index into a temporary tensor.
     blocks = torch.sparse_coo_tensor(
-        indices=torch.cat([block_seq.unsqueeze(0), in_block_indices]),
+        indices=torch.cat([block_seq.unsqueeze(0), inblock_indices]),
         values=coo.values(),
-        size=torch.Size([proxy.values().shape[0]] + b_dim)).to_dense()
+        size=torch.Size([proxy.values().shape[0]] + shape_b)).to_dense()
 
     # Create the sparse hybrid COO tensor.
-    return torch.sparse_coo_tensor(proxy.indices(), blocks, size=list(s_dim) + b_dim)
+    return torch.sparse_coo_tensor(proxy.indices(), blocks, size=list(shape_p) + shape_b)
 
 
 class SBTOperation(object):
@@ -693,20 +731,20 @@ class SparseBlockTensor(torch.Tensor):
 def sparse_block_tensor(
         indices, values, size=None, dtype=None, device=None, requires_grad=False):
     # Figure out the block shape.
-    n_block, block_shape = values.shape[0], values.shape[1:]
+    num_b, shape_b = values.shape[0], values.shape[1:]
 
     # Storage.
     storage = torch.sparse_coo_tensor(
         indices,
         values,
-        size=(*size, *block_shape),
+        size=(*size, *shape_b),
         dtype=dtype,
         device=device,
         requires_grad=requires_grad ).coalesce()
 
     proxy = torch.sparse_coo_tensor(
         indices,
-        torch.ones(n_block, dtype=dtype, device=device),
+        torch.ones(num_b, dtype=dtype, device=device),
         size=size,
         dtype=dtype,
         device=device,

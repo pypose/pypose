@@ -1,9 +1,10 @@
-
+import numpy as np
 import pytest
 import torch
 import pypose as pp
 from pypose.sparse import sparse_block_tensor, coo_2_hybrid, hybrid_2_coo, SparseBlockTensor
 import pypose.sparse as sp
+
 
 def test_pypose_operation():
     a = pp.randn_so3(2, requires_grad=True)
@@ -15,8 +16,9 @@ def test_pypose_operation():
     e = pp.add(a, b)
     print(f'e = \n{e}')
 
+
 def test_sparse_coo_2_sparse_hybrid_coo():
-    i = [[0, 1, 2],[2, 0, 2]]
+    i = [[0, 1, 2], [2, 0, 2]]
     v = torch.tensor([[3, 4], [-5, -6], [7, 8]], dtype=torch.float32)
     x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
 
@@ -32,40 +34,65 @@ def random_sbt(proxy_shape, block_shape, dense_zero_prob=0.):
     values[torch.rand(values.shape) < dense_zero_prob] = 0
     return sparse_block_tensor(indices, values, size=proxy_shape)
 
+
 @pytest.mark.parametrize('dense_zero_prob', [0., 0.7])
-@pytest.mark.parametrize('op,dense_op,num_operands,shape_mode', [
-    (sp.abs, torch.abs, 1, 'identical'),
-    (torch.abs, torch.abs, 1, 'identical'),
-    (SparseBlockTensor.__add__, torch.add, 2, 'identical'),
-    (torch.add, torch.add, 2, 'identical'),
-    (SparseBlockTensor.__sub__, torch.sub, 2, 'identical'),
-    (SparseBlockTensor.__matmul__, torch.matmul, 2, 'identical_square'),],
-    )
-def test_universal(op, dense_op, num_operands, shape_mode, dense_zero_prob, dim=2):
+@pytest.mark.parametrize('op,dense_op,type_operands,shape_mode,dim', [
+    (sp.abs, torch.abs, ['sbt'], 'identical', 2),
+    (sp.abs, torch.abs, ['sbt'], 'identical', 3),
+    (torch.abs, torch.abs, ['sbt'], 'identical', 2),
+    (torch.abs, torch.abs, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.__add__, torch.add, ['sbt', 'sbt'], 'identical', 2),
+    (SparseBlockTensor.__add__, torch.add, ['sbt', 'sbt'], 'identical', 3),
+    (SparseBlockTensor.__sub__, torch.sub, ['sbt', 'sbt'], 'identical', 2),
+    (SparseBlockTensor.__sub__, torch.sub, ['sbt', 'sbt'], 'identical', 3),
+    (SparseBlockTensor.__matmul__, torch.matmul, ['sbt', 'sbt'], 'mT', 2),
+    (SparseBlockTensor.__matmul__, torch.matmul, ['sbt', 'sbt'], 'identical_square', 2), ],
+                         )
+def test_universal(op, dense_op, type_operands, shape_mode, dim, dense_zero_prob):
     if shape_mode == 'identical':
         proxy_shape = torch.Size(torch.randint(1, 10, (dim,)))
-        block_shape = torch.randint(1, 10, (dim,))
-        proxy_shapes = [proxy_shape for _ in range(num_operands)]
-        block_shapes = [block_shape for _ in range(num_operands)]
+        block_shape = torch.Size(torch.randint(1, 10, (dim,)))
+        proxy_shapes = [proxy_shape for _ in type_operands]
+        block_shapes = [block_shape for _ in type_operands]
     elif shape_mode == 'identical_square':
-        proxy_shape = torch.Size(torch.randint(1, 10, (1,))) * 2
-        block_shape = torch.Size(torch.randint(1, 10, (1,))) * 2
-        proxy_shapes = [proxy_shape for _ in range(num_operands)]
-        block_shapes = [block_shape for _ in range(num_operands)]
+        proxy_shape = torch.Size(torch.randint(1, 10, (dim - 1,)))
+        proxy_shape = proxy_shape + proxy_shape[-1:]
+        block_shape = torch.Size(torch.randint(1, 10, (dim - 1,)))
+        block_shape = block_shape + block_shape[-1:]
+        proxy_shapes = [proxy_shape for _ in type_operands]
+        block_shapes = [block_shape for _ in type_operands]
+    elif shape_mode == 'mT':
+        shape_mT = lambda shape: shape[:-2] + torch.Size([shape[-1], shape[-2]])
+        proxy_shape = torch.Size(torch.randint(1, 10, (dim,)))
+        block_shape = torch.Size(torch.randint(1, 10, (dim,)))
+        proxy_shapes = [proxy_shape if idx % 2 == 0 else shape_mT(proxy_shape) for idx, _ in enumerate(type_operands)]
+        block_shapes = [block_shape if idx % 2 == 0 else shape_mT(block_shape) for idx, _ in enumerate(type_operands)]
     else:
         raise ValueError(f'Unknown shape_mode: {shape_mode}')
-    args = [random_sbt(proxy_shape, block_shape, dense_zero_prob) for _ in zip(proxy_shapes, block_shapes)]
+    dense_shapes = [torch.Size(np.multiply(proxy_shape, block_shape))
+                    for proxy_shape, block_shape in zip(proxy_shapes, block_shapes)]
+    args = []
+    args_dense = []
+    for t, proxy_shape, block_shape, dense_shapes in zip(type_operands, proxy_shapes, block_shapes, dense_shapes):
+        if t == 'sbt':
+            arg = random_sbt(proxy_shape, block_shape, dense_zero_prob)
+            arg_dense = hybrid_2_coo(arg._s).to_dense()
+            assert arg_dense.shape == dense_shapes
+        elif t == 'dense':
+            arg = torch.randn(dense_shapes)
+            arg_dense = arg
+        else:
+            raise ValueError(f'Unknown type_operands: {t}')
+        args.append(arg)
+        args_dense.append(arg_dense)
     y_sbt = op(*args)
-
-    # dense reference
-    args_dense = [hybrid_2_coo(x._s).to_dense() for x in args]
     y_dense = dense_op(*args_dense)
 
     torch.testing.assert_close(hybrid_2_coo(y_sbt._s).to_dense(), y_dense)
 
 
 def test_mm():
-    i = [[0, 0, 1, 2],[0, 2, 1, 2]]
+    i = [[0, 0, 1, 2], [0, 2, 1, 2]]
     v = torch.arange(16).view((-1, 2, 2)).to(dtype=torch.float32)
     x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
 
@@ -96,9 +123,7 @@ def test_mm():
 
 
 def test_is_sparse():
-    print()
-
-    i = [[0, 0, 1, 2],[0, 2, 1, 2]]
+    i = [[0, 0, 1, 2], [0, 2, 1, 2]]
     v = torch.arange(16).view((-1, 2, 2)).to(dtype=torch.float32)
     x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
 
@@ -106,13 +131,14 @@ def test_is_sparse():
 
 
 if __name__ == '__main__':
-    i = [[0, 0, 1, 2],[0, 2, 1, 2]]
+    i = [[0, 0, 1, 2], [0, 2, 1, 2]]
     v = torch.arange(16).view((4, 2, 2)).to(dtype=torch.float32)
     x = sparse_block_tensor(i, v, size=(3, 3), dtype=torch.float32)
     # if testing dense / sparse, set the following
     # x = hybrid_2_coo(x._s)
 
     import time
+
     start = time.time()
     for i in range(10000):
         x @ x
@@ -120,6 +146,7 @@ if __name__ == '__main__':
     print(f'elapsed time = {end - start}')
 
     from tqdm import tqdm
+
     mm_config = (SparseBlockTensor.__matmul__, torch.matmul, 2, 'identical_square', 0.7)
     for i in tqdm(range(10000)):
         test_universal(*mm_config)
