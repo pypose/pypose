@@ -14,10 +14,49 @@ def CSplineR3(points, steps=0.1):
     Returns:
        ``Tensor``: the interpolated points with [batch_size, inter_points_num, 3] shape.
 
-    A points query at
+    On the unit interval [0, 1], given a starting point :math:`p_0` at :math:`t = 0` and
+    an ending point :math:`p_1` at :math:`t = 1` with starting tangent :math:`m_0` at
+    :math:`t = 0` and ending tagent :math:`m_1` at :math:`t=1`, the polynomial can be
+    defined by
 
+    .. math::
+        \begin{aligned}
+            p(t) &= (1-3t^2+2t^3)p_0 + (t-2t^2+t^3)m_0+(3t^2-2t^3)p_1+(-t^2+t^3)m_1\\
+                 &= \begin{bmatrix}
+                        p_0, m_0, p_1, m_1
+                    \end{bmatrix}
+                    \begin{bmatrix}
+                        1& 0&-3& 2\\
+                        0& 1&-2& 1\\
+                        0& 0& 3&-2\\
+                        0& 0&-1& 1
+                    \end{bmatrix}
+                    \begin{bmatrix}1\\ t\\ t^2\\ t^3\end{bmatrix}
 
-    - .. figure:: /_static/img/module/liespline/CsplineR3.png
+        \end{aligned}
+
+    Examples:
+        >>> import torch
+        >>> import pypose as pp
+        >>> points = torch.tensor([[[0., 0., 0.],
+        ...                         [1., .5, 0.1],
+        ...                         [0., 1., 0.2],
+        ...                         [1., 1.5, 0.4],
+        ...                         [1.5, 0., 0.],
+        ...                         [2., 1.5, 0.4],
+        ...                         [2.5, 0., 0.],
+        ...                         [1.75, 0.75, 0.2],
+        ...                         [2.25, 0.75, 0.2],
+        ...                         [3., 1.5, 0.4],
+        ...                         [3., 0., 0.],
+        ...                         [4., 0., 0.],
+        ...                         [4., 1.5, 0.4],
+        ...                         [5., 1., 0.2],
+        ...                         [4., 0.75, 0.2],
+        ...                         [5., 0., 0.]]])
+        >>> waypoints = pp.CSplineR3(points)
+
+    .. figure:: /_static/img/module/liespline/CsplineR3.png
         :width: 600
 
         Fig. 1. Result of Cubic Spline Interpolation in R3.
@@ -62,9 +101,8 @@ def BSplineSE3(input_poses, time):
     A poses query at any time :math:`t \in [t_i, t_{i+1})` (i.e. a segment of the spline)
     only relies on the poses located at times :math:`\{t_{i-1},t_i,t_{i+1},t_{i+2}\}`.
     It means that the interpolation between adjacent poses needs four consecutive poses.
-    Thus, the B-spline interpolation could estimate the pose between
-
-    :math:`[t_1, t_{n-1}]` by the input poses at :math:`\{t_0, ...,t_{n}\}`.
+    Thus, the B-spline interpolation could estimate the pose between :math:`[t_1, t_{n-1}]`
+    by the input poses at :math:`\{t_0, ...,t_{n}\}`.
 
     The absolute pose of the spline :math:`T_{s}^w(t)`, where :math:`w` denotes the world
     and :math:`s` is the spline coordinate frame, can be calculated:
@@ -109,8 +147,8 @@ def BSplineSE3(input_poses, time):
         \end{aligned}
 
     Note:
-        The implementation is based on Eq. (A7), (A8), (A9), and (A10) of this report:
-        * David Hug, et al.,
+        The implementation is based on Eq. (3), (4), (5), and (6) of this paper:
+        David Hug, et al.,
         `HyperSLAM: A Generic and Modular Approach to Sensor Fusion and Simultaneous
         Localization And Mapping in Continuous-Time
         <https://ieeexplore.ieee.org/abstract/document/9320417>`_,
