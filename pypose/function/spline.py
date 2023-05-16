@@ -1,15 +1,60 @@
 import torch
+from . import is_SE3
 
-def BSlpineSE3(input_poses, time, extrapolate = True):
+
+def CSplineR3(points, steps=0.1):
     r"""
-    B spline interpolation in SE3.
+    Cubic Hermite Spline in R3
+
+    Args:
+        points (:obj:`Tensor`): the sparse points for interpolation with
+            [batch_size, point_num, 3] shape.
+        steps (:obj:`Float`): the step between adjacant interpolation points.
+
+    Returns:
+       ``Tensor``: the interpolated points with [batch_size, inter_points_num, 3] shape.
+
+    A points query at
+
+
+    - .. figure:: /_static/img/module/liespline/CsplineR3.png
+        :width: 600
+
+        Fig. 1. Result of Cubic Spline Interpolation in R3.
+    """
+    batch_size, num_p, _ = points.shape
+    xs = torch.arange(0, num_p-1+steps, steps, device=points.device)
+    xs = xs.repeat(batch_size, 1)
+    x  = torch.arange(num_p, device=points.device, dtype=points.dtype)
+    x  = x.repeat(batch_size, 1)
+    m = (points[..., 1:, :] - points[..., :-1, :])
+    m /= (x[..., 1:] - x[..., :-1]).unsqueeze(2)
+    m = torch.cat([m[...,[0],:], (m[..., 1:,:] + m[..., :-1,:]) / 2, m[...,[-1],:]], 1)
+    idxs = torch.searchsorted(x[0, 1:], xs[0, :])
+    dx = x[..., idxs + 1] - x[..., idxs]
+    t = (xs - x[:, idxs]) / dx
+    alpha = torch.arange(4, device=t.device, dtype=t.dtype)
+    tt = t[:, None, :]**alpha[None, :, None]
+    A = torch.tensor([[1, 0, -3, 2],
+                      [0, 1, -2, 1],
+                      [0, 0, 3, -2],
+                      [0, 0, -1, 1]], dtype=t.dtype, device=t.device)
+    hh = A@tt
+    hh = torch.transpose(hh, 1, 2)
+    out = hh[..., 0:1] * points[..., idxs, :]
+    out = out + hh[..., 1:2] * m[..., idxs, :] * dx[..., None]
+    out = out + hh[..., 2:3] * points[:, idxs + 1, :]
+    out = out + hh[..., 3:4] * m[..., idxs + 1, :] * dx[..., None]
+    return out
+
+def BSplineSE3(input_poses, time):
+    r'''
+    B-spline interpolation in SE3.
 
     Args:
         input_poses (:obj:`LieTensor`): the input sparse poses with
-            [batch_size, point_num, 7] shape
+            [batch_size, point_num, 7] shape.
         time (:obj:`Tensor`): the k time point with [1, 1, k] shape.
-        extrapolate (:obj:`bool`): whether duplicate the first pose
-            and the last pose. Default: ``True``.
 
     Returns:
         ``LieTensor``: the interpolated m poses with [batch_size, m, 7]
@@ -18,6 +63,7 @@ def BSlpineSE3(input_poses, time, extrapolate = True):
     only relies on the poses located at times :math:`\{t_{i-1},t_i,t_{i+1},t_{i+2}\}`.
     It means that the interpolation between adjacent poses needs four consecutive poses.
     Thus, the B-spline interpolation could estimate the pose between
+
     :math:`[t_1, t_{n-1}]` by the input poses at :math:`\{t_0, ...,t_{n}\}`.
 
     The absolute pose of the spline :math:`T_{s}^w(t)`, where :math:`w` denotes the world
@@ -64,21 +110,19 @@ def BSlpineSE3(input_poses, time, extrapolate = True):
 
     Note:
         The implementation is based on Eq. (A7), (A8), (A9), and (A10) of this report:
-
-        * Christian Forster, et al.,
-          `IMU Preintegration on Manifold for Efficient Visual-Inertial Maximum-a-
-          posteriori Estimation
-          <https://rpg.ifi.uzh.ch/docs/RSS15_Forster_Supplementary.pdf>`_,
-          Technical Report GT-IRIM-CP&R-2015-001, 2015.
+        * David Hug, et al.,
+        `HyperSLAM: A Generic and Modular Approach to Sensor Fusion and Simultaneous
+        Localization And Mapping in Continuous-Time
+        <https://ieeexplore.ieee.org/abstract/document/9320417>`_,
+        2020 International Conference on 3D Vision (3DV), Fukuoka, Japan, 2020.
 
     Examples:
-
         >>> import torch
         >>> import pypose as pp
         >>> a1 = pp.euler2SO3(torch.Tensor([0., 0., 0.]))
         >>> a2 = pp.euler2SO3(torch.Tensor([torch.pi / 4., torch.pi / 3., torch.pi / 2.]))
         >>> time = torch.arange(0, 1, 0.25).reshape(1, 1, -1)
-        >>> input_poses = pp.LieTensor([[
+        >>> poses = pp.LieTensor([[
         ...                             [0., 4., 0., a1[0], a1[1], a1[2], a1[3]],
         ...                             [0., 3., 0., a1[0], a1[1], a1[2], a1[3]],
         ...                             [0., 2., 0., a1[0], a1[1], a1[2], a1[3]],
@@ -88,20 +132,17 @@ def BSlpineSE3(input_poses, time, extrapolate = True):
         ...                             [3., 0., 1., a2[0], a2[1], a2[2], a2[3]],
         ...                             [4., 0., 1., a2[0], a2[1], a2[2], a2[3]]
         ...                            ]], ltype=pp.SE3_type)
-        >>> ls = pp.module.LieSpline()
-        >>> inter_poses = ls(input_poses, time)
+        >>> wayposes = pp.BSplineSE3(poses, time)
 
-        .. figure:: /_static/img/module/liespline/BsplineSE3.png
+    - .. figure:: /_static/img/module/liespline/BsplineSE3.png
 
-          Fig. 1. Result of LieSpline Interpolation
-    """
+        Fig. 1. Result of B Spline Interpolation in SE3.
+    '''
     assert is_SE3(input_poses), "The input poses are not SE3Type."
     assert time.shape[0]==time.shape[1]==1, "The time has wrong shape."
-    assert type(extrapolate) == bool, "The extrapolate should be bool type."
-    if extrapolate:
-        input_poses = torch.cat(
-            [torch.cat([input_poses[..., [0], :], input_poses], dim=1),
-                input_poses[..., [-1], :]], dim=1)
+    input_poses = torch.cat(
+        [torch.cat([input_poses[..., [0], :], input_poses], dim=1),
+            input_poses[..., [-1], :]], dim=1)
     timeSize = time.shape[-1]
     posesSize = input_poses.shape[1]
     alpha = torch.arange(4, dtype=time.dtype, device=time.device)
@@ -123,5 +164,5 @@ def BSlpineSE3(input_poses, time, extrapolate = True):
     A2 = ((posesTensor[..., [2], :].Inv() *
             (posesTensor[..., [3], :])).Log() * w2).Exp()
     interPosesSize = timeSize * (posesSize - 3)
-    interPoses = (T_delta * A0 * A1 * A2).reshape((-1, interPoseSize, 7))
-    return wayposes
+    interPoses = (T_delta * A0 * A1 * A2).reshape((-1, interPosesSize, 7))
+    return interPoses
