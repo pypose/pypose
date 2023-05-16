@@ -80,11 +80,11 @@ def CSplineR3(points, steps=0.1):
                       [0, 0, -1, 1]], dtype=t.dtype, device=t.device)
     hh = A@tt
     hh = torch.transpose(hh, 1, 2)
-    out = hh[..., 0:1] * points[..., idxs, :]
-    out = out + hh[..., 1:2] * m[..., idxs, :] * dx[..., None]
-    out = out + hh[..., 2:3] * points[:, idxs + 1, :]
-    out = out + hh[..., 3:4] * m[..., idxs + 1, :] * dx[..., None]
-    return out
+    interpoints = hh[..., 0:1] * points[..., idxs, :]
+    interpoints = interpoints + hh[..., 1:2] * m[..., idxs, :] * dx[..., None]
+    interpoints = interpoints + hh[..., 2:3] * points[:, idxs + 1, :]
+    interpoints = interpoints + hh[..., 3:4] * m[..., idxs + 1, :] * dx[..., None]
+    return interpoints
 
 def BSplineSE3(input_poses, time):
     r'''
