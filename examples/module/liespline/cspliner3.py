@@ -1,8 +1,8 @@
+import torch
 import os.path
 import argparse
 import pypose as pp
 import matplotlib.pyplot as plt
-from pypose.function.spline import *
 
 def plot_result(waypoints, xrange, yrange, zrange, k = 0,
                 oripoints = None, save=None, show=None):

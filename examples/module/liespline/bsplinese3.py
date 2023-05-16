@@ -31,12 +31,13 @@ def plot_result(wayposes, xrange, yrange, zrange, k = 0,
         ax1 = plot_basis(ax=ax1, s=0.15, R=R, p=p)
         x[i], y[i], z[i] = p[0], p[1], p[2]
         i += 1
-    ax1.plot3D(x, y, z)
-    ax2.plot3D(x, y, z)
+    ax1.plot3D(x, y, z, c='orangered')
+    ax2.plot3D(x, y, z, linewidth=2.0)
     if oriposes != None:
-        ax2.scatter(oriposes[k, :, 0], oriposes[k, :, 1], oriposes[k, :, 2], c='r')
+        ax2.scatter(oriposes[k, :, 0], oriposes[k, :, 1], oriposes[k, :, 2],
+                    c="r", marker="*", linewidth=3.0)
     if save is not None:
-        file_path = os.path.join(save, 'liespline.png')
+        file_path = os.path.join(save, 'BsplineSE3.png')
         plt.savefig(file_path)
         print("Save to", file_path)
     if show:
