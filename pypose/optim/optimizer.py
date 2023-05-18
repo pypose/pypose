@@ -386,6 +386,23 @@ class LevenbergMarquardt(_Optimizer):
             self.corrector = Trivial() if corrector is None else corrector
         self.weight = weight
 
+
+    def normalize_R_weight(self, R, weight=None):
+        weight_diag = None
+        if weight is not None:
+            assert len(R)==len(weight)
+            weight_diag = []
+            for w, r in zip(weight, R):
+                ni = r.numel() / w.shape[-1]
+                print(ni)
+                print(r.shape)
+                print(w.shape)
+                weight_diag += [w for i in range(int(ni))]
+            weight_diag = torch.block_diag(*weight_diag)
+        R = [r.reshape(-1) for r in R]
+        return torch.cat(R), weight_diag
+
+
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
         r'''
@@ -456,8 +473,13 @@ class LevenbergMarquardt(_Optimizer):
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
             R = self.model(input, target)
-            print("R = {}".format(len(R)))
+
+            R, weight = self.normalize_R_weight(R, weight)
+
+            print("R = {}".format(R.shape))
+            print("weight = {}".format(weight.shape))
             J = modjac(self.model, input=(input, target), **self.jackwargs)
+            print("J = {}".format(J.shape))
             R, J = self.corrector(R = R, J = J)
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target)

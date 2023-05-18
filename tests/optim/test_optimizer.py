@@ -291,6 +291,7 @@ class TestOptim:
             def forward(self, inputs):
                 error = (self.pose @ inputs).Log().tensor()
                 constraint = self.pose.Log().tensor().sum(-1)
+                print("constraint = {}".format(constraint.shape))
                 return error, constraint
 
         B1, B2, M, N = 2, 3, 2, 2
@@ -323,5 +324,4 @@ if __name__ == '__main__':
     # test.test_optim_trustregion()
     # test.test_optim_multiparameter()
     # test.test_optim_anybatch()
-    # test.test_optim_multi_input()
-    test.test_modjac()
+    test.test_optim_multi_input()
