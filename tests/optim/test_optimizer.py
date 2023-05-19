@@ -291,7 +291,6 @@ class TestOptim:
             def forward(self, inputs):
                 error = (self.pose @ inputs).Log().tensor()
                 constraint = self.pose.Log().tensor().sum(-1)
-                print("constraint = {}".format(constraint.shape))
                 return error, constraint
 
         B1, B2, M, N = 2, 3, 2, 2
@@ -302,6 +301,7 @@ class TestOptim:
         kernel = nn.ModuleList([ppok.Huber(), ppok.Scale()]).to(device)
         weight = [torch.eye(6, device=device), torch.ones(1, device=device)]
         optimizer = pp.optim.LM(invnet, strategy=strategy, kernel=kernel)
+        # optimizer = pp.optim.GN(invnet, kernel=kernel)
 
         for idx in range(10):
             loss = optimizer.step(inputs, weight=weight)
@@ -316,12 +316,12 @@ class TestOptim:
 
 if __name__ == '__main__':
     test = TestOptim()
-    # test.test_optim_liealgebra()
-    # test.test_optim_liegroup()
-    # test.test_optim_with_kernel()
-    # test.test_optim_strategy_constant()
-    # test.test_optim_strategy_adaptive()
-    # test.test_optim_trustregion()
-    # test.test_optim_multiparameter()
-    # test.test_optim_anybatch()
+    test.test_optim_liealgebra()
+    test.test_optim_liegroup()
+    test.test_optim_with_kernel()
+    test.test_optim_strategy_constant()
+    test.test_optim_strategy_adaptive()
+    test.test_optim_trustregion()
+    test.test_optim_multiparameter()
+    test.test_optim_anybatch()
     test.test_optim_multi_input()

@@ -36,10 +36,8 @@ class RobustModel(nn.Module):
         #     self.register_forward_hook(self.kernel_forward)
 
     def forward(self, input, target):
-        return self.model_forward(input)
-        # output = self.model_forward(input)
-        # return self.merge_data_list(self.residuals(output, target))
-        # return self.residual(output, target)
+        output = self.model_forward(input)
+        return self.residuals(output, target)
 
     def model_forward(self, input):
         if isinstance(input, tuple):
@@ -59,12 +57,11 @@ class RobustModel(nn.Module):
     def residuals(self, output, target):
         if isinstance(output, (tuple, list)):
             target = [None for i in range(len(output))] if target is None else target
-            return [self.residual(output[i], target[i]) for i in range(len(output))]
-        return [self.residual(output, target)]
+            return tuple([self.residual(output[i], target[i]) for i in range(len(output))])
+        return tuple([self.residual(output, target)])
 
     def kernel_forward(self, module, input, output):
         # eps is to prevent grad of sqrt() from being inf
-        print(output.shape)
         assert torch.is_floating_point(output), "model output have to be float type."
         eps = finfo(output.dtype).eps
         return self.kernel(output.square().sum(-1)).clamp(min=eps).sqrt()
@@ -77,7 +74,6 @@ class RobustModel(nn.Module):
         else:
             residuals = [self.kernel(r.square().sum(-1)).sum() for r in residual_list]
         return sum(residuals)
-        # return self.kernel(residual.square().sum(-1)).sum()
 
 
 class _Optimizer(Optimizer):
@@ -195,6 +191,19 @@ class GaussNewton(_Optimizer):
             self.corrector = Trivial() if corrector is None else corrector
         self.weight = weight
 
+    def normalize_R_weight(self, R, weight=None):
+        weight_diag = None
+        if weight is not None:
+            weight = weight if isinstance(weight, (tuple, list)) else [weight]
+            assert len(R)==len(weight)
+            weight_diag = []
+            for w, r in zip(weight, R):
+                ni = r.numel() / w.shape[-1]
+                weight_diag += [w for i in range(int(ni))]
+            weight_diag = torch.block_diag(*weight_diag)
+        R = [r.reshape(-1) for r in R]
+        return torch.cat(R), weight_diag
+
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
         r'''
@@ -253,12 +262,11 @@ class GaussNewton(_Optimizer):
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
             R = self.model(input, target)
+            R, weight = self.normalize_R_weight(R, weight)
             J = modjac(self.model, input=(input, target), **self.jackwargs)
             R, J = self.corrector(R = R, J = J)
-            A, b = J.T.reshape((-1,) + R.shape), R
-            if weight is not None:
-                A, b = (weight @ A.unsqueeze(-1)).squeeze(-1), (weight @ b.unsqueeze(-1)).squeeze(-1)
-            D = self.solver(A = A.reshape(A.shape[0], -1).T, b = -b.view(-1, 1))
+            A, b = (J, -R) if weight is None else (weight @ J, -weight @ R)
+            D = self.solver(A = A, b = b.view(-1, 1))
             self.last = self.loss if hasattr(self, 'loss') \
                         else self.model.loss(input, target)
             self.update_parameter(params = pg['params'], step = D)
@@ -386,22 +394,18 @@ class LevenbergMarquardt(_Optimizer):
             self.corrector = Trivial() if corrector is None else corrector
         self.weight = weight
 
-
     def normalize_R_weight(self, R, weight=None):
         weight_diag = None
         if weight is not None:
+            weight = weight if isinstance(weight, (tuple, list)) else [weight]
             assert len(R)==len(weight)
             weight_diag = []
             for w, r in zip(weight, R):
                 ni = r.numel() / w.shape[-1]
-                print(ni)
-                print(r.shape)
-                print(w.shape)
                 weight_diag += [w for i in range(int(ni))]
             weight_diag = torch.block_diag(*weight_diag)
         R = [r.reshape(-1) for r in R]
         return torch.cat(R), weight_diag
-
 
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
@@ -473,20 +477,12 @@ class LevenbergMarquardt(_Optimizer):
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
             R = self.model(input, target)
-
             R, weight = self.normalize_R_weight(R, weight)
-
-            print("R = {}".format(R.shape))
-            print("weight = {}".format(weight.shape))
             J = modjac(self.model, input=(input, target), **self.jackwargs)
-            print("J = {}".format(J.shape))
             R, J = self.corrector(R = R, J = J)
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target)
-            J_T = J.T.reshape((-1,) + R.shape)
-            if weight is not None:
-                J_T = (J_T.unsqueeze(-2) @ weight).squeeze(-2)
-            J_T = J_T.reshape(J_T.shape[0], -1)
+            J_T = J.T @ weight if weight is not None else J.T
             A, self.reject_count = J_T @ J, 0
             A.diagonal().clamp_(pg['min'], pg['max'])
             while self.last <= self.loss:
