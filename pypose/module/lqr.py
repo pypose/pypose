@@ -217,15 +217,11 @@ class LQR(nn.Module):
         >>> c1 = torch.tile(torch.randn(n_state), (n_batch, 1))
         >>> c2 = torch.tile(torch.zeros(n_state), (n_batch, 1))
         >>> x_init = torch.randn(n_batch, n_state)
-        >>> current_x = torch.zeros(n_batch, T, n_state, device=device)
         >>> current_u = torch.zeros(n_batch, T, n_ctrl, device=device)
-        >>> current_x[...,0,:] = x_init
         >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
-        >>> for i in range(T-1):
-        >>>     current_x[...,i+1,:], _ = lti(current_x[...,i,:], current_u[...,i,:])
-        >>> time = torch.arange(0, T, device=device)
+        >>> dt = 1
         >>> LQR = pp.module.LQR(lti, Q, p, T)
-        >>> x, u, cost = LQR(x_init)
+        >>> x, u, cost = LQR(x_init, dt)
         >>> print("x = ", x)
         >>> print("u = ", u)
         x = tensor([[[-0.2633, -0.3466,  2.3803, -0.0423],
