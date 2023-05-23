@@ -425,6 +425,32 @@ class SBTProxyNoOp(SBTOperation):
         '''
         return s_outs, p_outs
 
+class ProxyAddOp(SBTProxyNoOp):
+    '''Assume that the operation does the 'add' operation on the proxy tensor.
+
+
+    This class implements the SBTProxyNoOp interfaces for the operations that does the 'add' operation on the proxy tensor of an SBT. Most of the time, such operations also work directly on the Storage
+    tensor and proxy tensor which are Hybrid tensor. Therefore, the storage_pre, proxy_op and storage_post methods do not
+    need to do the Hybrid-COO conversion.
+
+    E.g., mostly the inplace operations such as torch.add_().
+
+    Args:
+        func_name (str): The name of the operation.
+
+    '''
+    def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
+        '''No-op on the Proxy tensor.
+
+        Returns:
+            p (torch.Tensor): The Proxy tensor.
+
+        Note:
+            Assume that the operation does the 'add' operation on the proxy tensor.
+        '''
+        # Find the first sparse Tensor in operands.
+        return torch.add(*p_args)
+
 class SBTProxyCloneOp(SBTProxyNoOp):
     '''An SBT Operation that clones the Proxy tensor.
 
@@ -461,7 +487,7 @@ class SBTProxyCloneOp(SBTProxyNoOp):
             ][0]
         return p.detach().clone()
 
-class SBTProxySameOpAsStorage(SBTOperation):
+class ComputeViaCOO(SBTOperation):
     '''SBT Operations that performs the same operation on the Proxy tensor.
 
     This class implements the SBTOperation that performs the same operation on the Proxy tensor.
@@ -612,6 +638,8 @@ HFS.add_op( '__get__', SBTGetOp )
 
 # ========== Unary functions. ==========
 HFS.add_op( 'abs', SBTProxyCloneOp )
+HFS.add_op('add', ProxyAddOp)
+HFS.add_op('sub', ProxyAddOp)
 
 # ==============================================================
 # ========== End of supported operation registration. ==========
@@ -701,26 +729,13 @@ class SparseBlockTensor(torch.Tensor):
     def __format__(self, spec):
         return str(self)
 
-    @HFS.register(OpType(op_type=SBTProxySameOpAsStorage, func_name='matmul'))
+    @HFS.register(OpType(op_type=ComputeViaCOO, func_name='matmul'))
     def __matmul__(self, other):
         r'''
         return the corresponding sparse matrix and index matrix
         '''
         return torch.matmul(self, other)
 
-    @HFS.register(OpType(op_type=SBTProxySameOpAsStorage, func_name='add'))
-    def __add__(self, other):
-        r'''
-        return the corresponding sparse matrix and index matrix
-        '''
-        return torch.add(self, other)
-
-    @HFS.register(OpType(op_type=SBTProxySameOpAsStorage, func_name='sub'))
-    def __sub__(self, other):
-        r'''
-        return the corresponding sparse matrix and index matrix
-        '''
-        return torch.sub(self, other)
     # NOTE: for torch operations that need special treatment, place an override here. Then call
     # the corresponding function of PyTorch to begin the dispatching. E.g.:
     # def abs(self):
