@@ -41,6 +41,16 @@ def random_sbt(proxy_shape, block_shape, dense_zero_prob=0.):
     (sp.abs, torch.abs, ['sbt'], 'identical', 3),
     (torch.abs, torch.abs, ['sbt'], 'identical', 2),
     (torch.abs, torch.abs, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.ceil, torch.ceil, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.ceil, torch.ceil, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.floor, torch.floor, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.floor, torch.floor, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.round, torch.round, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.round, torch.round, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.sqrt, torch.sqrt, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.sqrt, torch.sqrt, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.square, torch.square, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.square, torch.square, ['sbt'], 'identical', 3),
     (SparseBlockTensor.__add__, torch.add, ['sbt', 'sbt'], 'identical', 2),
     (SparseBlockTensor.__add__, torch.add, ['sbt', 'sbt'], 'identical', 3),
     (SparseBlockTensor.__sub__, torch.sub, ['sbt', 'sbt'], 'identical', 2),
@@ -88,7 +98,7 @@ def test_universal(op, dense_op, type_operands, shape_mode, dim, dense_zero_prob
     y_sbt = op(*args)
     y_dense = dense_op(*args_dense)
 
-    torch.testing.assert_close(hybrid_2_coo(y_sbt._s).to_dense(), y_dense)
+    torch.testing.assert_close(hybrid_2_coo(y_sbt._s).to_dense(), y_dense,equal_nan=True)
 
 
 def test_mm():

@@ -433,8 +433,6 @@ class ProxyAddOp(SBTProxyNoOp):
     tensor and proxy tensor which are Hybrid tensor. Therefore, the storage_pre, proxy_op and storage_post methods do not
     need to do the Hybrid-COO conversion.
 
-    E.g., mostly the inplace operations such as torch.add_().
-
     Args:
         func_name (str): The name of the operation.
 
@@ -637,7 +635,12 @@ HFS.add_op( '__get__', SBTGetOp )
 # ========== Operations for COO tensors. ==========
 
 # ========== Unary functions. ==========
-HFS.add_op( 'abs', SBTProxyCloneOp )
+HFS.add_op('abs', SBTProxyCloneOp)
+HFS.add_op('ceil', SBTProxyCloneOp)
+HFS.add_op('floor', SBTProxyCloneOp)
+HFS.add_op('round', SBTProxyCloneOp)
+HFS.add_op('sqrt', SBTProxyCloneOp)
+HFS.add_op('square', SBTProxyCloneOp)
 HFS.add_op('add', ProxyAddOp)
 HFS.add_op('sub', ProxyAddOp)
 
