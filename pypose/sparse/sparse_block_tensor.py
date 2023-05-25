@@ -583,7 +583,7 @@ HFS.add_op( '__get__', SBTGetOp )
 
 # ========== Unary functions. ==========
 HFS.add_op('abs', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('add', ComputeViaHybrid, proxy_reduction='add', clone=False)
+HFS.add_op('add', ComputeViaHybrid, proxy_reduction='add')
 HFS.add_op('asin', ComputeViaHybrid, proxy_reduction=None, clone=True)
 HFS.add_op('atan', ComputeViaHybrid, proxy_reduction=None, clone=True)
 HFS.add_op('ceil', ComputeViaHybrid, proxy_reduction=None, clone=True)
@@ -593,9 +593,10 @@ HFS.add_op('sin', ComputeViaHybrid, proxy_reduction=None, clone=True)
 HFS.add_op('sinh', ComputeViaHybrid, proxy_reduction=None, clone=True)
 HFS.add_op('sqrt', ComputeViaHybrid, proxy_reduction=None, clone=True)
 HFS.add_op('square', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('sub', ComputeViaHybrid, proxy_reduction='add', clone=False)
+HFS.add_op('sub', ComputeViaHybrid, proxy_reduction='add')
 HFS.add_op('tan', ComputeViaHybrid, proxy_reduction=None, clone=True)
 HFS.add_op('tanh', ComputeViaHybrid, proxy_reduction=None, clone=True)
+HFS.add_op('mul', ComputeViaHybrid, proxy_reduction='mul')
 
 # ==============================================================
 # ========== End of supported operation registration. ==========

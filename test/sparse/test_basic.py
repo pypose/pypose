@@ -59,6 +59,8 @@ def random_sbt(proxy_shape, block_shape, dense_zero_prob=0.):
     (SparseBlockTensor.square, torch.square, ['sbt'], 'identical', 3),
     (SparseBlockTensor.__add__, torch.add, ['sbt', 'sbt'], 'identical', 2),
     (SparseBlockTensor.__add__, torch.add, ['sbt', 'sbt'], 'identical', 3),
+    (SparseBlockTensor.__mul__, torch.mul, ['sbt', 'sbt'], 'identical', 2),
+    (SparseBlockTensor.__mul__, torch.mul, ['sbt', 'sbt'], 'identical', 3),
     (SparseBlockTensor.__sub__, torch.sub, ['sbt', 'sbt'], 'identical', 2),
     (SparseBlockTensor.__sub__, torch.sub, ['sbt', 'sbt'], 'identical', 3),
     (SparseBlockTensor.__matmul__, torch.matmul, ['sbt', 'sbt'], 'mT', 2),
