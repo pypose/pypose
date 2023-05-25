@@ -356,7 +356,7 @@ class SBTGetOp(SBTOperation):
             p_array.append( arg._p if isinstance(arg, SparseBlockTensor) else arg )
         return s_array, p_array
 
-class SBTProxyNoOp(SBTOperation):
+class ComputeViaHybrid(SBTOperation):
     '''An SBT Operation that does not touch the Proxy tensor.
 
     This class implements the SBTOperation interfaces for the operations that do not touch the
@@ -371,8 +371,10 @@ class SBTProxyNoOp(SBTOperation):
 
     '''
 
-    def __init__(self, func_name):
+    def __init__(self, func_name, proxy_reduction=None, clone=False):
         super().__init__(func_name=func_name)
+        self.proxy_reduction = proxy_reduction
+        self.clone = clone
 
     def storage_pre(self, func, types, args=(), kwargs={}):
         '''Separate the Storange and Proxy tensor.
@@ -388,25 +390,30 @@ class SBTProxyNoOp(SBTOperation):
             p_array.append( arg._p if isinstance(arg, SparseBlockTensor) else arg )
         return s_array, p_array
 
-    # def storage_op(self, func, stripped_types, s_args=(), kwargs={}):
-    #     # Forward all the arguments to parent's interface.
-    #     return super().storage_op(func, stripped_types, s_args, kwargs)
-
     def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
-        '''No-op on the Proxy tensor.
+        '''Apply operation on the Proxy tensor, according to the proxy_reduction.
 
         Returns:
             p (torch.Tensor): The Proxy tensor.
 
         Note:
-            Assume that the operation does not need to even touch the proxy tensor. For most of
-            such operations, the proxy Tensor is the only sparse Tensor in the list of arguments.
-
+            Assume that the operation does not need to even touch the proxy tensor.
+            For most of such operations, the proxy Tensor is the only sparse Tensor in
+            the list of arguments.
         '''
         # Find the first sparse Tensor in operands.
-        p = [ op for op in p_args
+        if self.proxy_reduction is None:
+            p = [ op for op in p_args
                 if isinstance(op, torch.Tensor) and op.is_sparse == True
             ][0]
+        elif self.proxy_reduction == 'add':
+            p = torch.add(*p_args)
+        elif self.proxy_reduction == 'mul':
+            p = torch.mul(*p_args)
+        else:
+            raise ValueError('Unknown proxy reduction: {}'.format(self.proxy_reduction))
+        if self.clone:
+            return p.detach().clone()
         return p
 
     def storage_post(self, func, types, s_outs=(), p_outs=(), kwargs={}):
@@ -424,66 +431,6 @@ class SBTProxyNoOp(SBTOperation):
 
         '''
         return s_outs, p_outs
-
-class ProxyAddOp(SBTProxyNoOp):
-    '''Assume that the operation does the 'add' operation on the proxy tensor.
-
-
-    This class implements the SBTProxyNoOp interfaces for the operations that does the 'add' operation on the proxy tensor of an SBT. Most of the time, such operations also work directly on the Storage
-    tensor and proxy tensor which are Hybrid tensor. Therefore, the storage_pre, proxy_op and storage_post methods do not
-    need to do the Hybrid-COO conversion.
-
-    Args:
-        func_name (str): The name of the operation.
-
-    '''
-    def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
-        '''No-op on the Proxy tensor.
-
-        Returns:
-            p (torch.Tensor): The Proxy tensor.
-
-        Note:
-            Assume that the operation does the 'add' operation on the proxy tensor.
-        '''
-        # Find the first sparse Tensor in operands.
-        return torch.add(*p_args)
-
-class SBTProxyCloneOp(SBTProxyNoOp):
-    '''An SBT Operation that clones the Proxy tensor.
-
-    This class implements the SBTOperation interfaces for the operations that clones the
-    Proxy tensor of an SBT. Most of the time, such operations also work directly on the Storage
-    tensor which is a Hybrid tensor. Therefore, the storage_pre and storage_post methods do not
-    need to do the Hybrid-COO conversion.
-
-    E.g., torch.abs().
-
-    Args:
-        func_name (str): The name of the operation.
-
-    '''
-
-    def __init__(self, func_name):
-        super().__init__(func_name)
-
-    def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
-        '''Clone on the Proxy tensor.
-
-        Returns:
-            p (torch.Tensor): The Proxy tensor.
-
-        Note:
-            Assume that the operation does not need to even touch the proxy tensor. For most of
-            such operations, the proxy Tensor is the only sparse Tensor in the list of
-            arguments. The returned Proxy tensor is first detached from the input.
-
-        '''
-        # Find the first sparse Tensor in operands.
-        p = [ op for op in p_args
-                if isinstance(op, torch.Tensor) and op.is_sparse == True
-            ][0]
-        return p.detach().clone()
 
 class ComputeViaCOO(SBTOperation):
     '''SBT Operations that performs the same operation on the Proxy tensor.
@@ -586,7 +533,7 @@ class HFS:
         return func_name in cls.HANDLED_FUNCS
 
     @classmethod
-    def add_op(cls, name, op_type):
+    def add_op(cls, name, op_type, *args, **kwargs):
         '''Add an operation to the supported operations on SBT.
 
         Args:
@@ -595,10 +542,10 @@ class HFS:
         '''
         if name in cls.HANDLED_FUNCS:
             raise ValueError(f'The operation {name} is already registered. ')
-        cls.HANDLED_FUNCS[name] = op_type(name)
+        cls.HANDLED_FUNCS[name] = op_type(name, *args, **kwargs)
 
     @classmethod
-    def register(cls, sbt_op_type):
+    def register(cls, sbt_op_type, *args, **kwargs):
         '''Thie function is meant to be used as a decorator.
 
         Args:
@@ -608,9 +555,9 @@ class HFS:
         '''
         def decorator(func):
             if sbt_op_type.func_name is None:
-                cls.add_op(func.__name__, sbt_op_type.op_type)
+                cls.add_op(func.__name__, sbt_op_type.op_type, *args, **kwargs)
             else:
-                cls.add_op(sbt_op_type.func_name, sbt_op_type.op_type)
+                cls.add_op(sbt_op_type.func_name, sbt_op_type.op_type, *args, **kwargs)
             return func
         return decorator
 
@@ -635,20 +582,20 @@ HFS.add_op( '__get__', SBTGetOp )
 # ========== Operations for COO tensors. ==========
 
 # ========== Unary functions. ==========
-HFS.add_op('abs', SBTProxyCloneOp)
-HFS.add_op('add', ProxyAddOp)
-HFS.add_op('asin', SBTProxyCloneOp)
-HFS.add_op('atan', SBTProxyCloneOp)
-HFS.add_op('ceil', SBTProxyCloneOp)
-HFS.add_op('floor', SBTProxyCloneOp)
-HFS.add_op('round', SBTProxyCloneOp)
-HFS.add_op('sin', SBTProxyCloneOp)
-HFS.add_op('sinh', SBTProxyCloneOp)
-HFS.add_op('sqrt', SBTProxyCloneOp)
-HFS.add_op('square', SBTProxyCloneOp)
-HFS.add_op('sub', ProxyAddOp)
-HFS.add_op('tan', SBTProxyCloneOp)
-HFS.add_op('tanh', SBTProxyCloneOp)
+HFS.add_op('abs', ComputeViaHybrid, proxy_reduction=None, clone=True)
+HFS.add_op('add', ComputeViaHybrid, proxy_reduction='add', clone=False)
+HFS.add_op('asin', ComputeViaHybrid, proxy_reduction=None, clone=True)
+HFS.add_op('atan', ComputeViaHybrid, proxy_reduction=None, clone=True)
+HFS.add_op('ceil', ComputeViaHybrid, proxy_reduction=None, clone=True)
+HFS.add_op('floor', ComputeViaHybrid, proxy_reduction=None, clone=True)
+HFS.add_op('round', ComputeViaHybrid, proxy_reduction=None, clone=True)
+HFS.add_op('sin', ComputeViaHybrid, proxy_reduction=None, clone=True)
+HFS.add_op('sinh', ComputeViaHybrid, proxy_reduction=None, clone=True)
+HFS.add_op('sqrt', ComputeViaHybrid, proxy_reduction=None, clone=True)
+HFS.add_op('square', ComputeViaHybrid, proxy_reduction=None, clone=True)
+HFS.add_op('sub', ComputeViaHybrid, proxy_reduction='add', clone=False)
+HFS.add_op('tan', ComputeViaHybrid, proxy_reduction=None, clone=True)
+HFS.add_op('tanh', ComputeViaHybrid, proxy_reduction=None, clone=True)
 
 # ==============================================================
 # ========== End of supported operation registration. ==========
