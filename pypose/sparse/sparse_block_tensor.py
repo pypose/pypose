@@ -636,13 +636,19 @@ HFS.add_op( '__get__', SBTGetOp )
 
 # ========== Unary functions. ==========
 HFS.add_op('abs', SBTProxyCloneOp)
+HFS.add_op('add', ProxyAddOp)
+HFS.add_op('asin', SBTProxyCloneOp)
+HFS.add_op('atan', SBTProxyCloneOp)
 HFS.add_op('ceil', SBTProxyCloneOp)
 HFS.add_op('floor', SBTProxyCloneOp)
 HFS.add_op('round', SBTProxyCloneOp)
+HFS.add_op('sin', SBTProxyCloneOp)
+HFS.add_op('sinh', SBTProxyCloneOp)
 HFS.add_op('sqrt', SBTProxyCloneOp)
 HFS.add_op('square', SBTProxyCloneOp)
-HFS.add_op('add', ProxyAddOp)
 HFS.add_op('sub', ProxyAddOp)
+HFS.add_op('tan', SBTProxyCloneOp)
+HFS.add_op('tanh', SBTProxyCloneOp)
 
 # ==============================================================
 # ========== End of supported operation registration. ==========

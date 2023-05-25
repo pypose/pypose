@@ -35,7 +35,7 @@ def random_sbt(proxy_shape, block_shape, dense_zero_prob=0.):
     return sparse_block_tensor(indices, values, size=proxy_shape)
 
 
-@pytest.mark.parametrize('dense_zero_prob', [0., 0.7])
+@pytest.mark.parametrize('dense_zero_prob', [0., 0.7, 1.0])
 @pytest.mark.parametrize('op,dense_op,type_operands,shape_mode,dim', [
     (sp.abs, torch.abs, ['sbt'], 'identical', 2),
     (sp.abs, torch.abs, ['sbt'], 'identical', 3),
@@ -43,6 +43,12 @@ def random_sbt(proxy_shape, block_shape, dense_zero_prob=0.):
     (torch.abs, torch.abs, ['sbt'], 'identical', 3),
     (SparseBlockTensor.ceil, torch.ceil, ['sbt'], 'identical', 2),
     (SparseBlockTensor.ceil, torch.ceil, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.asin, torch.asin, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.atan, torch.atan, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.sin, torch.sin, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.tan, torch.tan, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.sinh, torch.sinh, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.tanh, torch.tanh, ['sbt'], 'identical', 3),
     (SparseBlockTensor.floor, torch.floor, ['sbt'], 'identical', 2),
     (SparseBlockTensor.floor, torch.floor, ['sbt'], 'identical', 3),
     (SparseBlockTensor.round, torch.round, ['sbt'], 'identical', 2),
@@ -100,6 +106,20 @@ def test_universal(op, dense_op, type_operands, shape_mode, dim, dense_zero_prob
 
     torch.testing.assert_close(hybrid_2_coo(y_sbt._s).to_dense(), y_dense,equal_nan=True)
 
+def test_div_beh():
+    i = [[0, 0],
+         [0, 1]]
+    v = [[5.7, 5.1],
+         [5.5, 5.0]]
+    s = torch.sparse_coo_tensor(i, v, (1, 2, 2))
+
+    i2 = [[0],
+          [0]]
+    v2 = [[0.1, -0.1]]
+    s2 = torch.sparse_coo_tensor(i2, v2, (1, 2, 2))
+    s*s2
+
+    's.div(s2)'
 
 def test_mm():
     i = [[0, 0, 1, 2], [0, 2, 1, 2]]
