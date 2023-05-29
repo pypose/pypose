@@ -70,7 +70,7 @@ class LieType:
 
     def Inv(self, x):
         if self.on_manifold:
-            return - x
+            return LieTensor(-x, ltype=x.ltype)
         raise NotImplementedError("Instance has no Inv attribute.")
 
     def Act(self, X, p):
@@ -183,7 +183,7 @@ class SO3Type(LieType):
         X = X.tensor() if hasattr(X, 'ltype') else X
         x = SO3_Log.apply(X)
         return LieTensor(x, ltype=so3_type)
-    
+
     def Act(self, X, p):
         assert not self.on_manifold and isinstance(p, torch.Tensor)
         assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
@@ -213,12 +213,12 @@ class SO3Type(LieType):
         if self.on_manifold:
             return LieTensor(torch.mul(X, Y), ltype=SO3_type)
         raise NotImplementedError('Invalid __mul__ operation')
-    
+
     def Inv(self, X):
         X = X.tensor() if hasattr(X, 'ltype') else X
         out = SO3_Inv.apply(X)
         return LieTensor(out, ltype=SO3_type)
-    
+
     def Adj(self, X, a):
         X = X.tensor() if hasattr(X, 'ltype') else X
         a = a.tensor() if hasattr(a, 'ltype') else a
@@ -1108,7 +1108,7 @@ class LieTensor(torch.Tensor):
         flag = t2.abs() < 1. - eps
         yaw1 = torch.atan2(t3, t4)
         yaw2 = -2 * pm(t2) * torch.atan2(x, w)
-        
+
         roll = torch.where(flag, roll1, roll2)
         pitch = torch.asin(t2.clamp(-1, 1))
         yaw = torch.where(flag, yaw1, yaw2)
