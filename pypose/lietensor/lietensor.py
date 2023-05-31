@@ -1018,6 +1018,12 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.Mul(self, other)
 
+    def mul(self, other):
+        r'''
+        See :meth:`pypose.mul`
+        '''
+        return self.ltype.Mul(self, other)
+
     def __matmul__(self, other):
         r'''
         See :meth:`pypose.matmul`
