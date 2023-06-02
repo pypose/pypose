@@ -596,7 +596,7 @@ HFS.add_op('square', ComputeViaHybrid, proxy_reduction=None, clone=True)
 HFS.add_op('sub', ComputeViaHybrid, proxy_reduction='add')
 HFS.add_op('tan', ComputeViaHybrid, proxy_reduction=None, clone=True)
 HFS.add_op('tanh', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('mul', ComputeViaHybrid, proxy_reduction='mul')
+
 
 # ==============================================================
 # ========== End of supported operation registration. ==========
@@ -692,6 +692,27 @@ class SparseBlockTensor(torch.Tensor):
         return the corresponding sparse matrix and index matrix
         '''
         return torch.matmul(self, other)
+
+    @HFS.register(OpType(op_type=ComputeViaHybrid, func_name='mul'))
+    def __mul__(self, other):
+        r'''
+        return the corresponding sparse matrix and index matrix
+        '''
+        res = torch.mul(self, other)
+        # dim auto correction
+        s = res._s
+        p = res._p
+        if s.sparse_dim() != s.dense_dim() and s.indices().shape[1] == 0:
+            num_dim = (s.sparse_dim() + s.dense_dim()) // 2
+            shape_b = s.shape[num_dim:]
+            assert p.dim() == num_dim
+            s1 = torch.sparse_coo_tensor(
+                    indices=torch.tensor([]).reshape((num_dim, 0)),
+                    values=torch.tensor([]).reshape(0, *shape_b),
+                    size=(4, 1, 1, 7)).coalesce()
+            res._s = s1
+
+        return res
 
     # NOTE: for torch operations that need special treatment, place an override here. Then call
     # the corresponding function of PyTorch to begin the dispatching. E.g.:

@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 import torch
+from torch import tensor
 import pypose as pp
 from pypose.sparse import sparse_block_tensor, coo_2_hybrid, hybrid_2_coo, SparseBlockTensor
 import pypose.sparse as sp
@@ -26,6 +27,45 @@ def test_sparse_coo_2_sparse_hybrid_coo():
     print(f'x._s = \n{x._s}')
     print(f'x._p = \n{x._p}')
 
+
+def test_torch_empty_mul():
+    # required. used to check torch's behavior
+    s1 = torch.sparse_coo_tensor(
+            indices=tensor([]).reshape((2, 0)),
+            values=tensor([]).reshape((0, 1, 7)),
+            size=(4, 1, 1, 7)).coalesce()
+
+    s2 = torch.sparse_coo_tensor(
+        indices=tensor([[0, 1, 3],
+                        [0, 0, 0]]),
+        values=tensor([[[0., 0., 0., 0., 0., 0., 0.]],
+                       [[0., 0., 0., 0., 0., 0., 0.]],
+                       [[0., 0., 0., 0., 0., 0., 0.]]]),
+        size=(4, 1, 1, 7)).coalesce()
+
+    res = s1 * s2
+    assert s1.sparse_dim() == 2
+    assert s1.dense_dim() == 2
+    assert s2.sparse_dim() == 2
+    assert s2.dense_dim() == 2
+
+    assert res.shape == ((4, 1, 1, 7))
+    assert res.sparse_dim() == 4
+    assert res.dense_dim() == 0
+
+    sbt1 = sparse_block_tensor(
+        indices=s1.indices(),
+        values=s1.values(),
+        size=s1.shape[:s1.sparse_dim()],)
+
+    sbt2 = sparse_block_tensor(
+        indices=s2.indices(),
+        values=s2.values(),
+        size=s2.shape[:s2.sparse_dim()],)
+
+    res = sbt1 * sbt2
+    assert res._s.shape == torch.Size([4, 1, 1, 7])
+    assert res._p.shape == torch.Size([4, 1])
 
 def random_sbt(proxy_shape, block_shape, dense_zero_prob=0.):
     proxy = torch.randn(proxy_shape) > 0.5
