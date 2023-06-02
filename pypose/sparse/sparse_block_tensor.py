@@ -706,10 +706,11 @@ class SparseBlockTensor(torch.Tensor):
             num_dim = (s.sparse_dim() + s.dense_dim()) // 2
             shape_b = s.shape[num_dim:]
             assert p.dim() == num_dim
+            assert p.shape == s.shape[:num_dim]
             s1 = torch.sparse_coo_tensor(
                     indices=torch.tensor([]).reshape((num_dim, 0)),
                     values=torch.tensor([]).reshape(0, *shape_b),
-                    size=(4, 1, 1, 7)).coalesce()
+                    size=(*p.shape, *shape_b)).coalesce()
             res._s = s1
 
         return res
