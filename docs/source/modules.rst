@@ -13,6 +13,7 @@ Modules
    module.NLS
    module.EKF
    module.UKF
+   module.PF
    module.LQR
    module.IMUPreintegrator
    module.Cost
@@ -20,3 +21,5 @@ Modules
    module.Constraint
    module.LinCon
    module.ddpOptimizer
+   module.EPnP
+   module.ICP

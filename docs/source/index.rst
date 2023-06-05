@@ -8,10 +8,11 @@ PyPose Documentation
    :caption: Contents:
 
    lietensor
-   basics
+   functions
    convert
    modules
    optim
+   utils
 
 
 Indices and tables

@@ -1,4 +1,4 @@
-import torch
+import torch, os
 import numpy as np
 import pypose as pp
 import matplotlib.pyplot as plt
@@ -6,14 +6,14 @@ from matplotlib.patches import Ellipse
 from matplotlib.legend_handler import HandlerLine2D
 
 
-class Bicycle(pp.module.System):
+class Bicycle(pp.module.NLS):
     '''
     This is an implementation of the 2D Bicycle kinematic model,
     see: https://dingyan89.medium.com/simple-understanding-of-kinematic-bicycle-model
     -81cac6420357
     The robot is given a rotational and forward velocity, and traverses the 2D plane accordingly.
-    This model is Nonlinear Time Invariant (NTI) and can be filtered with the ``pp.module.EKF``
-    and  ``pp.module.UKF``.
+    This model is discrete-time non-linear system (NLS) and can be filtered with the
+    -``pp.module.EKF`` and  ``pp.module.UKF``.
     '''
 
     def __init__(self):
@@ -22,7 +22,7 @@ class Bicycle(pp.module.System):
     def state_transition(self, state, input, t=None):
         '''
         Don't add noise in this function, as it will be used for automatically
-        linearizing the system by the parent class ``pp.module.System``.
+        linearizing the system by the parent class ``pp.module.NLS``.
         '''
         theta = state[..., 2] + input[1]
         x = state[..., 0] + input[..., 0] * theta.cos()
@@ -32,12 +32,12 @@ class Bicycle(pp.module.System):
     def observation(self, state, input, t=None):
         '''
         Don't add noise in this function, as it will be used for automatically
-        linearizing the system by the parent class ``pp.module.System``.
+        linearizing the system by the parent class ``pp.module.NLS``.
         '''
         return state
 
 
-def bicycle_plot(model_name, state, est, cov):
+def bicycle_plot(model_name, state, est, cov, save=None, show=False):
     N = state.shape[0]
     state = state.cpu().numpy()
     est = est.cpu().numpy()
@@ -63,4 +63,11 @@ def bicycle_plot(model_name, state, est, cov):
     est_plot, = ax.plot(est[:, 0], est[:, 1], '.-', label="Estimated State")
     ax.legend(handler_map={est_plot: HandlerLine2D(numpoints=1)})
     plt.title("%s Example" % model_name.upper())
-    plt.show()
+
+    if save is not None:
+        figure = os.path.join(save, model_name + '_bicycle.png')
+        plt.savefig(figure)
+        print("Saved to", figure)
+
+    if show:
+        plt.show()

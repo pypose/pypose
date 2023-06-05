@@ -1,7 +1,8 @@
-import torch, functorch
-import sys, math, warnings
-from torch import nn, Tensor
+import torch
+from .. import hasnan
+from functools import partial
 from torch.autograd.functional import jacobian
+from torch.func import jacrev, jacfwd, functional_call
 
 
 def modjac(model, input=None, create_graph=False, strict=False, vectorize=False, \
@@ -9,8 +10,8 @@ def modjac(model, input=None, create_graph=False, strict=False, vectorize=False,
     r'''
     Compute the model Jacobian with respect to the model parameters.
 
-    For a parametric model :math:`\bm{f}(\bm{\theta}, \bm{x})`, where :math:`\bm{\theta}` is
-    the learnable parameter and :math:`\bm{x}` is the input, it computes the
+    For a parametric model :math:`\bm{f}(\bm{\theta}, \bm{x})`, where :math:`\bm{\theta}`
+    is the learnable parameter and :math:`\bm{x}` is the input, it computes the
     Jacobian of the :math:`i`-th output and :math:`j`-th parameter as
 
     .. math::
@@ -125,41 +126,39 @@ def modjac(model, input=None, create_graph=False, strict=False, vectorize=False,
         >>> J.shape
         torch.Size([8, 6])
     '''
-    func, params, buffers = functorch.make_functional_with_buffers(model)
+    params, buffers = dict(model.named_parameters()), dict(model.named_buffers())
+    params_names, params_values = params.keys(), tuple(params.values())
 
     if input is None:
-        func_param = lambda *p: func(p, buffers)
-    else:
-        input = input if isinstance(input, tuple) else (input,)
-        func_param = lambda *p: func(p, buffers, *input)
+        input = tuple()
 
-    J = jacobian(func_param, params, create_graph=create_graph, strict=strict, \
+    def func_param(*new_params_values):
+        new_params_dict = dict(zip(params_names, new_params_values))
+        return functional_call(model, (new_params_dict, buffers), input)
+
+    J = jacobian(func_param, params_values, create_graph=create_graph, strict=strict, \
                     vectorize=vectorize, strategy=strategy)
+
+    assert not hasnan(J), 'Jacobian contains Nan! Check your model and input!'
 
     if flatten and isinstance(J, tuple):
         if any(isinstance(j, tuple) for j in J):
             J = torch.cat([torch.cat([j.view(-1, p.numel()) \
-                    for j, p in zip(Jr, params)], dim=1) for Jr in J])
+                    for j, p in zip(Jr, params_values)], dim=1) for Jr in J])
         else:
-            J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params)], dim=1)
-
-    if isinstance(J, tuple):
-        assert not torch.any(torch.stack([torch.any(torch.isnan(j)) for j in J])), \
-            'Jacobian contains Nan! Check your model and input!'
-    else:
-        assert not torch.any(torch.isnan(J)), \
-            'Jacobian contains Nan! Check your model and input!'
+            J = torch.cat([j.view(-1, p.numel()) \
+                           for j, p in zip(J, params_values)], dim=1)
 
     return J
 
 
 def modjacrev(model, input, argnums=0, *, has_aux=False):
-    func, params = functorch.make_functional(model)
-    jacrev = functorch.jacrev(func, argnums=argnums, has_aux=has_aux)
-    return jacrev(params, input)
+    params = dict(model.named_parameters())
+    func = partial(functional_call, model)
+    return jacrev(func, argnums=argnums, has_aux=has_aux)(params, input)
 
 
 def modjacfwd(model, input, argnums=0, *, has_aux=False):
-    func, params = functorch.make_functional(model)
-    jacfwd = functorch.jacfwd(func, argnums=argnums, has_aux=has_aux)
-    return jacfwd(params, input)
+    params = dict(model.named_parameters())
+    func = partial(functional_call, model)
+    return jacfwd(func, argnums=argnums, has_aux=has_aux)(params, input)

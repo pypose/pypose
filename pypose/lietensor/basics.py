@@ -1,6 +1,8 @@
 import math
 import torch
-
+'''
+This basics file includes functions needed to implement LieTensor.
+'''
 
 def vec2skew(input:torch.Tensor) -> torch.Tensor:
     r"""
@@ -70,6 +72,10 @@ def add(input, other, alpha=1):
 
     where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is the ``other`` Tensor to add,
     and :math:`\bm{y}` is the output LieTensor.
+
+    Warning:
+        For better readability, we suggest calling ``a + b`` instead of ``a.add(b)`` or
+        ``pypose.add(a, b)``, which have the same behaviors.
 
     Note:
         A Lie Group normally requires a larger space than its corresponding Lie Algebra, thus
@@ -143,7 +149,7 @@ def mul(input, other):
     Return:
         :obj:`Tensor`/:obj:`LieTensor`: the product of ``input`` and ``other``.
 
-    .. list-table:: List of :obj:`pypose.mul` cases 
+    .. list-table:: List of :obj:`pypose.mul` cases
         :widths: 25 30 25
         :header-rows: 1
 
@@ -160,18 +166,22 @@ def mul(input, other):
           - :obj:`Tensor` :math:`\in \mathbb{R^{*\times4}}`
           - :obj:`Tensor`
         * - Lie Group
-          - :obj:`Lie Group` 
+          - :obj:`Lie Group`
           - :obj:`Lie Group`
 
-    When multiplying a Lie Group by another Lie Group, they must have the 
+    When multiplying a Lie Group by another Lie Group, they must have the
     same Lie type.
+
+    Warning:
+        For better readability, we suggest calling ``a * b`` or ``a @ b`` instead of
+        ``a.mul(b)`` or ``pypose.mul(a, b)``, which have the same behaviors.
 
     Note:
         - When ``other`` is a Tensor, this operator is equivalent to :meth:`Act`.
         - When ``other`` is a number and ``input`` is a Lie Algebra, this operator performs
           simple element-wise multiplication.
         - When ``input`` is a Lie Group, more details are shown below.
-   
+
     * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`SO3_type`
       (input :math:`\bm{x}` is an instance of :meth:`SO3`):
 
@@ -183,17 +193,17 @@ def mul(input, other):
               q_i^wq_i^{z'} + q_i^xq_i^{y'} -q_i^yq_i^{x'} + q_i^zq_i^{w'}
               \end{bmatrix}
         }^T},
-    
+
       where :math:`\bm{x}_i = [q_i^x, q_i^y, q_i^z, q_i^w]` and
       :math:`\bm{a}_i = [q_i^{x'}, q_i^{y'}, q_i^{z'}, q_i^{w'}]` are the ``input``
       and ``other`` LieTensor, respectively.
-        
+
     Note:
         :math:`\mathbf{y}_i` can be simply derived by taking the complex number multiplication.
 
-        .. math:: 
-            \bm{y}_i = 
-            (q_i^x\mathbf{i} + q_i^y\mathbf{j} + q_i^z\mathbf{k} + q_i^w) \ast 
+        .. math::
+            \bm{y}_i =
+            (q_i^x\mathbf{i} + q_i^y\mathbf{j} + q_i^z\mathbf{k} + q_i^w) \ast
             (q_i^{x'}\mathbf{i} + q_i^{y'}\mathbf{j} + q_i^{z'}\mathbf{k} + q_i^{w'}),
 
         where and :math:`\mathbf{i}` :math:`\mathbf{j}`, and :math:`\mathbf{k}` are the imaginary
@@ -208,14 +218,14 @@ def mul(input, other):
         .. math::
             \bm{y}_i = [\mathbf{q}_i * \mathbf{t}_i' + \mathbf{t}_i,
                         \mathbf{q}_i * \mathbf{q}_i']
-        
+
         where :math:`\bm{x}_i = [\mathbf{t}_i, \mathbf{q}_i]` and
         :math:`\bm{a}_i = [\mathbf{t}_i', \mathbf{q}_i']` are the ``input`` and ``other``
         LieTensor, respectively; :math:`\mathbf{t}_i`, :math:`\mathbf{t}_i'` and
         :math:`\mathbf{q}_i`, :math:`\mathbf{q}_i'` are their translation and :obj:`SO3`
         parts, respectively; the operator :math:`\ast` denotes the obj:`SO3_type`
         multiplication introduced above.
-            
+
     * Input :math:`\bm{x}`'s :obj:`ltype` is :obj:`RxSO3_type`
       (input :math:`\bm{x}` is an instance of :meth:`RxSO3`)
 
@@ -230,7 +240,7 @@ def mul(input, other):
 
         .. math::
             \bm{y}_i = [\mathbf{q}_i * \mathbf{t}_i' + \mathbf{t}_i,
-                            \mathbf{q}_i * \mathbf{q}_i', s_is_i'] 
+                            \mathbf{q}_i * \mathbf{q}_i', s_is_i']
 
         where :math:`\bm{x}_i = [\mathbf{t}_i, \mathbf{q}_i, s_i]` and
         :math:`\bm{a}_i = [\mathbf{t}_i', \mathbf{q}_i', s_i']` are the ``input`` and
@@ -263,7 +273,7 @@ def mul(input, other):
             >>> x * a
             tensor([ 0.9089,  1.6984, -0.5969])
             >>> a = torch.randn(4)
-            >>> a 
+            >>> a
             tensor([ 1.5236, -1.2757, -0.7140,  0.2467])
             >>> x * a
             tensor([ 1.6588, -0.4687, -1.2196,  0.2467]
@@ -318,201 +328,3 @@ def mul(input, other):
             LieTensor([ 0.5740,  1.3197, -0.2752,  0.6819, -0.5389,  0.4634,  0.1727, 1.1172])
     '''
     return input * other
-
-
-def cumops_(input, dim, ops):
-    r'''
-        Inplace version of :meth:`pypose.cumops`
-    '''
-    L, v = input.shape[dim], input
-    assert dim != -1 or dim != v.shape[-1], "Invalid dim"
-    for i in torch.pow(2, torch.arange(math.log2(L)+1, device=v.device, dtype=torch.int64)):
-        index = torch.arange(i, L, device=v.device, dtype=torch.int64)
-        v.index_copy_(dim, index, ops(v.index_select(dim, index), v.index_select(dim, index-i)))
-    return v
-
-
-def cummul_(input, dim):
-    r'''
-        Inplace version of :meth:`pypose.cummul`
-    '''
-    return cumops_(input, dim, lambda a, b : a * b)
-
-
-def cumprod_(input, dim):
-    r'''
-        Inplace version of :meth:`pypose.cumprod`
-    '''
-    return cumops_(input, dim, lambda a, b : a @ b)
-
-
-def cumops(input, dim, ops):
-    r"""Returns the cumulative user-defined operation of LieTensor along a dimension.
-
-    .. math::
-        y_i = x_1~\mathrm{\circ}~x_2 ~\mathrm{\circ}~ \cdots ~\mathrm{\circ}~ x_i,
-
-    where :math:`\mathrm{\circ}` is the user-defined operation and :math:`x_i,~y_i`
-    are the :math:`i`-th LieType item along the :obj:`dim` dimension of input and
-    output, respectively.
-
-    Args:
-        input (LieTensor): the input LieTensor
-        dim (int): the dimension to do the operation over
-        ops (func): the user-defined operation or function
-
-    Returns:
-        LieTensor: LieTensor
-
-    Note:
-        - The users are supposed to provide meaningful operation.
-        - This function doesn't check whether the results are valid for mathematical
-          definition of LieTensor, e.g., quaternion.
-        - The time complexity of the function is :math:`\mathcal{O}(\log N)`, where
-          :math:`N` is the LieTensor size along the :obj:`dim` dimension.
-
-    Examples:
-        >>> input = pp.randn_SE3(2)
-        >>> input.cumprod(dim = 0)
-        SE3Type LieTensor:
-        tensor([[-0.6466,  0.2956,  2.4055, -0.4428,  0.1893,  0.3933,  0.7833],
-                [ 1.2711,  1.2020,  0.0651, -0.0685,  0.6732,  0.7331, -0.0685]])
-        >>> pp.cumops(input, 0, lambda a, b : a @ b)
-        SE3Type LieTensor:
-        tensor([[-0.6466,  0.2956,  2.4055, -0.4428,  0.1893,  0.3933,  0.7833],
-                [ 1.2711,  1.2020,  0.0651, -0.0685,  0.6732,  0.7331, -0.0685]])
-    """
-    return cumops_(input.clone(), dim, ops)
-
-
-def cummul(input, dim, left = True):
-    r"""Returns the cumulative multiplication (*) of LieTensor along a dimension.
-
-    * Left multiplication:
-
-    .. math::
-        y_i = x_i * x_{i-1} * \cdots * x_1,
-
-    * Right multiplication:
-
-    .. math::
-        y_i = x_1 * x_2 * \cdots * x_i,
-        
-    where :math:`x_i,~y_i` are the :math:`i`-th LieType item along the :obj:`dim`
-    dimension of input and output, respectively.
-
-    Args:
-        input (LieTensor): the input LieTensor
-        dim (int): the dimension to do the multiplication over
-        left (bool, optional): whether perform left multiplication in :obj:`cummul`.
-            If set it to :obj:`False`, this function performs right multiplication.
-            Defaul: ``True``
-
-    Returns:
-        LieTensor: The LieTensor
-
-    Note:
-        - The time complexity of the function is :math:`\mathcal{O}(\log N)`, where
-          :math:`N` is the LieTensor size along the :obj:`dim` dimension.
-
-    Example:
-    
-        * Left multiplication with :math:`\text{input} \in` :obj:`SE3`
-
-        >>> input = pp.randn_SE3(2)
-        >>> pp.cummul(input, dim=0)
-        SE3Type LieTensor:
-        tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
-                [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
-
-        * Left multiplication with :math:`\text{input} \in` :obj:`SO3`
-
-        >>> input = pp.randn_SO3(1,2)
-        >>> pp.cummul(input, dim=1, left=False)
-        SO3Type LieTensor:
-        tensor([[[-1.8252e-01,  1.6198e-01,  8.3683e-01,  4.9007e-01],
-                [ 2.0905e-04,  5.2031e-01,  8.4301e-01, -1.3642e-01]]])
-    """
-    if left:
-        return cumops(input, dim, lambda a, b : a * b)
-    else: 
-        return cumops(input, dim, lambda a, b : b * a)
-
-
-def cumprod(input, dim, left = True):
-    r"""Returns the cumulative product (``@``) of LieTensor along a dimension.
-
-    * Left product:
-
-    .. math::
-        y_i = x_i ~\times~ x_{i-1} ~\times~ \cdots ~\times~ x_1,
-    
-    * Right product:
-
-    .. math::
-        y_i = x_1 ~\times~ x_2 ~\times~ \cdots ~\times~ x_i,
-
-    where :math:`\times` denotes the group product (``@``), :math:`x_i,~y_i` are the
-    :math:`i`-th item along the :obj:`dim` dimension of the input and output LieTensor,
-    respectively.
-
-    Args:
-        input (LieTensor): the input LieTensor
-        dim (int): the dimension to do the operation over
-        left (bool, optional): whether perform left product in :obj:`cumprod`. If set
-            it to :obj:`False`, this function performs right product. Defaul: ``True``
-
-    Returns:
-        LieTensor: The LieTensor
-
-    Note:
-        - The time complexity of the function is :math:`\mathcal{O}(\log N)`, where
-          :math:`N` is the LieTensor size along the :obj:`dim` dimension.
-
-    Example:
-
-        * Left product with :math:`\text{input} \in` :obj:`SE3`
-
-        >>> input = pp.randn_SE3(2)
-        >>> pp.cumprod(input, dim=0)
-        SE3Type LieTensor:
-        tensor([[-1.9615, -0.1246,  0.3666,  0.0165,  0.2853,  0.3126,  0.9059],
-                [ 0.7139,  1.3988, -0.1909, -0.1780,  0.4405, -0.6571,  0.5852]])
-
-        * Right product with :math:`\text{input} \in` :obj:`SO3`
-
-        >>> input = pp.randn_SO3(1,2)
-        >>> pp.cumprod(input, dim=1, left=False)
-        SO3Type LieTensor:
-        tensor([[[ 0.5798, -0.1189, -0.2429,  0.7686],
-                [ 0.7515, -0.1920,  0.5072,  0.3758]]])
-    """
-    if left:
-        return cumops(input, dim, lambda a, b : a @ b)
-    else:
-        return cumops(input, dim, lambda a, b : b @ a)
-
-
-def pm(input, *, out=None):
-    r'''
-    Returns plus or minus (:math:`\pm`) states for tensor.
-
-    Args:
-        input (:obj:`Tensor`): the input tensor.
-    
-    Return:
-        :obj:`Tensor`: the output tensor contains only :math:`-1` or :math:`+1`.
-
-    Note:
-        The :meth:`pm` function is different from :meth:`torch.sign`, which returns
-        :math:`0` for zero inputs, it will return :math:`+1` if an input element is zero.
-
-    Example:
-        >>> pp.pm(torch.tensor([0.1, 0, -0.2]))
-        tensor([ 1.,  1., -1.])
-        >>> pp.pm(torch.tensor([0.1, 0, -0.2], dtype=torch.float64))
-        tensor([ 1.,  1., -1.], dtype=torch.float64)
-    '''
-    out = torch.sign(input, out=None)
-    out[out==0] = 1
-    return out

@@ -1,7 +1,7 @@
 # Contributing to PyPose
-Thank you for your interest in contributing to PyPose! 
-Our focus is on creating a state-of-the-art library for robotics research, and we are open to accepting various types of contributions. 
-Before you start coding for PyPose, it is important to inform the PyPose team of your intention to contribute and specify the type of contribution you plan to make. 
+Thank you for your interest in contributing to PyPose!
+Our focus is on creating a state-of-the-art library for robotics research, and we are open to accepting various types of contributions.
+Before you start coding for PyPose, it is important to inform the PyPose team of your intention to contribute and specify the type of contribution you plan to make.
 These contributions may include but are not limited to:
 
 1. If you notice a typographical error in PyPose's code or documentation, you can submit a Pull Request directly to fix it.
@@ -9,7 +9,7 @@ These contributions may include but are not limited to:
     - If you require additional information regarding a specific issue, please do not hesitate to request it, and we will gladly provide it to you.
 2. If you have an idea for a new feature in PyPose and wish to implement it, we recommend that you create an issue to post about your proposed feature. From there, we can discuss the design and implementation. Once we agree that the plan looks good, go ahead and implement it.
 
-Once you implement and test your feature or bug-fix, please submit a Pull Request. 
+Once you implement and test your feature or bug-fix, please submit a Pull Request.
 
 ## Workflow
 This document covers a step-by-step guide of contributing. It will tell you how to start from setting up the code repository and create a Pull Request step by step. This guide is modified from [OpenMMlab](https://github.com/open-mmlab/mmcv/blob/master/CONTRIBUTING.md)'s contribution guide.
@@ -130,7 +130,7 @@ If you are very good at handling conflicts, then you can use rebase to resolve c
 1. Sphinx docs come with a makefile build system. To build PyPose documentation locally, run the following commands. Note that if you are on a clean (newly installed) Ubuntu, you may need to run `sudo apt install build-essential` before the following commands, but it is not needed for MacOS.
 
 ```bash
-pip install -r requirements/dev.txt
+pip install -r requirements/docs.txt
 cd docs
 make html
 ```

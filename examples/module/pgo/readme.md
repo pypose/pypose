@@ -5,21 +5,30 @@ An example for Pose Graph Optimization (PGO)
 ## Installation
 
     python -m pip install -U matplotlib
+    pip install torchvision
 
-## Prepare Dataset
+## Prepare Dataset (Optional)
 
-* Download the Parking Garage G2O sample data [parking-garage.g2o](https://www.dropbox.com/s/zu23p8d522qccor/parking-garage.g2o?dl=0).
-* Extract the file to any folder `DATAROOT`, so that it looks like:
+* The PGO sample data will be downloaded automatically.
+* Set dataset `download` option to `False` if you have other data in same format.
+  * In this case, the data in `DATAROOT` folder should look like:
 
         DATAROOT
             ├── parking-garage.g2o
 
 ## Run:
 
-        python pgo.py --dataroot DATAROOT --device cuda:0
+```bash
+python examples/module/pgo/pgo.py
+```
+
+Or
+
+```bash
+python examples/module/pgo/pgo.py --device cuda:0 --dataroot DATAROOT
+```
 
 Note: change `DATAROOT` to the folder you select.
-
 
 * Other supported arguments:
 

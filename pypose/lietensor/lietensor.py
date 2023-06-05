@@ -1,10 +1,8 @@
-import collections
-import math, numbers
-import torch, warnings
-from torch import nn, linalg
+import torch
+from torch import nn
+from .basics import vec2skew
+import collections, numbers, warnings
 from .operation import broadcast_inputs
-from .basics import cumops_, cummul_, cumprod_
-from .basics import vec2skew, cumops, cummul, cumprod, pm
 from torch.utils._pytree import tree_map, tree_flatten
 from .operation import SO3_Log, SE3_Log, RxSO3_Log, Sim3_Log
 from .operation import so3_Exp, se3_Exp, rxso3_Exp, sim3_Exp
@@ -15,6 +13,7 @@ from .operation import SO3_Act4, SE3_Act4, RxSO3_Act4, Sim3_Act4
 from .operation import SO3_AdjXa, SE3_AdjXa, RxSO3_AdjXa, Sim3_AdjXa
 from .operation import SO3_AdjTXa, SE3_AdjTXa, RxSO3_AdjTXa, Sim3_AdjTXa
 from .operation import so3_Jl_inv, se3_Jl_inv, rxso3_Jl_inv, sim3_Jl_inv
+from ..basics import pm, cumops_, cummul_, cumprod_, cumops, cummul, cumprod
 from torch.nn.modules.utils import _single, _pair, _triple, _quadruple, _ntuple
 
 
@@ -71,7 +70,7 @@ class LieType:
 
     def Inv(self, x):
         if self.on_manifold:
-            return - x
+            return LieTensor(-x, ltype=x.ltype)
         raise NotImplementedError("Instance has no Inv attribute.")
 
     def Act(self, X, p):
@@ -184,7 +183,7 @@ class SO3Type(LieType):
         X = X.tensor() if hasattr(X, 'ltype') else X
         x = SO3_Log.apply(X)
         return LieTensor(x, ltype=so3_type)
-    
+
     def Act(self, X, p):
         assert not self.on_manifold and isinstance(p, torch.Tensor)
         assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
@@ -214,12 +213,12 @@ class SO3Type(LieType):
         if self.on_manifold:
             return LieTensor(torch.mul(X, Y), ltype=SO3_type)
         raise NotImplementedError('Invalid __mul__ operation')
-    
+
     def Inv(self, X):
         X = X.tensor() if hasattr(X, 'ltype') else X
         out = SO3_Inv.apply(X)
         return LieTensor(out, ltype=SO3_type)
-    
+
     def Adj(self, X, a):
         X = X.tensor() if hasattr(X, 'ltype') else X
         a = a.tensor() if hasattr(a, 'ltype') else a
@@ -1019,6 +1018,12 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.Mul(self, other)
 
+    def mul(self, other):
+        r'''
+        See :meth:`pypose.mul`
+        '''
+        return self.ltype.Mul(self, other)
+
     def __matmul__(self, other):
         r'''
         See :meth:`pypose.matmul`
@@ -1109,7 +1114,7 @@ class LieTensor(torch.Tensor):
         flag = t2.abs() < 1. - eps
         yaw1 = torch.atan2(t3, t4)
         yaw2 = -2 * pm(t2) * torch.atan2(x, w)
-        
+
         roll = torch.where(flag, roll1, roll2)
         pitch = torch.asin(t2.clamp(-1, 1))
         yaw = torch.where(flag, yaw1, yaw2)

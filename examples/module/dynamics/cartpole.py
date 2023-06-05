@@ -1,8 +1,9 @@
+import argparse, os
 import torch, pypose as pp
 import math, matplotlib.pyplot as plt
 
 
-class CartPole(pp.module.NTI):
+class CartPole(pp.module.NLS):
     def __init__(self, dt, length, cartmass, polemass, gravity):
         super().__init__()
         self.tau = dt
@@ -13,7 +14,7 @@ class CartPole(pp.module.NTI):
         self.polemassLength = self.polemass * self.length
         self.totalMass = self.cartmass + self.polemass
 
-    def state_transition(self, state, input):
+    def state_transition(self, state, input, t = None):
         x, xDot, theta, thetaDot = state
         force = input.squeeze()
         costheta = theta.cos()
@@ -30,7 +31,7 @@ class CartPole(pp.module.NTI):
 
         return state + _dstate * self.tau
 
-    def observation(self, state, input):
+    def observation(self, state, input, t = None):
         return state
 
 
@@ -44,7 +45,16 @@ def subPlot(ax, x, y, xlabel=None, ylabel=None):
 
 if __name__ == "__main__":
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    parser = argparse.ArgumentParser(description='Cartpole Example')
+    parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
+    parser.add_argument("--save", type=str, default='./examples/module/dynamics/save/', 
+                        help="location of png files to save")
+    parser.add_argument('--show', dest='show', action='store_true',
+                        help="show plot, default: False")
+    parser.set_defaults(show=False)
+    args = parser.parse_args(); print(args)
+    os.makedirs(os.path.join(args.save), exist_ok=True)
+
     # Create parameters for cart pole trajectory
     dt = 0.01   # Delta t
     len = 1.5   # Length of pole
@@ -54,13 +64,13 @@ if __name__ == "__main__":
     N = 1000    # Number of time steps
 
     # Time and input
-    time  = torch.arange(0, N, device=device) * dt
+    time  = torch.arange(0, N, device=args.device) * dt
     input = torch.sin(time)
-    state = torch.zeros(N, 4, dtype=float, device=device)
-    state[0] = torch.tensor([0, 0, math.pi, 0], dtype=float, device=device)
+    state = torch.zeros(N, 4, dtype=float, device=args.device)
+    state[0] = torch.tensor([0, 0, math.pi, 0], dtype=float, device=args.device)
 
     # Create dynamics solver object
-    model = CartPole(dt, len, m_cart, m_pole, g).to(device)
+    model = CartPole(dt, len, m_cart, m_pole, g).to(args.device)
     for i in range(N - 1):
         state[i + 1], _ = model(state[i], input[i])
 
@@ -76,4 +86,10 @@ if __name__ == "__main__":
     subPlot(ax[1], time, xdot, ylabel='X dot')
     subPlot(ax[2], time, theta, ylabel='Theta')
     subPlot(ax[3], time, thetadot, ylabel='Theta dot', xlabel='Time')
-    plt.show()
+
+    figure = os.path.join(args.save + 'cartpole.png')
+    plt.savefig(figure)
+    print("Saved to", figure)
+
+    if args.show:
+        plt.show()
