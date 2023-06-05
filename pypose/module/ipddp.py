@@ -1,7 +1,7 @@
 import time
 import torch as torch
 import torch.nn as nn
-from ..basics import bmv, bvmv, btdot
+from ..function import bmv, bvmv, btdot
 
 class ddpOptimizer(nn.Module):
     r'''
@@ -10,11 +10,11 @@ class ddpOptimizer(nn.Module):
     Args:
         sys (:obj:`instance`): System dynamics of the optimal control problem.
         stage_cost (:obj:`instance`): Stage cost of the optimal control problem.
-        terminal_cost (:obj:`instance`): Terminal cost of the optimal control problem. 
-        cons (:obj:`instance`): Constraints of the optimal control problem. 
+        terminal_cost (:obj:`instance`): Terminal cost of the optimal control problem.
+        cons (:obj:`instance`): Constraints of the optimal control problem.
         n_cons (:obj:`int`): Dimension of constraints.
         init_traj (:obj:`Dict`): Initial system trajectory.
-    
+
     A discrete-time system can be described as:
 
     .. math::
@@ -22,11 +22,11 @@ class ddpOptimizer(nn.Module):
             \mathbf{x}_{t+1} &= \mathbf{f}(\mathbf{x}_{t}, \mathbf{u}_{t}, t)              \\
         \end{align*}
 
-    where :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state and input of the general nonlinear system. 
+    where :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state and input of the general nonlinear system.
     The subscript :math:`\cdot_{t}` denotes the time step.
 
-    IPDDP finds the optimal nominal trajectory :math:`\mathbf{\tau}^*` = 
-    :math:`\begin{Bmatrix} \mathbf{x}_t, \mathbf{u}_t \end{Bmatrix}_{0:T-1} \cup \begin{Bmatrix} \mathbf{x}_T \end{Bmatrix}` 
+    IPDDP finds the optimal nominal trajectory :math:`\mathbf{\tau}^*` =
+    :math:`\begin{Bmatrix} \mathbf{x}_t, \mathbf{u}_t \end{Bmatrix}_{0:T-1} \cup \begin{Bmatrix} \mathbf{x}_T \end{Bmatrix}`
     for the following optimization problem:
 
     .. math::
@@ -38,59 +38,59 @@ class ddpOptimizer(nn.Module):
         \end{align*}
 
     where :math:`\mathbf{\tau}_t` = :math:`\begin{bmatrix} \mathbf{x}_t \\ \mathbf{u}_t
-    \end{bmatrix}`; :math:`q` and :math:`p` denote the stage and terminal costs, respectively; 
+    \end{bmatrix}`; :math:`q` and :math:`p` denote the stage and terminal costs, respectively;
     :math:`\mathbf{c}` is the stage-wise inequality constraints.
 
     The IPDDP process can be summarised as iterative backward and forward recursions.
 
     - The backward recursion.
-        
+
       For :math:`t` = :math:`T-1` to 0:
 
         .. math::
             \begin{align*}
-                \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t 
-                                    + \mathbf{v}_{t+1} \odot \mathbf{G}_t 
+                \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t
+                                    + \mathbf{v}_{t+1} \odot \mathbf{G}_t
                                     - \mathbf{W}_t^\top \mathbf{S}_t \mathbf{C}_t^{-1} \mathbf{W}_t   \\
                 \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1}
-                                          + \mathbf{W}_t^\top\mathbf{s}_t 
+                                          + \mathbf{W}_t^\top\mathbf{s}_t
                                           - \mathbf{W}_t^\top \mathbf{C}_t^{-1}\mathbf{r}_t\\
-                \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1} 
+                \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}
                                                      \mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} \\
-                \mathbf{k}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1} 
+                \mathbf{k}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}
                                                            \mathbf{q}_{\mathbf{u}_t}         \\
-                \mathbf{K}_t^{\mathbf{s}} &= - \mathbf{S}_t\mathbf{C}_t^{-1} (\mathbf{c}_{\mathbf{x}_t}  
-                                        + \mathbf{c}_{\mathbf{u}_t} \mathbf{K}_t) \\                   
-                \mathbf{k}_t^{\mathbf{s}} &= - \mathbf{C}_t^{-1} (\mathbf{r}_t + \mathbf{S}_t 
+                \mathbf{K}_t^{\mathbf{s}} &= - \mathbf{S}_t\mathbf{C}_t^{-1} (\mathbf{c}_{\mathbf{x}_t}
+                                        + \mathbf{c}_{\mathbf{u}_t} \mathbf{K}_t) \\
+                \mathbf{k}_t^{\mathbf{s}} &= - \mathbf{C}_t^{-1} (\mathbf{r}_t + \mathbf{S}_t
                                                     \mathbf{c}_{\mathbf{u}_t} \mathbf{k}_t) \\
-                \mathbf{V}_t &= \mathbf{Q}_{\mathbf{x}_t, \mathbf{x}_t} 
-                    + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{K}_t 
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} 
+                \mathbf{V}_t &= \mathbf{Q}_{\mathbf{x}_t, \mathbf{x}_t}
+                    + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{K}_t
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t}
                     + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{K}_t   \\
-                \mathbf{v}_t &= \mathbf{q}_{\mathbf{x}_t} 
-                    + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{k}_t 
-                    + \mathbf{K}_t^\top\mathbf{q}_{\mathbf{u}_t} 
+                \mathbf{v}_t &= \mathbf{q}_{\mathbf{x}_t}
+                    + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{k}_t
+                    + \mathbf{K}_t^\top\mathbf{q}_{\mathbf{u}_t}
                     + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{k}_t   \\
             \end{align*}
 
-      where :math:`\odot` denotes the tensor contraction and 
+      where :math:`\odot` denotes the tensor contraction and
 
         .. math::
             \begin{align*}
-                \mathbf{V}_T &= p_{\mathbf{x}_T, \mathbf{x}_T} \\ 
-                \mathbf{v}_T &= p_{\mathbf{x}_T} \\ 
-                \mathbf{F}_t &= \begin{bmatrix} \mathbf{f}_{\mathbf{x}_t} \\ 
+                \mathbf{V}_T &= p_{\mathbf{x}_T, \mathbf{x}_T} \\
+                \mathbf{v}_T &= p_{\mathbf{x}_T} \\
+                \mathbf{F}_t &= \begin{bmatrix} \mathbf{f}_{\mathbf{x}_t} \\
                                 \mathbf{f}_{\mathbf{u}_t} \end{bmatrix} \\
-                \mathbf{W}_t &= \begin{bmatrix} \mathbf{c}_{\mathbf{x}_t} \\ 
-                                \mathbf{c}_{\mathbf{u}_t} \end{bmatrix} \\   
-                \mathbf{G}_t &= \begin{bmatrix} \mathbf{f}_{\mathbf{x}_t, \mathbf{x}_t}, \mathbf{f}_{\mathbf{x}_t, \mathbf{u}_t}\\ 
+                \mathbf{W}_t &= \begin{bmatrix} \mathbf{c}_{\mathbf{x}_t} \\
+                                \mathbf{c}_{\mathbf{u}_t} \end{bmatrix} \\
+                \mathbf{G}_t &= \begin{bmatrix} \mathbf{f}_{\mathbf{x}_t, \mathbf{x}_t}, \mathbf{f}_{\mathbf{x}_t, \mathbf{u}_t}\\
                                 \mathbf{f}_{\mathbf{u}_t, \mathbf{x}_t}, \mathbf{f}_{\mathbf{u}_t, \mathbf{u}_t}\\  \end{bmatrix} \\
                 \mathbf{S}_t &= \mathbf{diag}(\mathbf{s}_t) \\
-                \mathbf{C}_t &= \mathbf{diag}(\mathbf{c}_t) \\  
-                \mathbf{r}_t &= \mathbf{S}_t \mathbf{c}_t + \mu  \mathbf{1}  \\                                                                         
+                \mathbf{C}_t &= \mathbf{diag}(\mathbf{c}_t) \\
+                \mathbf{r}_t &= \mathbf{S}_t \mathbf{c}_t + \mu  \mathbf{1}  \\
             \end{align*}
 
-            
+
     - The forward recursion.
 
       For :math:`t` = 0 to :math:`T-1`:
@@ -105,18 +105,18 @@ class ddpOptimizer(nn.Module):
     Then cost of the system over the time horizon:
 
         .. math::
-            \mathbf{cost} \left( \mathbf{\tau}_t \right) = \sum\limits_{t=0}^{T-1}q(\mathbf{\tau}_t) + p(\mathbf{\tau}_T) 
+            \mathbf{cost} \left( \mathbf{\tau}_t \right) = \sum\limits_{t=0}^{T-1}q(\mathbf{\tau}_t) + p(\mathbf{\tau}_T)
 
     Note:
         Some additional tricks were used in the implementation, i.e., egularization in the backwardpass,
         filter, line search in the forwardpass.
 
     From the learning perspective, this can be interpreted as a module with unknown parameters in
-    :math:`\begin{Bmatrix} \mathbf{f}, \mathbf{c}, q, p \end{Bmatrix}`, 
+    :math:`\begin{Bmatrix} \mathbf{f}, \mathbf{c}, q, p \end{Bmatrix}`,
     which can be integrated into a larger end-to-end learning system.
 
     Note:
-        The implementation is based on paper `Interior Point Differential Dynamic Programming 
+        The implementation is based on paper `Interior Point Differential Dynamic Programming
         <https://arxiv.org/pdf/2004.12710.pdf>`_.
 
     Example:
@@ -124,34 +124,34 @@ class ddpOptimizer(nn.Module):
         >>> dt = 0.05   # Delta t
         >>> T = 5    # Number of time steps
         >>> state = torch.tensor([[-2.,0.], [-1., 0.], [-2.5, 1.]])
-        >>> 
-        >>> sys = InvPend(dt) 
+        >>>
+        >>> sys = InvPend(dt)
         >>> ns, nc = 2, 1
         >>> n_batch = 3
         >>> state_all =      torch.zeros(n_batch, T+1, ns)
         >>> input_all = 0.02*torch.ones(n_batch,  T,   nc)
         >>> state_all[...,0,:] = state
         >>> init_traj = {'state': state_all, 'input': input_all}
-        >>> 
+        >>>
         >>> Q = torch.tile(dt*torch.eye(ns, ns, device=device), (n_batch, T, 1, 1))
         >>> R = torch.tile(dt*torch.eye(nc, nc, device=device), (n_batch, T, 1, 1))
         >>> S = torch.tile(torch.zeros(ns, nc, device=device), (n_batch, T, 1, 1))
         >>> c = torch.tile(torch.zeros(1, device=device), (n_batch, T))
         >>> stage_cost = pp.module.QuadCost(Q, R, S, c)
         >>> terminal_cost = pp.module.QuadCost(10./dt*Q[...,0:1,:,:], R[...,0:1,:,:], S[...,0:1,:,:], c[...,0:1]) # special stagecost with T=1
-        >>> 
+        >>>
         >>> gx = torch.tile(torch.zeros( 2*nc, ns), (n_batch, T, 1, 1))
         >>> gu = torch.tile(torch.vstack( (torch.eye(nc, nc), - torch.eye(nc, nc)) ), (n_batch, T, 1, 1))
         >>> g = torch.tile(torch.hstack( (-0.25 * torch.ones(nc), -0.25 * torch.ones(nc)) ), (n_batch, T, 1))
         >>> lincon = pp.module.LinCon(gx, gu, g)
-        >>> 
+        >>>
         >>> traj_opt = [None for batch_id in range(n_batch)]
-        >>> for batch_id in range(n_batch): # use for loop and keep the ddpOptimizer 
+        >>> for batch_id in range(n_batch): # use for loop and keep the ddpOptimizer
         >>>     stage_cost = pp.module.QuadCost(Q[batch_id:batch_id+1], R[batch_id:batch_id+1], S[batch_id:batch_id+1], c[batch_id:batch_id+1])
         >>>     terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
-        >>>     lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])  
-        >>>     init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1], 'input': init_traj['input'][batch_id:batch_id+1]} 
-        >>>     solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, gx.shape[-2], init_traj_sample) 
+        >>>     lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
+        >>>     init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1], 'input': init_traj['input'][batch_id:batch_id+1]}
+        >>>     solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, gx.shape[-2], init_traj_sample)
         >>>     traj_opt[batch_id] = solver.optimizer()
 
     '''
@@ -168,7 +168,7 @@ class ddpOptimizer(nn.Module):
         self.x, self.u = init_traj['state'], init_traj['input']
         B = self.x.shape[:-2]
         ns, nc, ncons, self.T = self.x.size(-1), self.u.size(-1), n_cons, self.u.size(-2)
-                
+
         # algorithm parameter
         self.mu, self.maxiter, self.tol, self.infeas = 1.0, 50, torch.tensor([1.0e-7]), False
 
@@ -176,7 +176,7 @@ class ddpOptimizer(nn.Module):
         self.c = torch.zeros(B + (self.T, ncons))
         self.y = 0.01 * torch.ones(B + (self.T, ncons))
         self.s = 0.1 * torch.ones(B + (self.T, ncons))
-        # self.mu = self.y * self.s 
+        # self.mu = self.y * self.s
         # terms related with system dynamics
         self.fx = torch.zeros(B + (self.T, ns, ns))
         self.fu = torch.zeros(B + (self.T, ns, nc))
@@ -217,7 +217,7 @@ class ddpOptimizer(nn.Module):
         for t in range(self.T):
             self.f_fn.set_refpoint(self.x[...,t,:], self.u[...,t,:])
             self.fx[...,t,:,:] = self.f_fn.A.squeeze(0).squeeze(1)
-            self.fu[...,t,:,:] = self.f_fn.B.squeeze(0).squeeze(1)   
+            self.fu[...,t,:,:] = self.f_fn.B.squeeze(0).squeeze(1)
             self.fxx[...,t,:,:,:] = self.f_fn.fxx.squeeze(0).squeeze(1).squeeze(2)
             self.fxu[...,t,:,:,:] = self.f_fn.fxu.squeeze(0).squeeze(1).squeeze(2)
             self.fuu[...,t,:,:,:] = self.f_fn.fuu.squeeze(0).squeeze(1).squeeze(2)
@@ -226,22 +226,22 @@ class ddpOptimizer(nn.Module):
         self.qx = self.q_fn.cx
         self.qu = self.q_fn.cu
         self.qxx = self.q_fn.cxx # squeezed inside cxx definition
-        self.qxu = self.q_fn.cxu 
+        self.qxu = self.q_fn.cxu
         self.quu = self.q_fn.cuu
 
         self.c = self.c_fn(self.x[...,:-1,:], self.u)
         self.c_fn.set_refpoint(self.x[...,:-1,:], self.u)
         self.cx = self.c_fn.gx
-        self.cu = self.c_fn.gu   
+        self.cu = self.c_fn.gu
 
         self.Q = torch.cat([torch.cat([self.qxx, self.qxu],dim=-1),
-                            torch.cat([self.qxu.mT, self.quu],dim=-1)], dim=-2)                                     
+                            torch.cat([self.qxu.mT, self.quu],dim=-1)], dim=-2)
         self.p  = torch.cat([self.qx, self.qu],dim=-1)
         self.W =  torch.cat([self.cx, self.cu],dim=-1)
-        self.F =  torch.cat([self.fx, self.fu],dim=-1) 
+        self.F =  torch.cat([self.fx, self.fu],dim=-1)
         self.G =  torch.cat([torch.cat([self.fxx, self.fxu],dim=-1),
-                            torch.cat([self.fxu.mT, self.fuu],dim=-1)], dim=-2) 
-  
+                            torch.cat([self.fxu.mT, self.fuu],dim=-1)], dim=-2)
+
     def resetfilter(self):
         if (self.infeas):
             self.logcost = self.cost - self.mu * self.y.log().sum(-1).sum(-1)
@@ -261,7 +261,7 @@ class ddpOptimizer(nn.Module):
         Compute controller gains for next iteration from current trajectory.
         '''
         B = self.x.shape[:-2]
-        if lastIterFlag: 
+        if lastIterFlag:
             B = self.p.shape[:-2]
             ns, nc = self.Qx_terminal.size(-1), self.F.size(-1) - self.Qx_terminal.size(-1)
             self.Ku = torch.zeros(B + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
@@ -289,7 +289,7 @@ class ddpOptimizer(nn.Module):
             # recompute the first, second derivatives of the updated trajectory
             if not self.fp_failed:
                 self.computeall()
-                                    
+
             # backward recursions, similar to iLQR backward recursion, but more variables involved
             V, v = self.pxx, self.px
         else:
@@ -298,15 +298,15 @@ class ddpOptimizer(nn.Module):
         for t in range(self.T-1, -1, -1):
             Ft = self.F[...,t,:,:]
             Qt = self.Q[...,t,:,:] + Ft.mT @ V @ Ft
-            qt = self.p[...,t,:] + bmv(Ft.mT, v) 
-            if self.contraction_flag: 
+            qt = self.p[...,t,:] + bmv(Ft.mT, v)
+            if self.contraction_flag:
                 Qt += btdot(v, self.G[...,t,:,:,:]) # todo :check!!!!
             if self.constraint_flag:
                 qt += bmv(self.W[...,t,:,:].mT, self.s[...,t,:])
 
             if (self.infeas): #  start from infeasible/feasible trajs.
                 Wt = self.W[...,t,:,:]
-                st, ct, yt = self.s[...,t,:], self.c[...,t,:], self.y[...,t,:]  
+                st, ct, yt = self.s[...,t,:], self.c[...,t,:], self.y[...,t,:]
                 r, rhat, yinv = st * yt - self.mu, st * (ct + yt) - r, 1. / yt
                 SYinv = torch.diag_embed(st * yinv)
 
@@ -314,25 +314,25 @@ class ddpOptimizer(nn.Module):
                 qt += bmv(Wt.mT, yinv * rhat)
                 Qxx, Qxu = Qt[...,:ns,:ns], Qt[...,:ns,ns:]
                 Qux, Quu = Qt[...,ns:,:ns], Qt[...,ns:,ns:]
-                qx, qu = qt[...,:ns], qt[...,ns:]                
+                qx, qu = qt[...,:ns], qt[...,ns:]
                 Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(self.reg_exp_base, self.reg) - 1.)
-                   
-                try: 
-                    lltofQuuReg = torch.linalg.cholesky(Quu_reg) # compute the Cholesky decomposition 
-                except: 
+
+                try:
+                    lltofQuuReg = torch.linalg.cholesky(Quu_reg) # compute the Cholesky decomposition
+                except:
                     self.bp_failed, self.opterr = True, torch.inf
 
                 Quu_reg_inv = torch.linalg.pinv(Quu_reg)
                 self.Ku[...,t,:,:] = Kut = - Quu_reg_inv @ Qux
                 self.ku[...,t,:] = kut = - bmv(Quu_reg_inv, qu)
-       
+
                 cx, cu = Wt[..., :ns], Wt[..., ns:]
                 self.ks[...,t,:] = yinv * (rhat + st * bmv(cu, kut))
                 self.Ks[...,t,:,:] = SYinv @ (cx + cu @ Kut)
                 self.ky[...,t,:] = - (ct + yt) - bmv(cu, kut)
                 self.Ky[...,t,:,:] = - (cx + cu @ Kut)
             else:
-                Wt, st, ct = self.W[...,t,:,:], self.s[...,t,:], self.c[...,t,:] 
+                Wt, st, ct = self.W[...,t,:,:], self.s[...,t,:], self.c[...,t,:]
                 r, cinv = st * ct + self.mu, 1. / ct
                 SCinv = torch.diag_embed(st * cinv)
 
@@ -340,13 +340,13 @@ class ddpOptimizer(nn.Module):
                 qt -= bmv(Wt.mT, cinv * r)
                 Qxx, Qxu = Qt[...,:ns,:ns], Qt[...,:ns,ns:]
                 Qux, Quu = Qt[...,ns:,:ns], Qt[...,ns:,ns:]
-                qx, qu = qt[...,:ns], qt[..., ns:] 
-                
-                if not lastIterFlag:                
-                    Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(self.reg_exp_base, self.reg) - 1.) #todo:check     
+                qx, qu = qt[...,:ns], qt[..., ns:]
+
+                if not lastIterFlag:
+                    Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(self.reg_exp_base, self.reg) - 1.) #todo:check
                     try: #todo check batch output?
-                        lltofQuuReg = torch.linalg.cholesky(Quu_reg) # compute the Cholesky decomposition 
-                    except: 
+                        lltofQuuReg = torch.linalg.cholesky(Quu_reg) # compute the Cholesky decomposition
+                    except:
                         self.bp_failed, self.opterr = True, torch.inf
                 else:
                     Quu_reg = Quu
@@ -355,12 +355,12 @@ class ddpOptimizer(nn.Module):
                 self.Ku[...,t,:,:] = Kut = - Quu_reg_inv @ Qux
                 self.ku[...,t,:] = kut = - bmv(Quu_reg_inv, qu)
 
-                if not lastIterFlag:    
+                if not lastIterFlag:
                     cx, cu = Wt[...,:ns], Wt[...,ns:]
                     self.ks[...,t,:] = - cinv * (r + st * bmv(cu, kut))
                     self.Ks[...,t,:,:] = - SCinv @ (cx + cu @ Kut)
                     self.ky[...,t,:] = torch.zeros(ct.shape[-1]) # omitted
-                    self.Ky[...,t,:,:] = torch.zeros(ct.shape[-1], ns)       
+                    self.Ky[...,t,:,:] = torch.zeros(ct.shape[-1], ns)
 
             V = Qxx + Qxu @ Kut + Kut.mT @ Qux + Kut.mT @ Quu @ Kut
             v = qx  + bmv(Qxu, kut) + bmv(Kut.mT, qu) + bmv(Kut.mT @ Quu, kut)
@@ -368,7 +368,7 @@ class ddpOptimizer(nn.Module):
             if not lastIterFlag:
                 qu_err = torch.maximum(qu_err, torch.linalg.vector_norm(qu, float('inf'), dim=-1)  )
                 mu_err = torch.maximum(mu_err, torch.linalg.vector_norm(r,  float('inf'), dim=-1)  )
-                if (self.infeas): 
+                if (self.infeas):
                     c_err=torch.maximum(c_err, torch.linalg.vector_norm(ct+yt, float('inf'), dim=-1) )
         if not lastIterFlag:
             self.bp_failed, self.opterr = False, torch.maximum(torch.maximum(qu_err, c_err), mu_err)
@@ -381,18 +381,18 @@ class ddpOptimizer(nn.Module):
         if not lastIterFlag:
             tau, steplist = torch.maximum(1.-self.mu,torch.Tensor([0.99])), pow(2.0, torch.linspace(-10, 0, 11).flip(0))
             B = self.x.shape[:-2]
-        else: 
+        else:
             steplist = torch.ones((1)) # skip linesearch
             B = self.p.shape[:-2]
             xold, uold = self.xold, self.uold
 
         xnew, unew, ynew, snew, cnew = torch.zeros_like(xold), torch.zeros_like(uold), torch.zeros_like(yold), torch.zeros_like(sold), torch.zeros_like(cold)
-        logcost, err = torch.zeros(B), torch.zeros(B)       
+        logcost, err = torch.zeros(B), torch.zeros(B)
         for step in range(steplist.shape[0]): # line search
             failed, stepsize = False, steplist[step]
             xnew[...,0,:] = xold[...,0,:]
             xnewt = xnew[...,0,:]
-            if (self.infeas): #  start from infeasible/feasible trajs. 
+            if (self.infeas): #  start from infeasible/feasible trajs.
                 for t in range(self.T):
                     Kut, kut = self.Ku[...,t,:,:], self.ku[...,t,:]
                     Kst, kst = self.Ks[...,t,:,:], self.ks[...,t,:]
@@ -401,9 +401,9 @@ class ddpOptimizer(nn.Module):
                     ynew[...,t,:] = ynewt = yold[...,t,:] + stepsize * kyt + bmv(Kyt, xnewt - xold[...,t,:])
                     snew[...,t,:] = snewt = sold[...,t,:] + stepsize * kst + bmv(Kst, xnewt - xold[...,t,:])
 
-                    if ((ynewt < (1-tau)*yold[...,t,:]).any() or (snewt<(1-tau)*sold[...,t,:]).any()): 
+                    if ((ynewt < (1-tau)*yold[...,t,:]).any() or (snewt<(1-tau)*sold[...,t,:]).any()):
                         failed = True
-                        break                    
+                        break
                     unew[...,t,:] = unewt = uold[...,t,:] + stepsize * kut + bmv(Kut, xnewt - xold[...,t,:])
                     xnew[...,t+1,:] = xnewt = self.f_fn(xnewt, unewt)[0]
             else:
@@ -414,13 +414,13 @@ class ddpOptimizer(nn.Module):
                         Kst, kst = self.Ks[...,t,:,:], self.ks[...,t,:]
                         snew[...,t,:] = snewt = sold[...,t,:] + stepsize * kst + bmv(Kst, xnewt - xold[...,t,:])
                         cnew[...,t,:] = cnewt = self.c_fn(xnew[...,:-1,:], unew)[...,t,:]
-                        if ((cnewt > (1-tau) * cold[...,t,:]).any() or (snewt < (1-tau) * sold[...,t,:]).any()): 
+                        if ((cnewt > (1-tau) * cold[...,t,:]).any() or (snewt < (1-tau) * sold[...,t,:]).any()):
                             # todo: check
                             # check if the inequality holds, with some thresholds
                             failed = True
                             break
                     xnew[...,t+1,:] = xnewt = self.f_fn(xnewt, unewt)[0]
-                        
+
             if (failed):
                 continue
             else:
@@ -440,25 +440,25 @@ class ddpOptimizer(nn.Module):
                         # relax a bit for numerical stability, strange
                         # todo: any for each sample in a batch?
                         failed=True
-                        continue                    
+                        continue
                     else:
                         idx = torch.all(candidate<=self.filter,-1)
-                        
-                        ### fixed: 
-                        # todo: bug here!!! 
+
+                        ### fixed:
+                        # todo: bug here!!!
                         # wrong: self.filter[torch.logical_not(idx)]
                         # wrong: self.filter = self.filter[~idx]
-                        # one walkaround: self.filter[idx] = torch.inf 
+                        # one walkaround: self.filter[idx] = torch.inf
                         self.filter = self.filter[torch.logical_not(idx)]
                         if self.filter.ndim <= 2:  # todo: change this walkaround
                             self.filter = self.filter.unsqueeze(0)
                         self.filter=torch.cat((self.filter, candidate.unsqueeze(-2)), dim=-2)
                         break
-                  
+
         if (failed):
             self.stepsize, self.failed= 0.0, failed
         else:
-            self.x, self.u, self.y, self.s, self.c = xnew, unew, ynew, snew, cnew 
+            self.x, self.u, self.y, self.s, self.c = xnew, unew, ynew, snew, cnew
             self.cost, self.err, self.stepsize, self.step, self.failed = cost, err, stepsize, step, False
 
     def optimizer(self):
@@ -477,11 +477,11 @@ class ddpOptimizer(nn.Module):
         self.reg, self.bp_failed, self.recovery = 0.0, False, 0
 
         for iter in range(self.maxiter):
-            while True: 
+            while True:
                 self.backwardpasscompact()
-                if not self.bp_failed: 
-                    break    
-                
+                if not self.bp_failed:
+                    break
+
             self.forwardpasscompact()
             time_used = time.time() - time_start
             # if (iter % 5 == 1):
@@ -495,7 +495,7 @@ class ddpOptimizer(nn.Module):
             if (max(self.opterr, self.mu)<=self.tol):
                 print("~~~Optimality reached~~~")
                 break
-            
+
             if (self.opterr <= 0.2*self.mu):
                 self.mu = max(self.tol/10.0, min(0.2*self.mu, pow(self.mu, 1.2) ) )
                 self.resetfilter()
@@ -514,9 +514,9 @@ class ddpOptimizer(nn.Module):
             fp_list (List of :obj:`Class ddpOptimizer`): The list of ddpOptimizer class instances.
 
         Returns:
-            Tensors (:obj:`Tensor`) including 
+            Tensors (:obj:`Tensor`) including
             :math:`\mathbf{x}` (:obj:`Tensor`): The solved state sequence.
-            :math:`\mathbf{u}` (:obj:`Tensor`): The solved input sequence. 
+            :math:`\mathbf{u}` (:obj:`Tensor`): The solved input sequence.
             :math:`\mathbf{cost}` (:obj:`Tensor`):  The associated costs over the time horizon.
         '''
         with torch.autograd.set_detect_anomaly(True): # for debug
@@ -534,17 +534,17 @@ class ddpOptimizer(nn.Module):
             self.Qxx_terminal = torch.cat([fp_list[batch_id].pxx for batch_id in range(n_batch)],dim=0)
             self.Qx_terminal = torch.cat([fp_list[batch_id].px for batch_id in range(n_batch)],dim=0)
             self.Q = torch.cat([torch.cat( [torch.cat([fp_list[batch_id].qxx,    fp_list[batch_id].qxu],dim=-1),
-                                            torch.cat([fp_list[batch_id].qxu.mT, fp_list[batch_id].quu],dim=-1)], dim=-2) 
-                                for batch_id in range(n_batch)], dim=0) 
-            self.p = torch.cat([ torch.cat([fp_list[batch_id].qx, fp_list[batch_id].qu],dim=-1) 
+                                            torch.cat([fp_list[batch_id].qxu.mT, fp_list[batch_id].quu],dim=-1)], dim=-2)
+                                for batch_id in range(n_batch)], dim=0)
+            self.p = torch.cat([ torch.cat([fp_list[batch_id].qx, fp_list[batch_id].qu],dim=-1)
                                             for batch_id in range(n_batch)], dim=0)
-            self.W = torch.cat([ torch.cat([fp_list[batch_id].cx, fp_list[batch_id].cu],dim=-1) 
-                                            for batch_id in range(n_batch)], dim=0) 
-            self.F = torch.cat([ torch.cat([fp_list[batch_id].fx, fp_list[batch_id].fu],dim=-1) 
-                                            for batch_id in range(n_batch)], dim=0) 
+            self.W = torch.cat([ torch.cat([fp_list[batch_id].cx, fp_list[batch_id].cu],dim=-1)
+                                            for batch_id in range(n_batch)], dim=0)
+            self.F = torch.cat([ torch.cat([fp_list[batch_id].fx, fp_list[batch_id].fu],dim=-1)
+                                            for batch_id in range(n_batch)], dim=0)
             self.G = torch.cat([ torch.cat([torch.cat([fp_list[batch_id].fxx, fp_list[batch_id].fxu],dim=-1),
-                                            torch.cat([fp_list[batch_id].fxu.mT, fp_list[batch_id].fuu],dim=-1)], dim=-2) 
-                                 for batch_id in range(n_batch)], dim=0) 
+                                            torch.cat([fp_list[batch_id].fxu.mT, fp_list[batch_id].fuu],dim=-1)], dim=-2)
+                                 for batch_id in range(n_batch)], dim=0)
 
             self.T = self.F.size(-3)
             self.mu = torch.stack([fp_list[batch_id].mu for batch_id in range(n_batch)], dim=0) # use different mu for each sample
