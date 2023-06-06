@@ -1,12 +1,13 @@
 import pypose as pp
 import torch as torch
 import torch.nn as nn
+from .. import excludeBatch
 from torch.autograd.functional import jacobian
 
 class Cost(nn.Module):
     r'''
     The base class of a cost function.
-    
+
     The cost function :math:`\mathrm{cost}` is given by:
 
     .. math::
@@ -89,7 +90,7 @@ class Cost(nn.Module):
         r'''
         Function to set the reference point for linearization.
 
-        Args: 
+        Args:
             state (:obj:`Tensor`): The reference state of the dynamical system. If ``None``,
                 the the most recent state is taken. Default: ``None``.
             input (:obj:`Tensor`): The reference input to the dynamical system. If ``None``,
@@ -110,7 +111,7 @@ class Cost(nn.Module):
     def cx(self):
         r'''
         Quadratic/quadraticized cost linear term on state
-        
+
         .. math::
             c_{\mathbf{x}} = \left. \frac{\partial c}{\partial \mathbf{x}} \right|_{\chi^*}
         '''
@@ -122,18 +123,18 @@ class Cost(nn.Module):
     def cu(self):
         r'''
         Quadratic/quadraticized cost linear term on input
-        
+
         .. math::
             c_{\mathbf{u}} = \left. \frac{\partial c}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
         func = lambda x: self.cost(self._ref_state, x)
-        return excludeBatch(jacobian(func, self._ref_input, **self.jacargs))    
+        return excludeBatch(jacobian(func, self._ref_input, **self.jacargs))
 
     @property
     def cxx(self):
         r'''
         Quadratic/quadraticized cost quadratic term on state
-        
+
         .. math::
             c_\mathbf{xx} = \left. \frac{\partial^{2} c}{\partial \mathbf{x}^{2}} \right|_{\chi^*}
         '''
@@ -155,12 +156,12 @@ class Cost(nn.Module):
         func = lambda x: self.cost(x, self._ref_input)
         jac_func = lambda x: excludeBatch(jacobian(func, x, create_graph=True))
         return excludeBatch(jacobian(jac_func, self._ref_state, **self.jacargs),type=2)
-    
+
     @property
     def cxu(self):
         r'''
         Quadratic/quadraticized cost quadratic term on state and input
-        
+
         .. math::
             c_\mathbf{xu} = \left. \frac{\partial^{2} c}{\partial \mathbf{x} \partial \mathbf{u}} \right|_{\chi^*}
         '''
@@ -169,31 +170,31 @@ class Cost(nn.Module):
             jac = jacobian(func, self._ref_state, create_graph=True) # substitute x here
             return excludeBatch(jac)
         # func = lambda x,u: self.cost(x, u)
-        # jac_func = lambda u: excludeBatch(jacobian(func, x, create_graph=True))        
+        # jac_func = lambda u: excludeBatch(jacobian(func, x, create_graph=True))
         return excludeBatch(jacobian(jac_func, self._ref_input,  **self.jacargs), type=2)
-    
+
     @property
     def cux(self):
         r'''
         Quadratic/quadraticized cost quadratic term on input and state
-        
+
         .. math::
             c_\mathbf{ux} = \left. \frac{\partial^{2} c}{\partial \mathbf{u} \partial \mathbf{x}} \right|_{\chi^*}
         '''
         return self.cxu.mT
-    
+
     @property
     def cuu(self):
         r'''
         Quadratic/quadraticized cost quadratic term on input
-        
+
         .. math::
             c_\mathbf{uu} = \left. \frac{\partial^{2} c}{\partial \mathbf{u}^{2}} \right|_{\chi^*}
         '''
         func = lambda u: self.cost(self._ref_state, u)
         jac_func = lambda u: excludeBatch(jacobian(func, u, create_graph=True))
         return excludeBatch(jacobian(jac_func, self._ref_input,  **self.jacargs), type=2)
-    
+
     @property
     def c(self):
         r'''
@@ -212,32 +213,7 @@ class Cost(nn.Module):
                            - 0.5 * pp.bvmv(self._ref_state, self.cxx, self._ref_state) \
                            - 0.5 * pp.bvmv(self._ref_state, self.cxu, self._ref_input) \
                            - 0.5 * pp.bvmv(self._ref_input, self.cux, self._ref_state) \
-                           - 0.5 * pp.bvmv(self._ref_input, self.cuu, self._ref_input)  
-
-def excludeBatch(inp, type=1):
-    if inp.ndim <= 4: # non-batch case
-        # for cost cx  (1,1,  1,ns)
-        # for cost cxx (1,ns, 1,ns)  
-        # for constraint gx (ncon,1,  1,ns)
-        out = inp.squeeze(-2)
-        if out.shape[0]==1:
-            out = out.squeeze(0)
-        else:
-            out = out.squeeze(1)
-        
-    else:
-        B = inp.shape[-3:-1]
-        if type == 1: # zero dim per sample
-            out = torch.zeros(inp.shape[-3:], dtype=inp.dtype, device=inp.device)
-            for i in range(B[0]): #todo: compatible with non-batch case
-                for j in range(B[1]):
-                    out[i,j,:] = inp[i,j,i,j,:]
-        if type == 2: # vector per sample
-            out = torch.zeros(inp.shape[:3]+(inp.shape[-1:]), dtype=inp.dtype, device=inp.device)
-            for i in range(B[0]):
-                for j in range(B[1]):
-                    out[i,j,:,:] = inp[i,j,:,i,j,:]
-    return out        
+                           - 0.5 * pp.bvmv(self._ref_input, self.cuu, self._ref_input)
 
 class QuadCost(Cost):
     r'''
@@ -252,19 +228,19 @@ class QuadCost(Cost):
     A quadratic cost can be described by equation of the form:
 
     .. math::
-        \mathrm{cost} = \frac{1}{2}(\mathbf{x}^{\top}\mathbf{Q}\mathbf{x} 
-            +  \mathbf{x}^{\top}\mathbf{S}\mathbf{u} 
-            +  \mathbf{u}^{\top}\mathbf{S}^{\top}\mathbf{x} 
+        \mathrm{cost} = \frac{1}{2}(\mathbf{x}^{\top}\mathbf{Q}\mathbf{x}
+            +  \mathbf{x}^{\top}\mathbf{S}\mathbf{u}
+            +  \mathbf{u}^{\top}\mathbf{S}^{\top}\mathbf{x}
             +  \mathbf{u}^{\top}\mathbf{R}\mathbf{u}) + c \\
 
     where :math:`\mathbf{x}` and :math:`\mathbf{u}` are state and input of the current
     timestamp of system.
-    
+
     Note:
         More practical examples can be found at `examples/module/cost
         <https://github.com/pypose/pypose/tree/main/examples/module/cost>`_.
     '''
-    
+
     def __init__(self, Q, R, S, c=None):
         super(QuadCost, self).__init__()
         assert Q.ndim == R.ndim == S.ndim, "Invalid System Matrices dimensions"
@@ -283,9 +259,9 @@ class QuadCost(Cost):
         Perform QuadCost computation.
 
         .. math::
-            \mathrm{cost} = \frac{1}{2}(\mathbf{x}^{\top}\mathbf{Q}\mathbf{x} 
-                +  \mathbf{x}^{\top}\mathbf{S}\mathbf{u} 
-                +  \mathbf{u}^{\top}\mathbf{S}^{\top}\mathbf{x} 
+            \mathrm{cost} = \frac{1}{2}(\mathbf{x}^{\top}\mathbf{Q}\mathbf{x}
+                +  \mathbf{x}^{\top}\mathbf{S}\mathbf{u}
+                +  \mathbf{u}^{\top}\mathbf{S}^{\top}\mathbf{x}
                 +  \mathbf{u}^{\top}\mathbf{R}\mathbf{u}) + c \\
 
         '''

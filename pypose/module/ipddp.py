@@ -1,7 +1,7 @@
 import time
 import torch as torch
 import torch.nn as nn
-from ..function import bmv, bvmv, btdot
+from .. import bmv, bvmv, btdot
 
 class ddpOptimizer(nn.Module):
     r'''

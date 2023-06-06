@@ -3,11 +3,10 @@ import time
 import torch
 import shutil
 import argparse
-import setproctitle
 import pypose as pp
 import pickle as pkl
 import torch.optim as optim
-from invpend import InvPend
+from tests.module.test_ipddp import InvPend
 from pypose.module.ipddp import ddpOptimizer
 
 def main():
@@ -25,7 +24,6 @@ def main():
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     t = '.'.join(["{}={}".format(x, getattr(args, x))
                   for x in ['n_state', 'n_input', 'T']])
-    setproctitle.setproctitle('bamos.lqr.'+t+'.{}'.format(args.seed))
     if args.save is None:
         args.save = os.path.join(args.work, 'invpend', t, str(args.seed))
 
@@ -42,7 +40,7 @@ def main():
                           [-1., 0.],
                           [-2.5, 1.]])
     state = torch.tensor([[-2.,0.],
-                          [-1., 0.]])   
+                          [-1., 0.]])
     n_batch = state.shape[0]
 
     assert expert_seed != args.seed
@@ -78,7 +76,7 @@ def main():
     input_all = 0.02*torch.ones(n_batch,    T,  nc)
     state_all[...,0,:] = state
 
-    init_traj = {'state': state_all, 
+    init_traj = {'state': state_all,
                  'input': input_all}
 
     fname = os.path.join(args.save, 'pypose losses.csv')
@@ -99,13 +97,13 @@ def main():
         for batch_id in range(n_batch):
             stage_cost = pp.module.QuadCost(Q[batch_id:batch_id+1], R[batch_id:batch_id+1], S[batch_id:batch_id+1], c[batch_id:batch_id+1])
             terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
-            lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])  
-            init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1], 
-                                'input': init_traj['input'][batch_id:batch_id+1]} 
-            _ipddp_list[batch_id] = ddpOptimizer(sys_, stage_cost, terminal_cost, lincon, 
+            lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
+            init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1],
+                                'input': init_traj['input'][batch_id:batch_id+1]}
+            _ipddp_list[batch_id] = ddpOptimizer(sys_, stage_cost, terminal_cost, lincon,
                                     gx.shape[-2], init_traj_sample)
             # detached version to solve the best traj
-            with torch.no_grad():            
+            with torch.no_grad():
                 _fp_best_list[batch_id] = _ipddp_list[batch_id].optimizer()
 
         x_pred, u_pred, _ = _ipddp_list[0].forward(_fp_best_list) # call any one class instantiation to perform batch grad computation
@@ -116,11 +114,11 @@ def main():
         for batch_id in range(n_batch):
             stage_cost = pp.module.QuadCost(Q[batch_id:batch_id+1], R[batch_id:batch_id+1], S[batch_id:batch_id+1], c[batch_id:batch_id+1])
             terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
-            lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])  
-            init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1], 
-                                'input': init_traj['input'][batch_id:batch_id+1]} 
-            ipddp_list[batch_id] = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, 
-                                    gx.shape[-2], init_traj_sample) 
+            lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
+            init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1],
+                                'input': init_traj['input'][batch_id:batch_id+1]}
+            ipddp_list[batch_id] = ddpOptimizer(sys, stage_cost, terminal_cost, lincon,
+                                    gx.shape[-2], init_traj_sample)
             fp_list[batch_id] = ipddp_list[batch_id].optimizer()
         x_true, u_true = torch.cat([fp_list[batch_id].x for batch_id in range(n_batch)],dim=0), \
                          torch.cat([fp_list[batch_id].u for batch_id in range(n_batch)],dim=0)
@@ -161,7 +159,7 @@ def main():
             print(param, expert['param'])
         print('{:04d}: traj_loss: {:.4f} model_loss: {:.4f}'.format(
             i, traj_loss.item(), model_loss.item()))
-    
+
     print( args.save)
     os.system('python .\plot.py "{}" &'.format(args.save))
 if __name__=='__main__':

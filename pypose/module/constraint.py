@@ -1,13 +1,13 @@
 import pypose as pp
 import torch as torch
 import torch.nn as nn
-from pypose.module.cost import excludeBatch 
+from .. import excludeBatch
 from torch.autograd.functional import jacobian
 
 class Constraint(nn.Module):
     r'''
     The base class of a constraint function.
-    
+
     The cost function :math:`\mathrm{cons}` is given by:
 
     .. math::
@@ -51,7 +51,7 @@ class Constraint(nn.Module):
         r'''
         Function to set the reference point for linearization.
 
-        Args: 
+        Args:
             state (:obj:`Tensor`): The reference state of the dynamical system. If ``None``,
                 the the most recent state is taken. Default: ``None``.
             input (:obj:`Tensor`): The reference input to the dynamical system. If ``None``,
@@ -72,7 +72,7 @@ class Constraint(nn.Module):
     def gx(self):
         r'''
         Linear/linearized constraint term on state
-        
+
         .. math::
             \mathbf{g}_{\mathbf_{x}} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{x}} \right|_{\chi^*}
         '''
@@ -83,12 +83,12 @@ class Constraint(nn.Module):
     def gu(self):
         r'''
         Linear/linearized constraint term on input
-        
+
         .. math::
             \mathbf{g}_{\mathbf_{u}} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
         func = lambda u: self.constraint(self._ref_state, u)
-        return excludeBatch(jacobian(func, self._ref_input, **self.jacargs), type=2)    
+        return excludeBatch(jacobian(func, self._ref_input, **self.jacargs), type=2)
 
     @property
     def g(self):
@@ -105,7 +105,7 @@ class Constraint(nn.Module):
 class LinCon(Constraint):
     r'''
     Linear constraint.
-    
+
     Args:
         gx (:obj:`Tensor`): The state coefficient of linear constraint.
         gu (:obj:`Tensor`): The input coefficient of linear constraint.
@@ -135,10 +135,10 @@ class LinCon(Constraint):
         >>> print(lincon(state, input))
         >>> print(lincon.gx)
     '''
-    
+
     def __init__(self, gx, gu, g=None):
         super(LinCon, self).__init__()
-        # assert gx.ndim in (2, 3), "Invalid constraint state coefficient dimensions" 
+        # assert gx.ndim in (2, 3), "Invalid constraint state coefficient dimensions"
         assert gx.ndim == gu.ndim, "Invalid coefficient matrices dimensions"
         self.gx, self.gu, self.g = gx, gu, g
 
@@ -195,4 +195,3 @@ class LinCon(Constraint):
     @g.setter
     def g(self, g):
         self._g = g
-

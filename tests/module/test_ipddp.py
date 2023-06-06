@@ -1,13 +1,13 @@
 import pypose as pp
 import torch as torch
 import torch.nn as nn
-from pypose.module.dynamics import System, NLS
 from pypose.module.ipddp import ddpOptimizer
+from pypose.module.dynamics import System, NLS
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Create class for inverted-pendulum dynamics
-class InvPend(NLS): # why use NLS to inherit?
+class InvPend(NLS):
     def __init__(self, dt, length=[10.0], gravity=10.0):
         super(InvPend, self).__init__()
         self.tau = dt
@@ -33,15 +33,15 @@ if __name__ == "__main__":
                           [-1., 0.],
                           [-2.5, 1.]])
 
-    sys = InvPend(dt) 
+    sys = InvPend(dt)
     ns, nc = 2, 1
     n_batch = 3
     state_all =      torch.zeros(n_batch, T+1, ns)
     input_all = 0.02*torch.ones(n_batch,  T,   nc)
     state_all[...,0,:] = state
-    init_traj = {'state': state_all, 
+    init_traj = {'state': state_all,
                  'input': input_all}
- 
+
     # Create cost object
     Q = torch.tile(dt*torch.eye(ns, ns, device=device), (n_batch, T, 1, 1))
     R = torch.tile(dt*torch.eye(nc, nc, device=device), (n_batch, T, 1, 1))
@@ -58,15 +58,12 @@ if __name__ == "__main__":
 
     traj_opt = [None for batch_id in range(n_batch)]
 
-    for batch_id in range(n_batch): # use for loop and keep the ddpOptimizer 
+    for batch_id in range(n_batch): # use for loop and keep the ddpOptimizer
         # used class is for batched version, inside loop use batch_size = 1
         stage_cost = pp.module.QuadCost(Q[batch_id:batch_id+1], R[batch_id:batch_id+1], S[batch_id:batch_id+1], c[batch_id:batch_id+1])
         terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
-        lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])  
-        init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1], 
-                            'input': init_traj['input'][batch_id:batch_id+1]} 
-        solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, gx.shape[-2], init_traj_sample) 
+        lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
+        init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1],
+                            'input': init_traj['input'][batch_id:batch_id+1]}
+        solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, gx.shape[-2], init_traj_sample)
         traj_opt[batch_id] = solver.optimizer()
-
-
-    
