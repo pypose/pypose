@@ -87,8 +87,6 @@ def main():
         pkl.dump(expert, fi)
 
     current_u = torch.sin(time).unsqueeze(1).unsqueeze(0)
-    x_init = torch.tensor([[0, 0, torch.pi, 0]], device=device)
-    expert_cartPoleSolver = CartPole(dt, expert['len'], expert['m_cart'], expert['m_pole'], g).to(device)
 
     torch.manual_seed(args.seed)
     len = torch.tensor(1.55).to(device).requires_grad_()
@@ -100,11 +98,13 @@ def main():
     loss_f.write('im_loss,mse\n')
     loss_f.flush()
 
-    mpc_expert = pp.module.MPC(expert_cartPoleSolver, T, step=15).to(device)
-    x_true, u_true, cost_true = mpc_expert(expert['Q'], expert['p'], x_init, dt, current_u)
 
-    def get_loss(_len, _m_cart, _m_pole):
-        x_init = torch.tensor([[0, 0, torch.pi, 0]], device=device)
+    def get_loss(x_init, _len, _m_cart,  _m_pole):
+
+        expert_cartPoleSolver = CartPole(dt, expert['len'], expert['m_cart'], expert['m_pole'], g).to(device)
+        mpc_expert = pp.module.MPC(expert_cartPoleSolver, T, step=15).to(device)
+        x_true, u_true, cost_true = mpc_expert(expert['Q'], expert['p'], x_init, dt, current_u)
+
         agent_cartPoleSolver = CartPole(dt, _len, _m_cart, _m_pole, g).to(device)
         mpc_agent = pp.module.MPC(agent_cartPoleSolver, T, step=15).to(device)
         x_pred, u_pred, cost_pred = mpc_agent(expert['Q'], expert['p'], x_init, dt, current_u)
@@ -114,17 +114,19 @@ def main():
 
         return traj_loss
 
-    opt = optim.RMSprop((len, m_cart, m_pole), lr=1e-2)
+    opt = optim.RMSprop([len, m_cart, m_pole], lr=1e-2)
 
-    for i in range(1000):
-        traj_loss = get_loss(len, m_cart, m_pole)
+    for i in range(5000):
+        x_init = torch.tensor([[0, 0, torch.pi + torch.deg2rad(5.0*torch.randn(1)), 0]], device=device)
+        traj_loss = get_loss(x_init, len, m_cart, m_pole)
+
         opt.zero_grad()
         traj_loss.backward()
         opt.step()
 
         model_loss = torch.mean((len - expert['len'])**2) + \
-                     torch.mean((m_cart - expert['m_cart'])**2) + \
-                     torch.mean((m_pole - expert['m_pole'])**2)
+                    torch.mean((m_cart - expert['m_cart'])**2) + \
+                    torch.mean((m_pole - expert['m_pole'])**2)
 
         loss_f.write('{},{}\n'.format(traj_loss.item(), model_loss.item()))
         loss_f.flush()

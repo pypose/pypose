@@ -59,12 +59,6 @@ class TrainMPC:
         with open(fname, 'wb') as fi:
             pkl.dump(expert, fi)
 
-        x_init = torch.randn(n_batch, n_state, device=device)
-        lti = pp.module.LTI(expert['A'], expert['B'], C, D, c1, c2)
-
-        mpc_expert = pp.module.MPC(lti, T, step=1)
-        x_true, u_true, cost_true = mpc_expert.forward(expert['Q'], expert['p'], x_init, dt)
-
         torch.manual_seed(args.seed)
         A = (torch.eye(n_state, device=device) + 0.2 * torch.randn(n_state, n_state, device=device))\
             .requires_grad_()
@@ -80,6 +74,10 @@ class TrainMPC:
         time_d.flush()
 
         def get_loss(x_init, _A, _B):
+            lti = pp.module.LTI(expert['A'], expert['B'], C, D, c1, c2)
+            mpc_expert = pp.module.MPC(lti, T, step=1)
+            x_true, u_true, cost_true = mpc_expert.forward(expert['Q'], expert['p'], x_init, dt)
+
             lti_ = pp.module.LTI(_A, _B, C, D, c1, c2)
             mpc_agent = pp.module.MPC(lti_, T, step=1)
             x_pred, u_pred, cost_pred = mpc_agent.forward(expert['Q'], expert['p'], x_init, dt)
@@ -91,7 +89,9 @@ class TrainMPC:
 
         opt = optim.RMSprop((A, B), lr=1e-2)
 
-        for i in range(150):
+        for i in range(5000):
+            x_init = torch.randn(n_batch, n_state, device=device)
+
             t1 = time.time()
             traj_loss = get_loss(x_init, A, B)
             opt.zero_grad()
