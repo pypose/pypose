@@ -113,7 +113,11 @@ def main():
 
         return traj_loss
 
-    opt = optim.RMSprop((len, m_cart, m_pole), lr=1e-2)
+    opt = optim.RMSprop([len, m_cart, m_pole], lr=1e-2)
+
+    for i in range(5000):
+        x_init = torch.tensor([[0, 0, torch.pi + torch.deg2rad(5.0*torch.randn(1)), 0]], device=device)
+        traj_loss = get_loss(x_init, len, m_cart, m_pole)
 
     for i in range(500):
         x_init = torch.tensor([[0, 0, torch.pi + torch.deg2rad(5.0*torch.randn(1)), 0]], device=device)
@@ -123,8 +127,8 @@ def main():
         opt.step()
 
         model_loss = torch.mean((len - expert['len'])**2) + \
-                     torch.mean((m_cart - expert['m_cart'])**2) + \
-                     torch.mean((m_pole - expert['m_pole'])**2)
+                    torch.mean((m_cart - expert['m_cart'])**2) + \
+                    torch.mean((m_pole - expert['m_pole'])**2)
 
         loss_f.write('{},{}\n'.format(traj_loss.item(), model_loss.item()))
         loss_f.flush()
