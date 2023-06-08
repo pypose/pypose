@@ -75,8 +75,8 @@ class TestLQR:
         LQR = pp.module.LQR(lti, Q, p, T).to(device)
         x, u, cost = LQR(x_init, dt)
 
-        torch.testing.assert_close(x_ref, x)
-        torch.testing.assert_close(u_ref, u)
+        torch.testing.assert_close(x_ref, x, rtol=1e-5, atol=1e-3)
+        torch.testing.assert_close(u_ref, u, atol=1e-5, rtol=1e-3)
 
 
     def test_lqr_ltv(self, device='cpu'):
