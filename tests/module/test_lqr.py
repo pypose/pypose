@@ -72,7 +72,6 @@ class TestLQR:
         x_init = torch.tensor([[ 1.50, -0.34, -2.18,  0.54], [-1.05, -1.36,  0.43,  0.80]], device=device)
 
         lti = pp.module.LTI(A, B, C, D, c1, c2).to(device)
-
         LQR = pp.module.LQR(lti, Q, p, T).to(device)
         x, u, cost = LQR(x_init, dt)
 
@@ -148,7 +147,6 @@ class TestLQR:
                 return self._D[...,self._t,:,:]
 
         ltv = MyLTV(A, B, C, D).to(device)
-
         LQR  = pp.module.LQR(ltv, Q, p, T).to(device)
         x, u, cost = LQR(x_init, dt)
 
