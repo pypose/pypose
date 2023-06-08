@@ -65,19 +65,17 @@ def main():
         def observation(self, state, input, t=None):
             return state
 
-    expert_seed = 7
-    assert expert_seed != args.seed
-    torch.manual_seed(expert_seed)
-
-    Q = torch.tile(torch.eye(n_state + n_ctrl, device=device), (n_batch, T, 1, 1))
-    p = torch.randn(n_batch, T, n_sc)
     dt = 0.01
     g = 9.81
     time  = torch.arange(0, T, device=device) * dt
 
     expert = dict(
         Q = torch.tile(torch.eye(n_state + n_ctrl, device=device), (n_batch, T, 1, 1)),
-        p = torch.randn(n_batch, T, n_sc).to(device),
+        p = torch.tensor([[[ 0.1945,  0.2579,  0.1655,  1.0841, -0.6235],
+                           [-0.3816, -0.4376, -0.7798, -0.3692,  1.4181],
+                           [-0.4025,  1.0821, -0.0679,  0.5890,  1.1151],
+                           [-0.0610,  0.0656, -1.0557,  0.8769, -0.5928],
+                           [ 0.0123,  0.3731, -0.2426, -1.5464,  0.0056]]]).to(device),
         len = torch.tensor(1.5).to(device),
         m_cart = torch.tensor(20.0).to(device),
         m_pole = torch.tensor(10.0).to(device),
@@ -90,7 +88,7 @@ def main():
 
     torch.manual_seed(args.seed)
     len = torch.tensor(2.0).to(device).requires_grad_()
-    m_cart = torch.tensor(20.0).to(device).requires_grad_()
+    #m_cart = torch.tensor(20.1).to(device).requires_grad_()
     m_pole = torch.tensor(11.1).to(device).requires_grad_()
 
     fname = os.path.join(args.save, 'cartpole losses.csv')
@@ -98,7 +96,7 @@ def main():
     loss_f.write('im_loss,mse\n')
     loss_f.flush()
 
-    def get_loss(x_init, _len, _m_cart, _m_pole):
+    def get_loss(x_init, _len, _m_pole):
 
         expert_cartPoleSolver = CartPole(dt, expert['len'], expert['m_cart'], expert['m_pole'], g).to(device)
         mpc_expert = pp.module.MPC(expert_cartPoleSolver, T, step=15).to(device)
@@ -113,17 +111,16 @@ def main():
 
         return traj_loss
 
-    opt = optim.RMSprop([len, m_cart, m_pole], lr=1e-2)
+    opt = optim.RMSprop([len, m_pole], lr=1e-2)
 
     for i in range(500):
         x_init = torch.tensor([[0, 0, torch.pi + torch.deg2rad(5.0*torch.randn(1)), 0]], device=device)
-        traj_loss = get_loss(x_init, len, m_cart, m_pole)
+        traj_loss = get_loss(x_init, len, m_pole)
         opt.zero_grad()
         traj_loss.backward()
         opt.step()
 
         model_loss = torch.mean((len - expert['len'])**2) + \
-                    torch.mean((m_cart - expert['m_cart'])**2) + \
                     torch.mean((m_pole - expert['m_pole'])**2)
 
         loss_f.write('{},{}\n'.format(traj_loss.item(), model_loss.item()))
@@ -134,8 +131,8 @@ def main():
             os.system('./plot.py "{}" &'.format(args.save))
             print("Length of pole of the agent system = ", len)
             print("Length of pole of the expert system = ", expert['len'])
-            print("Mass of cart of the agent system = ", m_cart)
-            print("Mass of cart of the expert system = ", expert['m_cart'])
+            #print("Mass of cart of the agent system = ", m_cart)
+            #print("Mass of cart of the expert system = ", expert['m_cart'])
             print("Mass of pole of the agent system = ", m_pole)
             print("Mass of pole of the expert system = ", expert['m_pole'])
             print('{:04d}: traj_loss: {:.8f} model_loss: {:.8f}'.format(
