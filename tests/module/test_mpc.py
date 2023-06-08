@@ -78,7 +78,7 @@ class TestMPC:
 
         cartPoleSolver = CartPole(dt, len, m_cart, m_pole, g).to(device)
         MPC = pp.module.MPC(cartPoleSolver, T, step=15).to(device)
-        x, u, cost = MPC(Q, p, x_init, dt, current_u)
+        x, u, cost = MPC(Q, p, x_init, dt, current_u=current_u)
 
         torch.testing.assert_close(x_ref, x, atol=1e-5, rtol=1e-3)
         torch.testing.assert_close(u_ref, u, atol=1e-5, rtol=1e-3)

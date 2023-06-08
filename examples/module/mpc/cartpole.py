@@ -102,11 +102,11 @@ def main():
 
         expert_cartPoleSolver = CartPole(dt, expert['len'], expert['m_cart'], expert['m_pole'], g).to(device)
         mpc_expert = pp.module.MPC(expert_cartPoleSolver, T, step=15).to(device)
-        x_true, u_true, cost_true = mpc_expert(expert['Q'], expert['p'], x_init, dt, current_u)
+        x_true, u_true, cost_true = mpc_expert(expert['Q'], expert['p'], x_init, dt, current_u=current_u)
 
         agent_cartPoleSolver = CartPole(dt, _len, expert['m_cart'], _m_pole, g).to(device)
         mpc_agent = pp.module.MPC(agent_cartPoleSolver, T, step=15).to(device)
-        x_pred, u_pred, cost_pred = mpc_agent(expert['Q'], expert['p'], x_init, dt, current_u)
+        x_pred, u_pred, cost_pred = mpc_agent(expert['Q'], expert['p'], x_init, dt, current_u=current_u)
 
         traj_loss = torch.mean((u_true - u_pred)**2) \
             + torch.mean((x_true - x_pred)**2)
@@ -114,10 +114,6 @@ def main():
         return traj_loss
 
     opt = optim.RMSprop([len, m_cart, m_pole], lr=1e-2)
-
-    for i in range(5000):
-        x_init = torch.tensor([[0, 0, torch.pi + torch.deg2rad(5.0*torch.randn(1)), 0]], device=device)
-        traj_loss = get_loss(x_init, len, m_cart, m_pole)
 
     for i in range(500):
         x_init = torch.tensor([[0, 0, torch.pi + torch.deg2rad(5.0*torch.randn(1)), 0]], device=device)

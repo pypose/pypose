@@ -149,7 +149,7 @@ class MPC(nn.Module):
         self.step = step
         self.eps = eps
 
-    def forward(self, Q, p, x_init, dt, current_u=None):
+    def forward(self, Q, p, x_init, dt, current_x = None, current_u=None):
         r'''
         Performs MPC for the discrete system.
 
@@ -158,6 +158,8 @@ class MPC(nn.Module):
             p (:obj:`Tensor`): The weight vector of the first-order term.
             x_init (:obj:`Tensor`): The initial state of the system.
             dt (:obj:`int`): The timestamp for ths system to estimate.
+            current_x (:obj:`Tensor`, optinal): The current states of the system along a
+                trajectory. Default: ``None``.
             current_u (:obj:`Tensor`, optinal): The current inputs of the system along a
                 trajectory. Default: ``None``.
 
@@ -167,6 +169,7 @@ class MPC(nn.Module):
             quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
         best = None
+        x = current_x
         u = current_u
 
         for i in range(self.step):
@@ -175,22 +178,25 @@ class MPC(nn.Module):
                 u = u.detach()
 
             lqr = pp.module.LQR(self.system, Q, p, self.T)
-            x, u, cost = lqr(x_init, dt, u)
+            x, u, cost = lqr(x_init, dt, x, u)
             assert x.ndim == u.ndim == 3
 
             if best is None:
                 best = {
+                    'x': x,
                     'u': u,
                     'cost': cost,}
             else:
                 if cost <= best['cost']+ self.eps:
+                    best['x']= x
                     best['u']= u
                     best['cost'] = cost
 
         if self.step > 1:
+            current_x = best['x']
             current_u = best['u']
 
         _lqr = pp.module.LQR(self.system, Q, p, self.T)
-        x, u, cost= _lqr(x_init, dt, current_u)
+        x, u, cost= _lqr(x_init, dt, current_x, current_u)
 
         return x, u, cost
