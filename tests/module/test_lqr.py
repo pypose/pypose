@@ -1,6 +1,7 @@
 import torch, pypose as pp
 
 
+
 class TestLQR:
 
     def test_lqr_linear(self, device='cpu'):
