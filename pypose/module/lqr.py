@@ -228,12 +228,14 @@ class LQR(nn.Module):
                      [ 0.1849, -1.3884,  1.0898, -1.6229],
                      [ 1.2138, -0.7161,  0.2954, -0.6819],
                      [ 1.4840, -1.1249, -1.0302,  0.9805],
-                     [-0.3477, -1.7063,  4.6494,  2.6780]],
+                     [-0.3477, -1.7063,  4.6494,  2.6780],
+                     [ 7.2346,  4.9958, 17.9926, -7.7881]],
                     [[-0.9744,  0.4976,  0.0603, -0.5258],
                      [-0.6356,  0.0539,  0.7264, -0.5048],
                      [-0.2275, -0.1649,  0.3872, -0.4614],
                      [ 0.2697, -0.3577,  0.0999, -0.4594],
-                     [ 0.3916, -2.0832,  0.0701, -0.5407]]])
+                     [ 0.3916, -2.0832,  0.0701, -0.5407],
+                     [ 1.0404, -1.3799, -2.0913, -0.1459]]])
         u = tensor([[[ 1.0405,  0.1586, -0.1282],
                      [-1.4845, -0.5745,  0.2523],
                      [-0.6322, -0.3281, -0.3620],
@@ -258,7 +260,6 @@ class LQR(nn.Module):
         if self.p.ndim == 2:
             self.p = torch.tile(self.p.unsqueeze(-2), (1, self.T, 1))
 
-        # Q: (n_batch*, T, N, N), p: (n_batch*, T, N), where n_batch* can be any batch dimensions, e.g., (2, 3)
         self.n_batch = self.p.shape[:-2]
 
         assert self.Q.shape[:-1] == self.p.shape, "Shape not compatible."
@@ -273,12 +274,9 @@ class LQR(nn.Module):
 
         Args:
             x_init (:obj:`Tensor`): The initial state of the system.
-            current_x (:obj:`Tensor`, optinal): The current states of the system along a
-                trajectory.
+            dt (:obj:`int`): The timestamp for ths system to estimate.
             current_u (:obj:`Tensor`, optinal): The current inputs of the system along a
-                trajectory.
-            time (:obj:`Tensor`, optinal): The reference time step of the dynamical
-                system.
+                trajectory. Default: ``None``
 
         Returns:
             List of :obj:`Tensor`: A list of tensors including the solved state sequence
@@ -310,7 +308,6 @@ class LQR(nn.Module):
         K = torch.zeros(self.n_batch + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
         k = torch.zeros(self.n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
         p_new = torch.zeros(self.n_batch + (self.T, nsc), dtype=self.p.dtype, device=self.p.device)
-        #use detach here
 
         for i in range(self.T):
             current_xut = torch.cat((current_x[...,i,:], current_u[...,i,:]), dim=-1)
@@ -365,4 +362,4 @@ class LQR(nn.Module):
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
             cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
 
-        return x[...,0:-1,:], u, cost
+        return x, u, cost

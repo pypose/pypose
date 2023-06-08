@@ -12,9 +12,9 @@ class TrainMPC:
     def main(self, device='cpu'):
 
         parser = argparse.ArgumentParser()
-        parser.add_argument('--n_batch', type=int, default=16)
-        parser.add_argument('--n_state', type=int, default=5)
-        parser.add_argument('--n_ctrl', type=int, default=5)
+        parser.add_argument('--n_batch', type=int, default=5)
+        parser.add_argument('--n_state', type=int, default=3)
+        parser.add_argument('--n_ctrl', type=int, default=3)
         parser.add_argument('--T', type=int, default=5)
         parser.add_argument('--save', type=str)
         parser.add_argument('--work', type=str, default='work')
@@ -59,12 +59,6 @@ class TrainMPC:
         with open(fname, 'wb') as fi:
             pkl.dump(expert, fi)
 
-        x_init = torch.randn(n_batch, n_state, device=device)
-        lti = pp.module.LTI(expert['A'], expert['B'], C, D, c1, c2)
-
-        mpc_expert = pp.module.MPC(lti, T, step=1)
-        x_true, u_true, cost_true = mpc_expert.forward(expert['Q'], expert['p'], x_init, dt)
-
         torch.manual_seed(args.seed)
         A = (torch.eye(n_state, device=device) + 0.2 * torch.randn(n_state, n_state, device=device))\
             .requires_grad_()
@@ -80,6 +74,10 @@ class TrainMPC:
         time_d.flush()
 
         def get_loss(x_init, _A, _B):
+            lti = pp.module.LTI(expert['A'], expert['B'], C, D, c1, c2)
+            mpc_expert = pp.module.MPC(lti, T, step=1)
+            x_true, u_true, cost_true = mpc_expert.forward(expert['Q'], expert['p'], x_init, dt)
+
             lti_ = pp.module.LTI(_A, _B, C, D, c1, c2)
             mpc_agent = pp.module.MPC(lti_, T, step=1)
             x_pred, u_pred, cost_pred = mpc_agent.forward(expert['Q'], expert['p'], x_init, dt)
@@ -91,8 +89,9 @@ class TrainMPC:
 
         opt = optim.RMSprop((A, B), lr=1e-2)
 
-        for i in range(150):
+        for i in range(1500):
             t1 = time.time()
+            x_init = torch.randn(n_batch, n_state, device=device)
             traj_loss = get_loss(x_init, A, B)
             opt.zero_grad()
             t2 = time.time()
