@@ -219,6 +219,7 @@ class MPC(nn.Module):
             quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
         best, x, u = None, None, u_init
+        self.stepper.reset()
         with torch.no_grad():
             while self.stepper.continual():
                 x, u, cost = self.lqr(x_init, dt, x, u)
