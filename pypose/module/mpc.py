@@ -1,6 +1,7 @@
+import torch
 import pypose as pp
 import torch.nn as nn
-
+from ..utils.stepper import ReduceToBason
 
 class MPC(nn.Module):
     r'''
@@ -8,10 +9,12 @@ class MPC(nn.Module):
 
     Args:
         system (:obj:`instance`): The system to be soved by MPC.
+        Q (:obj:`Tensor`): The weight matrix of the quadratic term.
+        p (:obj:`Tensor`): The weight vector of the first-order term.
         T (:obj:`int`): Time steps of system.
-        steps (:obj:`int`, optional): Total number of iterations for iterative LQR.
-            Default: 10.
-        eps (:obj:`int`, optional): Epsilon as the tolerance. Default: 1e-4.
+        stepper (``Planner``, optional): the stepper to stop iterations. If ``None``,
+            the ``pypose.utils.ReduceToBason`` with a maximum of 10 steps are used.
+            Default: ``None``.
 
     **Model Predictive Control**, also known as Receding Horizon Control (RHC), uses the
     mathematical model of the system to solve a finite, moving horizon, and
@@ -194,25 +197,20 @@ class MPC(nn.Module):
                       [-0.0530],
                       [ 0.1023]]])
     '''
-    def __init__(self, system, T, step=10, eps=1e-4):
+    def __init__(self, system, Q, p, T, stepper=None):
         super().__init__()
-        self.system = system
-        self.T = T
-        self.step = step
-        self.eps = eps
+        self.stepper = ReduceToBason(steps=10) if stepper is None else stepper
+        self.lqr = pp.module.LQR(system, Q, p, T)
 
-    def forward(self, Q, p, x_init, dt, current_x=None, current_u=None):
+    def forward(self, dt, x_init, u_init=None):
         r'''
         Performs MPC for the discrete system.
 
         Args:
-            Q (:obj:`Tensor`): The weight matrix of the quadratic term.
-            p (:obj:`Tensor`): The weight vector of the first-order term.
+
+            dt (:obj:`int`): The interval (:math:`\delta t`) between two time steps.
             x_init (:obj:`Tensor`): The initial state of the system.
-            dt (:obj:`int`): The timestamp for ths system to estimate.
-            current_x (:obj:`Tensor`, optinal): The current states of the system along a
-                trajectory. Default: ``None``.
-            current_u (:obj:`Tensor`, optinal): The current inputs of the system along a
+            u_init (:obj:`Tensor`, optinal): The current inputs of the system along a
                 trajectory. Default: ``None``.
 
         Returns:
@@ -220,27 +218,13 @@ class MPC(nn.Module):
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the associated
             quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
-        best = None
-        x = current_x
-        u = current_u
+        best, x, u = None, None, u_init
+        with torch.no_grad():
+            while self.stepper.continual():
+                x, u, cost = self.lqr(x_init, dt, x, u)
+                self.stepper.step(cost)
 
-        for i in range(self.step):
+                if best is None or cost < best['cost']:
+                    best = {'x': x, 'u': u, 'cost': cost}
 
-            if u is not None:
-                u = u.detach()
-
-            lqr = pp.module.LQR(self.system, Q, p, self.T)
-            x, u, cost = lqr(x_init, dt, x, u)
-            assert x.ndim == u.ndim == 3
-
-            if best is None or cost <= best['cost'] + self.eps:
-                best = {'x': x, 'u': u, 'cost': cost}
-
-        if self.step > 1:
-            current_x = best['x']
-            current_u = best['u']
-
-        _lqr = pp.module.LQR(self.system, Q, p, self.T)
-        x, u, cost= _lqr(x_init, dt, current_x, current_u)
-
-        return x, u, cost
+        return self.lqr(x_init, dt, best['x'], best['u'])
