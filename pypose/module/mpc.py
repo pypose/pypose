@@ -201,7 +201,7 @@ class MPC(nn.Module):
         self.step = step
         self.eps = eps
 
-    def forward(self, Q, p, x_init, dt, current_x = None, current_u=None):
+    def forward(self, Q, p, x_init, dt, current_x=None, current_u=None):
         r'''
         Performs MPC for the discrete system.
 
@@ -233,16 +233,8 @@ class MPC(nn.Module):
             x, u, cost = lqr(x_init, dt, x, u)
             assert x.ndim == u.ndim == 3
 
-            if best is None:
-                best = {
-                    'x': x,
-                    'u': u,
-                    'cost': cost,}
-            else:
-                if cost <= best['cost']+ self.eps:
-                    best['x']= x
-                    best['u']= u
-                    best['cost'] = cost
+            if best is None or cost <= best['cost'] + self.eps:
+                best = {'x': x, 'u': u, 'cost': cost}
 
         if self.step > 1:
             current_x = best['x']
