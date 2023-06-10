@@ -266,16 +266,18 @@ class LQR(nn.Module):
         assert self.Q.shape[:-1] == self.p.shape, "Shape not compatible."
         assert self.Q.size(-1) == self.Q.size(-2), "Shape not compatible."
         assert self.Q.ndim == 4 or self.p.ndim == 3, "Shape not compatible."
-        assert self.Q.device == self.p.device, "device not compatible."
-        assert self.Q.dtype == self.p.dtype, "tensor data type not compatible."
+        assert self.Q.device == self.p.device, "Device not compatible."
+        assert self.Q.dtype == self.p.dtype, "Tensor data type not compatible."
+        self.dargs = {'dtype': self.p.dtype, 'device': self.p.device}
 
-    def forward(self, x_init, dt, current_x = None, current_u=None):
+    def forward(self, x_init, dt=1, current_x=None, current_u=None):
         r'''
         Performs LQR for the discrete system.
 
         Args:
             x_init (:obj:`Tensor`): The initial state of the system.
-            dt (:obj:`int`): The timestamp for ths system to estimate.
+            dt (:obj:`int`): The interval (:math:`\delta t`) between two time steps.
+                Default: `1`.
             current_x (:obj:`Tensor`, optinal): The current states of the system along a
                 trajectory. Default: ``None``.
             current_u (:obj:`Tensor`, optinal): The current inputs of the system along a
@@ -296,25 +298,23 @@ class LQR(nn.Module):
         nc = nsc - ns
 
         if current_u is None:
-            current_u = torch.zeros(self.n_batch + (self.T, nc), device=self.p.device)
+            current_u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
 
         if current_x is None:
-            current_x = torch.zeros(self.n_batch + (self.T, ns), device=self.p.device)
+            current_x = torch.zeros(self.n_batch + (self.T, ns), **self.dargs)
             current_x[...,0,:] = x_init
-            current_xt = x_init
             for i in range(self.T-1):
-                current_x[...,i+1,:] = current_xt = self.system(current_xt, current_u[...,i,:])[0]
+                current_x[...,i+1,:], _ = self.system(current_x[...,i,:], current_u[...,i,:])
 
         self.current_x = current_x
         self.current_u = current_u
 
-        K = torch.zeros(self.n_batch + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
-        k = torch.zeros(self.n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
-        p_new = torch.zeros(self.n_batch + (self.T, nsc), dtype=self.p.dtype, device=self.p.device)
+        K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
+        k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
+        p_new = torch.zeros(self.n_batch + (self.T, nsc), **self.dargs)
 
-        for i in range(self.T):
-            current_xut = torch.cat((current_x[...,i,:], current_u[...,i,:]), dim=-1)
-            p_new[...,i,:] = bmv(self.Q[...,i,:,:], current_xut) + self.p[...,i,:]
+        current_xut = torch.cat((current_x[...,:self.T,:], current_u), dim=-1)
+        p_new = bmv(self.Q, current_xut) + self.p
 
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
@@ -349,10 +349,10 @@ class LQR(nn.Module):
 
         ns, nc = self.current_x.size(-1), self.current_u.size(-1)
 
-        u = torch.zeros(self.n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
-        delta_u = torch.zeros(self.n_batch + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
-        cost = torch.zeros(self.n_batch, dtype=self.p.dtype, device=self.p.device)
-        x = torch.zeros(self.n_batch + (self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
+        u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
+        delta_u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
+        cost = torch.zeros(self.n_batch, **self.dargs)
+        x = torch.zeros(self.n_batch + (self.T+1, ns), **self.dargs)
         x[..., 0, :] = x_init
         xt = x_init
 
