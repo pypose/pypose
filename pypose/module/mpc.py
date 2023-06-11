@@ -1,5 +1,5 @@
 import torch
-import pypose as pp
+from .lqr import LQR
 import torch.nn as nn
 from ..utils.stepper import ReduceToBason
 
@@ -200,7 +200,7 @@ class MPC(nn.Module):
     def __init__(self, system, Q, p, T, stepper=None):
         super().__init__()
         self.stepper = ReduceToBason(steps=10) if stepper is None else stepper
-        self.lqr = pp.module.LQR(system, Q, p, T)
+        self.lqr = LQR(system, Q, p, T)
 
     def forward(self, dt, x_init, u_init=None):
         r'''
