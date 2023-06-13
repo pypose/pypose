@@ -84,7 +84,7 @@ class TrainMPC:
 
         opt = optim.RMSprop((A, B), lr=1e-2)
 
-        for i in range(15):
+        for i in range(150):
             t1 = time.time()
             x_init = torch.randn(n_batch, n_state, device=device)
             traj_loss = get_loss(x_init, A, B)
@@ -110,7 +110,7 @@ class TrainMPC:
                 i, traj_loss.item(), model_loss.item()))
             print("backward_time = ", backward_time)
             print("overall_time = ", overall_time)
-            
+
 if __name__=='__main__':
     train = TrainMPC()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
