@@ -8,3 +8,8 @@ from .dynamics import System, LTI, LTV, NLS
 from .imu_preintegrator import IMUPreintegrator
 from .pnp import EPnP
 from .icp import ICP
+
+from .lqr_pn import LQR2
+from .mpc_pn import MPC2
+from .lqr_n import LQRN
+from .mpc_n import MPCN

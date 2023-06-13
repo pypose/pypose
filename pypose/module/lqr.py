@@ -6,7 +6,7 @@ class LQR(nn.Module):
 
     def __init__(self, system, Q, p, T):
         super().__init__()
-
+ 
         self.system = system
         self.Q, self.p, self.T = Q, p, T
         self.current_x = None
@@ -95,7 +95,7 @@ class LQR(nn.Module):
         x = torch.zeros(self.n_batch + (self.T+1, ns), dtype=self.p.dtype, device=self.p.device)
         x[..., 0, :] = x_init
         xt = x_init
-        
+
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]
             delta_xt = xt - self.current_x[...,t,:]
