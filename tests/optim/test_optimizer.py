@@ -14,10 +14,10 @@ class Timer:
     def __init__(self):
         self.synchronize()
         self.start_time = time.time()
-    
+
     def synchronize(self):
         if torch.cuda.is_available():
-            torch.cuda.synchronize()  
+            torch.cuda.synchronize()
 
     def tic(self):
         self.start()
@@ -118,7 +118,7 @@ class TestOptim:
                 print('Early Stoping!')
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
-        
+
         assert idx < 9, "Optimization requires too many steps."
 
 
@@ -279,7 +279,7 @@ class TestOptim:
                 print('Early Stoping!')
                 print('Optimization Early Done with loss:', loss.item())
                 break
-        
+
         assert idx < 9, "Optimization requires too many steps."
 
 if __name__ == '__main__':

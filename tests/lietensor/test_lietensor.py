@@ -68,6 +68,20 @@ def test_lietensor():
 
     b.Inv()
 
+    assert pp.is_lietensor(pp.randn_so3(2).Inv())
+
+    inv = pp.randn_SE3(4)
+    torch.testing.assert_close(inv.Inv().Log(), inv.Log().Inv())
+
+    inv = pp.randn_SO3(4)
+    torch.testing.assert_close(inv.Inv().Log(), inv.Log().Inv())
+
+    inv = pp.randn_RxSO3(4)
+    torch.testing.assert_close(inv.Inv().Log(), inv.Log().Inv())
+
+    inv = pp.randn_Sim3(4)
+    torch.testing.assert_close(inv.Inv().Log(), inv.Log().Inv())
+
     a = pp.randn_SE3(1,5)
     b = pp.randn_SE3(5,1)
     c = pp.randn_SO3(1,5)

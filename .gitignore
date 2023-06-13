@@ -136,9 +136,19 @@ docs/source/generated
 
 # IDE config
 .idea/
-.vscode/
+.vscode/launch.json
 
 # Example data
 examples/module/imu/2011_09_26.zip
 examples/module/imu/2011_09_26/*
 examples/module/imu/save/*
+examples/module/filter/save/*
+examples/module/dynamics/save/*
+examples/module/pgo/pgodata/*
+examples/module/pgo/data/*
+examples/module/pgo/save/*
+examples/module/pcr/data/*
+examples/module/pcr/save/*
+*epnp-test-data.pt*
+*icp-test-data.pt*
+*__MACOSX

@@ -1,8 +1,6 @@
 import torch
-from . import LieTensor
-'''
-This function file includes functions using LieTensor attributes.
-'''
+from .. import LieTensor
+
 
 def bvv(lvec, rvec, *, out=None):
     r'''
