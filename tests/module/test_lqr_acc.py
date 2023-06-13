@@ -1,6 +1,5 @@
 import torch, pypose as pp
 
-
 class TestLQR:
 
     def test_lqr_linear(self, device='cpu'):
@@ -44,10 +43,13 @@ class TestLQR:
         lti = pp.module.LTI(A, B, C, D, c1, c2).to(device)
         LQR = pp.module.LQR(lti, Q, p, T).to(device)
         x, u, cost = LQR(x_init)
- 
+
         ACLQR = pp.module.ACLQR(lti, Q, p, T).to(device)
         tau = ACLQR(x_init)
-        
+
+        torch.testing.assert_close(tau[:,:n_state], x[...,-1,:], rtol=1e-5, atol=1e-3)
+        torch.testing.assert_close(tau[:,n_state:], u[...,-1,:], rtol=1e-5, atol=1e-3)
+
 
     def test_lqr_ltv(self, device='cpu'):
 
@@ -55,7 +57,7 @@ class TestLQR:
         n_state, n_ctrl = 4, 3
 
         Q = torch.tile(torch.eye(n_state + n_ctrl, device=device), (n_batch, 1, 1))
-        p = torch.tensor([[-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54], 
+        p = torch.tensor([[-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54],
                           [-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54]], device=device)
         rt = torch.arange(1, T+1).view(T, 1, 1)
         A = rt * torch.tile(torch.eye(n_state, device=device), (n_batch, T, 1, 1))
@@ -66,7 +68,7 @@ class TestLQR:
                                [-1.05, -1.36,  0.43,  0.80]], device=device)
 
         class MyLTV(pp.module.LTV):
-        
+
             def __init__(self, A, B, C, D):
                 super().__init__(A, B, C, D)
 
@@ -81,7 +83,7 @@ class TestLQR:
             @property
             def C(self):
                 return self._C[...,self._t,:,:]
-        
+
             @property
             def D(self):
                 return self._D[...,self._t,:,:]
@@ -92,7 +94,10 @@ class TestLQR:
 
         lqr  = pp.module.LQR(ltv, Q, p, T).to(device)
         x, u, cost = lqr(x_init)
-        
+
+        torch.testing.assert_close(tau[:,:n_state], x[...,-1,:], rtol=1e-5, atol=1e-3)
+        torch.testing.assert_close(tau[:,n_state:], u[...,-1,:], rtol=1e-5, atol=1e-3)
+
 
 if __name__ == '__main__':
     test = TestLQR()

@@ -1,16 +1,15 @@
 import torch
-import pypose as pp
 import torch.nn as nn
-from ..basics import bmv, bvmv
+from .. import bmv, bvmv, cumops
 
 
 class ACLQR(nn.Module):
-    
+
     def __init__(self, system, Q, p, T):
         super().__init__()
         self.system = system
         self.Q, self.p, self.T = Q, p, T
-        
+
         if self.Q.ndim == 3:
             self.Q = torch.tile(self.Q.unsqueeze(-3), (1, self.T, 1, 1))
 
@@ -37,7 +36,7 @@ class ACLQR(nn.Module):
         K = torch.zeros(B + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
         k = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
 
-        for t in range(self.T-1, -1, -1): 
+        for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
                 Qt = self.Q[...,t,:,:]
                 qt = self.p[...,t,:]
@@ -58,7 +57,7 @@ class ACLQR(nn.Module):
             k[...,t,:] = kt = - bmv(Quu_inv, qu)
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
             v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
-            
+
         return K, k
 
     def lqr_forward(self, x_init, K, k):
@@ -71,7 +70,7 @@ class ACLQR(nn.Module):
         A = torch.zeros(n_batch, self.T, ns, ns, dtype=self.p.dtype, device=self.p.device)
         B = torch.zeros(n_batch, self.T, ns, nc, dtype=self.p.dtype, device=self.p.device)
 
-        for t in range(self.T): 
+        for t in range(self.T):
             self.system.set_refpoint(t=t)
             A[:,t,:,:] = self.system.A
             B[:,t,:,:] = self.system.B
@@ -79,7 +78,7 @@ class ACLQR(nn.Module):
         if A.ndim != 4:
             A = torch.tile(A.unsqueeze(-3), (1, self.T, 1, 1))
             B = torch.tile(B.unsqueeze(-3), (1, self.T, 1, 1))
-            
+
         F = torch.cat((A, B), dim=-1)
         tau_0 = torch.cat((x_init, bmv(K[...,0,:,:], x_init) + k[...,0,:]), 1)
         N = torch.cat((torch.zeros(n_batch, self.T-1, ns, 1), k[...,1:,:].unsqueeze(-1)), dim=-2)
@@ -94,7 +93,7 @@ class ACLQR(nn.Module):
         Gs = torch.flip(G, dims = [1])
         Gs = torch.cat((torch.tile(torch.eye(ns+nc)[None,:,:], (n_batch, 1, 1, 1)), Gs), dim=1)
         NN = torch.cat((torch.flip(N, dims = [1]), tau_0.unsqueeze(-1)[:,None,:,:]), dim=1)
-        W = pp.cumops(Gs, 1, lambda a, b : b @ a) @ NN
+        W = cumops(Gs, 1, lambda a, b : b @ a) @ NN
         tau = torch.sum(W, 1).mT.squeeze()
 
         return tau
