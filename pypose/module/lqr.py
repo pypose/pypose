@@ -290,6 +290,7 @@ class LQR(nn.Module):
         '''
         K, k = self.lqr_backward(x_init, dt, current_x, current_u)
         x, u, cost = self.lqr_forward(x_init, K, k)
+
         return x, u, cost
 
     def lqr_backward(self, x_init, dt, current_x, current_u):
@@ -303,8 +304,9 @@ class LQR(nn.Module):
         if current_x is None:
             current_x = torch.zeros(self.n_batch + (self.T, ns), **self.dargs)
             current_x[...,0,:] = x_init
+            current_xt = x_init
             for i in range(self.T-1):
-                current_x[...,i+1,:], _ = self.system(current_x[...,i,:], current_u[...,i,:])
+                current_x[...,i+1,:] = current_xt = self.system(current_xt, current_u[...,i,:])[0]
 
         self.current_x = current_x
         self.current_u = current_u

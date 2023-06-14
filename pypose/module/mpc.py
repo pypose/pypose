@@ -218,14 +218,17 @@ class MPC(nn.Module):
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the associated
             quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
-        best, x, u = None, None, u_init
-        self.stepper.reset()
-        with torch.no_grad():
-            while self.stepper.continual():
-                x, u, cost = self.lqr(x_init, dt, x, u)
-                self.stepper.step(cost)
+        x, u = None, u_init
+        best = {'x': x, 'u': u, 'cost': None}
 
-                if best is None or cost < best['cost']:
-                    best = {'x': x, 'u': u, 'cost': cost}
+        self.stepper.reset()
+        if self.stepper.steps > 1:
+            with torch.no_grad():
+                while self.stepper.continual():
+                    x, u, cost = self.lqr(x_init, dt, x, u)
+                    self.stepper.step(cost)
+
+                    if best['cost'] == None or cost < best['cost']:
+                        best = {'x': x, 'u': u, 'cost': cost}
 
         return self.lqr(x_init, dt, best['x'], best['u'])
