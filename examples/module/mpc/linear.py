@@ -41,6 +41,7 @@ class TrainMPC:
         c1 = torch.zeros(n_state, device=device)
         c2 = torch.zeros(n_state, device=device)
         dt = 1
+        stepper = pp.utils.ReduceToBason(steps=0, verbose=True)
 
         expert = dict(
             Q = torch.tile(torch.eye(n_sc, device=device), (n_batch, T, 1, 1)),
@@ -53,6 +54,9 @@ class TrainMPC:
                               [-0.5938, -0.5724,  0.0422],
                               [-0.1804, -0.2535,  1.7218]], device=device),
         )
+        # Based on n_batch, n_state and n_ctrl, different Q, p, A, B can be given.
+        # Note that the given A and B should make the system controllable.
+
         fname = os.path.join(args.save, 'expert.pkl')
         with open(fname, 'wb') as fi:
             pkl.dump(expert, fi)
@@ -76,12 +80,12 @@ class TrainMPC:
 
         def get_loss(x_init, _A, _B):
             lti = pp.module.LTI(expert['A'], expert['B'], C, D, c1, c2)
-            mpc_expert = pp.module.MPC(lti, T, step=1)
-            x_true, u_true, cost_true = mpc_expert.forward(expert['Q'], expert['p'], x_init, dt)
+            mpc_expert = pp.module.MPC(lti, expert['Q'], expert['p'], T, stepper=stepper)
+            x_true, u_true, cost_true = mpc_expert.forward(dt, x_init)
 
             lti_ = pp.module.LTI(_A, _B, C, D, c1, c2)
-            mpc_agent = pp.module.MPC(lti_, T, step=1)
-            x_pred, u_pred, cost_pred = mpc_agent.forward(expert['Q'], expert['p'], x_init, dt)
+            mpc_agent = pp.module.MPC(lti_, expert['Q'], expert['p'], T, stepper=stepper)
+            x_pred, u_pred, cost_pred = mpc_agent.forward(dt, x_init)
 
             traj_loss = torch.mean((u_true - u_pred)**2) \
                 + torch.mean((x_true - x_pred)**2)
@@ -90,7 +94,7 @@ class TrainMPC:
 
         opt = optim.RMSprop((A, B), lr=1e-2)
 
-        for i in range(1400):
+        for i in range(1500):
             t1 = time.time()
             x_init = torch.randn(n_batch, n_state, device=device)
             traj_loss = get_loss(x_init, A, B)
