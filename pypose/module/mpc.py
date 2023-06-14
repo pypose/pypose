@@ -180,9 +180,10 @@ class MPC(nn.Module):
         >>> time  = torch.arange(0, T, device=device) * dt
         >>> current_u = torch.sin(time).unsqueeze(1).unsqueeze(0)
         >>> x_init = torch.tensor([[0, 0, torch.pi, 0]])
+        >>> stepper = pp.utils.ReduceToBason(steps=15, verbose=True)
         >>> cartPoleSolver = CartPole(dt, len, m_cart, m_pole, g).to(device)
-        >>> MPC = pp.module.MPC(cartPoleSolver, T, step=15).to(device)
-        >>> x, u, cost = MPC(Q, p, x_init, dt, current_u)
+        >>> MPC = pp.module.MPC(cartPoleSolver, Q, p, T, stepper=stepper).to(device)
+        >>> x, u, cost = MPC(dt, x_init, u_init=current_u)
         >>> print("x = ", x)
         >>> print("u = ", u)
         x =  tensor([[[ 0.0000e+00,  0.0000e+00,  3.1416e+00,  0.0000e+00],
