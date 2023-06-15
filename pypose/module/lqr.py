@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from .. import bmv, bvmv
-
+from torch.linalg import vecdot
 
 class LQR(nn.Module):
     r'''
@@ -218,7 +218,7 @@ class LQR(nn.Module):
         >>> c1 = torch.tile(torch.randn(n_state), (n_batch, 1))
         >>> c2 = torch.tile(torch.zeros(n_state), (n_batch, 1))
         >>> x_init = torch.randn(n_batch, n_state)
-        >>> current_u = torch.zeros(n_batch, T, n_ctrl, device=device)
+        >>> u_traj = torch.zeros(n_batch, T, n_ctrl, device=device)
         >>> lti = pp.module.LTI(A, B, C, D, c1, c2)
         >>> dt = 1
         >>> LQR = pp.module.LQR(lti, Q, p, T)
@@ -252,8 +252,8 @@ class LQR(nn.Module):
         super().__init__()
         self.system = system
         self.Q, self.p, self.T = Q, p, T
-        self.current_x = None
-        self.current_u = None
+        self.x_traj = None
+        self.u_traj = None
 
         if self.Q.ndim == 3:
             self.Q = torch.tile(self.Q.unsqueeze(-3), (1, self.T, 1, 1))
@@ -270,7 +270,7 @@ class LQR(nn.Module):
         assert self.Q.dtype == self.p.dtype, "Tensor data type not compatible."
         self.dargs = {'dtype': self.p.dtype, 'device': self.p.device}
 
-    def forward(self, x_init, dt=1, current_x=None, current_u=None):
+    def forward(self, x_init, dt=1, u_traj=None):
         r'''
         Performs LQR for the discrete system.
 
@@ -278,51 +278,48 @@ class LQR(nn.Module):
             x_init (:obj:`Tensor`): The initial state of the system.
             dt (:obj:`int`): The interval (:math:`\delta t`) between two time steps.
                 Default: `1`.
-            current_x (:obj:`Tensor`, optinal): The current states of the system along a
+            x_traj (:obj:`Tensor`, optinal): The current states of the system along a
                 trajectory. Default: ``None``.
-            current_u (:obj:`Tensor`, optinal): The current inputs of the system along a
+            u_traj (:obj:`Tensor`, optinal): The current inputs of the system along a
                 trajectory. Default: ``None``.
 
         Returns:
             List of :obj:`Tensor`: A list of tensors including the solved state sequence
-            :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the associated
+            :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and theassociated
             quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
-        K, k = self.lqr_backward(x_init, dt, current_x, current_u)
+        K, k = self.lqr_backward(x_init, dt, u_traj)
         x, u, cost = self.lqr_forward(x_init, K, k)
 
         return x, u, cost
 
-    def lqr_backward(self, x_init, dt, current_x, current_u):
+    def lqr_backward(self, x_init, dt, u_traj=None):
 
         ns, nsc = x_init.size(-1), self.p.size(-1)
         nc = nsc - ns
 
-        if current_u is None:
-            current_u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
+        if u_traj is None:
+            self.u_traj = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
+        else:
+            self.u_traj = u_traj
 
-        if current_x is None:
-            current_x = torch.zeros(self.n_batch + (self.T, ns), **self.dargs)
-            current_x[...,0,:] = x_init
-            current_xt = x_init
-            for i in range(self.T-1):
-                current_x[...,i+1,:] = current_xt = self.system(current_xt, current_u[...,i,:])[0]
-
-        self.current_x = current_x
-        self.current_u = current_u
+        self.x_traj = x_init.unsqueeze(-2).repeat((1, self.T, 1))
+        for i in range(self.T-1):
+            self.x_traj[...,i+1,:], _ = self.system(self.x_traj[...,i,:].clone(), self.u_traj[...,i,:])
 
         K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
 
-        current_xut = torch.cat((current_x[...,:self.T,:], current_u), dim=-1)
-        p = bmv(self.Q, current_xut) + self.p
+        xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
+        p = bmv(self.Q, xut) + self.p
 
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
                 Qt = self.Q[...,t,:,:]
                 qt = p[...,t,:]
             else:
-                self.system.set_refpoint(state=current_x[...,t,:], input=current_u[...,t,:],
+                self.system.set_refpoint(state=self.x_traj[...,t,:],
+                                         input=self.u_traj[...,t,:],
                                          t=torch.tensor(t*dt))
                 A = self.system.A.squeeze(-2)
                 B = self.system.B.squeeze(-1)
@@ -348,22 +345,21 @@ class LQR(nn.Module):
         assert x_init.dtype == K.dtype == k.dtype
         assert x_init.ndim == 2, "Shape not compatible."
 
-        ns, nc = self.current_x.size(-1), self.current_u.size(-1)
+        ns, nc = self.x_traj.size(-1), self.u_traj.size(-1)
 
         u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
         delta_u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
         cost = torch.zeros(self.n_batch, **self.dargs)
         x = torch.zeros(self.n_batch + (self.T+1, ns), **self.dargs)
-        x[..., 0, :] = x_init
-        xt = x_init
+        xt = x[..., 0, :] = x_init
 
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]
-            delta_xt = xt - self.current_x[...,t,:]
+            delta_xt = xt - self.x_traj[...,t,:]
             delta_u[..., t, :] = bmv(Kt, delta_xt) + kt
-            u[...,t,:] = ut = delta_u[..., t, :] + self.current_u[...,t,:]
+            u[...,t,:] = ut = delta_u[..., t, :] + self.u_traj[...,t,:]
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
-            cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
+            cost += 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + vecdot(xut, self.p[...,t,:])
 
         return x, u, cost

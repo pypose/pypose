@@ -41,7 +41,7 @@ class TrainMPC:
         c1 = torch.zeros(n_state, device=device)
         c2 = torch.zeros(n_state, device=device)
         dt = 1
-        stepper = pp.utils.ReduceToBason(steps=0, verbose=True)
+        stepper = pp.utils.ReduceToBason(steps=1, verbose=False)
 
         expert = dict(
             Q = torch.tile(torch.eye(n_sc, device=device), (n_batch, T, 1, 1)),
