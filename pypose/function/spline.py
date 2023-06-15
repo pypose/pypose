@@ -2,17 +2,18 @@ import torch
 from . import is_SE3
 
 
-def CSplineR3(points, steps=0.1):
+def chspline(points, interval=0.1):
     r"""
-    Cubic Hermite Spline in R3
+    Cubic Hermite Spline, a piecewise-cubic interpolator matching values and first
+    derivatives.
 
     Args:
-        points (:obj:`Tensor`): the sparse points for interpolation with
-            [batch_size, point_num, 3] shape.
-        steps (:obj:`Float`): the step between adjacant interpolation points.
+        points (:obj:`Tensor`): the sequence of points for interpolation with shape
+            [..., point_num, dim].
+        interval (:obj:`Float`): the interval between adjacant interpolation points.
 
     Returns:
-       ``Tensor``: the interpolated points with [batch_size, inter_points_num, 3] shape.
+       ``Tensor``: the interpolated points with [..., inter_points_num, dim] shape.
 
     On the unit interval [0, 1], given a starting point :math:`p_0` at :math:`t = 0` and
     an ending point :math:`p_1` at :math:`t = 1` with starting tangent :math:`m_0` at
@@ -61,30 +62,30 @@ def CSplineR3(points, steps=0.1):
 
         Fig. 1. Result of Cubic Spline Interpolation in R3.
     """
-    batch_size, num_p, _ = points.shape
-    xs = torch.arange(0, num_p-1+steps, steps, device=points.device)
-    xs = xs.repeat(batch_size, 1)
-    x  = torch.arange(num_p, device=points.device, dtype=points.dtype)
-    x  = x.repeat(batch_size, 1)
+    assert points.dim() >= 2, 'Dimension of points should be [..., N, C]'
+    batch, N = points.shape[:-2], points.shape[-2]
+    dargs = {'device': points.device, 'dtype': points.dtype}
+    xs = torch.arange(0, N-1+interval, interval, **dargs).expand(batch+(-1,))
+    x  = torch.arange(N, **dargs).expand(batch+(-1,))
     m = (points[..., 1:, :] - points[..., :-1, :])
-    m /= (x[..., 1:] - x[..., :-1]).unsqueeze(2)
-    m = torch.cat([m[...,[0],:], (m[..., 1:,:] + m[..., :-1,:]) / 2, m[...,[-1],:]], 1)
+    m /= (x[..., 1:] - x[..., :-1])[..., None]
+    m = torch.cat([m[...,[0],:], (m[..., 1:,:] + m[..., :-1,:]) / 2, m[...,[-1],:]], -2)
     idxs = torch.searchsorted(x[0, 1:], xs[0, :])
     dx = x[..., idxs + 1] - x[..., idxs]
-    t = (xs - x[:, idxs]) / dx
-    alpha = torch.arange(4, device=t.device, dtype=t.dtype)
-    tt = t[:, None, :]**alpha[None, :, None]
+    t = (xs - x[..., idxs]) / dx
+    alpha = torch.arange(4, **dargs)
+    tt = t[..., None, :]**alpha[..., None]
     A = torch.tensor([[1, 0, -3, 2],
                       [0, 1, -2, 1],
                       [0, 0, 3, -2],
-                      [0, 0, -1, 1]], dtype=t.dtype, device=t.device)
-    hh = A@tt
-    hh = torch.transpose(hh, 1, 2)
-    interpoints = hh[..., 0:1] * points[..., idxs, :]
-    interpoints = interpoints + hh[..., 1:2] * m[..., idxs, :] * dx[..., None]
-    interpoints = interpoints + hh[..., 2:3] * points[:, idxs + 1, :]
-    interpoints = interpoints + hh[..., 3:4] * m[..., idxs + 1, :] * dx[..., None]
+                      [0, 0, -1, 1]], **dargs)
+    hh = (A @ tt).mT
+    interpoints = hh[..., :1] * points[..., idxs, :]
+    interpoints += hh[..., 1:2] * m[..., idxs, :] * dx[..., None]
+    interpoints += hh[..., 2:3] * points[..., idxs + 1, :]
+    interpoints += hh[..., 3:4] * m[..., idxs + 1, :] * dx[..., None]
     return interpoints
+
 
 def BSplineSE3(input_poses, time):
     r'''

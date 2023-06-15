@@ -51,6 +51,6 @@ if __name__=="__main__":
     xrange = [0., 5.]
     yrange = [0., 1.5]
     zrange = [0., 1.]
-    waypoints = pp.CSplineR3(points)
+    waypoints = pp.chspline(points, interval=10)
     plot_result(waypoints, xrange, yrange, zrange,
                 oripoints=points, show=args.show, save=args.save)

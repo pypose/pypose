@@ -54,5 +54,5 @@ Functions
     reprojerr
     knn
     svdtf
-    CSplineR3
+    chspline
     BSplineSE3
