@@ -14,6 +14,8 @@ from bs4 import BeautifulSoup
 import pypose as pp
 import torch
 
+__ALL__ = ['build_pipeline', 'read_bal_data', 'DATA_URL', 'ALL_DATASETS']
+
 DATA_URL = 'https://grail.cs.washington.edu/projects/bal/'
 ALL_DATASETS = ['ladybug', 'trafalgar', 'dubrovnik', 'venice', 'final']
 
@@ -150,6 +152,7 @@ def build_pipeline(dataset='ladybug'):
     bal_data_dp = download_dp.map(read_bal_data)
     return bal_data_dp
 
-dp = build_pipeline()
-for i in dp:
-    print(i)
+if __name__ == '__main__':
+    dp = build_pipeline()
+    for i in dp:
+        print(i)
