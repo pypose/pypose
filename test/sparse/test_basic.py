@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 import torch
+from torch import tensor
 import pypose as pp
 from pypose.sparse import sparse_block_tensor, coo_2_hybrid, hybrid_2_coo, SparseBlockTensor
 import pypose.sparse as sp
@@ -27,6 +28,45 @@ def test_sparse_coo_2_sparse_hybrid_coo():
     print(f'x._p = \n{x._p}')
 
 
+def test_torch_empty_mul():
+    # required. used to check torch's behavior
+    s1 = torch.sparse_coo_tensor(
+            indices=tensor([]).reshape((2, 0)),
+            values=tensor([]).reshape((0, 1, 7)),
+            size=(4, 1, 1, 7)).coalesce()
+
+    s2 = torch.sparse_coo_tensor(
+        indices=tensor([[0, 1, 3],
+                        [0, 0, 0]]),
+        values=tensor([[[0., 0., 0., 0., 0., 0., 0.]],
+                       [[0., 0., 0., 0., 0., 0., 0.]],
+                       [[0., 0., 0., 0., 0., 0., 0.]]]),
+        size=(4, 1, 1, 7)).coalesce()
+
+    res = s1 * s2
+    assert s1.sparse_dim() == 2
+    assert s1.dense_dim() == 2
+    assert s2.sparse_dim() == 2
+    assert s2.dense_dim() == 2
+
+    assert res.shape == ((4, 1, 1, 7))
+    assert res.sparse_dim() == 4
+    assert res.dense_dim() == 0
+
+    sbt1 = sparse_block_tensor(
+        indices=s1.indices(),
+        values=s1.values(),
+        size=s1.shape[:s1.sparse_dim()],)
+
+    sbt2 = sparse_block_tensor(
+        indices=s2.indices(),
+        values=s2.values(),
+        size=s2.shape[:s2.sparse_dim()],)
+
+    res = sbt1 * sbt2
+    assert res._s.shape == torch.Size([4, 1, 1, 7])
+    assert res._p.shape == torch.Size([4, 1])
+
 def random_sbt(proxy_shape, block_shape, dense_zero_prob=0.):
     proxy = torch.randn(proxy_shape) > 0.5
     indices = proxy.nonzero().T  # (dim, nnz)
@@ -35,14 +75,32 @@ def random_sbt(proxy_shape, block_shape, dense_zero_prob=0.):
     return sparse_block_tensor(indices, values, size=proxy_shape)
 
 
-@pytest.mark.parametrize('dense_zero_prob', [0., 0.7])
+@pytest.mark.parametrize('dense_zero_prob', [0., 0.7, 1.0])
 @pytest.mark.parametrize('op,dense_op,type_operands,shape_mode,dim', [
     (sp.abs, torch.abs, ['sbt'], 'identical', 2),
     (sp.abs, torch.abs, ['sbt'], 'identical', 3),
     (torch.abs, torch.abs, ['sbt'], 'identical', 2),
     (torch.abs, torch.abs, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.ceil, torch.ceil, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.ceil, torch.ceil, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.asin, torch.asin, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.atan, torch.atan, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.sin, torch.sin, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.tan, torch.tan, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.sinh, torch.sinh, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.tanh, torch.tanh, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.floor, torch.floor, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.floor, torch.floor, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.round, torch.round, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.round, torch.round, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.sqrt, torch.sqrt, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.sqrt, torch.sqrt, ['sbt'], 'identical', 3),
+    (SparseBlockTensor.square, torch.square, ['sbt'], 'identical', 2),
+    (SparseBlockTensor.square, torch.square, ['sbt'], 'identical', 3),
     (SparseBlockTensor.__add__, torch.add, ['sbt', 'sbt'], 'identical', 2),
     (SparseBlockTensor.__add__, torch.add, ['sbt', 'sbt'], 'identical', 3),
+    (SparseBlockTensor.__mul__, torch.mul, ['sbt', 'sbt'], 'identical', 2),
+    (SparseBlockTensor.__mul__, torch.mul, ['sbt', 'sbt'], 'identical', 3),
     (SparseBlockTensor.__sub__, torch.sub, ['sbt', 'sbt'], 'identical', 2),
     (SparseBlockTensor.__sub__, torch.sub, ['sbt', 'sbt'], 'identical', 3),
     (SparseBlockTensor.__matmul__, torch.matmul, ['sbt', 'sbt'], 'mT', 2),
@@ -88,8 +146,22 @@ def test_universal(op, dense_op, type_operands, shape_mode, dim, dense_zero_prob
     y_sbt = op(*args)
     y_dense = dense_op(*args_dense)
 
-    torch.testing.assert_close(hybrid_2_coo(y_sbt._s).to_dense(), y_dense)
+    torch.testing.assert_close(hybrid_2_coo(y_sbt._s).to_dense(), y_dense,equal_nan=True)
 
+def test_div_beh():
+    i = [[0, 0],
+         [0, 1]]
+    v = [[5.7, 5.1],
+         [5.5, 5.0]]
+    s = torch.sparse_coo_tensor(i, v, (1, 2, 2))
+
+    i2 = [[0],
+          [0]]
+    v2 = [[0.1, -0.1]]
+    s2 = torch.sparse_coo_tensor(i2, v2, (1, 2, 2))
+    s*s2
+
+    's.div(s2)'
 
 def test_mm():
     i = [[0, 0, 1, 2], [0, 2, 1, 2]]
