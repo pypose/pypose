@@ -3,6 +3,7 @@ from .lqr import LQR
 import torch.nn as nn
 from ..utils.stepper import ReduceToBason
 
+
 class MPC(nn.Module):
     r'''
     Model Predictive Control (MPC) based on iterative LQR.

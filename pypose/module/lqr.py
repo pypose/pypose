@@ -3,6 +3,7 @@ import torch.nn as nn
 from .. import bmv, bvmv
 from torch.linalg import vecdot
 
+
 class LQR(nn.Module):
     r'''
     Linear Quadratic Regulator (LQR) with Dynamic Programming.

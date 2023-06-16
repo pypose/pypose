@@ -44,9 +44,9 @@ class TrainMPC:
         stepper = pp.utils.ReduceToBason(steps=1, verbose=False)
 
         expert = dict(
-            Q = torch.tile(torch.eye(n_sc, device=device), (n_batch, T, 1, 1)),
-            p = torch.tile(torch.tensor([ 0.6336, -0.2203, -0.1395, -0.7664,  0.8874,  0.8153], \
-                                        device=device), (n_batch, T, 1)),
+            Q = torch.eye(n_sc, device=device).tile(n_batch, T, 1, 1),
+            p = torch.tensor([ 0.6336, -0.2203, -0.1395, -0.7664,  0.8874,  0.8153], \
+                                        device=device).tile(n_batch, T, 1),
             A = torch.tensor([[ 1.1267, -0.0441, -0.0279],
                               [-0.1533,  1.1775,  0.1631],
                               [ 0.1618,  0.1238,  0.9489]], device=device),
@@ -75,7 +75,7 @@ class TrainMPC:
         loss_f.flush()
         fname = os.path.join(args.save, 'pypose time.csv')
         time_d = open(fname, 'w')
-        time_d.write('backward_time,overall_time\n')
+        time_d.write('backward_time, overall_time\n')
         time_d.flush()
 
         def get_loss(x_init, _A, _B):

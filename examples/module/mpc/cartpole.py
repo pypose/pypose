@@ -7,6 +7,7 @@ import pypose as pp
 import pickle as pkl
 import torch.optim as optim
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_batch', type=int, default=1)
@@ -41,7 +42,7 @@ def main():
             self.cartmass = cartmass
             self.polemass = polemass
             self.gravity = gravity
-            self.polemassLength = self.polemass * self.length
+            self.poleml = self.polemass * self.length
             self.totalMass = self.cartmass + self.polemass
 
         def state_transition(self, state, input, t=None):
@@ -50,16 +51,11 @@ def main():
             costheta = torch.cos(theta)
             sintheta = torch.sin(theta)
 
-            temp = (
-                force + self.polemassLength * thetaDot**2 * sintheta
-            ) / self.totalMass
-            thetaAcc = (self.gravity * sintheta - costheta * temp) / (
-                self.length * (4.0 / 3.0 - self.polemass * costheta**2 / self.totalMass)
-            )
-            xAcc = temp - self.polemassLength * thetaAcc * costheta / self.totalMass
-
+            temp = (force + self.poleml * thetaDot**2 * sintheta) / self.totalMass
+            thetaAcc = (self.gravity * sintheta - costheta * temp) / \
+                (self.length * (4.0 / 3.0 - self.polemass * costheta**2 / self.totalMass))
+            xAcc = temp - self.poleml * thetaAcc * costheta / self.totalMass
             _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
-
             return (state.squeeze() + torch.mul(_dstate, self.tau)).unsqueeze(0)
 
         def observation(self, state, input, t=None):
@@ -68,7 +64,7 @@ def main():
     dt = 0.01
     g = 9.81
     time  = torch.arange(0, T, device=device) * dt
-    stepper = pp.utils.ReduceToBason(steps=15, verbose=True)
+    stepper = pp.utils.ReduceToBason(steps=15, verbose=False)
 
     expert = dict(
         Q = torch.tile(torch.eye(n_state + n_ctrl, device=device), (n_batch, T, 1, 1)),
@@ -89,7 +85,6 @@ def main():
 
     torch.manual_seed(args.seed)
     len = torch.tensor(2.0).to(device).requires_grad_()
-    #m_cart = torch.tensor(20.1).to(device).requires_grad_()
     m_pole = torch.tensor(11.1).to(device).requires_grad_()
 
     fname = os.path.join(args.save, 'cartpole losses.csv')
@@ -99,12 +94,12 @@ def main():
 
     def get_loss(x_init, _len, _m_pole):
 
-        expert_cartPoleSolver = CartPole(dt, expert['len'], expert['m_cart'], expert['m_pole'], g).to(device)
-        mpc_expert = pp.module.MPC(expert_cartPoleSolver, expert['Q'], expert['p'], T, stepper=stepper).to(device)
+        expert_solver = CartPole(dt, expert['len'], expert['m_cart'], expert['m_pole'], g).to(device)
+        mpc_expert = pp.module.MPC(expert_solver, expert['Q'], expert['p'], T, stepper=stepper).to(device)
         x_true, u_true, cost_true = mpc_expert(dt, x_init, u_init=current_u)
 
-        agent_cartPoleSolver = CartPole(dt, _len, expert['m_cart'], _m_pole, g).to(device)
-        mpc_agent = pp.module.MPC(agent_cartPoleSolver, expert['Q'], expert['p'], T, stepper=stepper).to(device)
+        agent_solver = CartPole(dt, _len, expert['m_cart'], _m_pole, g).to(device)
+        mpc_agent = pp.module.MPC(agent_solver, expert['Q'], expert['p'], T, stepper=stepper).to(device)
         x_pred, u_pred, cost_pred = mpc_agent(dt, x_init, u_init=current_u)
 
         traj_loss = torch.mean((u_true - u_pred)**2) \
@@ -132,8 +127,6 @@ def main():
             os.system('./plot.py "{}" &'.format(args.save))
             print("Length of pole of the agent system = ", len)
             print("Length of pole of the expert system = ", expert['len'])
-            #print("Mass of cart of the agent system = ", m_cart)
-            #print("Mass of cart of the expert system = ", expert['m_cart'])
             print("Mass of pole of the agent system = ", m_pole)
             print("Mass of pole of the expert system = ", expert['m_pole'])
             print('{:04d}: traj_loss: {:.8f} model_loss: {:.8f}'.format(
