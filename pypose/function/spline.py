@@ -178,18 +178,17 @@ def bspline(data, time):
         Fig. 1. Result of B Spline Interpolation in SE3.
     '''
     assert is_SE3(data), "The input poses are not SE3Type."
-    assert time.shape[0]==time.shape[1]==1, "The time has wrong shape."
     data = torch.cat((data[..., :1, :], data, data[..., -1:, :]), dim=-2)
-    K, N = time.shape[-1], data.shape[-2]
+    Bth, N, D, K = data.shape[:-2], data.shape[-2], data.shape[-1], time.shape[-1]
     dargs = {'dtype': time.dtype, 'device': time.device}
-    alpha = torch.arange(4, **dargs).view(-1, 1)
-    tt = time ** alpha
+    tt = time ** torch.arange(4, **dargs).view(-1, 1)
     B = torch.tensor([[5, 3,-3, 1],
                       [1, 3, 3,-2],
                       [0, 0, 0, 1]], **dargs) / 6
-    T_delta = data[..., 0:-3, :].unsqueeze(2).repeat(1, 1, K, 1)
+    dP = data[..., 0:-3, :].unsqueeze(-2)
     w = (B @ tt).unsqueeze(-1)
-    P = torch.stack([data[..., i:i + 4, :] for i in range(N - 3)], dim=1).unsqueeze(-2)
+    index = (torch.arange(0, N-3).unsqueeze(-1) + torch.arange(0, 4)).view(-1)
+    P = data[..., index, :].view(Bth + (N-3, 4, 1, D))
     A = ((P[..., :3,:, :].Inv() * P[..., 1:,:,:]).Log() * w).Exp()
     A = A[...,0,:,:] * A[...,1,:,:] * A[...,2,:,:]
-    return (T_delta * A).view((-1, K * (N - 3), 7))
+    return (dP * A).view(Bth + (K * (N - 3), D))

@@ -37,7 +37,7 @@ def plot_result(wayposes, xrange, yrange, zrange, k = 0,
         ax2.scatter(oriposes[k, :, 0], oriposes[k, :, 1], oriposes[k, :, 2],
                     c="r", marker="*", linewidth=3.0)
     if save is not None:
-        file_path = os.path.join(save, 'BsplineSE3.png')
+        file_path = os.path.join(save, 'Bspline.png')
         plt.savefig(file_path)
         print("Save to", file_path)
     if show:
@@ -56,7 +56,7 @@ if __name__=="__main__":
     print(args)
     angle1 = pp.euler2SO3(torch.Tensor([0., 0., 0.]))
     angle2 = pp.euler2SO3(torch.Tensor([torch.pi / 4., torch.pi / 3., torch.pi / 2.]))
-    time = torch.arange(0, 1, 0.25).reshape(1, 1, -1)
+    time = torch.arange(0, 1, 0.25)#.reshape(1, 1, -1)
     poses = pp.LieTensor([[[0., 4., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
                            [0., 3., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
                            [0., 2., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
