@@ -6,8 +6,8 @@ import argparse
 import pypose as pp
 import pickle as pkl
 import torch.optim as optim
+from pypose.module.ipddp import IPDDP
 from tests.module.test_ipddp import InvPend
-from pypose.module.ipddp import ddpOptimizer
 
 def main():
     torch.set_default_dtype(torch.float64)
@@ -53,15 +53,13 @@ def main():
     c = torch.tile(torch.zeros(1, device=device), (n_batch, T))
 
     # Create constraint object
-    gx = torch.tile(torch.zeros( 2*nc, ns), (n_batch, T, 1, 1))
-    gu = torch.tile(torch.vstack( (torch.eye(nc, nc), - torch.eye(nc, nc)) ), (n_batch, T, 1, 1))
-    g = torch.tile(torch.hstack( (-0.25 * torch.ones(nc), -0.25 * torch.ones(nc)) ), (n_batch, T, 1))
+    gx = torch.tile(torch.zeros(2*nc, ns, device=device), (n_batch, T, 1, 1))
+    gu = torch.tile(torch.vstack((torch.eye(nc, nc, device=device), - torch.eye(nc, nc, device=device)) ), (n_batch, T, 1, 1))
+    g = torch.tile(torch.hstack((-0.25 * torch.ones(nc, device=device), -0.25 * torch.ones(nc, device=device)) ), (n_batch, T, 1))
     batch_lincon = pp.module.LinCon(gx, gu, g)
 
 
     expert = dict(
-        # Q = torch.tile(dt*torch.eye(ns+nc), (n_batch, T, 1, 1)).to(device),
-        # p = torch.tile(torch.randn(ns+nc), (n_batch, T, 1)).to(device),
         param = torch.Tensor([10.0]).to(device)
     )
     fname = os.path.join(args.save, 'expert.pkl')
@@ -71,7 +69,6 @@ def main():
     torch.manual_seed(args.seed)
     param = torch.Tensor([8.0]).to(device).requires_grad_()
 
-    # state = torch.tensor([[-1., 0.]])
     state_all =      torch.zeros(n_batch, T+1,  ns)
     input_all = 0.02*torch.ones(n_batch,    T,  nc)
     state_all[...,0,:] = state
@@ -93,20 +90,19 @@ def main():
         sys_ = InvPend(dt, length=_param)
         _ipddp_list = [None for batch_id in range(n_batch)]
         _fp_best_list = [None for batch_id in range(n_batch)]
-        # batch_ddpgrad = ddpGrad(sys_, batch_lincon)
-        for batch_id in range(n_batch):
+        for batch_id in range(n_batch): # solved separated
             stage_cost = pp.module.QuadCost(Q[batch_id:batch_id+1], R[batch_id:batch_id+1], S[batch_id:batch_id+1], c[batch_id:batch_id+1])
             terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
             lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
             init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1],
                                 'input': init_traj['input'][batch_id:batch_id+1]}
-            _ipddp_list[batch_id] = ddpOptimizer(sys_, stage_cost, terminal_cost, lincon,
+            _ipddp_list[batch_id] = IPDDP(sys_, stage_cost, terminal_cost, lincon,
                                     gx.shape[-2], init_traj_sample)
             # detached version to solve the best traj
             with torch.no_grad():
-                _fp_best_list[batch_id] = _ipddp_list[batch_id].optimizer()
+                _fp_best_list[batch_id] = _ipddp_list[batch_id].solver()
 
-        x_pred, u_pred, _ = _ipddp_list[0].forward(_fp_best_list) # call any one class instantiation to perform batch grad computation
+        x_pred, u_pred, _ = _ipddp_list[0].forward(_fp_best_list) # call any one class instantiation, but perform batch grad computation
         print('x_pred solved')
         sys = InvPend(dt, length=expert['param'])
         ipddp_list = [None for batch_id in range(n_batch)]
@@ -117,9 +113,9 @@ def main():
             lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
             init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1],
                                 'input': init_traj['input'][batch_id:batch_id+1]}
-            ipddp_list[batch_id] = ddpOptimizer(sys, stage_cost, terminal_cost, lincon,
+            ipddp_list[batch_id] = IPDDP(sys, stage_cost, terminal_cost, lincon,
                                     gx.shape[-2], init_traj_sample)
-            fp_list[batch_id] = ipddp_list[batch_id].optimizer()
+            fp_list[batch_id] = ipddp_list[batch_id].solver()
         x_true, u_true = torch.cat([fp_list[batch_id].x for batch_id in range(n_batch)],dim=0), \
                          torch.cat([fp_list[batch_id].u for batch_id in range(n_batch)],dim=0)
         print('x_true solved')
@@ -128,7 +124,6 @@ def main():
                     torch.mean((x_true - x_pred)**2))
         return traj_loss
 
-    # opt = optim.RMSprop([param], lr=1e-2)
     opt = optim.SGD([param], lr=2e-1)
 
     for i in range(50):

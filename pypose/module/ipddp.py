@@ -3,7 +3,7 @@ import torch as torch
 import torch.nn as nn
 from .. import bmv, bvmv, btdot
 
-class ddpOptimizer(nn.Module):
+class IPDDP(nn.Module):
     r'''
     Interior-point differential dynamic programming.
 
@@ -146,12 +146,12 @@ class ddpOptimizer(nn.Module):
         >>> lincon = pp.module.LinCon(gx, gu, g)
         >>>
         >>> traj_opt = [None for batch_id in range(n_batch)]
-        >>> for batch_id in range(n_batch): # use for loop and keep the ddpOptimizer
+        >>> for batch_id in range(n_batch): # use for loop and keep the IPDDP
         >>>     stage_cost = pp.module.QuadCost(Q[batch_id:batch_id+1], R[batch_id:batch_id+1], S[batch_id:batch_id+1], c[batch_id:batch_id+1])
         >>>     terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
         >>>     lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
         >>>     init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1], 'input': init_traj['input'][batch_id:batch_id+1]}
-        >>>     solver = ddpOptimizer(sys, stage_cost, terminal_cost, lincon, gx.shape[-2], init_traj_sample)
+        >>>     solver = IPDDP(sys, stage_cost, terminal_cost, lincon, gx.shape[-2], init_traj_sample)
         >>>     traj_opt[batch_id] = solver.optimizer()
 
     '''
@@ -174,9 +174,10 @@ class ddpOptimizer(nn.Module):
 
         # quantities in forward pass
         self.c = torch.zeros(B + (self.T, ncons))
-        self.y = 0.01 * torch.ones(B + (self.T, ncons))
-        self.s = 0.1 * torch.ones(B + (self.T, ncons))
-        # self.mu = self.y * self.s
+        self.s = 0.1 * torch.ones(B + (self.T, ncons)) # dual variable for inequality constraint c
+        self.y = 0.01 * torch.ones(B + (self.T, ncons)) # slack variable for infeasible case
+
+        # -------- derivatives --------------------------
         # terms related with system dynamics
         self.fx = torch.zeros(B + (self.T, ns, ns))
         self.fu = torch.zeros(B + (self.T, ns, nc))
@@ -195,12 +196,13 @@ class ddpOptimizer(nn.Module):
         # terms related with constraint
         self.cx = torch.zeros(B + (self.T, ncons, ns))
         self.cu = torch.zeros(B + (self.T, ncons, nc))
+        # -----------------------------------------------
 
         self.filter = torch.Tensor([[torch.inf], [0.]])
         self.err, self.cost, self.logcost = torch.zeros(B), torch.zeros(B), torch.zeros(B)
         self.step, self.fp_failed, self.stepsize, self.reg_exp_base = 0, False, 1.0, 1.6
 
-        # quantities used in backward
+        # quantities used in backwardpass
         self.ky = torch.zeros(B + (self.T, ncons))
         self.Ky = torch.zeros(B + (self.T, ncons, ns))
         self.ks = torch.zeros(B + (self.T, ncons))
@@ -209,7 +211,7 @@ class ddpOptimizer(nn.Module):
         self.Ku = torch.zeros(B + (self.T, nc, ns))
         self.opterr, self.reg, self.bp_failed, self.recovery = 0., 0., False, 0
 
-    def computeall(self): #todo merge this
+    def getDerivatives(self):
         self.p_fn.set_refpoint(self.x[...,-1,:], self.u[...,-1,:])
         self.px = self.p_fn.cx
         self.pxx = self.p_fn.cxx.squeeze(0).squeeze(1)
@@ -252,7 +254,7 @@ class ddpOptimizer(nn.Module):
             self.logcost = self.cost - self.mu * (-self.c).log().sum(-1).sum(-1)
             self.err = torch.zeros(self.x.shape[:-2])
 
-        self.filter = torch.stack((self.logcost, self.err), dim=-1).unsqueeze(-2) #todo:check
+        self.filter = torch.stack((self.logcost, self.err), dim=-1).unsqueeze(-2)
         self.step = 0
         self.failed = False
 
@@ -262,14 +264,14 @@ class ddpOptimizer(nn.Module):
         '''
         B = self.x.shape[:-2]
         if lastIterFlag:
-            B = self.p.shape[:-2]
+            B = self.p.shape[:-2] # redefine B as last iteration consider batched version
             ns, nc = self.Qx_terminal.size(-1), self.F.size(-1) - self.Qx_terminal.size(-1)
             self.Ku = torch.zeros(B + (self.T, nc, ns), dtype=self.p.dtype, device=self.p.device)
             self.ku = torch.zeros(B + (self.T, nc), dtype=self.p.dtype, device=self.p.device)
 
         ns = self.x.shape[-1]
         if not lastIterFlag:
-            c_err, mu_err, qu_err = torch.zeros(B), torch.zeros(B), torch.zeros(B)
+            c_err, r_err, qu_err = torch.zeros(B), torch.zeros(B), torch.zeros(B)
 
             # set regularization parameter
             if (self.fp_failed or self.bp_failed):
@@ -288,21 +290,22 @@ class ddpOptimizer(nn.Module):
 
             # recompute the first, second derivatives of the updated trajectory
             if not self.fp_failed:
-                self.computeall()
+                self.getDerivatives()
 
-            # backward recursions, similar to iLQR backward recursion, but more variables involved
             V, v = self.pxx, self.px
         else:
             V, v = self.Qxx_terminal, self.Qx_terminal
 
+        # --------- backward recursions ---------------------------
+        # similar to iLQR backward recursion, but more variables involved
         for t in range(self.T-1, -1, -1):
             Ft = self.F[...,t,:,:]
             Qt = self.Q[...,t,:,:] + Ft.mT @ V @ Ft
             qt = self.p[...,t,:] + bmv(Ft.mT, v)
             if self.contraction_flag:
-                Qt += btdot(v, self.G[...,t,:,:,:]) # todo :check!!!!
+                Qt += btdot(v, self.G[...,t,:,:,:]) # terms related to 2nd-order derivatives of dynamics
             if self.constraint_flag:
-                qt += bmv(self.W[...,t,:,:].mT, self.s[...,t,:])
+                qt += bmv(self.W[...,t,:,:].mT, self.s[...,t,:]) # terms related to 2nd-order derivatives of constraints
 
             if (self.infeas): #  start from infeasible/feasible trajs.
                 Wt = self.W[...,t,:,:]
@@ -318,7 +321,7 @@ class ddpOptimizer(nn.Module):
                 Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(self.reg_exp_base, self.reg) - 1.)
 
                 try:
-                    lltofQuuReg = torch.linalg.cholesky(Quu_reg) # compute the Cholesky decomposition
+                    lltofQuuReg = torch.linalg.cholesky(Quu_reg)
                 except:
                     self.bp_failed, self.opterr = True, torch.inf
 
@@ -343,9 +346,9 @@ class ddpOptimizer(nn.Module):
                 qx, qu = qt[...,:ns], qt[..., ns:]
 
                 if not lastIterFlag:
-                    Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(self.reg_exp_base, self.reg) - 1.) #todo:check
-                    try: #todo check batch output?
-                        lltofQuuReg = torch.linalg.cholesky(Quu_reg) # compute the Cholesky decomposition
+                    Quu_reg = Quu + self.Q[...,t,ns:,ns:] * (pow(self.reg_exp_base, self.reg) - 1.)
+                    try:
+                        lltofQuuReg = torch.linalg.cholesky(Quu_reg)
                     except:
                         self.bp_failed, self.opterr = True, torch.inf
                 else:
@@ -359,7 +362,7 @@ class ddpOptimizer(nn.Module):
                     cx, cu = Wt[...,:ns], Wt[...,ns:]
                     self.ks[...,t,:] = - cinv * (r + st * bmv(cu, kut))
                     self.Ks[...,t,:,:] = - SCinv @ (cx + cu @ Kut)
-                    self.ky[...,t,:] = torch.zeros(ct.shape[-1]) # omitted
+                    self.ky[...,t,:] = torch.zeros(ct.shape[-1]) # dummy as zero
                     self.Ky[...,t,:,:] = torch.zeros(ct.shape[-1], ns)
 
             V = Qxx + Qxu @ Kut + Kut.mT @ Qux + Kut.mT @ Quu @ Kut
@@ -367,11 +370,11 @@ class ddpOptimizer(nn.Module):
 
             if not lastIterFlag:
                 qu_err = torch.maximum(qu_err, torch.linalg.vector_norm(qu, float('inf'), dim=-1)  )
-                mu_err = torch.maximum(mu_err, torch.linalg.vector_norm(r,  float('inf'), dim=-1)  )
+                r_err = torch.maximum(r_err, torch.linalg.vector_norm(r,  float('inf'), dim=-1)  )
                 if (self.infeas):
-                    c_err=torch.maximum(c_err, torch.linalg.vector_norm(ct+yt, float('inf'), dim=-1) )
+                    c_err=torch.maximum(c_err, torch.linalg.vector_norm(ct + yt, float('inf'), dim=-1) )
         if not lastIterFlag:
-            self.bp_failed, self.opterr = False, torch.maximum(torch.maximum(qu_err, c_err), mu_err)
+            self.bp_failed, self.opterr = False, torch.maximum(torch.maximum(qu_err, c_err), r_err)
 
     def forwardpasscompact(self, lastIterFlag=False):
         r'''
@@ -407,16 +410,14 @@ class ddpOptimizer(nn.Module):
                     unew[...,t,:] = unewt = uold[...,t,:] + stepsize * kut + bmv(Kut, xnewt - xold[...,t,:])
                     xnew[...,t+1,:] = xnewt = self.f_fn(xnewt, unewt)[0]
             else:
-                for t in range(self.T): # forward recuisions
+                for t in range(self.T): # forward recursions
                     Kut, kut = self.Ku[...,t,:,:], self.ku[...,t,:]
                     unew[...,t,:] = unewt = uold[...,t,:] + stepsize * kut + bmv(Kut, xnewt - xold[...,t,:])
-                    if not lastIterFlag:
+                    if not lastIterFlag: # check feasibility of forward recursions
                         Kst, kst = self.Ks[...,t,:,:], self.ks[...,t,:]
                         snew[...,t,:] = snewt = sold[...,t,:] + stepsize * kst + bmv(Kst, xnewt - xold[...,t,:])
                         cnew[...,t,:] = cnewt = self.c_fn(xnew[...,:-1,:], unew)[...,t,:]
                         if ((cnewt > (1-tau) * cold[...,t,:]).any() or (snewt < (1-tau) * sold[...,t,:]).any()):
-                            # todo: check
-                            # check if the inequality holds, with some thresholds
                             failed = True
                             break
                     xnew[...,t+1,:] = xnewt = self.f_fn(xnewt, unewt)[0]
@@ -434,23 +435,16 @@ class ddpOptimizer(nn.Module):
                     else:
                         logcost = cost - self.mu * (-cnew).log().sum(-1).sum(-1)
                         err = torch.zeros(B)
-                    # step filter
+                    # step filter, ref to R. Fletcher and S. Leyffer, “Nonlinear programming without a penalty function,” Mathematical programming, vol. 91, no. 2, pp. 239–269, 2002.
                     candidate = torch.stack((logcost, err), dim=-1)
                     if torch.any( torch.all(candidate-torch.tile(torch.Tensor([1e-13, 0.]), B + (1,))>=self.filter, -1) ):
-                        # relax a bit for numerical stability, strange
-                        # todo: any for each sample in a batch?
+                        # relax a bit for numerical stability, strange; todo: any for each sample in a batch?
                         failed=True
                         continue
                     else:
                         idx = torch.all(candidate<=self.filter,-1)
-
-                        ### fixed:
-                        # todo: bug here!!!
-                        # wrong: self.filter[torch.logical_not(idx)]
-                        # wrong: self.filter = self.filter[~idx]
-                        # one walkaround: self.filter[idx] = torch.inf
                         self.filter = self.filter[torch.logical_not(idx)]
-                        if self.filter.ndim <= 2:  # todo: change this walkaround
+                        if self.filter.ndim <= 2:
                             self.filter = self.filter.unsqueeze(0)
                         self.filter=torch.cat((self.filter, candidate.unsqueeze(-2)), dim=-2)
                         break
@@ -461,9 +455,9 @@ class ddpOptimizer(nn.Module):
             self.x, self.u, self.y, self.s, self.c = xnew, unew, ynew, snew, cnew
             self.cost, self.err, self.stepsize, self.step, self.failed = cost, err, stepsize, step, False
 
-    def optimizer(self):
+    def solver(self, verbose=False):
         r'''
-        Call forwardpass and backwardpass to solve trajectory
+        Call forwardpass and backwardpass to solve an optimal trajectory for general nonlinear system
         '''
         time_start = time.time()
 
@@ -484,12 +478,13 @@ class ddpOptimizer(nn.Module):
 
             self.forwardpasscompact()
             time_used = time.time() - time_start
-            # if (iter % 5 == 1):
-            #     print('\n')
-            #     print('Iteration','Time','mu','Cost','Opt. error','Reg. power','Stepsize')
-            #     print('\n')
-            # print('%-12d%-12.4g%-12.4g%-12.4g%-12.4g%-12d%-12.3f\n'%(
-            #             iter, time_used, self.mu, self.cost, self.opterr, self.reg, self.stepsize))
+            if verbose:
+                if (iter % 5 == 1):
+                    print('\n')
+                    print('Iteration','Time','mu','Cost','Opt. error','Reg. power','Stepsize')
+                    print('\n')
+                print('%-12d%-12.4g%-12.4g%-12.4g%-12.4g%-12d%-12.3f\n'%(
+                            iter, time_used, self.mu, self.cost, self.opterr, self.reg, self.stepsize))
 
             #-----------termination conditions---------------
             if (max(self.opterr, self.mu)<=self.tol):
@@ -503,15 +498,15 @@ class ddpOptimizer(nn.Module):
 
             if iter == self.maxiter - 1:
                 print("max iter", self.maxiter, "reached, not the optimal one!")
-
+            #-----------------------------------------------
         return self
 
     def forward(self, fp_list):
         r'''
-        Performs IPDDP for the general nonlinear system.
+        Generate the trajectory with computational graph.
 
         Args:
-            fp_list (List of :obj:`Class ddpOptimizer`): The list of ddpOptimizer class instances.
+            fp_list (List of :obj:`Class IPDDP`): The list of IPDDP class instances, each instance is solved from solver.
 
         Returns:
             Tensors (:obj:`Tensor`) including
@@ -520,33 +515,33 @@ class ddpOptimizer(nn.Module):
             :math:`\mathbf{cost}` (:obj:`Tensor`):  The associated costs over the time horizon.
         '''
         with torch.autograd.set_detect_anomaly(True): # for debug
-            self.prepare(fp_list) # collect into batch
+            # collect fp_list into batch
+            n_batch = len(fp_list)
+            with torch.no_grad(): # detach
+                self.c, self.s = torch.cat([fp_list[batch_id].c for batch_id in range(n_batch)],dim=0), \
+                                 torch.cat([fp_list[batch_id].s for batch_id in range(n_batch)],dim=0)
+                self.Qxx_terminal = torch.cat([fp_list[batch_id].pxx for batch_id in range(n_batch)],dim=0)
+                self.Qx_terminal = torch.cat([fp_list[batch_id].px for batch_id in range(n_batch)],dim=0)
+                self.Q = torch.cat([torch.cat( [torch.cat([fp_list[batch_id].qxx,    fp_list[batch_id].qxu],dim=-1),
+                                                torch.cat([fp_list[batch_id].qxu.mT, fp_list[batch_id].quu],dim=-1)], dim=-2)
+                                    for batch_id in range(n_batch)], dim=0)
+                self.p = torch.cat([ torch.cat([fp_list[batch_id].qx, fp_list[batch_id].qu],dim=-1)
+                                                for batch_id in range(n_batch)], dim=0)
+                self.W = torch.cat([ torch.cat([fp_list[batch_id].cx, fp_list[batch_id].cu],dim=-1)
+                                                for batch_id in range(n_batch)], dim=0)
+                self.F = torch.cat([ torch.cat([fp_list[batch_id].fx, fp_list[batch_id].fu],dim=-1)
+                                                for batch_id in range(n_batch)], dim=0)
+                self.G = torch.cat([ torch.cat([torch.cat([fp_list[batch_id].fxx, fp_list[batch_id].fxu],dim=-1),
+                                                torch.cat([fp_list[batch_id].fxu.mT, fp_list[batch_id].fuu],dim=-1)], dim=-2)
+                                    for batch_id in range(n_batch)], dim=0)
+
+                self.T = self.F.size(-3)
+                self.mu = torch.stack([fp_list[batch_id].mu for batch_id in range(n_batch)], dim=0) # use different mu for each sample
+                self.xold = torch.cat([fp_list[batch_id].x for batch_id in range(n_batch)], dim=0)
+                self.uold = torch.cat([fp_list[batch_id].u for batch_id in range(n_batch)], dim=0)
+
+            # run backward and forward once
             self.infeas = False
             self.backwardpasscompact(lastIterFlag=True)
             self.forwardpasscompact(lastIterFlag=True)
         return self.x, self.u, self.cost
-
-    def prepare(self, fp_list):
-        n_batch = len(fp_list)
-        self.c, self.s = torch.cat([fp_list[batch_id].c for batch_id in range(n_batch)],dim=0), \
-                         torch.cat([fp_list[batch_id].s for batch_id in range(n_batch)],dim=0)
-        with torch.no_grad(): # detach
-            self.Qxx_terminal = torch.cat([fp_list[batch_id].pxx for batch_id in range(n_batch)],dim=0)
-            self.Qx_terminal = torch.cat([fp_list[batch_id].px for batch_id in range(n_batch)],dim=0)
-            self.Q = torch.cat([torch.cat( [torch.cat([fp_list[batch_id].qxx,    fp_list[batch_id].qxu],dim=-1),
-                                            torch.cat([fp_list[batch_id].qxu.mT, fp_list[batch_id].quu],dim=-1)], dim=-2)
-                                for batch_id in range(n_batch)], dim=0)
-            self.p = torch.cat([ torch.cat([fp_list[batch_id].qx, fp_list[batch_id].qu],dim=-1)
-                                            for batch_id in range(n_batch)], dim=0)
-            self.W = torch.cat([ torch.cat([fp_list[batch_id].cx, fp_list[batch_id].cu],dim=-1)
-                                            for batch_id in range(n_batch)], dim=0)
-            self.F = torch.cat([ torch.cat([fp_list[batch_id].fx, fp_list[batch_id].fu],dim=-1)
-                                            for batch_id in range(n_batch)], dim=0)
-            self.G = torch.cat([ torch.cat([torch.cat([fp_list[batch_id].fxx, fp_list[batch_id].fxu],dim=-1),
-                                            torch.cat([fp_list[batch_id].fxu.mT, fp_list[batch_id].fuu],dim=-1)], dim=-2)
-                                 for batch_id in range(n_batch)], dim=0)
-
-            self.T = self.F.size(-3)
-            self.mu = torch.stack([fp_list[batch_id].mu for batch_id in range(n_batch)], dim=0) # use different mu for each sample
-            self.xold = torch.cat([fp_list[batch_id].x for batch_id in range(n_batch)], dim=0)
-            self.uold = torch.cat([fp_list[batch_id].u for batch_id in range(n_batch)], dim=0)
