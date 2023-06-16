@@ -27,21 +27,22 @@ class MPC(nn.Module):
         \begin{align*}
           \mathop{\arg\min}\limits_{\mathbf{x}_{1:T}, \mathbf{u}_{1:T}} \sum\limits_t
           &\mathbf{c}_t (\mathbf{x}_t, \mathbf{u}_t) \\
-          \mathrm{s.t.} \quad \mathbf{x}_{t+1} &= \mathbf{f}(\mathbf{x}_t, \mathbf{u}_t), \\
+          \mathrm{s.t.}\quad \mathbf{x}_{t+1} &= \mathbf{f}(\mathbf{x}_t, \mathbf{u}_t),\\
           \mathbf{x}_1 &= \mathbf{x}_{\text{init}} \\
         \end{align*}
 
     where :math:`\mathbf{c}` is the cost function; :math:`\mathbf{x}`, :math:`\mathbf{u}`
-    are the state and input of the linear system; :math:`\mathbf{f}` is the dynamics model;
-    :math:`\mathbf{x}_{\text{init}}` is the initial state of the system.
+    are the state and input of the linear system; :math:`\mathbf{f}` is the dynamics
+    model; :math:`\mathbf{x}_{\text{init}}` is the initial state of the system.
 
     For the linear system with quadratic cost, MPC is equivalent to solving an LQR problem
     on each horizon as well as considering the dynamics as constraints. For nonlinear
     system, one way to solve the MPC problem is to use iterative LQR, which uses linear
     approximations of the dynamics and quadratic approximations of the cost function to
     iteratively compute a local optimal solution based on the current states and control
-    sequences. Then, analytical derivative for the backward can be computed using one additional
-    forward pass of iLQR for the learning problem, such as learning the parameters of the dynamic system.
+    sequences. Then, analytical derivative for the backward can be computed using one
+    additional forward pass of iLQR for the learning problem, such as learning the
+    parameters of the dynamic system.
 
     Specifically, the discrete-time non-linear system can be described as:
 
@@ -51,14 +52,15 @@ class MPC(nn.Module):
             \mathbf{y}_{t} &= \mathbf{g}(\mathbf{x}_t, \mathbf{u}_t, t_t) \\
         \end{aligned}
 
-    We can do a linear approximation at current point :math:`\chi^*=(\mathbf{x}^*, \mathbf{u}^*, t^*)` along a
-    trajectory with small perturbation :math:`\chi=(\mathbf{x}^*+\delta\mathbf{x}, \mathbf{u}^*
-    +\delta\mathbf{u}, t^*)` near :math:`\chi^*` for both dynamics and cost:
+    We can do a linear approximation at current point :math:`\chi^*=(\mathbf{x}^*,
+    \mathbf{u}^*, t^*)` along a trajectory with small perturbation
+    :math:`\chi=(\mathbf{x}^*+\delta\mathbf{x}, \mathbf{u}^* +\delta\mathbf{u}, t^*)`
+    near :math:`\chi^*` for both dynamics and cost:
 
     .. math::
             \begin{aligned}
             \mathbf{f}(\mathbf{x}, \mathbf{u}, t^*) &\approx \mathbf{f}(\mathbf{x}^*,
-                \mathbf{u}^*, t^*) +  \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}}
+                \mathbf{u}^*, t^*) + \left.\frac{\partial \mathbf{f}}{\partial \mathbf{x}}
                 \right|_{\chi^*} \delta \mathbf{x} + \left. \frac{\partial \mathbf{f}}
                 {\partial \mathbf{u}} \right|_{\chi^*} \delta \mathbf{u} \\
             &= \mathbf{f}(\mathbf{x}^*, \mathbf{u}^*, t^*) + \mathbf{A} \delta \mathbf{x}
@@ -67,10 +69,10 @@ class MPC(nn.Module):
                 \delta \mathbf{u}_t \\
             &= \mathbf{F}_t \delta \mathbf{\tau}_t \\
             \mathbf{c} \left( \mathbf{\tau}, t^* \right) &\approx
-                \mathbf{c} \left( \mathbf{\tau}^*, t^* \right) + \frac{1}{2} \delta
-                \mathbf{\tau}^\top \nabla^2_{\mathbf{\tau}} \mathbf{c} \left( \mathbf{\tau}^*,
+                \mathbf{c} \left(\mathbf{\tau}^*, t^* \right) + \frac{1}{2} \delta
+                \mathbf{\tau}^\top\nabla^2_{\mathbf{\tau}}\mathbf{c}\left(\mathbf{\tau}^*,
                 t^* \right) \delta \mathbf{\tau} + \nabla_{\mathbf{\tau}}
-                \mathbf{c} \left( \mathbf{\tau}^*, t^* \right)^\top \delta \mathbf{\tau} \\
+                \mathbf{c} \left( \mathbf{\tau}^*, t^* \right)^\top \delta \mathbf{\tau}\\
             \bar{\mathbf{c}} \left( \delta \mathbf{\tau} \right) &= \frac{1}{2} \delta
                 \mathbf{\tau}_t^\top \bar{\mathbf{Q}}_t \delta \mathbf{\tau}_t +
                 \bar{\mathbf{p}}_t^\top \delta \mathbf{\tau}_t \\
@@ -79,8 +81,9 @@ class MPC(nn.Module):
     where :math:`\mathbf{F}_t` = :math:`\begin{bmatrix}
     \mathbf{A}_t & \mathbf{B}_t \end{bmatrix}`.
 
-    Then, LQR can be performed on a linear quadractic problem with :math:`\delta \mathbf{\tau}_t`, :math:`\mathbf{F}_t`,
-    :math:`\bar{\mathbf{Q}}_t` and :math:`\bar{\mathbf{p}}_t`.
+    Then, LQR can be performed on a linear quadractic problem with
+    :math:`\delta \mathbf{\tau}_t`, :math:`\mathbf{F}_t`, :math:`\bar{\mathbf{Q}}_t` and
+    :math:`\bar{\mathbf{p}}_t`.
 
     - The backward recursion.
 
@@ -91,14 +94,14 @@ class MPC(nn.Module):
                 \mathbf{Q}_t &= \bar{\mathbf{Q}}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}
                                     \mathbf{F}_t \\
                 \mathbf{q}_t &= \bar{\mathbf{p}}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1}  \\
-                \mathbf{K}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}^{-1}
-                                    \mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{x}_t} \\
-                \mathbf{k}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}^{-1}
+                \mathbf{K}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t,\delta \mathbf{u}_t}^{-1}
+                                 \mathbf{Q}_{\delta \mathbf{u}_t,\delta \mathbf{x}_t} \\
+                \mathbf{k}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t,\delta \mathbf{u}_t}^{-1}
                                     \mathbf{q}_{\delta \mathbf{u}_t}         \\
                 \mathbf{V}_t &= \mathbf{Q}_{\delta \mathbf{x}_t, \delta \mathbf{x}_t}
                     + \mathbf{Q}_{\delta \mathbf{x}_t, \delta \mathbf{u}_t}\mathbf{K}_t
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{x}_t}
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\delta\mathbf{u}_t,\delta \mathbf{x}_t}
+                    + \mathbf{K}_t^\top\mathbf{Q}_{\delta\mathbf{u}_t,\delta \mathbf{u}_t}
                         \mathbf{K}_t   \\
                 \mathbf{v}_t &= \mathbf{q}_{\delta \mathbf{x}_t}
                     + \mathbf{Q}_{\delta \mathbf{x}_t, \delta \mathbf{u}_t}\mathbf{k}_t
@@ -126,15 +129,15 @@ class MPC(nn.Module):
     Note:
         The definition of MPC is cited from this book:
 
-        * George Nikolakopoulos, Sina Sharif Mansouri, Christoforos Kanellakis, `Aerial Robotic Workers: Design, Modeling, Control, Vision and Their Applications
-          <https://doi.org/10.1016/C2017-0-02260-7>`_,
-          Butterworth-Heinemann, 2023.
+        * George Nikolakopoulos, Sina Sharif Mansouri, Christoforos Kanellakis, `Aerial
+          Robotic Workers: Design, Modeling, Control, Vision and Their Applications
+          <https://doi.org/10.1016/C2017-0-02260-7>`_, Butterworth-Heinemann, 2023.
 
         The implementation of MPC is based on Eq. (10)~(13) of this paper:
 
         * Amos, Brandon, et al, `Differentiable mpc for end-to-end planning and control
-          <https://proceedings.neurips.cc/paper/2018/hash/ba6d843eb4251a4526ce65d1807a9309-Abstract.html>`_,
-          Advances in neural information processing systems 31, 2018.
+          <https://tinyurl.com/3h9tsuyb>`_, Advances in neural information processing
+          systems, 31, 2018.
 
     Example:
         >>> import torch, pypose as pp
@@ -146,7 +149,7 @@ class MPC(nn.Module):
         ...         self.cartmass = cartmass
         ...         self.polemass = polemass
         ...         self.gravity = gravity
-        ...         self.polemassLength = self.polemass * self.length
+        ...         self.poleml = self.polemass * self.length
         ...         self.totalMass = self.cartmass + self.polemass
         ...
         ...     def state_transition(self, state, input, t=None):
@@ -154,22 +157,17 @@ class MPC(nn.Module):
         ...         force = input.squeeze()
         ...         costheta = torch.cos(theta)
         ...         sintheta = torch.sin(theta)
-        ...
-        ...         temp = (
-        ...             force + self.polemassLength * thetaDot**2 * sintheta
-        ...         ) / self.totalMass
-        ...         thetaAcc = (self.gravity * sintheta - costheta * temp) / (
-        ...             self.length * (4.0 / 3.0 - self.polemass * costheta**2 / self.totalMass)
-        ...         )
-        ...         xAcc = temp - self.polemassLength * thetaAcc * costheta / self.totalMass
-        ...
+        ...         temp = (force + self.poleml * thetaDot**2 * sintheta) / self.totalMass
+        ...         thetaAcc = (self.gravity * sintheta - costheta * temp) /
+        ...                     (self.length * (4.0 / 3.0
+        ...                            - self.polemass * costheta**2 / self.totalMass))
+        ...         xAcc = temp - self.poleml * thetaAcc * costheta / self.totalMass
         ...         _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
-        ...
         ...         return (state.squeeze() + torch.mul(_dstate, self.tau)).unsqueeze(0)
         ...
         ...     def observation(self, state, input, t=None):
         ...         return state
-        >>>
+        ...
         >>> torch.manual_seed(0)
         >>> dt, len, m_cart, m_pole, g = 0.01, 1.5, 20, 10, 9.81
         >>> n_batch, T = 1, 5
@@ -222,8 +220,8 @@ class MPC(nn.Module):
 
         Returns:
             List of :obj:`Tensor`: A list of tensors including the solved state sequence
-            :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the associated
-            quadratic costs :math:`\mathbf{c}` over the time horizon.
+            :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
+            associated quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
         x, u = None, u_init
         best = {'x': x, 'u': u, 'cost': None}
