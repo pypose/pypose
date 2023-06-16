@@ -38,9 +38,11 @@ def main():
     expert_seed = 26
     state = torch.tensor([[-2.,0.],
                           [-1., 0.],
-                          [-2.5, 1.]])
+                          [-2.5, 1.]],
+                          device=device)
     state = torch.tensor([[-2.,0.],
-                          [-1., 0.]])
+                          [-1., 0.]],
+                          device=device)
     n_batch = state.shape[0]
 
     assert expert_seed != args.seed
@@ -69,8 +71,8 @@ def main():
     torch.manual_seed(args.seed)
     param = torch.Tensor([8.0]).to(device).requires_grad_()
 
-    state_all =      torch.zeros(n_batch, T+1,  ns)
-    input_all = 0.02*torch.ones(n_batch,    T,  nc)
+    state_all =      torch.zeros(n_batch, T+1,  ns, device=device)
+    input_all = 0.02*torch.ones(n_batch,    T,  nc, device=device)
     state_all[...,0,:] = state
 
     init_traj = {'state': state_all,

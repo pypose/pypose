@@ -170,45 +170,45 @@ class IPDDP(nn.Module):
         ns, nc, ncons, self.T = self.x.size(-1), self.u.size(-1), n_cons, self.u.size(-2)
 
         # algorithm parameter
-        self.mu, self.maxiter, self.tol, self.infeas = 1.0, 50, torch.tensor([1.0e-7]), False
+        self.mu, self.maxiter, self.tol, self.infeas = 1.0, 50, torch.tensor([1.0e-7], dtype=self.x.dtype, device=self.x.device), False
 
         # quantities in forward pass
-        self.c = torch.zeros(B + (self.T, ncons))
-        self.s = 0.1 * torch.ones(B + (self.T, ncons)) # dual variable for inequality constraint c
-        self.y = 0.01 * torch.ones(B + (self.T, ncons)) # slack variable for infeasible case
+        self.c = torch.zeros(B + (self.T, ncons), dtype=self.x.dtype, device=self.x.device)
+        self.s = 0.1 * torch.ones(B + (self.T, ncons), dtype=self.x.dtype, device=self.x.device) # dual variable for inequality constraint c
+        self.y = 0.01 * torch.ones(B + (self.T, ncons), dtype=self.x.dtype, device=self.x.device) # slack variable for infeasible case
 
         # -------- derivatives --------------------------
         # terms related with system dynamics
-        self.fx = torch.zeros(B + (self.T, ns, ns))
-        self.fu = torch.zeros(B + (self.T, ns, nc))
-        self.fxx = torch.zeros(B + (self.T, ns, ns, ns))
-        self.fxu = torch.zeros(B + (self.T, ns, ns, nc))
-        self.fuu = torch.zeros(B + (self.T, ns, nc, nc))
+        self.fx = torch.zeros(B + (self.T, ns, ns), dtype=self.x.dtype, device=self.x.device)
+        self.fu = torch.zeros(B + (self.T, ns, nc), dtype=self.x.dtype, device=self.x.device)
+        self.fxx = torch.zeros(B + (self.T, ns, ns, ns), dtype=self.x.dtype, device=self.x.device)
+        self.fxu = torch.zeros(B + (self.T, ns, ns, nc), dtype=self.x.dtype, device=self.x.device)
+        self.fuu = torch.zeros(B + (self.T, ns, nc, nc), dtype=self.x.dtype, device=self.x.device)
         # terms related with stage cost
-        self.qx = torch.zeros(B + (self.T, ns))
-        self.qu = torch.zeros(B + (self.T, nc))
-        self.qxx = torch.zeros(B + (self.T, ns, ns))
-        self.qxu = torch.zeros(B + (self.T, ns, nc))
-        self.quu = torch.zeros(B + (self.T, nc, nc))
+        self.qx = torch.zeros(B + (self.T, ns), dtype=self.x.dtype, device=self.x.device)
+        self.qu = torch.zeros(B + (self.T, nc), dtype=self.x.dtype, device=self.x.device)
+        self.qxx = torch.zeros(B + (self.T, ns, ns), dtype=self.x.dtype, device=self.x.device)
+        self.qxu = torch.zeros(B + (self.T, ns, nc), dtype=self.x.dtype, device=self.x.device)
+        self.quu = torch.zeros(B + (self.T, nc, nc), dtype=self.x.dtype, device=self.x.device)
         # terms related with terminal cost
-        self.px = torch.zeros(B + (ns,))
-        self.pxx = torch.zeros(B + (ns, ns))
+        self.px = torch.zeros(B + (ns,), dtype=self.x.dtype, device=self.x.device)
+        self.pxx = torch.zeros(B + (ns, ns), dtype=self.x.dtype, device=self.x.device)
         # terms related with constraint
-        self.cx = torch.zeros(B + (self.T, ncons, ns))
-        self.cu = torch.zeros(B + (self.T, ncons, nc))
+        self.cx = torch.zeros(B + (self.T, ncons, ns), dtype=self.x.dtype, device=self.x.device)
+        self.cu = torch.zeros(B + (self.T, ncons, nc), dtype=self.x.dtype, device=self.x.device)
         # -----------------------------------------------
 
         self.filter = torch.Tensor([[torch.inf], [0.]])
-        self.err, self.cost, self.logcost = torch.zeros(B), torch.zeros(B), torch.zeros(B)
+        self.err, self.cost, self.logcost = torch.zeros(B, dtype=self.x.dtype, device=self.x.device), torch.zeros(B, dtype=self.x.dtype, device=self.x.device), torch.zeros(B, dtype=self.x.dtype, device=self.x.device)
         self.step, self.fp_failed, self.stepsize, self.reg_exp_base = 0, False, 1.0, 1.6
 
         # quantities used in backwardpass
-        self.ky = torch.zeros(B + (self.T, ncons))
-        self.Ky = torch.zeros(B + (self.T, ncons, ns))
-        self.ks = torch.zeros(B + (self.T, ncons))
-        self.Ks = torch.zeros(B + (self.T, ncons, ns))
-        self.ku = torch.zeros(B + (self.T, nc))
-        self.Ku = torch.zeros(B + (self.T, nc, ns))
+        self.ky = torch.zeros(B + (self.T, ncons), dtype=self.x.dtype, device=self.x.device)
+        self.Ky = torch.zeros(B + (self.T, ncons, ns), dtype=self.x.dtype, device=self.x.device)
+        self.ks = torch.zeros(B + (self.T, ncons), dtype=self.x.dtype, device=self.x.device)
+        self.Ks = torch.zeros(B + (self.T, ncons, ns), dtype=self.x.dtype, device=self.x.device)
+        self.ku = torch.zeros(B + (self.T, nc), dtype=self.x.dtype, device=self.x.device)
+        self.Ku = torch.zeros(B + (self.T, nc, ns), dtype=self.x.dtype, device=self.x.device)
         self.opterr, self.reg, self.bp_failed, self.recovery = 0., 0., False, 0
 
     def getDerivatives(self):
@@ -252,7 +252,7 @@ class IPDDP(nn.Module):
                 self.err = torch.zeros(self.x.shape[:-2])
         else:
             self.logcost = self.cost - self.mu * (-self.c).log().sum(-1).sum(-1)
-            self.err = torch.zeros(self.x.shape[:-2])
+            self.err = torch.zeros(self.x.shape[:-2], dtype=self.x.dtype, device=self.x.device)
 
         self.filter = torch.stack((self.logcost, self.err), dim=-1).unsqueeze(-2)
         self.step = 0
@@ -271,7 +271,7 @@ class IPDDP(nn.Module):
 
         ns = self.x.shape[-1]
         if not lastIterFlag:
-            c_err, r_err, qu_err = torch.zeros(B), torch.zeros(B), torch.zeros(B)
+            c_err, r_err, qu_err = torch.zeros(B, dtype=self.x.dtype, device=self.x.device), torch.zeros(B, dtype=self.x.dtype, device=self.x.device), torch.zeros(B, dtype=self.x.dtype, device=self.x.device)
 
             # set regularization parameter
             if (self.fp_failed or self.bp_failed):
@@ -382,10 +382,10 @@ class IPDDP(nn.Module):
         '''
         xold, uold, yold, sold, cold = self.x, self.u, self.y, self.s, self.c
         if not lastIterFlag:
-            tau, steplist = torch.maximum(1.-self.mu,torch.Tensor([0.99])), pow(2.0, torch.linspace(-10, 0, 11).flip(0))
+            tau, steplist = torch.maximum(1.-self.mu,torch.tensor([0.99], dtype=self.x.dtype, device=self.x.device)), pow(2.0, torch.linspace(-10, 0, 11, dtype=self.x.dtype, device=self.x.device).flip(0))
             B = self.x.shape[:-2]
         else:
-            steplist = torch.ones((1)) # skip linesearch
+            steplist = torch.ones((1), dtype=self.x.dtype, device=self.x.device) # skip linesearch
             B = self.p.shape[:-2]
             xold, uold = self.xold, self.uold
 
@@ -434,10 +434,10 @@ class IPDDP(nn.Module):
                         err = torch.maximum(self.tol, err)
                     else:
                         logcost = cost - self.mu * (-cnew).log().sum(-1).sum(-1)
-                        err = torch.zeros(B)
+                        err = torch.zeros(B, dtype=self.x.dtype, device=self.x.device)
                     # step filter, ref to R. Fletcher and S. Leyffer, “Nonlinear programming without a penalty function,” Mathematical programming, vol. 91, no. 2, pp. 239–269, 2002.
                     candidate = torch.stack((logcost, err), dim=-1)
-                    if torch.any( torch.all(candidate-torch.tile(torch.Tensor([1e-13, 0.]), B + (1,))>=self.filter, -1) ):
+                    if torch.any( torch.all(candidate-torch.tile(torch.tensor([1e-13, 0.], dtype=self.x.dtype, device=self.x.device), B + (1,))>=self.filter, -1) ):
                         # relax a bit for numerical stability, strange; todo: any for each sample in a batch?
                         failed=True
                         continue
