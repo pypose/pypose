@@ -87,12 +87,12 @@ def chspline(points, interval=0.1):
     return interpoints
 
 
-def bspline(input_poses, time):
+def bspline(data, time):
     r'''
     B-spline interpolation, which currently only support SE3 LieTensor.
 
     Args:
-        input_poses (:obj:`LieTensor`): the input sparse poses with
+        data (:obj:`LieTensor`): the input sparse poses with
             [batch_size, point_num, 7] shape.
         time (:obj:`Tensor`): the k time point with [1, 1, k] shape.
 
@@ -177,31 +177,19 @@ def bspline(input_poses, time):
 
         Fig. 1. Result of B Spline Interpolation in SE3.
     '''
-    assert is_SE3(input_poses), "The input poses are not SE3Type."
+    assert is_SE3(data), "The input poses are not SE3Type."
     assert time.shape[0]==time.shape[1]==1, "The time has wrong shape."
-    input_poses = torch.cat(
-        [torch.cat([input_poses[..., [0], :], input_poses], dim=1),
-            input_poses[..., [-1], :]], dim=1)
-    timeSize = time.shape[-1]
-    posesSize = input_poses.shape[1]
-    alpha = torch.arange(4, dtype=time.dtype, device=time.device)
-    tt = time[:, None, :] ** alpha[None, :, None]
+    data = torch.cat((data[..., :1, :], data, data[..., -1:, :]), dim=-2)
+    K, N = time.shape[-1], data.shape[-2]
+    dargs = {'dtype': time.dtype, 'device': time.device}
+    alpha = torch.arange(4, **dargs).view(-1, 1)
+    tt = time ** alpha
     B = torch.tensor([[5, 3,-3, 1],
                       [1, 3, 3,-2],
-                      [0, 0, 0, 1]], dtype=time.dtype, device=time.device) / 6
-    w = (B @ tt).squeeze(0)
-    w0 = w[..., 0, :].T
-    w1 = w[..., 1, :].T
-    w2 = w[..., 2, :].T
-    posesTensor = torch.stack([input_poses[..., i:i + 4, :]
-                                for i in range(posesSize - 3)], dim=1)
-    T_delta = input_poses[..., 0:-3, :].unsqueeze(2).repeat(1, 1, timeSize, 1)
-    A0 = ((posesTensor[..., [0], :].Inv() *
-            (posesTensor[..., [1], :])).Log() * w0).Exp()
-    A1 = ((posesTensor[..., [1], :].Inv() *
-            (posesTensor[..., [2], :])).Log() * w1).Exp()
-    A2 = ((posesTensor[..., [2], :].Inv() *
-            (posesTensor[..., [3], :])).Log() * w2).Exp()
-    interPosesSize = timeSize * (posesSize - 3)
-    interPoses = (T_delta * A0 * A1 * A2).reshape((-1, interPosesSize, 7))
-    return interPoses
+                      [0, 0, 0, 1]], **dargs) / 6
+    T_delta = data[..., 0:-3, :].unsqueeze(2).repeat(1, 1, K, 1)
+    w = (B @ tt).unsqueeze(-1)
+    P = torch.stack([data[..., i:i + 4, :] for i in range(N - 3)], dim=1).unsqueeze(-2)
+    A = ((P[..., :3,:, :].Inv() * P[..., 1:,:,:]).Log() * w).Exp()
+    A = A[...,0,:,:] * A[...,1,:,:] * A[...,2,:,:]
+    return (T_delta * A).view((-1, K * (N - 3), 7))

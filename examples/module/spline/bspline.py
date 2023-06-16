@@ -46,7 +46,7 @@ def plot_result(wayposes, xrange, yrange, zrange, k = 0,
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='LieSpline Example')
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
-    parser.add_argument("--save", type=str, default='./examples/module/liespline/save/',
+    parser.add_argument("--save", type=str, default='./examples/module/spline/save/',
                         help="location of png files to save")
     parser.add_argument('--show', dest='show', action='store_true',
                         help="show plot, default: False")
