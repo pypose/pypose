@@ -23,12 +23,13 @@ class LQR(nn.Module):
                                                      + \mathbf{c}_{2t}              \\
         \end{align*}
 
-    where :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state and input of the linear system;
-    :math:`\mathbf{y}` is the observation of the linear system; :math:`\mathbf{A}`,
-    :math:`\mathbf{B}` are the state matrix and input matrix of the linear system;
-    :math:`\mathbf{C}`, :math:`\mathbf{D}` are the output matrix and observation matrix of the
-    linear system; :math:`\mathbf{c}_{1}`, :math:`\mathbf{c}_{2}` are the constant input and
-    constant output of the linear system. The subscript :math:`\cdot_{t}` denotes the time step.
+    where :math:`\mathbf{x}`, :math:`\mathbf{u}` are the state and input of the linear
+    system; :math:`\mathbf{y}` is the observation of the linear system; :math:`\mathbf{A}`
+    and :math:`\mathbf{B}` are the state matrix and input matrix of the linear system;
+    :math:`\mathbf{C}`, :math:`\mathbf{D}` are the output matrix and observation matrix
+    of the linear system; :math:`\mathbf{c}_{1}`, :math:`\mathbf{c}_{2}` are the constant
+    input and constant output of the linear system. The subscript :math:`\cdot_{t}`
+    denotes the time step.
 
     LQR finds the optimal nominal trajectory :math:`\mathbf{\tau}_{1:T}^*` =
     :math:`\begin{Bmatrix} \mathbf{x}_t, \mathbf{u}_t \end{Bmatrix}_{1:T}`
@@ -36,15 +37,17 @@ class LQR(nn.Module):
 
     .. math::
         \begin{align*}
-          \mathbf{\tau}_{1:T}^* = \mathop{\arg\min}\limits_{\tau_{1:T}} &\sum\limits_t\frac{1}{2}
-          \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t \\
+          \mathbf{\tau}_{1:T}^* = \mathop{\arg\min}\limits_{\tau_{1:T}}
+            &\sum\limits_t\frac{1}{2}
+          \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t
+            + \mathbf{p}_t^\top\mathbf{\tau}_t \\
           \mathrm{s.t.} \quad \mathbf{x}_1 &= \mathbf{x}_{\text{init}}, \\
           \mathbf{x}_{t+1} &= \mathbf{F}_t\mathbf{\tau}_t + \mathbf{c}_{1t} \\
         \end{align*}
 
     where :math:`\mathbf{\tau}_t` = :math:`\begin{bmatrix} \mathbf{x}_t \\ \mathbf{u}_t
-    \end{bmatrix}`, :math:`\mathbf{F}_t` = :math:`\begin{bmatrix} \mathbf{A}_t & \mathbf{B}_t
-    \end{bmatrix}`.
+    \end{bmatrix}`, :math:`\mathbf{F}_t` = :math:`\begin{bmatrix} \mathbf{A}_t &
+    \mathbf{B}_t \end{bmatrix}`.
 
     One way to solve the LQR problem is to use the dynamic programming, where the process
     can be summarised as a backward and a forward recursion.
@@ -53,24 +56,27 @@ class LQR(nn.Module):
 
       For :math:`t` = :math:`T` to 1:
 
-        .. math::
-            \begin{align*}
-                \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t \\
-                \mathbf{q}_t &= \mathbf{p}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}
-                                        \mathbf{c}_{1t} + \mathbf{F}_t^\top\mathbf{v}_{t+1}  \\
-                \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}
-                                                     \mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} \\
-                \mathbf{k}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}
-                                                           \mathbf{q}_{\mathbf{u}_t}         \\
-                \mathbf{V}_t &= \mathbf{Q}_{\mathbf{x}_t, \mathbf{x}_t}
-                    + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{K}_t
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t}
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{K}_t   \\
-                \mathbf{v}_t &= \mathbf{q}_{\mathbf{x}_t}
-                    + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{k}_t
-                    + \mathbf{K}_t^\top\mathbf{q}_{\mathbf{u}_t}
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}\mathbf{k}_t   \\
-            \end{align*}
+    .. math::
+        \begin{align*}
+            \mathbf{Q}_t &= \mathbf{Q}_t +
+                \mathbf{F}_t^\top\mathbf{V}_{t+1} \mathbf{F}_t \\
+            \mathbf{q}_t &= \mathbf{p}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}
+                            \mathbf{c}_{1t} + \mathbf{F}_t^\top\mathbf{v}_{t+1}  \\
+            \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}
+                                        \mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} \\
+            \mathbf{k}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}
+                                                        \mathbf{q}_{\mathbf{u}_t}  \\
+            \mathbf{V}_t &= \mathbf{Q}_{\mathbf{x}_t, \mathbf{x}_t}
+                + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{K}_t
+                + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t}
+                + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}
+                    \mathbf{K}_t \\
+            \mathbf{v}_t &= \mathbf{q}_{\mathbf{x}_t}
+                + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{k}_t
+                + \mathbf{K}_t^\top\mathbf{q}_{\mathbf{u}_t}
+                + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t,
+                    \mathbf{u}_t}\mathbf{k}_t  \\
+        \end{align*}
 
     - The forward recursion.
 
@@ -80,17 +86,18 @@ class LQR(nn.Module):
             \begin{align*}
                 \mathbf{u}_t &= \mathbf{K}_t\mathbf{x}_t + \mathbf{k}_t \\
                 \mathbf{x}_{t+1} &= \mathbf{A}_t\mathbf{x}_t + \mathbf{B}_t\mathbf{u}_t
-                                                             + \mathbf{c}_{1t} \\
+                                                                + \mathbf{c}_{1t} \\
             \end{align*}
 
     Then quadratic costs of the system over the time horizon:
 
-        .. math::
-            \mathbf{c} \left( \mathbf{\tau}_t \right) = \frac{1}{2}
-            \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t
+    .. math::
+        \mathbf{c} \left( \mathbf{\tau}_t \right) = \frac{1}{2}
+        \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t
+            + \mathbf{p}_t^\top\mathbf{\tau}_t
 
-    For the **non-linear system**, sometimes people want to solve MPC problem with **iterative
-    LQR**. A discrete-time non-linear system can be described as:
+    For the **non-linear system**, sometimes people want to solve MPC problem with
+    **iterative LQR**. A discrete-time non-linear system can be described as:
 
     .. math::
         \begin{aligned}
@@ -98,14 +105,15 @@ class LQR(nn.Module):
             \mathbf{y}_{t} &= \mathbf{g}(\mathbf{x}_t, \mathbf{u}_t, t_t) \\
         \end{aligned}
 
-    We can do a linear approximation at current point :math:`\chi^*=(\mathbf{x}^*, \mathbf{u}^*, t^*)` along a
-    trajectory with small perturbation :math:`\chi=(\mathbf{x}^*+\delta\mathbf{x}, \mathbf{u}^*
-    +\delta\mathbf{u}, t^*)` near :math:`\chi^*` for both dynamics and cost:
+    We can do a linear approximation at current point :math:`\chi^*=(\mathbf{x}^*,
+    \mathbf{u}^*, t^*)` along a trajectory with small perturbation
+    :math:`\chi=(\mathbf{x}^*+\delta\mathbf{x}, \mathbf{u}^* +\delta\mathbf{u}, t^*)`
+    near :math:`\chi^*` for both dynamics and cost:
 
     .. math::
             \begin{aligned}
             \mathbf{f}(\mathbf{x}, \mathbf{u}, t^*) &\approx \mathbf{f}(\mathbf{x}^*,
-                \mathbf{u}^*, t^*) +  \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}}
+                \mathbf{u}^*, t^*) +  \left.\frac{\partial \mathbf{f}}{\partial\mathbf{x}}
                 \right|_{\chi^*} \delta \mathbf{x} + \left. \frac{\partial \mathbf{f}}
                 {\partial \mathbf{u}} \right|_{\chi^*} \delta \mathbf{u} \\
             &= \mathbf{f}(\mathbf{x}^*, \mathbf{u}^*, t^*) + \mathbf{A} \delta \mathbf{x}
@@ -115,9 +123,9 @@ class LQR(nn.Module):
             &= \mathbf{F}_t \delta \mathbf{\tau}_t \\
             \mathbf{c} \left( \mathbf{\tau}, t^* \right) &\approx
                 \mathbf{c} \left( \mathbf{\tau}^*, t^* \right) + \frac{1}{2} \delta
-                \mathbf{\tau}^\top \nabla^2_{\mathbf{\tau}} \mathbf{c} \left( \mathbf{\tau}^*,
+                \mathbf{\tau}^\top\nabla^2_{\mathbf{\tau}}\mathbf{c}\left(\mathbf{\tau}^*,
                 t^* \right) \delta \mathbf{\tau} + \nabla_{\mathbf{\tau}}
-                \mathbf{c} \left( \mathbf{\tau}^*, t^* \right)^\top \delta \mathbf{\tau} \\
+                \mathbf{c} \left( \mathbf{\tau}^*, t^* \right)^\top \delta \mathbf{\tau}\\
             \bar{\mathbf{c}} \left( \delta \mathbf{\tau} \right) &= \frac{1}{2} \delta
                 \mathbf{\tau}_t^\top \bar{\mathbf{Q}}_t \delta \mathbf{\tau}_t +
                 \bar{\mathbf{p}}_t^\top \delta \mathbf{\tau}_t \\
@@ -125,36 +133,37 @@ class LQR(nn.Module):
 
     where :math:`\delta \mathbf{\tau}_t` = :math:`\begin{bmatrix} \delta \mathbf{x}_t \\
     \delta \mathbf{u}_t \end{bmatrix}`, :math:`\mathbf{F}_t` = :math:`\begin{bmatrix}
-    \mathbf{A}_t & \mathbf{B}_t \end{bmatrix}`, :math:`\bar{\mathbf{Q}}_t` = :math:`\mathbf{Q}_t`,
+    \mathbf{A}_t & \mathbf{B}_t \end{bmatrix}`, :math:`\bar{\mathbf{Q}}_t = \mathbf{Q}_t`,
     :math:`\bar{\mathbf{p}}_t` = :math:`\mathbf{Q}_t \mathbf{\tau}^*_t + \mathbf{p}_t`.
 
-    Then, LQR can be performed on a linear quadractic problem with :math:`\delta \mathbf{\tau}_t`, :math:`\mathbf{F}_t`,
+    Then, LQR can be performed on a linear quadractic problem with
+    :math:`\delta \mathbf{\tau}_t`, :math:`\mathbf{F}_t`,
     :math:`\bar{\mathbf{Q}}_t` and :math:`\bar{\mathbf{p}}_t`.
 
     - The backward recursion.
 
       For :math:`t` = :math:`T` to 1:
 
-        .. math::
-            \begin{align*}
-                \mathbf{Q}_t &= \bar{\mathbf{Q}}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}
-                                    \mathbf{F}_t \\
-                \mathbf{q}_t &= \bar{\mathbf{p}}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1}  \\
-                \mathbf{K}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}^{-1}
-                                    \mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{x}_t} \\
-                \mathbf{k}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}^{-1}
-                                    \mathbf{q}_{\delta \mathbf{u}_t}         \\
-                \mathbf{V}_t &= \mathbf{Q}_{\delta \mathbf{x}_t, \delta \mathbf{x}_t}
-                    + \mathbf{Q}_{\delta \mathbf{x}_t, \delta \mathbf{u}_t}\mathbf{K}_t
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{x}_t}
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}
-                        \mathbf{K}_t   \\
-                \mathbf{v}_t &= \mathbf{q}_{\delta \mathbf{x}_t}
-                    + \mathbf{Q}_{\delta \mathbf{x}_t, \delta \mathbf{u}_t}\mathbf{k}_t
-                    + \mathbf{K}_t^\top\mathbf{q}_{\delta \mathbf{u}_t}
-                    + \mathbf{K}_t^\top\mathbf{Q}_{\delta \mathbf{u}_t,
-                        \delta \mathbf{u}_t}\mathbf{k}_t   \\
-            \end{align*}
+    .. math::
+        \begin{align*}
+            \mathbf{Q}_t &= \bar{\mathbf{Q}}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}
+                                \mathbf{F}_t \\
+            \mathbf{q}_t &= \bar{\mathbf{p}}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1}  \\
+            \mathbf{K}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}^{-1}
+                                \mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{x}_t} \\
+            \mathbf{k}_t &= -\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}^{-1}
+                                \mathbf{q}_{\delta \mathbf{u}_t}         \\
+            \mathbf{V}_t &= \mathbf{Q}_{\delta \mathbf{x}_t, \delta \mathbf{x}_t}
+                + \mathbf{Q}_{\delta \mathbf{x}_t, \delta \mathbf{u}_t}\mathbf{K}_t
+                + \mathbf{K}_t^\top\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{x}_t}
+                + \mathbf{K}_t^\top\mathbf{Q}_{\delta \mathbf{u}_t, \delta \mathbf{u}_t}
+                    \mathbf{K}_t \\
+            \mathbf{v}_t &= \mathbf{q}_{\delta \mathbf{x}_t}
+                + \mathbf{Q}_{\delta \mathbf{x}_t, \delta \mathbf{u}_t}\mathbf{k}_t
+                + \mathbf{K}_t^\top\mathbf{q}_{\delta \mathbf{u}_t}
+                + \mathbf{K}_t^\top\mathbf{Q}_{\delta \mathbf{u}_t,
+                    \delta \mathbf{u}_t}\mathbf{k}_t   \\
+        \end{align*}
 
     Note:
         Because we made a linear approximation, here :math:`\bar{\mathbf{p}}_t` leads to a
@@ -177,30 +186,30 @@ class LQR(nn.Module):
 
         .. math::
             \mathbf{c} \left( \mathbf{\tau}_t \right) = \frac{1}{2}
-            \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t + \mathbf{p}_t^\top\mathbf{\tau}_t
+            \mathbf{\tau}_t^\top\mathbf{Q}_t\mathbf{\tau}_t
+                + \mathbf{p}_t^\top\mathbf{\tau}_t
 
     Note:
         The discrete-time system to be solved by LQR can be either linear time-invariant
-        (:meth:`LTI`) system, or linear time-varying (:meth:`LTV`) system. For the non-linear
-        system, one can approximate it as a linear system via Taylor expansion, using iterative
-        LQR algorithm for MPC. Here we provide a unified general format for the implementation.
+        (:meth:`LTI`) system, or linear time-varying (:meth:`LTV`) system. For non-linear
+        system, one can approximate it as a linear system via Taylor expansion, using
+        iterative LQR algorithm for MPC. Here we provide a unified general format for the
+        implementation.
 
-    From the learning perspective, this can be interpreted as a module with unknown parameters
-    :math:`\begin{Bmatrix} \mathbf{Q}, \mathbf{p}, \mathbf{F}, \mathbf{f} \end{Bmatrix}`,
-    which can be integrated into an end-to-end learning system.
+    From the learning perspective, this can be interpreted as a module with unknown
+    parameters :math:`\begin{Bmatrix} \mathbf{Q}, \mathbf{p}, \mathbf{F}, \mathbf{f}
+    \end{Bmatrix}`, which can be integrated into an end-to-end learning system.
 
     Note:
         The implementation of LQR is based on page 24-32 of the slides:
 
-        * `Optimal Control and Planning
-          <http://rll.berkeley.edu/deeprlcourse/f17docs/lecture_8_model_based_planning.pdf>`_.
+        * `Optimal Control and Planning <https://tinyurl.com/y5ck36vw>`_.
 
         The implementation of iterative LQR is based on Eq. (1)~(19) of this paper:
 
         * Li Weiwei, and Emanuel Todorov, `Iterative linear quadratic regulator design for
-          nonlinear biological movement systems
-          <https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=dfc73c664f85562956e4b98b3102ebd7e41906ae>`_,
-          ICINCO (1), 2004.
+          nonlinear biological movement systems <https://tinyurl.com/bdma36s6>`_, ICINCO
+          (1), 2004.
 
     Example:
         >>> torch.manual_seed(0)
@@ -289,8 +298,8 @@ class LQR(nn.Module):
 
         Returns:
             List of :obj:`Tensor`: A list of tensors including the solved state sequence
-            :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the associated
-            quadratic costs :math:`\mathbf{c}` over the time horizon.
+            :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
+            associated quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
         K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
         x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
@@ -309,7 +318,8 @@ class LQR(nn.Module):
 
         self.x_traj = x_init.unsqueeze(-2).repeat((1, self.T, 1))
         for i in range(self.T-1):
-            self.x_traj[...,i+1,:], _ = self.system(self.x_traj[...,i,:].clone(), self.u_traj[...,i,:])
+            self.x_traj[...,i+1,:], _ = self.system(self.x_traj[...,i,:].clone(),
+                                                    self.u_traj[...,i,:])
 
         K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
