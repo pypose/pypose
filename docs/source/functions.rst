@@ -55,4 +55,4 @@ Functions
     knn
     svdtf
     chspline
-    BSplineSE3
+    bspline

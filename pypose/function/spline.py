@@ -87,9 +87,9 @@ def chspline(points, interval=0.1):
     return interpoints
 
 
-def BSplineSE3(input_poses, time):
+def bspline(input_poses, time):
     r'''
-    B-spline interpolation in SE3.
+    B-spline interpolation, which currently only support SE3 LieTensor.
 
     Args:
         input_poses (:obj:`LieTensor`): the input sparse poses with

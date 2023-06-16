@@ -74,7 +74,7 @@ if __name__=="__main__":
                            [2., 0., 4., angle2[0], angle2[1], angle2[2], angle2[3]],
                            [3., 0., 5., angle2[0], angle2[1], angle2[2], angle2[3]]]],
                            ltype=pp.SE3_type)
-    wayposes = pp.BSplineSE3(poses, time)
+    wayposes = pp.bspline(poses, time)
     xrange = [0, 5.]
     yrange = [0, 5.]
     zrange = [0, 1.2]
