@@ -204,7 +204,7 @@ class MPC(nn.Module):
         self.stepper.max_steps -= 1 # n-1 loops, 1 loop with gradient
         self.lqr = LQR(system, Q, p, T)
 
-    def forward(self, dt, x_init, u_init=None):
+    def forward(self, dt, x_init, u_init=None, u_lower=None, u_upper=None, du=None):
         r'''
         Performs MPC for the discrete system.
 
@@ -213,6 +213,12 @@ class MPC(nn.Module):
             x_init (:obj:`Tensor`): The initial state of the system.
             u_init (:obj:`Tensor`, optinal): The current inputs of the system along a
                 trajectory. Default: ``None``.
+            u_lower (:obj:`Tensor`, optinal): The lower bounds on the controls.
+                Default: ``None``.
+            u_upper (:obj:`Tensor`, optinal): The upper bounds on the controls.
+                Default: ``None``.
+            du (:obj:`int`, optinal): The amount each component of the controls
+                is allowed to change in each LQR iteration. Default: ``None``.
 
         Returns:
             List of :obj:`Tensor`: A list of tensors including the solved state sequence
@@ -231,4 +237,4 @@ class MPC(nn.Module):
                 if best['cost'] == None or cost < best['cost']:
                     best = {'x': x, 'u': u, 'cost': cost}
 
-        return self.lqr(x_init, dt, best['u'])
+        return self.lqr(x_init, dt, u_traj=best['u'])

@@ -270,7 +270,7 @@ class LQR(nn.Module):
         assert self.Q.dtype == self.p.dtype, "Tensor data type not compatible."
         self.dargs = {'dtype': self.p.dtype, 'device': self.p.device}
 
-    def forward(self, x_init, dt=1, u_traj=None):
+    def forward(self, x_init, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
         r'''
         Performs LQR for the discrete system.
 
@@ -278,22 +278,26 @@ class LQR(nn.Module):
             x_init (:obj:`Tensor`): The initial state of the system.
             dt (:obj:`int`): The interval (:math:`\delta t`) between two time steps.
                 Default: `1`.
-            x_traj (:obj:`Tensor`, optinal): The current states of the system along a
-                trajectory. Default: ``None``.
             u_traj (:obj:`Tensor`, optinal): The current inputs of the system along a
                 trajectory. Default: ``None``.
+            u_lower (:obj:`Tensor`, optinal): The lower bounds on the controls.
+                Default: ``None``.
+            u_upper (:obj:`Tensor`, optinal): The upper bounds on the controls.
+                Default: ``None``.
+            du (:obj:`int`, optinal): The amount each component of the controls
+                is allowed to change in each LQR iteration. Default: ``None``.
 
         Returns:
             List of :obj:`Tensor`: A list of tensors including the solved state sequence
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and theassociated
             quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
-        K, k = self.lqr_backward(x_init, dt, u_traj)
-        x, u, cost = self.lqr_forward(x_init, K, k)
+        K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
+        x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
 
         return x, u, cost
 
-    def lqr_backward(self, x_init, dt, u_traj=None):
+    def lqr_backward(self, x_init, dt, u_traj=None, u_lower=None, u_upper=None, du=None):
 
         ns, nsc = x_init.size(-1), self.p.size(-1)
         nc = nsc - ns
@@ -339,7 +343,7 @@ class LQR(nn.Module):
 
         return K, k
 
-    def lqr_forward(self, x_init, K, k):
+    def lqr_forward(self, x_init, K, k, u_lower=None, u_upper=None, du=None):
 
         assert x_init.device == K.device == k.device
         assert x_init.dtype == K.dtype == k.dtype
