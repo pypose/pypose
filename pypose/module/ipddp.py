@@ -39,7 +39,9 @@ class IPDDP(nn.Module):
 
     where :math:`\mathbf{\tau}_t` = :math:`\begin{bmatrix} \mathbf{x}_t \\ \mathbf{u}_t
     \end{bmatrix}`; :math:`q` and :math:`p` denote the stage and terminal costs, respectively;
-    :math:`\mathbf{c}` is the stage-wise inequality constraints.
+    :math:`\mathbf{c}` is the stage-wise inequality constraints. In addition to the notations
+    defined above, two additional variables :math:`\mathbf{s}` and :math:`\mathbf{y}` are
+    introduced, which denote the dual variable and the slack variable, respectively.
 
     The IPDDP process can be summarised as iterative backward and forward recursions.
 
@@ -90,6 +92,10 @@ class IPDDP(nn.Module):
                 \mathbf{r}_t &= \mathbf{S}_t \mathbf{c}_t + \mu  \mathbf{1}  \\
             \end{align*}
 
+      As seen from the above equations, compared with LQR, additional terms involving
+      :math:`\mathbf{W}` have been added into iteration, which are related to the inequality
+      constraints. Additionally, feedback gains :math:`\mathbf{K}_t^{\mathbf{s}}`,
+      :math:`\mathbf{k}_t^{\mathbf{s}}` for the dual variable are also introduced.
 
     - The forward recursion.
 
@@ -101,6 +107,8 @@ class IPDDP(nn.Module):
                 \mathbf{s}_t &= \mathbf{K}_t^{\mathbf{s}}(\mathbf{x}_t - \mathbf{x}_t^{-}) + \mathbf{k}_t^{\mathbf{s}}  + \mathbf{s}_t^{-}\\
                 \mathbf{x}_{t+1} &= \mathbf{f}(\mathbf{x}_t,\mathbf{u}_t,t)  \\
             \end{align*}
+
+      Additionally, some line-search and feasibility check algorithms are implemented therein.
 
     Then cost of the system over the time horizon:
 
@@ -120,16 +128,34 @@ class IPDDP(nn.Module):
         <https://arxiv.org/pdf/2004.12710.pdf>`_.
 
     Example:
-
+        >>> import pypose as pp
+        >>> import torch as torch
+        >>> import torch.nn as nn
+        >>> from pypose.module.ipddp import IPDDP
+        >>> from pypose.module.dynamics import NLS
+        >>> device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        >>> class InvPend(NLS):
+                def __init__(self, dt, length=[10.0], gravity=10.0):
+                super(InvPend, self).__init__()
+                self.tau = dt
+                self.length = length
+                self.gravity = gravity
+        >>> def state_transition(self, state, input, t=None):
+                force = input.squeeze(-1)
+                _dstate = torch.stack([state[...,1], force+self.gravity/self.length[0]*torch.sin(state[...,0].clone())], dim=-1)
+                return state + torch.mul(_dstate, self.tau)
+        >>> def observation(self, state, input, t=None):
+                return state
+        >>>
         >>> dt = 0.05   # Delta t
         >>> T = 5    # Number of time steps
-        >>> state = torch.tensor([[-2.,0.], [-1., 0.], [-2.5, 1.]])
+        >>> state = torch.tensor([[-2.,0.], [-1., 0.], [-2.5, 1.]], device=device)
         >>>
         >>> sys = InvPend(dt)
         >>> ns, nc = 2, 1
         >>> n_batch = 3
-        >>> state_all =      torch.zeros(n_batch, T+1, ns)
-        >>> input_all = 0.02*torch.ones(n_batch,  T,   nc)
+        >>> state_all =      torch.zeros(n_batch, T+1, ns, device=device)
+        >>> input_all = 0.02*torch.ones(n_batch,  T,   nc, device=device)
         >>> state_all[...,0,:] = state
         >>> init_traj = {'state': state_all, 'input': input_all}
         >>>
@@ -140,9 +166,9 @@ class IPDDP(nn.Module):
         >>> stage_cost = pp.module.QuadCost(Q, R, S, c)
         >>> terminal_cost = pp.module.QuadCost(10./dt*Q[...,0:1,:,:], R[...,0:1,:,:], S[...,0:1,:,:], c[...,0:1]) # special stagecost with T=1
         >>>
-        >>> gx = torch.tile(torch.zeros( 2*nc, ns), (n_batch, T, 1, 1))
-        >>> gu = torch.tile(torch.vstack( (torch.eye(nc, nc), - torch.eye(nc, nc)) ), (n_batch, T, 1, 1))
-        >>> g = torch.tile(torch.hstack( (-0.25 * torch.ones(nc), -0.25 * torch.ones(nc)) ), (n_batch, T, 1))
+        >>> gx = torch.tile(torch.zeros( 2*nc, ns, device=device), (n_batch, T, 1, 1))
+        >>> gu = torch.tile(torch.vstack( (torch.eye(nc, nc, device=device), - torch.eye(nc, nc, device=device)) ), (n_batch, T, 1, 1))
+        >>> g = torch.tile(torch.hstack( (-0.25 * torch.ones(nc, device=device), -0.25 * torch.ones(nc, device=device)) ), (n_batch, T, 1))
         >>> lincon = pp.module.LinCon(gx, gu, g)
         >>>
         >>> traj_opt = [None for batch_id in range(n_batch)]
