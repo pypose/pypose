@@ -55,12 +55,12 @@ def chspline(points, interval=0.1):
         ...                         [5., 1., 0.2],
         ...                         [4., 0.75, 0.2],
         ...                         [5., 0., 0.]]])
-        >>> waypoints = pp.CSplineR3(points)
+        >>> waypoints = pp.chspline(points)
 
     .. figure:: /_static/img/module/liespline/CsplineR3.png
         :width: 600
 
-        Fig. 1. Result of Cubic Spline Interpolation in R3.
+        Fig. 1. Result of Cubic Spline Interpolation in 3D space.
     """
     assert points.dim() >= 2, 'Dimension of points should be [..., N, C]'
     batch, N = points.shape[:-2], points.shape[-2]
@@ -87,20 +87,20 @@ def chspline(points, interval=0.1):
     return interpoints
 
 
-def bspline(data, time):
+def bspline(data, timeline):
     r'''
     B-spline interpolation, which currently only support SE3 LieTensor.
 
     Args:
         data (:obj:`LieTensor`): the input sparse poses with
-            [batch_size, point_num, 7] shape.
-        time (:obj:`Tensor`): the k time point with [1, 1, k] shape.
+            [batch_size, point_num, dim] shape.
+        timeline (:obj:`Tensor`): the time line to interpolate.
 
     Returns:
-        ``LieTensor``: the interpolated m poses with [batch_size, m, 7]
+        ``LieTensor``: the interpolated SE3 LieTensor.
 
     A poses query at any time :math:`t \in [t_i, t_{i+1})` (i.e. a segment of the spline)
-    only relies on the poses located at times :math:`\{t_{i-1},t_i,t_{i+1},t_{i+2}\}`.
+    only relies on the poses located at time steps :math:`\{t_{i-1},t_i,t_{i+1},t_{i+2}\}`.
     It means that the interpolation between adjacent poses needs four consecutive poses.
     Thus, the B-spline interpolation could estimate the pose between :math:`[t_1, t_{n-1}]`
     by the input poses at :math:`\{t_0, ...,t_{n}\}`.
@@ -156,22 +156,19 @@ def bspline(data, time):
         2020 International Conference on 3D Vision (3DV), Fukuoka, Japan, 2020.
 
     Examples:
-        >>> import torch
-        >>> import pypose as pp
+        >>> import torch, pypose as pp
         >>> a1 = pp.euler2SO3(torch.Tensor([0., 0., 0.]))
         >>> a2 = pp.euler2SO3(torch.Tensor([torch.pi / 4., torch.pi / 3., torch.pi / 2.]))
-        >>> time = torch.arange(0, 1, 0.25).reshape(1, 1, -1)
-        >>> poses = pp.LieTensor([[
-        ...                             [0., 4., 0., a1[0], a1[1], a1[2], a1[3]],
-        ...                             [0., 3., 0., a1[0], a1[1], a1[2], a1[3]],
-        ...                             [0., 2., 0., a1[0], a1[1], a1[2], a1[3]],
-        ...                             [0., 1., 0., a1[0], a1[1], a1[2], a1[3]],
-        ...                             [1., 0., 1., a2[0], a2[1], a2[2], a2[3]],
-        ...                             [2., 0., 1., a2[0], a2[1], a2[2], a2[3]],
-        ...                             [3., 0., 1., a2[0], a2[1], a2[2], a2[3]],
-        ...                             [4., 0., 1., a2[0], a2[1], a2[2], a2[3]]
-        ...                            ]], ltype=pp.SE3_type)
-        >>> wayposes = pp.BSplineSE3(poses, time)
+        >>> timeline = torch.arange(0, 1, 0.25)
+        >>> poses = pp.SE3([[[0., 4., 0., a1[0], a1[1], a1[2], a1[3]],
+        ...                  [0., 3., 0., a1[0], a1[1], a1[2], a1[3]],
+        ...                  [0., 2., 0., a1[0], a1[1], a1[2], a1[3]],
+        ...                  [0., 1., 0., a1[0], a1[1], a1[2], a1[3]],
+        ...                  [1., 0., 1., a2[0], a2[1], a2[2], a2[3]],
+        ...                  [2., 0., 1., a2[0], a2[1], a2[2], a2[3]],
+        ...                  [3., 0., 1., a2[0], a2[1], a2[2], a2[3]],
+        ...                  [4., 0., 1., a2[0], a2[1], a2[2], a2[3]]]])
+        >>> wayposes = pp.bspline(poses, timeline)
 
     - .. figure:: /_static/img/module/liespline/BsplineSE3.png
 
@@ -179,9 +176,9 @@ def bspline(data, time):
     '''
     assert is_SE3(data), "The input poses are not SE3Type."
     data = torch.cat((data[..., :1, :], data, data[..., -1:, :]), dim=-2)
-    Bth, N, D, K = data.shape[:-2], data.shape[-2], data.shape[-1], time.shape[-1]
-    dargs = {'dtype': time.dtype, 'device': time.device}
-    tt = time ** torch.arange(4, **dargs).view(-1, 1)
+    Bth, N, D, K = data.shape[:-2], data.shape[-2], data.shape[-1], timeline.shape[-1]
+    dargs = {'dtype': timeline.dtype, 'device': timeline.device}
+    tt = timeline ** torch.arange(4, **dargs).view(-1, 1)
     B = torch.tensor([[5, 3,-3, 1],
                       [1, 3, 3,-2],
                       [0, 0, 0, 1]], **dargs) / 6
