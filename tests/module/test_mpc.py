@@ -30,7 +30,7 @@ class TestMPC:
                 self.cartmass = cartmass
                 self.polemass = polemass
                 self.gravity = gravity
-                self.polemassLength = self.polemass * self.length
+                self.poleml = self.polemass * self.length
                 self.totalMass = self.cartmass + self.polemass
 
             def state_transition(self, state, input, t=None):
@@ -39,16 +39,11 @@ class TestMPC:
                 costheta = torch.cos(theta)
                 sintheta = torch.sin(theta)
 
-                temp = (
-                    force + self.polemassLength * thetaDot**2 * sintheta
-                ) / self.totalMass
-                thetaAcc = (self.gravity * sintheta - costheta * temp) / (
-                    self.length * (4.0 / 3.0 - self.polemass * costheta**2 / self.totalMass)
-                )
-                xAcc = temp - self.polemassLength * thetaAcc * costheta / self.totalMass
-
+                temp = (force + self.poleml * thetaDot**2 * sintheta) / self.totalMass
+                thetaAcc = (self.gravity * sintheta - costheta * temp) / \
+                    (self.length * (4.0 / 3.0 - self.polemass * costheta**2 / self.totalMass))
+                xAcc = temp - self.poleml * thetaAcc * costheta / self.totalMass
                 _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
-
                 return (state.squeeze() + torch.mul(_dstate, self.tau)).unsqueeze(0)
 
             def observation(self, state, input, t=None):
@@ -77,7 +72,7 @@ class TestMPC:
         x_init = torch.tensor([[0, 0, torch.pi, 0]], device=device)
 
         cartPoleSolver = CartPole(dt, len, m_cart, m_pole, g).to(device)
-        stepper = pp.utils.ReduceToBason(steps=10, verbose=True)
+        stepper = pp.utils.ReduceToBason(steps=10, verbose=False)
         MPC = pp.module.MPC(cartPoleSolver, Q, p, T, stepper=stepper).to(device)
         x, u, cost = MPC(dt, x_init, u_init=current_u)
 
