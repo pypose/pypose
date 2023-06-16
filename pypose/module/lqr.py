@@ -289,7 +289,7 @@ class LQR(nn.Module):
 
         Returns:
             List of :obj:`Tensor`: A list of tensors including the solved state sequence
-            :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and theassociated
+            :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the associated
             quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
         K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
