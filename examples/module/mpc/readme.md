@@ -1,6 +1,6 @@
 # Model Predictive Control
 
-Two Learning Examples for Predictive Control (MPC)
+Two Learning Examples for Model Predictive Control (MPC)
 
 ## Installation
 
