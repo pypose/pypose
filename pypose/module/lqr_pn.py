@@ -102,7 +102,7 @@ class LQR2(nn.Module):
                     K[...,t,:,:] = Kt = -Qux_.lu_solve(*Quu_free_LU)
 
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
-            v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
+            v = qx + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
 
         return K, k
 
@@ -120,16 +120,19 @@ class LQR2(nn.Module):
         x[..., 0, :] = x_init
         xt = x_init
 
-        assert not ((delta_u is not None) and (u_lower is None))
+        assert not ((du is not None) and (u_lower is None))
 
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]
             delta_xt = xt - self.current_x[...,t,:]
             delta_u[..., t, :] = delta_ut = bmv(Kt, delta_xt) + kt
+            u[...,t,:] = ut = delta_ut + self.current_u[...,t,:]
+
             if u_lower is not None:
                 lb = u_lower[...,t,:]
                 ub = u_upper[...,t,:]
-                if delta_u is not None:
+
+                if du is not None:
                     lb_limit, ub_limit = lb, ub
                     lb = self.current_u[...,t,:] - du
                     ub = self.current_u[...,t,:] + du
@@ -137,9 +140,9 @@ class LQR2(nn.Module):
                     lb[I] = lb_limit if isinstance(lb_limit, float) else lb_limit[I]
                     I = ub > ub_limit
                     ub[I] = ub_limit if isinstance(lb_limit, float) else ub_limit[I]
-                delta_u[..., t, :] = delta_ut = eclamp(delta_ut, lb, ub)
+                u[...,t,:] = eclamp(ut, lb, ub)
+                ut = u[...,t,:]
 
-            u[...,t,:] = ut = delta_ut + self.current_u[...,t,:]
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
             cost = cost + 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + (xut * self.p[...,t,:]).sum(-1)
@@ -222,9 +225,9 @@ def pn(H, g, lb, up, x_init=None, n_iter=20):
 def eclamp(x, lb, ub):
 
     I = x < lb
-    x[I] = lb[I]
+    x[I] = lb[I] if not isinstance(lb, float) else lb
 
     I = x > ub
-    x[I] = ub[I]
+    x[I] = ub[I] if not isinstance(ub, float) else ub
 
     return x

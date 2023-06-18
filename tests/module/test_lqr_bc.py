@@ -42,13 +42,13 @@ class TestLQR:
         c2 = torch.zeros(n_batch, n_state, device=device)
         x_init = torch.tensor([[ 1.50, -0.34, -2.18,  0.54], [-1.05, -1.36,  0.43,  0.80]], device=device)
         dt = 1
-        u_lower = -torch.randn(n_batch, T, n_ctrl, device=device)
-        u_upper = torch.randn(n_batch, T, n_ctrl, device=device)
-        du = 0.1
+        u_lower = -1e-4 * torch.randn(n_batch, T, n_ctrl, device=device)
+        u_upper = 1e-4 * torch.randn(n_batch, T, n_ctrl, device=device)
+        #du = 0.1
 
         lti = pp.module.LTI(A, B, C, D, c1, c2).to(device)
         LQR = pp.module.LQR2(lti, Q, p, T).to(device)
-        x, u, cost = LQR(x_init, dt, u_lower=u_lower, u_upper=u_upper, du=du)
+        x, u, cost = LQR(x_init, dt, u_lower=u_lower, u_upper=u_upper)
 
 
 if __name__ == '__main__':
