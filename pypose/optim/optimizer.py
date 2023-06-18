@@ -6,7 +6,7 @@ from .strategy import TrustRegion
 from torch.optim import Optimizer
 from .solver import PINV, Cholesky
 from torch.linalg import cholesky_ex
-from corrector import FastTriggs
+from .corrector import FastTriggs
 
 
 class Trivial(torch.nn.Module):
@@ -454,6 +454,8 @@ class LevenbergMarquardt(_Optimizer):
             R = self.model(input, target)
             R, weight = self.model.normalize_residuals_weights(R, weight)
             J = modjac(self.model, input=(input, target), **self.jackwargs)
+            print(R)
+            print(J)
             R, J = self.corrector(R = R, J = J)
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target)
