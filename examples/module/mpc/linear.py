@@ -27,7 +27,6 @@ if __name__ == "__main__":
     c1 = torch.zeros(n_state, device=args.device)
     c2 = torch.zeros(n_state, device=args.device)
     dt = 1
-    stepper = pp.utils.ReduceToBason(steps=1, verbose=False)
 
     # expert
     exp = dict(
@@ -39,8 +38,7 @@ if __name__ == "__main__":
                             [ 0.1618,  0.1238,  0.9489]], device=args.device),
         B = torch.tensor([[ 0.4567,  0.7805,  0.0319],
                             [-0.5938, -0.5724,  0.0422],
-                            [-0.1804, -0.2535,  1.7218]], device=args.device),
-    )
+                            [-0.1804, -0.2535,  1.7218]], device=args.device))
     # Based on n_batch, n_state and n_ctrl, different Q, p, A, B can be given.
     # Note that the given A and B should make the system controllable.
 
@@ -54,11 +52,13 @@ if __name__ == "__main__":
 
     def get_loss(x_init, _A, _B):
         lti = pp.module.LTI(exp['A'], exp['B'], C, D, c1, c2)
-        mpc_exp = pp.module.MPC(lti, exp['Q'], exp['p'], T, stepper=stepper) # expert
+        stepper_exp = pp.utils.ReduceToBason(steps=1, verbose=False)
+        mpc_exp = pp.module.MPC(lti, exp['Q'], exp['p'], T, stepper=stepper_exp) # expert
         x_true, u_true, cost_true = mpc_exp.forward(dt, x_init)
 
         lti_ = pp.module.LTI(_A, _B, C, D, c1, c2)
-        mpc_agt = pp.module.MPC(lti_, exp['Q'], exp['p'], T, stepper=stepper) # agent
+        stepper_agt = pp.utils.ReduceToBason(steps=1, verbose=False)
+        mpc_agt = pp.module.MPC(lti_, exp['Q'], exp['p'], T, stepper=stepper_agt) # agent
         x_pred, u_pred, cost_pred = mpc_agt.forward(dt, x_init)
 
         traj_loss = torch.mean((u_true - u_pred)**2) \
@@ -85,8 +85,7 @@ if __name__ == "__main__":
         t4 = time.time()
         overall_time = t4 - t1
 
-        model_loss = torch.mean((A - exp['A'])**2) + \
-                    torch.mean((B - exp['B'])**2)
+        model_loss = ((A - exp['A'])**2).mean() + ((B - exp['B'])**2).mean()
 
         traj_losses.append(traj_loss.item())
         model_losses.append(model_loss.item())

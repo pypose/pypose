@@ -52,7 +52,6 @@ if __name__ == "__main__":
     dt = 0.01
     g = 9.81
     time  = torch.arange(0, T, device=args.device) * dt
-    stepper = pp.utils.ReduceToBason(steps=15, verbose=False)
     current_u = torch.sin(time).unsqueeze(1).unsqueeze(0)
 
     # expert
@@ -67,8 +66,7 @@ if __name__ == "__main__":
                            device=args.device),
         len = torch.tensor(1.5).to(args.device),
         m_cart = torch.tensor(20.0).to(args.device),
-        m_pole = torch.tensor(10.0).to(args.device),
-    )
+        m_pole = torch.tensor(10.0).to(args.device))
 
     torch.manual_seed(0)
     len = torch.tensor(2.0).to(args.device).requires_grad_()
@@ -77,17 +75,18 @@ if __name__ == "__main__":
     def get_loss(x_init, _len, _m_pole):
 
         # expert
-        exp_solver = CartPole(dt, exp['len'], exp['m_cart'], exp['m_pole'], g)
-        mpc_expert = pp.module.MPC(exp_solver, exp['Q'], exp['p'], T, stepper=stepper)
+        solver_exp = CartPole(dt, exp['len'], exp['m_cart'], exp['m_pole'], g)
+        stepper_exp = pp.utils.ReduceToBason(steps=15, verbose=False)
+        mpc_expert = pp.module.MPC(solver_exp, exp['Q'], exp['p'], T, stepper=stepper_exp)
         x_true, u_true, cost_true = mpc_expert(dt, x_init, u_init=current_u)
 
         #agent
-        agt_solver = CartPole(dt, _len, exp['m_cart'], _m_pole, g)
-        mpc_agt = pp.module.MPC(agt_solver, exp['Q'], exp['p'], T, stepper=stepper)
+        solver_agt = CartPole(dt, _len, exp['m_cart'], _m_pole, g)
+        stepper_agt = pp.utils.ReduceToBason(steps=15, verbose=False)
+        mpc_agt = pp.module.MPC(solver_agt, exp['Q'], exp['p'], T, stepper=stepper_agt)
         x_pred, u_pred, cost_pred = mpc_agt(dt, x_init, u_init=current_u)
 
-        traj_loss = torch.mean((u_true - u_pred)**2) \
-            + torch.mean((x_true - x_pred)**2)
+        traj_loss = ((u_true - u_pred)**2).mean() + ((x_true - x_pred)**2).mean()
 
         return traj_loss
 
