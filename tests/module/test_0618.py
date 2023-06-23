@@ -31,7 +31,7 @@ c2 = torch.zeros(n_state)
 dt = 1
 
 lti = pp.module.LTI(expert['A'], expert['B'], C, D, c1, c2)
-mpc = pp.module.MPC(lti, T, step=1)
+mpc = pp.module.MPCO(lti, T, step=1)
 x_true, u_true, cost_true = mpc.forward(expert['Q'], expert['p'], x_init, dt)
 
 print(x_true)
