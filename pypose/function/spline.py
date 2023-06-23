@@ -76,7 +76,6 @@ def chspline(points, interval=0.1):
     m = (points[..., 1:, :] - points[..., :-1, :])
     m /= (x[..., 1:] - x[..., :-1])[..., None]
     m = torch.cat([m[...,[0],:], (m[..., 1:,:] + m[..., :-1,:]) / 2, m[...,[-1],:]], -2)
-    idxs = torch.searchsorted(x[0, 1:], xs[0, :])
     dx = x[..., idxs + 1] - x[..., idxs]
     t = (xs - x[..., idxs]) / dx
     alpha = torch.arange(4, **dargs)
