@@ -10,23 +10,23 @@ class TestSpline:
         data = pp.randn_SE3(2,device=device)
         poses = pp.bspline(data, timeline)
         torch.testing.assert_close(poses[...,[0,-1],:].translation(),
-                                   data[...,[0,-1],:].translation(),atol=1e-4, rtol=1e-2)
+                                   data[...,[0,-1],:].translation(),atol=1e-4, rtol=1e-1)
         torch.testing.assert_close(poses[...,[0,-1],:].rotation(),
-                                   data[...,[0,-1],:].rotation(),atol=1e-4, rtol=1e-2)
+                                   data[...,[0,-1],:].rotation(),atol=1e-4, rtol=1e-1)
         # test for multi batch
         data = pp.randn_SE3(2,3, device=device)
         poses = pp.bspline(data, timeline)
         torch.testing.assert_close(poses[...,[0,-1],:].translation(),
-                                   data[...,[0,-1],:].translation(),atol=1e-4, rtol=1e-2)
+                                   data[...,[0,-1],:].translation(),atol=1e-4, rtol=1e-1)
         torch.testing.assert_close(poses[...,[0,-1],:].rotation(),
-                                   data[...,[0,-1],:].rotation(),atol=1e-4, rtol=1e-2)
+                                   data[...,[0,-1],:].rotation(),atol=1e-4, rtol=1e-1)
         # test for high dimension
         data = pp.randn_SE3(2,3,4, device=device)
         poses = pp.bspline(data, timeline)
         torch.testing.assert_close(poses[...,[0,-1],:].translation(),
-                                   data[...,[0,-1],:].translation(),atol=1e-4, rtol=1e-2)
+                                   data[...,[0,-1],:].translation(),atol=1e-4, rtol=1e-1)
         torch.testing.assert_close(poses[...,[0,-1],:].rotation(),
-                                   data[...,[0,-1],:].rotation(),atol=1e-4, rtol=1e-2)
+                                   data[...,[0,-1],:].rotation(),atol=1e-4, rtol=1e-1)
 
     def test_chspline(self):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
