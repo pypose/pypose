@@ -92,9 +92,9 @@ class LQR2(nn.Module):
                     Quu, qu, lb, ub, x_init=prev_kt, n_iter=20)
 
                 prev_kt = kt
+                k[...,t,:] = kt
                 Qux_ = Qux.clone()
                 Qux_[(1-If).unsqueeze(2).repeat(1,1,Qux.size(2)).bool()] = 0
-
 
                 if nc == 1:
                     K[...,t,:,:] = Kt = -((1./Quu_free_LU)*Qux_)
@@ -172,9 +172,9 @@ def pn(H, g, lb, up, x_init=None, n_iter=20):
     J = torch.ones(n_batch).type_as(x).byte()
 
     for i in range(n_iter):
-        g = bmv(H, x) + g
+        l = bmv(H, x) + g
 
-        Ic = (((x == lb) & (g > 0)) | ((x == up) & (g < 0))).float()
+        Ic = (((x == lb) & (l > 0)) | ((x == up) & (l < 0))).float()
         If = 1-Ic
 
         if If.is_cuda:
@@ -186,17 +186,17 @@ def pn(H, g, lb, up, x_init=None, n_iter=20):
             not_Hff_I = 1-Hff_I
             Hfc_I = If.unsqueeze(2).bmm(Ic.unsqueeze(1)).type_as(If)
 
-        g_ = g.clone()
-        g_[Ic.bool()] = 0.0
+        l_ = l.clone()
+        l_[Ic.bool()] = 0.0
         H_ = H.clone()
         H_[not_Hff_I.bool()] = 0.0
         H_ = H_ + pn_I
 
         if n_ctrl == 1:
-            dx = -(1./H_.squeeze(2))*g_
+            dx = -(1./H_.squeeze(2))*l_
         else:
             H_lu_ = H_.lu()
-            dx = -g_.unsqueeze(2).lu_solve(*H_lu_).squeeze(2)
+            dx = -l_.unsqueeze(2).lu_solve(*H_lu_).squeeze(2)
 
         J = torch.norm(dx, 2, 1) >= 1e-4
         m = J.sum().item()
@@ -211,7 +211,7 @@ def pn(H, g, lb, up, x_init=None, n_iter=20):
         while max_armijo <= GAMMA and count < 10:
             maybe_x = eclamp(x+torch.diag(alpha).mm(dx), lb, up)
             armijos = (GAMMA+1e-6)*torch.ones(n_batch).type_as(x)
-            armijos[J] = (obj(x)-obj(maybe_x))[J]/(torch.bmm(g.unsqueeze(1), (x-maybe_x).unsqueeze(2)).squeeze(1).squeeze(1))[J]
+            armijos[J] = (obj(x)-obj(maybe_x))[J]/(torch.bmm(l.unsqueeze(1), (x-maybe_x).unsqueeze(2)).squeeze(1).squeeze(1))[J]
             I = armijos <= GAMMA
             alpha[I] *= decay
             max_armijo = torch.max(armijos)
