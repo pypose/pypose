@@ -181,7 +181,13 @@ def bspline(data, timeline):
         Fig. 1. Result of B Spline Interpolation in SE3.
     '''
     assert is_SE3(data), "The input poses are not SE3Type."
-    data = torch.cat((data[..., :1, :], data, data[..., -1:, :]), dim=-2)
+    assert data.dim()>=2, 'Dimension of data should be [..., N, C]'
+    if data.dim()==2:
+        data.unsqueeze(0)
+    batch = data.shape[:-2]
+    data = torch.cat((data[..., :1, :].expand(batch+(2,-1)), 
+                      data, 
+                      data[..., -1:, :].expand(batch+(2,-1))), dim=-2)
     Bth, N, D, K = data.shape[:-2], data.shape[-2], data.shape[-1], timeline.shape[-1]
     dargs = {'dtype': timeline.dtype, 'device': timeline.device}
     tt = timeline ** torch.arange(4, **dargs).view(-1, 1)
