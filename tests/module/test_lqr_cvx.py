@@ -86,7 +86,7 @@ class TestLQR:
         dt = 1
 
         lti = pp.module.LTI(A, B, C, D, c1, c2)
-        LQR = pp.module.LQR(lti, Q, p, T)
+        LQR = pp.module.LQRO(lti, Q, p, T)
         x_lqr, u_lqr, cost_lqr = LQR(x_init, dt)
 
         print(x_lqr)

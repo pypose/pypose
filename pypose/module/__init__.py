@@ -13,3 +13,5 @@ from .lqr_pn import LQR2
 from .mpc_pn import MPC2
 from .lqr_n import LQRN
 from .mpc_n import MPCN
+from .lqr_ori import LQRO
+from .mpc_ori import MPCO
