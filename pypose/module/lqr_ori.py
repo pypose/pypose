@@ -66,7 +66,10 @@ class LQRO(nn.Module):
                 self.system.set_refpoint(state=current_x[...,t,:], input=current_u[...,t,:],
                                          t=torch.tensor(t*dt))
                 A = self.system.A.squeeze(-2)
-                B = self.system.B.squeeze(-1)
+                if self.system.B.dim() > 2:
+                    B = self.system.B.squeeze(-1)
+                else:
+                    B = self.system.B
                 F = torch.cat((A, B), dim=-1)
                 Qt = self.Q[...,t,:,:] + F.mT @ V @ F
                 qt = p_new[...,t,:] + bmv(F.mT, v)
