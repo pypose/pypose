@@ -310,6 +310,7 @@ class LQR(nn.Module):
 
         ns, nsc = x_init.size(-1), self.p.size(-1)
         nc = nsc - ns
+        prev_kt = None
 
         if u_traj is None:
             self.u_traj = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
@@ -345,8 +346,32 @@ class LQR(nn.Module):
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
             qx, qu = qt[..., :ns], qt[..., ns:]
             Quu_inv = torch.linalg.pinv(Quu)
-            K[...,t,:,:] = Kt = - Quu_inv @ Qux
-            k[...,t,:] = kt = - bmv(Quu_inv, qu)
+
+            if u_lower is None:
+                K[...,t,:,:] = Kt = - Quu_inv @ Qux
+                k[...,t,:] = kt = - bmv(Quu_inv, qu)
+            else:
+                lb = u_lower[...,t,:] - self.u_traj[...,t,:]
+                ub = u_upper[...,t,:] - self.u_traj[...,t,:]
+
+                if du is not None:
+                    lb[lb < -du] = -du
+                    ub[ub > du] = du
+
+                kt, Quu_free_LU, If = pn(
+                    Quu, qu, lb, ub, x_init=prev_kt, n_iter=20)
+
+                prev_kt = kt
+                k[...,t,:] = kt
+                Qux_ = Qux.clone()
+                Qux_[(1-If).unsqueeze(2).repeat(1,1,Qux.size(2)).bool()] = 0
+
+                if nc == 1:
+                    K[...,t,:,:] = Kt = -((1./Quu_free_LU)*Qux_)
+                else:
+                    K[...,t,:,:] = Kt = -Qux_.lu_solve(*Quu_free_LU)
+
+
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
             v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
 
@@ -357,6 +382,7 @@ class LQR(nn.Module):
         assert x_init.device == K.device == k.device
         assert x_init.dtype == K.dtype == k.dtype
         assert x_init.ndim == 2, "Shape not compatible."
+        assert not ((du is not None) and (u_lower is None))
 
         ns, nc = self.x_traj.size(-1), self.u_traj.size(-1)
 
@@ -371,8 +397,108 @@ class LQR(nn.Module):
             delta_xt = xt - self.x_traj[...,t,:]
             delta_u[..., t, :] = bmv(Kt, delta_xt) + kt
             u[...,t,:] = ut = delta_u[..., t, :] + self.u_traj[...,t,:]
+
+            if u_lower is not None:
+                lb = u_lower[...,t,:]
+                ub = u_upper[...,t,:]
+
+                if du is not None:
+                    lb_limit, ub_limit = lb, ub
+                    lb = self.u_traj[...,t,:] - du
+                    ub = self.u_traj[...,t,:] + du
+                    I = lb < lb_limit
+                    lb[I] = lb_limit if isinstance(lb_limit, float) else lb_limit[I]
+                    I = ub > ub_limit
+                    ub[I] = ub_limit if isinstance(lb_limit, float) else ub_limit[I]
+                u[...,t,:] = eclamp(ut, lb, ub)
+                ut = u[...,t,:]
+
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
             cost += 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + vecdot(xut, self.p[...,t,:])
 
         return x, u, cost
+
+
+def pn(H, g, lb, up, x_init=None, n_iter=20):
+    GAMMA = 0.1
+    n_batch, n_ctrl, _ = H.size()
+    pn_I = 1e-11*torch.eye(n_ctrl).type_as(H).expand_as(H)
+
+    def obj(x):
+        return 0.5 * bvmv(x, H, x) + (x * g).sum(-1)
+
+    if x_init is None:
+        if n_ctrl == 1:
+            x_init = -(1./H.squeeze(2))*g
+        else:
+            H_lu = H.lu()
+            x_init = -g.unsqueeze(2).lu_solve(*H_lu).squeeze(2)
+    else:
+        x_init = x_init.clone()
+
+    x = eclamp(x_init, lb, up)
+
+    J = torch.ones(n_batch).type_as(x).byte()
+
+    for i in range(n_iter):
+        l = bmv(H, x) + g
+
+        Ic = (((x == lb) & (l > 0)) | ((x == up) & (l < 0))).float()
+        If = 1-Ic
+
+        if If.is_cuda:
+            Hff_I = If.float().unsqueeze(2).bmm(If.float().unsqueeze(1)).type_as(If)
+            not_Hff_I = 1-Hff_I
+            Hfc_I = If.float().unsqueeze(2).bmm(Ic.float().unsqueeze(1)).type_as(If)
+        else:
+            Hff_I = If.unsqueeze(2).bmm(If.unsqueeze(1)).type_as(If)
+            not_Hff_I = 1-Hff_I
+            Hfc_I = If.unsqueeze(2).bmm(Ic.unsqueeze(1)).type_as(If)
+
+        l_ = l.clone()
+        l_[Ic.bool()] = 0.0
+        H_ = H.clone()
+        H_[not_Hff_I.bool()] = 0.0
+        H_ = H_ + pn_I
+
+        if n_ctrl == 1:
+            dx = -(1./H_.squeeze(2))*l_
+        else:
+            H_lu_ = H_.lu()
+            dx = -l_.unsqueeze(2).lu_solve(*H_lu_).squeeze(2)
+
+        J = torch.norm(dx, 2, 1) >= 1e-4
+        m = J.sum().item()
+        if m == 0:
+            return x, H_ if n_ctrl == 1 else H_lu_, If
+
+        alpha = torch.ones(n_batch).type_as(x)
+        decay = 0.1
+        max_armijo = GAMMA
+        count = 0
+
+        while max_armijo <= GAMMA and count < 10:
+            maybe_x = eclamp(x+torch.diag(alpha).mm(dx), lb, up)
+            armijos = (GAMMA+1e-6)*torch.ones(n_batch).type_as(x)
+            armijos[J] = (obj(x)-obj(maybe_x))[J]/(torch.bmm(l.unsqueeze(1), (x-maybe_x).unsqueeze(2)).squeeze(1).squeeze(1))[J]
+            I = armijos <= GAMMA
+            alpha[I] *= decay
+            max_armijo = torch.max(armijos)
+            count += 1
+
+        x = maybe_x
+
+    return x, H_ if n_ctrl == 1 else H_lu_, If
+
+
+def eclamp(x, lb, ub):
+
+    I = x < lb
+    x[I] = lb[I] if not isinstance(lb, float) else lb
+
+    I = x > ub
+    x[I] = ub[I] if not isinstance(ub, float) else ub
+
+    return x
+
