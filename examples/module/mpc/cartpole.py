@@ -1,39 +1,13 @@
 import os
+import time
 import torch
-import shutil
 import argparse
-import setproctitle
 import pypose as pp
-import pickle as pkl
 import torch.optim as optim
+import matplotlib.pyplot as plt
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--n_batch', type=int, default=1)
-    parser.add_argument('--n_state', type=int, default=4)
-    parser.add_argument('--n_ctrl', type=int, default=1)
-    parser.add_argument('--T', type=int, default=5)
-    parser.add_argument('--save', type=str)
-    parser.add_argument('--work2', type=str, default='work2')
-    parser.add_argument('--no-cuda', action='store_true')
-    parser.add_argument('--seed', type=int, default=0)
-    args = parser.parse_args()
 
-    args.cuda = not args.no_cuda and torch.cuda.is_available()
-    t = '.'.join(["{}={}".format(x, getattr(args, x))
-                  for x in ['n_batch', 'n_state', 'n_ctrl', 'T']])
-    setproctitle.setproctitle('bamos.lqr.'+t+'.{}'.format(args.seed))
-    if args.save is None:
-        args.save = os.path.join(args.work2, t, str(args.seed))
-    if os.path.exists(args.save):
-        shutil.rmtree(args.save)
-    os.makedirs(args.save, exist_ok=True)
-
-    device = torch.device("cuda" if args.cuda else "cpu")
-    n_batch, n_state, n_ctrl, T= args.n_batch, args.n_state, args.n_ctrl, args.T
-    n_sc = n_state + n_ctrl
-
-    class CartPole(pp.module.NLS):
+class CartPole(pp.module.NLS):
         def __init__(self, dt, length, cartmass, polemass, gravity):
             super().__init__()
             self.tau = dt
@@ -41,7 +15,7 @@ def main():
             self.cartmass = cartmass
             self.polemass = polemass
             self.gravity = gravity
-            self.polemassLength = self.polemass * self.length
+            self.poleml = self.polemass * self.length
             self.totalMass = self.cartmass + self.polemass
 
         def state_transition(self, state, input, t=None):
@@ -50,94 +24,114 @@ def main():
             costheta = torch.cos(theta)
             sintheta = torch.sin(theta)
 
-            temp = (
-                force + self.polemassLength * thetaDot**2 * sintheta
-            ) / self.totalMass
-            thetaAcc = (self.gravity * sintheta - costheta * temp) / (
-                self.length * (4.0 / 3.0 - self.polemass * costheta**2 / self.totalMass)
-            )
-            xAcc = temp - self.polemassLength * thetaAcc * costheta / self.totalMass
-
+            temp = (force + self.poleml * thetaDot**2 * sintheta) / self.totalMass
+            thetaAcc = (self.gravity * sintheta - costheta * temp) / \
+                (self.length * (4.0 / 3.0 - self.polemass * costheta**2 / self.totalMass))
+            xAcc = temp - self.poleml * thetaAcc * costheta / self.totalMass
             _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
-
             return (state.squeeze() + torch.mul(_dstate, self.tau)).unsqueeze(0)
 
         def observation(self, state, input, t=None):
             return state
 
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='MPC Nonl-inear Learning Example \
+                                     (Cartpole)')
+    parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
+    parser.add_argument("--save", type=str, default='./examples/module/mpc/save/',
+                        help="location of png files to save")
+    parser.add_argument('--show', dest='show', action='store_true',
+                        help="show plot, default: False")
+    parser.set_defaults(show=False)
+    args = parser.parse_args(); print(args)
+    os.makedirs(os.path.join(args.save), exist_ok=True)
+
+    n_batch, n_state, n_ctrl, T = 1, 4, 1, 5
     dt = 0.01
     g = 9.81
-    time  = torch.arange(0, T, device=device) * dt
+    time  = torch.arange(0, T, device=args.device) * dt
+    current_u = torch.sin(time).unsqueeze(1).unsqueeze(0)
 
-    expert = dict(
-        Q = torch.tile(torch.eye(n_state + n_ctrl, device=device), (n_batch, T, 1, 1)),
+    # expert
+    exp = dict(
+        Q = torch.tile(torch.eye(n_state + n_ctrl, device=args.device), \
+                       (n_batch, T, 1, 1)),
         p = torch.tensor([[[ 0.1945,  0.2579,  0.1655,  1.0841, -0.6235],
                            [-0.3816, -0.4376, -0.7798, -0.3692,  1.4181],
                            [-0.4025,  1.0821, -0.0679,  0.5890,  1.1151],
                            [-0.0610,  0.0656, -1.0557,  0.8769, -0.5928],
-                           [ 0.0123,  0.3731, -0.2426, -1.5464,  0.0056]]]).to(device),
-        len = torch.tensor(1.5).to(device),
-        m_cart = torch.tensor(20.0).to(device),
-        m_pole = torch.tensor(10.0).to(device),
-    )
-    fname = os.path.join(args.save, 'expert.pkl')
-    with open(fname, 'wb') as fi:
-        pkl.dump(expert, fi)
+                           [ 0.0123,  0.3731, -0.2426, -1.5464,  0.0056]]],
+                           device=args.device),
+        len = torch.tensor(1.5).to(args.device),
+        m_cart = torch.tensor(20.0).to(args.device),
+        m_pole = torch.tensor(10.0).to(args.device))
 
-    current_u = torch.sin(time).unsqueeze(1).unsqueeze(0)
-
-    torch.manual_seed(args.seed)
-    len = torch.tensor(2.0).to(device).requires_grad_()
-    #m_cart = torch.tensor(20.1).to(device).requires_grad_()
-    m_pole = torch.tensor(11.1).to(device).requires_grad_()
-
-    fname = os.path.join(args.save, 'cartpole losses.csv')
-    loss_f = open(fname, 'w')
-    loss_f.write('im_loss,mse\n')
-    loss_f.flush()
+    torch.manual_seed(0)
+    len = torch.tensor(2.0).to(args.device).requires_grad_()
+    m_pole = torch.tensor(11.1).to(args.device).requires_grad_()
 
     def get_loss(x_init, _len, _m_pole):
 
-        expert_cartPoleSolver = CartPole(dt, expert['len'], expert['m_cart'], expert['m_pole'], g).to(device)
-        mpc_expert = pp.module.MPC(expert_cartPoleSolver, T, step=15).to(device)
-        x_true, u_true, cost_true = mpc_expert(expert['Q'], expert['p'], x_init, dt, current_u=current_u)
+        # expert
+        solver_exp = CartPole(dt, exp['len'], exp['m_cart'], exp['m_pole'], g)
+        stepper_exp = pp.utils.ReduceToBason(steps=15, verbose=False)
+        mpc_expert = pp.module.MPC(solver_exp, exp['Q'], exp['p'], T, stepper=stepper_exp)
+        x_true, u_true, cost_true = mpc_expert(dt, x_init, u_init=current_u)
 
-        agent_cartPoleSolver = CartPole(dt, _len, expert['m_cart'], _m_pole, g).to(device)
-        mpc_agent = pp.module.MPC(agent_cartPoleSolver, T, step=15).to(device)
-        x_pred, u_pred, cost_pred = mpc_agent(expert['Q'], expert['p'], x_init, dt, current_u=current_u)
+        #agent
+        solver_agt = CartPole(dt, _len, exp['m_cart'], _m_pole, g)
+        stepper_agt = pp.utils.ReduceToBason(steps=15, verbose=False)
+        mpc_agt = pp.module.MPC(solver_agt, exp['Q'], exp['p'], T, stepper=stepper_agt)
+        x_pred, u_pred, cost_pred = mpc_agt(dt, x_init, u_init=current_u)
 
-        traj_loss = torch.mean((u_true - u_pred)**2) \
-            + torch.mean((x_true - x_pred)**2)
+        traj_loss = ((u_true - u_pred)**2).mean() + ((x_true - x_pred)**2).mean()
 
         return traj_loss
 
     opt = optim.RMSprop([len, m_pole], lr=1e-2)
 
-    for i in range(500):
-        x_init = torch.tensor([[0, 0, torch.pi + torch.deg2rad(5.0*torch.randn(1)), 0]], device=device)
+    steps = 500
+    traj_losses = []
+    model_losses = []
+
+    for i in range(steps):
+        x_init = torch.tensor([[0, 0, torch.pi + torch.deg2rad(5.0*torch.randn(1)), 0]],
+                              device=args.device)
         traj_loss = get_loss(x_init, len, m_pole)
         opt.zero_grad()
         traj_loss.backward()
         opt.step()
 
-        model_loss = torch.mean((len - expert['len'])**2) + \
-                    torch.mean((m_pole - expert['m_pole'])**2)
+        model_loss = torch.mean((len - exp['len'])**2) + \
+                    torch.mean((m_pole - exp['m_pole'])**2)
 
-        loss_f.write('{},{}\n'.format(traj_loss.item(), model_loss.item()))
-        loss_f.flush()
+        traj_losses.append(traj_loss.item())
+        model_losses.append(model_loss.item())
 
         plot_interval = 1
         if i % plot_interval == 0:
             os.system('./plot.py "{}" &'.format(args.save))
             print("Length of pole of the agent system = ", len)
-            print("Length of pole of the expert system = ", expert['len'])
-            #print("Mass of cart of the agent system = ", m_cart)
-            #print("Mass of cart of the expert system = ", expert['m_cart'])
+            print("Length of pole of the exp system = ", exp['len'])
             print("Mass of pole of the agent system = ", m_pole)
-            print("Mass of pole of the expert system = ", expert['m_pole'])
+            print("Mass of pole of the exp system = ", exp['m_pole'])
             print('{:04d}: traj_loss: {:.8f} model_loss: {:.8f}'.format(
             i, traj_loss.item(), model_loss.item()))
 
+    plt.subplot(2, 1, 1)
+    plt.plot(range(steps), traj_losses)
+    plt.ylabel('Trajectory Loss')
 
-if __name__=='__main__':
-    main()
+    plt.subplot(2, 1, 2)
+    plt.plot(range(steps), model_losses)
+    plt.xlabel('Iteration')
+    plt.ylabel('Model Loss')
+
+    figure = os.path.join(args.save + 'cartpole.png')
+    plt.savefig(figure)
+    print("Saved to", figure)
+
+    if args.show:
+        plt.show()
