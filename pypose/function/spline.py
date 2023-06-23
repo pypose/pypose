@@ -63,10 +63,16 @@ def chspline(points, interval=0.1):
         Fig. 1. Result of Cubic Spline Interpolation in 3D space.
     """
     assert points.dim() >= 2, 'Dimension of points should be [..., N, C]'
+    assert 1/interval%1 == 0.0, '1 should be divisible by interval between points'
+    if points.dim()==2:
+        points = points.unsqueeze(0)
     batch, N = points.shape[:-2], points.shape[-2]
     dargs = {'device': points.device, 'dtype': points.dtype}
-    xs = torch.arange(0, N-1+interval, interval, **dargs).expand(batch+(-1,))
-    x  = torch.arange(N, **dargs).expand(batch+(-1,))
+    xs = torch.arange(0, N-1+interval, interval, **dargs)
+    x = torch.arange(N, **dargs)
+    idxs = torch.searchsorted(x[...,1:], xs[..., :])
+    x = x.expand(batch+(-1,))
+    xs = xs.expand(batch+(-1,))
     m = (points[..., 1:, :] - points[..., :-1, :])
     m /= (x[..., 1:] - x[..., :-1])[..., None]
     m = torch.cat([m[...,[0],:], (m[..., 1:,:] + m[..., :-1,:]) / 2, m[...,[-1],:]], -2)
