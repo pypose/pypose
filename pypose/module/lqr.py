@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from .. import bmv, bvmv
+from .. import bmv, bvmv, bvv
 from torch.linalg import vecdot
 
 class LQR(nn.Module):
@@ -337,7 +337,10 @@ class LQR(nn.Module):
                                          input=self.u_traj[...,t,:],
                                          t=torch.tensor(t*dt))
                 A = self.system.A.squeeze(-2)
-                B = self.system.B.squeeze(-1)
+                if self.system.B.dim() > 2:
+                    B = self.system.B.squeeze(-1)
+                else:
+                    B = self.system.B
                 F = torch.cat((A, B), dim=-1)
                 Qt = self.Q[...,t,:,:] + F.mT @ V @ F
                 qt = p[...,t,:] + bmv(F.mT, v)
@@ -358,7 +361,90 @@ class LQR(nn.Module):
                     lb[lb < -du] = -du
                     ub[ub > du] = du
 
-                kt, Quu_free_LU, If = pn(
+                def pn(H, g, lb, up, x_init=None, n_iter=20):
+                    GAMMA = 0.1
+                    n_batch, n_ctrl, _ = H.size()
+                    pn_I = 1e-11*torch.eye(n_ctrl, **self.dargs)
+
+                    def obj(x):
+                        return 0.5 * bvmv(x, H, x) + vecdot(x, g)
+
+                    if x_init is None:
+                        if n_ctrl == 1:
+                            H_inv = torch.linalg.pinv(H)
+                            x_init = - bmv(H_inv, g)
+                            #x_init = -(1./H.squeeze(2))*g
+                        else:
+                            H_LU, pivots = torch.linalg.lu_factor(H)
+                            x_init = -torch.linalg.lu_solve(H_LU, pivots, \
+                                                            g.unsqueeze(-1)).squeeze(-1)
+                            #H_lu = H.lu()
+                            #x_init = -g.unsqueeze(2).lu_solve(*H_lu).squeeze(2)
+                    else:
+                        x_init = x_init#.clone()
+
+                    x = torch.where(x_init < lb, lb, x_init)
+                    x = torch.where(x_init > ub, ub, x_init)
+
+                    J = torch.ones(n_batch, **self.dargs)
+
+                    for i in range(n_iter):
+                        l = bmv(H, x) + g
+
+                        Ic = (((x == lb) & (l > 0)) | ((x == up) & (l < 0))).float()
+                        If = 1 - Ic
+
+                        #Hff_I = If.unsqueeze(2).bmm(If.unsqueeze(1)).type_as(If)
+                        Hff_I = bvv(If, If)
+                        not_Hff_I = 1 - Hff_I
+                        #Hfc_I = If.unsqueeze(2).bmm(Ic.unsqueeze(1)).type_as(If)
+                        Hfc_I = bvv(If, Ic)
+
+                        l_ = l.clone()
+                        l_[Ic.bool()] = 0.0
+                        H_ = H.clone()
+                        H_[not_Hff_I.bool()] = 0.0
+                        H_ = H_ + pn_I
+
+                        if n_ctrl == 1:
+                            H_inv_ = torch.linalg.pinv(H_)
+                            dx = - bmv(H_inv_, l_)
+                            #dx = -(1./H_.squeeze(2))*l_
+                            pivots_ =  None
+                        else:
+                            H_LU_, pivots_ = torch.linalg.lu_factor(H_)
+                            dx = -torch.linalg.lu_solve(H_LU_, pivots_, \
+                                                        l_.unsqueeze(-1)).squeeze(-1)
+                            #H_lu_ = H_.lu()
+                            #dx = -l_.unsqueeze(2).lu_solve(*H_lu_).squeeze(2)
+
+                        J = torch.norm(dx, 2, 1) >= 1e-4
+                        m = J.sum().item()
+                        if m == 0:
+                            return x, H_ if n_ctrl == 1 else H_LU_, If, pivots_
+
+                        alpha = torch.ones(n_batch)
+                        decay = 0.1
+                        max_armijo = GAMMA
+                        count = 0
+
+                        while max_armijo <= GAMMA and count < 10:
+                            #maybe_x = eclamp(x+torch.diag(alpha).mm(dx), lb, up)
+                            maybe_x = x + torch.diag(alpha).mm(dx)
+                            maybe_x = torch.where(maybe_x < lb, lb, maybe_x)
+                            maybe_x = torch.where(maybe_x > ub, ub, maybe_x)
+                            armijos = (GAMMA + 1e-6) * torch.ones(n_batch)
+                            armijos[J] = (obj(x) - obj(maybe_x))[J]/(torch.bmm(l.unsqueeze(-2), (x - maybe_x).unsqueeze(2)).squeeze(1).squeeze(1))[J]
+                            I = armijos <= GAMMA
+                            alpha[I] *= decay
+                            max_armijo = torch.max(armijos)
+                            count += 1
+
+                        x = maybe_x
+
+                    return x, H_ if n_ctrl == 1 else H_LU_, If, pivots_
+
+                kt, Quu_free_LU, If, pivots_ = pn(
                     Quu, qu, lb, ub, x_init=prev_kt, n_iter=20)
 
                 prev_kt = kt
@@ -367,9 +453,10 @@ class LQR(nn.Module):
                 Qux_[(1-If).unsqueeze(2).repeat(1,1,Qux.size(2)).bool()] = 0
 
                 if nc == 1:
-                    K[...,t,:,:] = Kt = -((1./Quu_free_LU)*Qux_)
+                    K[...,t,:,:] = Kt = -((1./Quu_free_LU) * Qux_)
                 else:
-                    K[...,t,:,:] = Kt = -Qux_.lu_solve(*Quu_free_LU)
+                    K[...,t,:,:] = Kt = -torch.linalg.lu_solve(Quu_free_LU, pivots_, Qux_)
+                    #K[...,t,:,:] = Kt = -Qux_.lu_solve(*Quu_free_LU)
 
 
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
@@ -406,99 +493,16 @@ class LQR(nn.Module):
                     lb_limit, ub_limit = lb, ub
                     lb = self.u_traj[...,t,:] - du
                     ub = self.u_traj[...,t,:] + du
-                    I = lb < lb_limit
-                    lb[I] = lb_limit if isinstance(lb_limit, float) else lb_limit[I]
-                    I = ub > ub_limit
-                    ub[I] = ub_limit if isinstance(lb_limit, float) else ub_limit[I]
-                u[...,t,:] = eclamp(ut, lb, ub)
-                ut = u[...,t,:]
+                    lb = torch.where(lb < lb_limit, lb_limit, lb)
+                    ub = torch.where(ub < ub_limit, ub_limit, ub)
+
+                ut = torch.where(ut < lb, lb, ut)
+                ut = torch.where(ut > ub, ub, ut)
+
+                u[...,t,:] = ut
 
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
             cost += 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + vecdot(xut, self.p[...,t,:])
 
         return x, u, cost
-
-
-def pn(H, g, lb, up, x_init=None, n_iter=20):
-    GAMMA = 0.1
-    n_batch, n_ctrl, _ = H.size()
-    pn_I = 1e-11*torch.eye(n_ctrl).type_as(H).expand_as(H)
-
-    def obj(x):
-        return 0.5 * bvmv(x, H, x) + (x * g).sum(-1)
-
-    if x_init is None:
-        if n_ctrl == 1:
-            x_init = -(1./H.squeeze(2))*g
-        else:
-            H_lu = H.lu()
-            x_init = -g.unsqueeze(2).lu_solve(*H_lu).squeeze(2)
-    else:
-        x_init = x_init.clone()
-
-    x = eclamp(x_init, lb, up)
-
-    J = torch.ones(n_batch).type_as(x).byte()
-
-    for i in range(n_iter):
-        l = bmv(H, x) + g
-
-        Ic = (((x == lb) & (l > 0)) | ((x == up) & (l < 0))).float()
-        If = 1-Ic
-
-        if If.is_cuda:
-            Hff_I = If.float().unsqueeze(2).bmm(If.float().unsqueeze(1)).type_as(If)
-            not_Hff_I = 1-Hff_I
-            Hfc_I = If.float().unsqueeze(2).bmm(Ic.float().unsqueeze(1)).type_as(If)
-        else:
-            Hff_I = If.unsqueeze(2).bmm(If.unsqueeze(1)).type_as(If)
-            not_Hff_I = 1-Hff_I
-            Hfc_I = If.unsqueeze(2).bmm(Ic.unsqueeze(1)).type_as(If)
-
-        l_ = l.clone()
-        l_[Ic.bool()] = 0.0
-        H_ = H.clone()
-        H_[not_Hff_I.bool()] = 0.0
-        H_ = H_ + pn_I
-
-        if n_ctrl == 1:
-            dx = -(1./H_.squeeze(2))*l_
-        else:
-            H_lu_ = H_.lu()
-            dx = -l_.unsqueeze(2).lu_solve(*H_lu_).squeeze(2)
-
-        J = torch.norm(dx, 2, 1) >= 1e-4
-        m = J.sum().item()
-        if m == 0:
-            return x, H_ if n_ctrl == 1 else H_lu_, If
-
-        alpha = torch.ones(n_batch).type_as(x)
-        decay = 0.1
-        max_armijo = GAMMA
-        count = 0
-
-        while max_armijo <= GAMMA and count < 10:
-            maybe_x = eclamp(x+torch.diag(alpha).mm(dx), lb, up)
-            armijos = (GAMMA+1e-6)*torch.ones(n_batch).type_as(x)
-            armijos[J] = (obj(x)-obj(maybe_x))[J]/(torch.bmm(l.unsqueeze(1), (x-maybe_x).unsqueeze(2)).squeeze(1).squeeze(1))[J]
-            I = armijos <= GAMMA
-            alpha[I] *= decay
-            max_armijo = torch.max(armijos)
-            count += 1
-
-        x = maybe_x
-
-    return x, H_ if n_ctrl == 1 else H_lu_, If
-
-
-def eclamp(x, lb, ub):
-
-    I = x < lb
-    x[I] = lb[I] if not isinstance(lb, float) else lb
-
-    I = x > ub
-    x[I] = ub[I] if not isinstance(ub, float) else ub
-
-    return x
-

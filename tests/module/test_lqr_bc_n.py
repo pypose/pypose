@@ -2,12 +2,12 @@ import torch
 import pypose as pp
 
 
-n_state, n_ctrl = 4, 3
+n_state, n_ctrl = 4, 2
 n_sc = n_state+n_ctrl
 T = 5
 n_batch = 2
 
-expert_seed = 33
+expert_seed = 333
 torch.manual_seed(expert_seed)
 
 alpha = 0.2
