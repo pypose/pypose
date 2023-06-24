@@ -10,3 +10,4 @@ Examples for how to use PyPose
 * [IMU Preintegration](./module/imu)
 * [Pose Graph Optimization](./module/pgo)
 * [Point Cloud Registration](./module/pcr)
+* [Model Predictive Control](./module/mpc)
