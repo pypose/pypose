@@ -139,14 +139,14 @@ def read_bal_data(file_name: str) -> dict:
     return {'problem_name': os.path.basename(file_name).split('.')[0], # str
             'camera_extrinsics': camera_extrinsics, # pp.SE3 (n_observation, 7)
             'camera_intrinsics': camera_intrinsics, # torch.Tensor (n_observation, 3, 3)
-            'points_3d': torch.from_numpy(points_3d), # torch.Tensor (n_observations, 3)
-            'points_2d': torch.from_numpy(points_2d), # torch.Tensor (n_observations, 2)
+            'points_3d': points_3d, # torch.Tensor (n_observations, 3)
+            'points_2d': points_2d, # torch.Tensor (n_observations, 2)
             }
 
-def build_pipeline(dataset='ladybug'):
+def build_pipeline(dataset='ladybug', cache_dir='bal_data'):
     assert dataset in ALL_DATASETS, f"dataset_name must be one of {ALL_DATASETS}"
     url_dp = problem_lister(with_base_url(dataset + '.html'))
-    download_dp = download_pipe(cache_dir='test', url_dp=url_dp, suffix='.bz2')
+    download_dp = download_pipe(cache_dir=cache_dir, url_dp=url_dp, suffix='.bz2')
     bal_data_dp = download_dp.map(read_bal_data)
     return bal_data_dp
 
