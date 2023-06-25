@@ -4,13 +4,17 @@ from operator import itemgetter, methodcaller
 from pathlib import Path
 from typing import Union
 
+from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
+import warnings
+# ignore bs4 warning
+warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
+
 import numpy as np
 from scipy.spatial.transform import Rotation
 from torchdata.datapipes.iter import FileOpener, HttpReader, IterableWrapper, \
     IterDataPipe, Zipper, IterKeyZipper, OnlineReader, Decompressor, Concater, \
     MapKeyZipper
 from torchvision.transforms import Compose
-from bs4 import BeautifulSoup
 import pypose as pp
 import torch
 
