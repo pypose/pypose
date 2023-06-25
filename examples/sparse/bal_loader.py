@@ -75,19 +75,15 @@ def read_bal_data(file_name: str) -> dict:
         A dictionary containing the following fields:
         - problem_name: str
             The name of the problem.
-        - camera_extrinsics: pp.SE3 (n_cameras, 7)
+        - camera_extrinsics: pp.SE3 (n_observation, 7)
             The camera extrinsics, represented as pp.SE3.
             First three columns are translation, last four columns is unit quaternion.
-        - camera_intrinsics: torch.Tensor (n_cameras, 3, 3)
+        - camera_intrinsics: torch.Tensor (n_observation, 3, 3)
             The camera intrinsics. Each camera is represented as a 3x3 K matrix.
-        - points_3d: torch.Tensor (n_points, 3)
+        - points_3d: torch.Tensor (n_observation, 3)
             contains initial estimates of point coordinates in the world frame.
         - points_2d: torch.Tensor (n_observations, 2)
             contains measured 2-D coordinates of points projected on images in each observations.
-        - camera_indices: torch.Tensor (n_observations,)
-            contains indices of cameras (from 0 to n_cameras - 1) involved in each observation.
-        - point_indices: torch.Tensor (n_observations,)
-            contains indices of points (from 0 to n_points - 1) involved in each observation.
     """
     with open(file_name, "r") as file:
         n_cameras, n_points, n_observations = map(
@@ -113,6 +109,9 @@ def read_bal_data(file_name: str) -> dict:
             points_3d[i] = float(file.readline())
         points_3d = points_3d.reshape((n_points, -1))
 
+    # use shape (n_observations, 3) as seen in pp.reprojerr
+    points_3d = torch.from_numpy(points_3d[point_indices])
+
     # convert Rodrigues vector to unit quaternion for camera rotation
     # camera_params[0:3] is the Rodrigues vector
     theta = np.linalg.norm(camera_params[:, :3], axis=1)[:, np.newaxis]
@@ -122,11 +121,12 @@ def read_bal_data(file_name: str) -> dict:
     r = Rotation.from_rotvec(v)
     q = r.as_quat()
 
-    # use pp.SE3 to represent camera extrinsics as seen in pp.point2pixel
+    # use pp.SE3 of shape (n_observations, 7) as seen in pp.reprojerr
     # camera_params[3:6] is the camera translation
-    camera_extrinsics = pp.SE3(np.concatenate([camera_params[:, 3:6], q], axis=1))
+    camera_extrinsics = np.concatenate([camera_params[:, 3:6], q], axis=1)
+    camera_extrinsics = pp.SE3(camera_extrinsics[camera_indices])
 
-    # use torch.Tensor of shape (N, 3, 3) to represent camera intrinsics as seen in pp.point2pixel
+    # use torch.Tensor of shape (n_observations, 3, 3) as seen in pp.reprojerr
     # camera_params[6] is focal length, camera_params[7] and camera_params[8] are two radial distortion parameters
     camera_intrinsics = np.zeros((n_cameras, 3, 3))
     camera_intrinsics[:, 0, 0] = camera_params[:, 6]
@@ -134,15 +134,13 @@ def read_bal_data(file_name: str) -> dict:
     camera_intrinsics[:, 0, 2] = camera_params[:, 7]
     camera_intrinsics[:, 1, 2] = camera_params[:, 8]
     camera_intrinsics[:, 2, 2] = 1
-    camera_intrinsics = torch.from_numpy(camera_intrinsics)
+    camera_intrinsics = torch.from_numpy(camera_intrinsics[camera_indices])
 
     return {'problem_name': os.path.basename(file_name).split('.')[0], # str
-            'camera_extrinsics': camera_extrinsics, # pp.SE3 (n_cameras, 7)
-            'camera_intrinsics': camera_intrinsics, # torch.Tensor (n_cameras, 3, 3)
-            'points_3d': torch.from_numpy(points_3d), # torch.Tensor (n_points, 3)
+            'camera_extrinsics': camera_extrinsics, # pp.SE3 (n_observation, 7)
+            'camera_intrinsics': camera_intrinsics, # torch.Tensor (n_observation, 3, 3)
+            'points_3d': torch.from_numpy(points_3d), # torch.Tensor (n_observations, 3)
             'points_2d': torch.from_numpy(points_2d), # torch.Tensor (n_observations, 2)
-            'camera_indices': torch.from_numpy(camera_indices), # torch.Tensor (n_observations,)
-            'point_indices': torch.from_numpy(point_indices), # torch.Tensor (n_observations,)
             }
 
 def build_pipeline(dataset='ladybug'):
