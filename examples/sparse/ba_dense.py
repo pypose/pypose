@@ -39,17 +39,22 @@ def bundle_adjustment(dataset: dict):
       if isinstance(v, torch.Tensor):
           dataset[k] = v.to(device)
 
-    optimizer = torch.optim.Adam([dataset['camera_extrinsics'], dataset['points_3d']], lr=1e-2)
 
-    extrinsics = dataset['camera_extrinsics'][dataset['camera_indices']].requires_grad_(True)
-    intrinsics = dataset['camera_intrinsics'][dataset['camera_indices']]
-    points_3d = dataset['points_3d'][dataset['point_indices']].requires_grad_(True)
-    points_2d = dataset['points_2d']
+    dataset['camera_extrinsics'].requires_grad_(True)
+    dataset['points_3d'].requires_grad_(True)
+
+    optimizer = torch.optim.Adam([dataset['camera_extrinsics'], dataset['points_3d']], lr=1e-2)
 
     for i in range(100):
         optimizer.zero_grad()
+
+        extrinsics = dataset['camera_extrinsics'][dataset['camera_indices']]
+        intrinsics = dataset['camera_intrinsics'][dataset['camera_indices']]
+        points_3d = dataset['points_3d'][dataset['point_indices']]
+        points_2d = dataset['points_2d']
+
         loss = pp.reprojerr(points_3d, points_2d, intrinsics, extrinsics)
-        loss = torch.sum(loss)
+        loss = torch.mean(loss)
         loss.backward()
         optimizer.step()
         print(f'Iter {i+1} loss: {loss.item()}')
