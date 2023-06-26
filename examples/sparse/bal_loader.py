@@ -4,19 +4,17 @@ from operator import itemgetter, methodcaller
 from pathlib import Path
 from typing import Union
 
+import numpy as np
+from scipy.spatial.transform import Rotation
+from torchdata.datapipes.iter import HttpReader, IterableWrapper, OnlineReader
+from torchvision.transforms import Compose
+import pypose as pp
+import torch
+
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 import warnings
 # ignore bs4 warning
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
-
-import numpy as np
-from scipy.spatial.transform import Rotation
-from torchdata.datapipes.iter import FileOpener, HttpReader, IterableWrapper, \
-    IterDataPipe, Zipper, IterKeyZipper, OnlineReader, Decompressor, Concater, \
-    MapKeyZipper
-from torchvision.transforms import Compose
-import pypose as pp
-import torch
 
 __ALL__ = ['build_pipeline', 'read_bal_data', 'DATA_URL', 'ALL_DATASETS']
 
@@ -79,15 +77,19 @@ def read_bal_data(file_name: str) -> dict:
         A dictionary containing the following fields:
         - problem_name: str
             The name of the problem.
-        - camera_extrinsics: pp.LieTensor (n_observation, 7)
-            The camera extrinsics, represented as pp.LieTensor, SE3 type
+        - camera_extrinsics: pp.LieTensor (n_cameras, 7)
+            The camera extrinsics.
             First three columns are translation, last four columns is unit quaternion.
-        - camera_intrinsics: torch.Tensor (n_observation, 3, 3)
+        - camera_intrinsics: torch.Tensor (n_cameras, 3, 3)
             The camera intrinsics. Each camera is represented as a 3x3 K matrix.
-        - points_3d: torch.Tensor (n_observation, 3)
-            Contains initial estimates of point coordinates in the world frame.
+        - points_3d: torch.Tensor (n_points, 3)
+            contains initial estimates of point coordinates in the world frame.
         - points_2d: torch.Tensor (n_observations, 2)
-            Contains measured 2-D coordinates of points projected on images in each observations.
+            contains measured 2-D coordinates of points projected on images in each observations.
+        - camera_indices: torch.Tensor (n_observations,)
+            contains indices of cameras (from 0 to n_cameras - 1) involved in each observation.
+        - point_indices: torch.Tensor (n_observations,)
+            contains indices of points (from 0 to n_points - 1) involved in each observation.
     """
     with open(file_name, "r") as file:
         n_cameras, n_points, n_observations = map(
@@ -102,6 +104,7 @@ def read_bal_data(file_name: str) -> dict:
             camera_indices[i] = int(camera_index)
             point_indices[i] = int(point_index)
             points_2d[i] = [float(x), float(y)]
+        points_2d = torch.from_numpy(points_2d)
 
         camera_params = np.empty(n_cameras * 9, dtype=np.float32)
         for i in range(n_cameras * 9):
@@ -112,11 +115,7 @@ def read_bal_data(file_name: str) -> dict:
         for i in range(n_points * 3):
             points_3d[i] = float(file.readline())
         points_3d = points_3d.reshape((n_points, -1))
-
-    # use shape (n_observations, 3) as seen in pp.reprojerr
-    points_3d = torch.from_numpy(points_3d[point_indices])
-    # use shape (n_observations, 2) as seen in pp.reprojerr
-    points_2d = torch.from_numpy(points_2d)
+        points_3d = torch.from_numpy(points_3d)
 
     # convert Rodrigues vector to unit quaternion for camera rotation
     # camera_params[0:3] is the Rodrigues vector
@@ -127,12 +126,12 @@ def read_bal_data(file_name: str) -> dict:
     r = Rotation.from_rotvec(v)
     q = r.as_quat()
 
-    # use pp.LieTensor of shape (n_observations, 7) as seen in pp.reprojerr
+    # use torch.Tensor of shape (n_cameras, 7) to represent camera extrinsics
     # camera_params[3:6] is the camera translation
-    camera_extrinsics = np.concatenate([camera_params[:, 3:6], q], axis=1)
-    camera_extrinsics = pp.LieTensor(camera_extrinsics[camera_indices], ltype=pp.SE3_type)
+    camera_extrinsics = pp.LieTensor(np.concatenate([camera_params[:, 3:6], q], axis=1),
+                                     ltype=pp.SE3_type)
 
-    # use torch.Tensor of shape (n_observations, 3, 3) as seen in pp.reprojerr
+    # use torch.Tensor of shape (n_cameras, 3, 3) to represent camera intrinsics
     # camera_params[6] is focal length, camera_params[7] and camera_params[8] are two radial distortion parameters
     camera_intrinsics = np.zeros((n_cameras, 3, 3), dtype=np.float32)
     camera_intrinsics[:, 0, 0] = camera_params[:, 6]
@@ -140,13 +139,15 @@ def read_bal_data(file_name: str) -> dict:
     camera_intrinsics[:, 0, 2] = camera_params[:, 7]
     camera_intrinsics[:, 1, 2] = camera_params[:, 8]
     camera_intrinsics[:, 2, 2] = 1
-    camera_intrinsics = torch.from_numpy(camera_intrinsics[camera_indices])
+    camera_intrinsics = torch.from_numpy(camera_intrinsics)
 
     return {'problem_name': os.path.basename(file_name).split('.')[0], # str
-            'camera_extrinsics': camera_extrinsics, # pp.LieTensor (n_observation, 7)
-            'camera_intrinsics': camera_intrinsics, # torch.Tensor (n_observation, 3, 3)
-            'points_3d': points_3d, # torch.Tensor (n_observations, 3)
+            'camera_extrinsics': camera_extrinsics, # pp.LieTensor (n_cameras, 7)
+            'camera_intrinsics': camera_intrinsics, # torch.Tensor (n_cameras, 3, 3)
+            'points_3d': points_3d, # torch.Tensor (n_points, 3)
             'points_2d': points_2d, # torch.Tensor (n_observations, 2)
+            'camera_indices': camera_indices, # torch.Tensor (n_observations,)
+            'point_indices': point_indices, # torch.Tensor (n_observations,)
             }
 
 def build_pipeline(dataset='ladybug', cache_dir='bal_data'):
@@ -160,14 +161,18 @@ if __name__ == '__main__':
     dp = build_pipeline()
     print("Testing dataset pipeline...")
     for i in dp:
-        points = i['points_3d']
+        point_indices = i['point_indices']
+        camera_indices = i['camera_indices']
+        points = i['points_3d'][point_indices]
         pixels = i['points_2d']
-        intrinsics = i['camera_intrinsics']
-        extrinsics = i['camera_extrinsics']
+        intrinsics = i['camera_intrinsics'][camera_indices]
+        extrinsics = i['camera_extrinsics'][camera_indices]
         problem_name = i['problem_name']
         # check shape as in pp.reprojerr
         assert points.size(-1) == 3 and pixels.size(-1) == 2 and isinstance(extrinsics, pp.LieTensor) \
             and intrinsics.size(-1) == intrinsics.size(-2) == 3, "Shape not compatible."
+        # check shape at index 0, should be n_observation
+        assert points.size(0) == pixels.size(0) == intrinsics.size(0) == extrinsics.size(0)
         # check dtype is float32
         assert torch.float32 == points.dtype == pixels.dtype == intrinsics.dtype == extrinsics.dtype
         print(problem_name, 'ok')

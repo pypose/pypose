@@ -12,42 +12,38 @@ def bundle_adjustment(dataset: dict):
         A dictionary containing the following fields:
         - problem_name: str
             The name of the problem.
-        - camera_extrinsics: pp.LieTensor (n_observation, 7)
-            The camera extrinsics, represented as pp.LieTensor, SE3 type
+        - camera_extrinsics: pp.LieTensor (n_cameras, 7)
+            The camera extrinsics.
             First three columns are translation, last four columns is unit quaternion.
-        - camera_intrinsics: torch.Tensor (n_observation, 3, 3)
+        - camera_intrinsics: torch.Tensor (n_cameras, 3, 3)
             The camera intrinsics. Each camera is represented as a 3x3 K matrix.
-        - points_3d: torch.Tensor (n_observation, 3)
-            Contains initial estimates of point coordinates in the world frame.
+        - points_3d: torch.Tensor (n_points, 3)
+            contains initial estimates of point coordinates in the world frame.
         - points_2d: torch.Tensor (n_observations, 2)
-            Contains measured 2-D coordinates of points projected on images in each observations.
-
+            contains measured 2-D coordinates of points projected on images in each observations.
+        - camera_indices: torch.Tensor (n_observations,)
+            contains indices of cameras (from 0 to n_cameras - 1) involved in each observation.
+        - point_indices: torch.Tensor (n_observations,)
+            contains indices of points (from 0 to n_points - 1) involved in each observation.
     Returns
     -------
-    camera_extrinsics : pp.LieTensor (n_observation, 7)
-        The camera extrinsics, represented as pp.LieTensor, SE3 type
-        First three columns are translation, last four columns is unit quaternion.
-    points_3d : torch.Tensor (n_observation, 3)
-        Contains optimized estimates of point coordinates in the world frame.
+    ...
     """
+    print(f'Solving {dataset["problem_name"]}')
+
     # use pytorch's adam for dense ba, device is automatically set to cuda if available
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using device: {device}')
 
-    for k, v in dataset.items():
-        if isinstance(v, torch.Tensor):
-            dataset[k] = v.to(device)
+    extrinsics = dataset['camera_extrinsics'][dataset['camera_indices']].to(device).requires_grad_(True)
+    intrinsics = dataset['camera_intrinsics'][dataset['camera_indices']].to(device)
+    points_3d = dataset['points_3d'][dataset['point_indices']].to(device).requires_grad_(True)
+    points_2d = dataset['points_2d'].to(device)
 
-    dataset['points_3d'].requires_grad_()
-    dataset['camera_extrinsics'].requires_grad_()
-
-    optimizer = torch.optim.Adam([dataset['camera_extrinsics'], dataset['points_3d']], lr=1e-2)
+    optimizer = torch.optim.Adam([extrinsics, points_3d], lr=1e-2)
     for i in range(100):
         optimizer.zero_grad()
-        loss = pp.reprojerr(dataset['points_3d'],
-                            dataset['points_2d'],
-                            dataset['camera_intrinsics'],
-                            dataset['camera_extrinsics'])
+        loss = pp.reprojerr(points_3d, points_2d, intrinsics, extrinsics)
         loss = torch.sum(loss)
         loss.backward()
         optimizer.step()
@@ -56,8 +52,8 @@ def bundle_adjustment(dataset: dict):
 
 
 if __name__ == '__main__':
-    dataset_pipeline = build_pipeline(dataset='ladybug', cache_dir='bal_data')
+    dataset_pipeline = build_pipeline(dataset='ladybug', cache_dir='bal_data')\
+        .filter(lambda x: x['problem_name'] == 'problem-49-7776-pre')
     dataset_iterator = iter(dataset_pipeline)
     dataset = next(dataset_iterator)
-    print(f'Solving {dataset["problem_name"]}')
     bundle_adjustment(dataset)
