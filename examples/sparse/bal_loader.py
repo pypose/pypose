@@ -95,7 +95,7 @@ def read_bal_data(file_name: str) -> dict:
 
         camera_indices = np.empty(n_observations, dtype=int)
         point_indices = np.empty(n_observations, dtype=int)
-        points_2d = np.empty((n_observations, 2))
+        points_2d = np.empty((n_observations, 2), dtype=np.float32)
 
         for i in range(n_observations):
             camera_index, point_index, x, y = file.readline().split()
@@ -103,12 +103,12 @@ def read_bal_data(file_name: str) -> dict:
             point_indices[i] = int(point_index)
             points_2d[i] = [float(x), float(y)]
 
-        camera_params = np.empty(n_cameras * 9)
+        camera_params = np.empty(n_cameras * 9, dtype=np.float32)
         for i in range(n_cameras * 9):
             camera_params[i] = float(file.readline())
         camera_params = camera_params.reshape((n_cameras, -1))
 
-        points_3d = np.empty(n_points * 3)
+        points_3d = np.empty(n_points * 3, dtype=np.float32)
         for i in range(n_points * 3):
             points_3d[i] = float(file.readline())
         points_3d = points_3d.reshape((n_points, -1))
@@ -134,7 +134,7 @@ def read_bal_data(file_name: str) -> dict:
 
     # use torch.Tensor of shape (n_observations, 3, 3) as seen in pp.reprojerr
     # camera_params[6] is focal length, camera_params[7] and camera_params[8] are two radial distortion parameters
-    camera_intrinsics = np.zeros((n_cameras, 3, 3))
+    camera_intrinsics = np.zeros((n_cameras, 3, 3), dtype=np.float32)
     camera_intrinsics[:, 0, 0] = camera_params[:, 6]
     camera_intrinsics[:, 1, 1] = camera_params[:, 6]
     camera_intrinsics[:, 0, 2] = camera_params[:, 7]
@@ -165,8 +165,10 @@ if __name__ == '__main__':
         intrinsics = i['camera_intrinsics']
         extrinsics = i['camera_extrinsics']
         problem_name = i['problem_name']
-        # same check as in pp.reprojerr
+        # check shape as in pp.reprojerr
         assert points.size(-1) == 3 and pixels.size(-1) == 2 and isinstance(extrinsics, pp.LieTensor) \
             and intrinsics.size(-1) == intrinsics.size(-2) == 3, "Shape not compatible."
+        # check dtype is float32
+        assert torch.float32 == points.dtype == pixels.dtype == intrinsics.dtype == extrinsics.dtype
         print(problem_name, 'ok')
     print("All tests passed!")
