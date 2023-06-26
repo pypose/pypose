@@ -115,6 +115,8 @@ def read_bal_data(file_name: str) -> dict:
 
     # use shape (n_observations, 3) as seen in pp.reprojerr
     points_3d = torch.from_numpy(points_3d[point_indices])
+    # use shape (n_observations, 2) as seen in pp.reprojerr
+    points_2d = torch.from_numpy(points_2d)
 
     # convert Rodrigues vector to unit quaternion for camera rotation
     # camera_params[0:3] is the Rodrigues vector
@@ -158,9 +160,13 @@ if __name__ == '__main__':
     dp = build_pipeline()
     print("Testing dataset pipeline...")
     for i in dp:
-        assert i['camera_intrinsics'].shape == (i['points_3d'].shape[0], 3, 3)
-        assert i['camera_extrinsics'].shape == (i['points_3d'].shape[0], 7)
-        assert i['points_2d'].shape == (i['points_3d'].shape[0], 2)
-        assert i['points_3d'].shape == (i['points_3d'].shape[0], 3)
-        print(i['problem_name'], 'ok')
+        points = i['points_3d']
+        pixels = i['points_2d']
+        intrinsics = i['camera_intrinsics']
+        extrinsics = i['camera_extrinsics']
+        problem_name = i['problem_name']
+        # same check as in pp.reprojerr
+        assert points.size(-1) == 3 and pixels.size(-1) == 2 and isinstance(extrinsics, pp.LieTensor) \
+            and intrinsics.size(-1) == intrinsics.size(-2) == 3, "Shape not compatible."
+        print(problem_name, 'ok')
     print("All tests passed!")

@@ -48,7 +48,7 @@ def bundle_adjustment(dataset: dict):
 
 
 if __name__ == '__main__':
-    dataset_pipeline = build_pipeline(dataset='ladybug', cache_dir='data')
+    dataset_pipeline = build_pipeline(dataset='ladybug', cache_dir='bal_data')
     dataset_iterator = iter(dataset_pipeline)
     dataset = next(dataset_iterator)
     print(dataset['problem_name'])
