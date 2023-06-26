@@ -35,12 +35,17 @@ def bundle_adjustment(dataset: dict):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using device: {device}')
 
-    extrinsics = dataset['camera_extrinsics'][dataset['camera_indices']].to(device).requires_grad_(True)
-    intrinsics = dataset['camera_intrinsics'][dataset['camera_indices']].to(device)
-    points_3d = dataset['points_3d'][dataset['point_indices']].to(device).requires_grad_(True)
-    points_2d = dataset['points_2d'].to(device)
+    for k, v in dataset.items():
+      if isinstance(v, torch.Tensor):
+          dataset[k] = v.to(device)
 
-    optimizer = torch.optim.Adam([extrinsics, points_3d], lr=1e-2)
+    optimizer = torch.optim.Adam([dataset['camera_extrinsics'], dataset['points_3d']], lr=1e-2)
+
+    extrinsics = dataset['camera_extrinsics'][dataset['camera_indices']].requires_grad_(True)
+    intrinsics = dataset['camera_intrinsics'][dataset['camera_indices']]
+    points_3d = dataset['points_3d'][dataset['point_indices']].requires_grad_(True)
+    points_2d = dataset['points_2d']
+
     for i in range(100):
         optimizer.zero_grad()
         loss = pp.reprojerr(points_3d, points_2d, intrinsics, extrinsics)
@@ -48,6 +53,7 @@ def bundle_adjustment(dataset: dict):
         loss.backward()
         optimizer.step()
         print(f'Iter {i+1} loss: {loss.item()}')
+
     return dataset['camera_extrinsics'], dataset['points_3d']
 
 
