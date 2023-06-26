@@ -434,7 +434,10 @@ class LQR(nn.Module):
                             maybe_x = torch.where(maybe_x < lb, lb, maybe_x)
                             maybe_x = torch.where(maybe_x > ub, ub, maybe_x)
                             armijos = (GAMMA + 1e-6) * torch.ones(n_batch)
-                            armijos[J] = (obj(x) - obj(maybe_x))[J]/(torch.bmm(l.unsqueeze(-2), (x - maybe_x).unsqueeze(2)).squeeze(1).squeeze(1))[J]
+                            armijos[J] = (obj(x) - obj(maybe_x))[J]/((l.unsqueeze(-2) \
+                                        @ (x - maybe_x).unsqueeze(2)) \
+                                        .squeeze(1).squeeze(1))[J]
+
                             I = armijos <= GAMMA
                             alpha[I] *= decay
                             max_armijo = torch.max(armijos)
@@ -450,7 +453,7 @@ class LQR(nn.Module):
                 prev_kt = kt
                 k[...,t,:] = kt
                 Qux_ = Qux.clone()
-                Qux_[(1-If).unsqueeze(2).repeat(1,1,Qux.size(2)).bool()] = 0
+                Qux_[torch.tile((1 - If).unsqueeze(-1), (1, 1, ns)).bool()] = 0
 
                 if nc == 1:
                     K[...,t,:,:] = Kt = -((1./Quu_free_LU) * Qux_)
