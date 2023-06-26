@@ -79,8 +79,8 @@ def read_bal_data(file_name: str) -> dict:
         A dictionary containing the following fields:
         - problem_name: str
             The name of the problem.
-        - camera_extrinsics: pp.SE3 (n_observation, 7)
-            The camera extrinsics, represented as pp.SE3.
+        - camera_extrinsics: pp.LieTensor (n_observation, 7)
+            The camera extrinsics, represented as pp.LieTensor, SE3 type
             First three columns are translation, last four columns is unit quaternion.
         - camera_intrinsics: torch.Tensor (n_observation, 3, 3)
             The camera intrinsics. Each camera is represented as a 3x3 K matrix.
@@ -125,10 +125,10 @@ def read_bal_data(file_name: str) -> dict:
     r = Rotation.from_rotvec(v)
     q = r.as_quat()
 
-    # use pp.SE3 of shape (n_observations, 7) as seen in pp.reprojerr
+    # use pp.LieTensor of shape (n_observations, 7) as seen in pp.reprojerr
     # camera_params[3:6] is the camera translation
     camera_extrinsics = np.concatenate([camera_params[:, 3:6], q], axis=1)
-    camera_extrinsics = pp.SE3(camera_extrinsics[camera_indices])
+    camera_extrinsics = pp.LieTensor(camera_extrinsics[camera_indices], ltype=pp.SE3_type)
 
     # use torch.Tensor of shape (n_observations, 3, 3) as seen in pp.reprojerr
     # camera_params[6] is focal length, camera_params[7] and camera_params[8] are two radial distortion parameters
@@ -141,7 +141,7 @@ def read_bal_data(file_name: str) -> dict:
     camera_intrinsics = torch.from_numpy(camera_intrinsics[camera_indices])
 
     return {'problem_name': os.path.basename(file_name).split('.')[0], # str
-            'camera_extrinsics': camera_extrinsics, # pp.SE3 (n_observation, 7)
+            'camera_extrinsics': camera_extrinsics, # pp.LieTensor (n_observation, 7)
             'camera_intrinsics': camera_intrinsics, # torch.Tensor (n_observation, 3, 3)
             'points_3d': points_3d, # torch.Tensor (n_observations, 3)
             'points_2d': points_2d, # torch.Tensor (n_observations, 2)
@@ -156,5 +156,11 @@ def build_pipeline(dataset='ladybug', cache_dir='bal_data'):
 
 if __name__ == '__main__':
     dp = build_pipeline()
+    print("Testing dataset pipeline...")
     for i in dp:
-        print(i)
+        assert i['camera_intrinsics'].shape == (i['points_3d'].shape[0], 3, 3)
+        assert i['camera_extrinsics'].shape == (i['points_3d'].shape[0], 7)
+        assert i['points_2d'].shape == (i['points_3d'].shape[0], 2)
+        assert i['points_3d'].shape == (i['points_3d'].shape[0], 3)
+        print(i['problem_name'], 'ok')
+    print("All tests passed!")
