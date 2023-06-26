@@ -85,9 +85,9 @@ def read_bal_data(file_name: str) -> dict:
         - camera_intrinsics: torch.Tensor (n_observation, 3, 3)
             The camera intrinsics. Each camera is represented as a 3x3 K matrix.
         - points_3d: torch.Tensor (n_observation, 3)
-            contains initial estimates of point coordinates in the world frame.
+            Contains initial estimates of point coordinates in the world frame.
         - points_2d: torch.Tensor (n_observations, 2)
-            contains measured 2-D coordinates of points projected on images in each observations.
+            Contains measured 2-D coordinates of points projected on images in each observations.
     """
     with open(file_name, "r") as file:
         n_cameras, n_points, n_observations = map(
