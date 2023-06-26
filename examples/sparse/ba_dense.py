@@ -48,6 +48,7 @@ def bundle_adjustment(dataset: dict):
                             dataset['points_2d'],
                             dataset['camera_intrinsics'],
                             dataset['camera_extrinsics'])
+        loss = torch.sum(loss)
         loss.backward()
         optimizer.step()
         print(f'Iter {i+1} loss: {loss.item()}')
