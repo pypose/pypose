@@ -34,35 +34,35 @@ class TestSpline:
         points = 10*torch.randn(1,2,3, device=device)
         interpoints = pp.chspline(points, interval=0.1)
         num = points.shape[-2]
-        po = interpoints.index_select(-2, torch.arange(0, int(num/0.1),
-                                                       1/0.1, device=device).int())
+        index = torch.arange(0, int(num/0.1), 1/0.1, device=device, dtype=torch.int64)
+        po = interpoints.index_select(-2, index)
         assert (points - po).sum()<1e-5
         # test multi points
         points = torch.randn(20, 3, device=device)
         interpoints = pp.chspline(points, interval=0.2)
         num = points.shape[-2]
-        po = interpoints.index_select(-2, torch.arange(0, int(num/0.2),
-                                                       1/0.2, device=device).int())
+        index = torch.arange(0, int(num/0.2), 1/0.2, device=device, dtype=torch.int64)
+        po = interpoints.index_select(-2, index)
         assert (points - po).sum()<1e-5
         # test multi batches
         points = torch.randn(3,20,3, device=device)
         interpoints = pp.chspline(points, interval=0.25)
         num = points.shape[-2]
-        po = interpoints.index_select(-2, torch.arange(0, int(num/0.25),
-                                                       1/0.25,device=device).int())
+        index = torch.arange(0, int(num/0.25), 1/0.25, device=device, dtype=torch.int64)
+        po = interpoints.index_select(-2, index)
         assert (points - po).sum()<1e-5
         # test multi dim of points
         points = torch.randn(2,3,50,4, device=device)
         interpoints = pp.chspline(points)
         num = points.shape[-2]
-        po = interpoints.index_select(-2, torch.arange(0, int(num/0.1),
-                                                       1/0.1, device=device).int())
+        index = torch.arange(0, int(num/0.1), 1/0.1, device=device, dtype=torch.int64)
+        po = interpoints.index_select(-2, index)
         assert (points - po).sum()<1e-5
         points = torch.randn(10,2,3,50,4, device=device)
         interpoints = pp.chspline(points)
         num = points.shape[-2]
-        po = interpoints.index_select(-2, torch.arange(0, int(num/0.1),
-                                                       1/0.1, device=device).int())
+        index = torch.arange(0, int(num/0.1), 1/0.1, device=device, dtype=torch.int64)
+        po = interpoints.index_select(-2, index)
         assert (points - po).sum()<1e-5
 
 
