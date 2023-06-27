@@ -1,9 +1,10 @@
 import torch
+from torch import nn
 from .. import knn, svdtf, is_SE3
 from ..utils.stepper import ReduceToBason
 
 
-class ICP(torch.nn.Module):
+class ICP(nn.Module):
     r'''
     Batched Iterative Closest Point (ICP) algorithm to find a rigid transformation
     between two sets of points using Singular Value Decomposition (SVD).
