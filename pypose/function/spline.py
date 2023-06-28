@@ -177,7 +177,7 @@ def bspline(data, timeline):
         ...                  [4., 0., 1., a2[0], a2[1], a2[2], a2[3]]]])
         >>> wayposes = pp.bspline(poses, timeline)
 
-    - .. figure:: /_static/img/module/liespline/BsplineSE3.png
+    .. figure:: /_static/img/module/liespline/BsplineSE3.png
 
         Fig. 1. Result of B Spline Interpolation in SE3.
     '''
