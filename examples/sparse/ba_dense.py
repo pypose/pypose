@@ -1,6 +1,6 @@
+import torch, argparse, os
 import pypose as pp
 from bal_loader import build_pipeline
-import torch
 
 def bundle_adjustment(dataset: dict):
     """
@@ -17,6 +17,8 @@ def bundle_adjustment(dataset: dict):
             First three columns are translation, last four columns is unit quaternion.
         - camera_intrinsics: torch.Tensor (n_cameras, 3, 3)
             The camera intrinsics. Each camera is represented as a 3x3 K matrix.
+        - camera_distortions: torch.Tensor (n_cameras, 2)
+            The camera distortions. k1 and k2.
         - points_3d: torch.Tensor (n_points, 3)
             contains initial estimates of point coordinates in the world frame.
         - points_2d: torch.Tensor (n_observations, 2)

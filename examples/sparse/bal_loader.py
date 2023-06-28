@@ -106,6 +106,8 @@ def read_bal_data(file_name: str) -> dict:
             First three columns are translation, last four columns is unit quaternion.
         - camera_intrinsics: torch.Tensor (n_cameras, 3, 3)
             The camera intrinsics. Each camera is represented as a 3x3 K matrix.
+        - camera_distortions: torch.Tensor (n_cameras, 2)
+            The camera distortions. k1 and k2.
         - points_3d: torch.Tensor (n_points, 3)
             contains initial estimates of point coordinates in the world frame.
         - points_2d: torch.Tensor (n_observations, 2)
@@ -157,17 +159,20 @@ def read_bal_data(file_name: str) -> dict:
 
     # use torch.Tensor of shape (n_cameras, 3, 3) to represent camera intrinsics
     # camera_params[6] is focal length, camera_params[7] and camera_params[8] are two radial distortion parameters
+    # the origin of the image coordinate system is at the center of the image
     camera_intrinsics = np.zeros((n_cameras, 3, 3), dtype=np.float32)
     camera_intrinsics[:, 0, 0] = camera_params[:, 6]
     camera_intrinsics[:, 1, 1] = camera_params[:, 6]
-    camera_intrinsics[:, 0, 2] = camera_params[:, 7]
-    camera_intrinsics[:, 1, 2] = camera_params[:, 8]
     camera_intrinsics[:, 2, 2] = 1
     camera_intrinsics = torch.from_numpy(camera_intrinsics)
+
+    camera_distortions = camera_params[:, 7:9]
+    camera_distortions = torch.from_numpy(camera_distortions)
 
     return {'problem_name': os.path.splitext(os.path.basename(file_name))[0], # str
             'camera_extrinsics': camera_extrinsics, # pp.LieTensor (n_cameras, 7)
             'camera_intrinsics': camera_intrinsics, # torch.Tensor (n_cameras, 3, 3)
+            'camera_distortions': camera_distortions, # torch.Tensor (n_cameras, 2)
             'points_3d': points_3d, # torch.Tensor (n_points, 3)
             'points_2d': points_2d, # torch.Tensor (n_observations, 2)
             'camera_index_of_observations': camera_indices, # torch.Tensor (n_observations,)
@@ -198,6 +203,8 @@ def build_pipeline(dataset='ladybug', cache_dir='bal_data'):
             First three columns are translation, last four columns is unit quaternion.
         - camera_intrinsics: torch.Tensor (n_cameras, 3, 3)
             The camera intrinsics. Each camera is represented as a 3x3 K matrix.
+        - camera_distortions: torch.Tensor (n_cameras, 2)
+            The camera distortions. k1 and k2.
         - points_3d: torch.Tensor (n_points, 3)
             contains initial estimates of point coordinates in the world frame.
         - points_2d: torch.Tensor (n_observations, 2)
