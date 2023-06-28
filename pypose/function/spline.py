@@ -36,6 +36,10 @@ def chspline(points, interval=0.1):
 
         \end{aligned}
 
+    Note:
+        The implementation is based on wiki of `Cubic Hermite spline
+        <https://en.wikipedia.org/wiki/Cubic_Hermite_spline>`_.
+
     Examples:
         >>> import torch
         >>> import pypose as pp
@@ -64,8 +68,6 @@ def chspline(points, interval=0.1):
     """
     assert points.dim() >= 2, 'Dimension of points should be [..., N, C]'
     assert 1/interval%1 == 0.0, '1 should be divisible by interval between points'
-    if points.dim()==2:
-        points = points.unsqueeze(0)
     batch, N = points.shape[:-2], points.shape[-2]
     dargs = {'device': points.device, 'dtype': points.dtype}
     xs = torch.arange(0, N-1+interval, interval, **dargs)
@@ -181,11 +183,9 @@ def bspline(data, timeline):
     '''
     assert is_SE3(data), "The input poses are not SE3Type."
     assert data.dim()>=2, 'Dimension of data should be [..., N, C]'
-    if data.dim()==2:
-        data.unsqueeze(0)
     batch = data.shape[:-2]
-    data = torch.cat((data[..., :1, :].expand(batch+(2,-1)), 
-                      data, 
+    data = torch.cat((data[..., :1, :].expand(batch+(2,-1)),
+                      data,
                       data[..., -1:, :].expand(batch+(2,-1))), dim=-2)
     Bth, N, D, K = data.shape[:-2], data.shape[-2], data.shape[-1], timeline.shape[-1]
     dargs = {'dtype': timeline.dtype, 'device': timeline.device}
