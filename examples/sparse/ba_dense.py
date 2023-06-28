@@ -21,9 +21,9 @@ def bundle_adjustment(dataset: dict):
             contains initial estimates of point coordinates in the world frame.
         - points_2d: torch.Tensor (n_observations, 2)
             contains measured 2-D coordinates of points projected on images in each observations.
-        - camera_indices: torch.Tensor (n_observations,)
+        - camera_index_of_observations: torch.Tensor (n_observations,)
             contains indices of cameras (from 0 to n_cameras - 1) involved in each observation.
-        - point_indices: torch.Tensor (n_observations,)
+        - point_index_of_observations: torch.Tensor (n_observations,)
             contains indices of points (from 0 to n_points - 1) involved in each observation.
     Returns
     -------
@@ -48,9 +48,9 @@ def bundle_adjustment(dataset: dict):
     for i in range(100):
         optimizer.zero_grad()
 
-        extrinsics = dataset['camera_extrinsics'][dataset['camera_indices']]
-        intrinsics = dataset['camera_intrinsics'][dataset['camera_indices']]
-        points_3d = dataset['points_3d'][dataset['point_indices']]
+        extrinsics = dataset['camera_extrinsics'][dataset['camera_index_of_observations']]
+        intrinsics = dataset['camera_intrinsics'][dataset['camera_index_of_observations']]
+        points_3d = dataset['points_3d'][dataset['point_index_of_observations']]
         points_2d = dataset['points_2d']
 
         loss = pp.reprojerr(points_3d, points_2d, intrinsics, extrinsics)

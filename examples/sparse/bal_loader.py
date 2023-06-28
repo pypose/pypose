@@ -1,3 +1,14 @@
+"""
+This file contains the pipeline for the Bundle Adjustment in the Large dataset.
+
+The dataset is from the following paper:
+Sameer Agarwal, Noah Snavely, Steven M. Seitz, and Richard Szeliski.
+Bundle adjustment in the large.
+In European Conference on Computer Vision (ECCV), 2010.
+
+Link to the dataset: https://grail.cs.washington.edu/projects/bal/
+"""
+
 import torch, os, warnings
 import numpy as np
 import pypose as pp
@@ -198,7 +209,7 @@ def build_pipeline(dataset='ladybug', cache_dir='bal_data'):
     """
     global ALL_DATASETS
     assert dataset in ALL_DATASETS, f"dataset_name must be one of {ALL_DATASETS}"
-    print(f"Building pipeline for {dataset}...")
+    print(f"Streaming data for {dataset}...")
     url_dp = _problem_lister(_with_base_url(dataset + '.html'))
     download_dp = _download_pipe(cache_dir=cache_dir, url_dp=url_dp, suffix='.bz2')
     bal_data_dp = download_dp.map(read_bal_data)
@@ -208,8 +219,8 @@ if __name__ == '__main__':
     dp = build_pipeline()
     print("Testing dataset pipeline...")
     for i in dp:
-        point_indices = i['point_indices']
-        camera_indices = i['camera_indices']
+        point_indices = i['point_index_of_observations']
+        camera_indices = i['camera_index_of_observations']
         points = i['points_3d'][point_indices]
         pixels = i['points_2d']
         intrinsics = i['camera_intrinsics'][camera_indices]
