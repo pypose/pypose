@@ -56,7 +56,6 @@ if __name__=="__main__":
     print(args)
     angle1 = pp.euler2SO3(torch.Tensor([0., 0., 0.]))
     angle2 = pp.euler2SO3(torch.Tensor([torch.pi / 4., torch.pi / 3., torch.pi / 2.]))
-    timeline = torch.arange(0, 1, 0.25)
     poses = pp.LieTensor([[[0., 4., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
                            [0., 3., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
                            [0., 2., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
@@ -74,7 +73,7 @@ if __name__=="__main__":
                            [2., 0., 4., angle2[0], angle2[1], angle2[2], angle2[3]],
                            [3., 0., 5., angle2[0], angle2[1], angle2[2], angle2[3]]]],
                            ltype=pp.SE3_type)
-    wayposes = pp.bspline(poses, timeline)
+    wayposes = pp.bspline(poses)
     xrange = [0, 5.]
     yrange = [0, 5.]
     zrange = [0, 1.2]
