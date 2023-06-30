@@ -74,7 +74,7 @@ def chspline(points, num=10):
     """
     assert points.dim() >= 2, "Dimension of points should be [..., N, C]"
     assert type(num)==int, "The type of interpolated point number should be int."
-    assert num!=0, "The number of interpolated point number is 0."
+    assert num > 0, "The number of interpolated point number should be larger than 0."
     batch, N = points.shape[:-2], points.shape[-2]
     dargs = {'device': points.device, 'dtype': points.dtype}
     interval = 1.0/num
@@ -104,7 +104,7 @@ def chspline(points, num=10):
 
 def bspline(data, num:int=10):
     r'''
-    B-spline interpolation, which currently only support SE3 LieTensor.
+    B-spline interpolation, which currently only supports SE3 LieTensor.
 
     Args:
         data (:obj:`LieTensor`): the input sparse poses with
@@ -189,9 +189,9 @@ def bspline(data, num:int=10):
         Fig. 1. Result of B Spline Interpolation in SE3.
     '''
     assert is_SE3(data), "The input poses are not SE3Type."
-    assert data.dim()>=2, "Dimension of data should be [..., N, C]."
-    assert type(num)==int, "The type of interpolated pose number should be int."
-    assert num!=0, "The number of interpolated pose number is 0."
+    assert data.dim() >= 2, "Dimension of data should be [..., N, C]."
+    assert type(num) == int, "The type of interpolated pose number should be int."
+    assert num > 0, "The number of interpolated pose number should be larger than 0."
     batch = data.shape[:-2]
     data = torch.cat((data[..., :1, :].expand(batch+(2,-1)),
                       data,
