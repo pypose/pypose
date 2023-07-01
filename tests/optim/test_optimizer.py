@@ -298,7 +298,8 @@ class TestOptim:
         inputs = pp.randn_SE3(B2, B1, M, N, sigma=0.0001).to(device)
         invnet = PoseInv(M, N).to(device)
         strategy = pp.optim.strategy.TrustRegion(radius=1e6)
-        kernel = nn.ModuleList([ppok.Huber(), ppok.Scale()]).to(device)
+        # kernel = nn.ModuleList([ppok.Huber(), ppok.Scale()]).to(device)
+        kernel = [ppok.Huber().to(device), ppok.Scale().to(device)]
         weight = [torch.eye(6, device=device), torch.ones(1, device=device)]
         optimizer = pp.optim.LM(invnet, strategy=strategy, kernel=kernel)
         # optimizer = pp.optim.GN(invnet, kernel=kernel)
@@ -316,12 +317,12 @@ class TestOptim:
 
 if __name__ == '__main__':
     test = TestOptim()
-    test.test_optim_liealgebra()
-    test.test_optim_liegroup()
-    test.test_optim_with_kernel()
-    test.test_optim_strategy_constant()
-    test.test_optim_strategy_adaptive()
-    test.test_optim_trustregion()
-    test.test_optim_multiparameter()
-    test.test_optim_anybatch()
+    # test.test_optim_liealgebra()
+    # test.test_optim_liegroup()
+    # test.test_optim_with_kernel()
+    # test.test_optim_strategy_constant()
+    # test.test_optim_strategy_adaptive()
+    # test.test_optim_trustregion()
+    # test.test_optim_multiparameter()
+    # test.test_optim_anybatch()
     test.test_optim_multi_input()
