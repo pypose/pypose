@@ -9,10 +9,7 @@ from torch.linalg import cholesky_ex
 from .corrector import FastTriggs
 
 
-def flatten_jacobian(J, params_values):
-    if isinstance(J, (tuple, list)):
-        J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params_values)])
-    return J
+
 
 
 class Trivial(torch.nn.Module):
@@ -39,7 +36,12 @@ class RobustModel(nn.Module):
         self.model = model
         self.kernel = [Trivial()] if kernel is None else kernel
 
-    def normalize_residuals_weights(self, R, weight=None):
+    def flatten_jacobian(self, J, params_values):
+        if isinstance(J, (tuple, list)):
+            J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params_values)])
+        return J
+
+    def normalize_RWJ(self, R, weight, J):
         weight_diag = None
         if weight is not None:
             weight = weight if isinstance(weight, (tuple, list)) else [weight]
@@ -50,7 +52,8 @@ class RobustModel(nn.Module):
                 weight_diag += [w] * int(ni)
             weight_diag = torch.block_diag(*weight_diag)
         R = [r.reshape(-1) for r in R]
-        return torch.cat(R), weight_diag
+        J = torch.cat(J) if isinstance(J, (tuple, list)) else J
+        return torch.cat(R), weight_diag, J
 
     def forward(self, input, target):
         output = self.model_forward(input)
@@ -184,17 +187,14 @@ class GaussNewton(_Optimizer):
     '''
     def __init__(self, model, solver=None, kernel=None, corrector=None, weight=None, vectorize=True):
         super().__init__(model.parameters(), defaults={})
+        self.jackwargs = {'vectorize': vectorize}
         self.solver = PINV() if solver is None else solver
-        self.jackwargs = {'vectorize': vectorize, 'flatten': True}
-        if kernel is not None and corrector is None:
-            # auto diff of robust model will be computed
-            self.model = RobustModel(model, kernel, auto=True)
-            self.corrector = FastTriggs(kernel)
-        else:
-            # manually Jacobian correction will be computed
-            self.model = RobustModel(model, kernel, auto=False)
-            self.corrector = Trivial() if corrector is None else corrector
         self.weight = weight
+        self.model = RobustModel(model, kernel)
+        if kernel is not None:
+            self.corrector = [FastTriggs(k) for k in kernel] if corrector is None else corrector
+        else:
+            self.corrector = [Trivial()] if corrector is None else corrector
 
 
 
@@ -255,10 +255,16 @@ class GaussNewton(_Optimizer):
         '''
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
-            R = self.model(input, target)
-            R, weight = self.model.normalize_residuals_weights(R, weight)
-            J = modjac(self.model, input=(input, target), **self.jackwargs)
-            R, J = self.corrector(R = R, J = J)
+            R = list(self.model(input, target))
+            J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
+            params = dict(self.model.named_parameters())
+            params_values = tuple(params.values())
+            J = [J] if len(R) == 1 else J
+            J = [self.model.flatten_jacobian(Jr, params_values) for Jr in J]
+            for i in range(len(R)):
+                R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
+                    else self.corrector[i](R = R[i], J = J[i])
+            R, weight, J = self.model.normalize_RWJ(R, weight, J)
             A, b = (J, -R) if weight is None else (weight @ J, -weight @ R)
             D = self.solver(A = A, b = b.view(-1, 1))
             self.last = self.loss if hasattr(self, 'loss') \
@@ -375,7 +381,6 @@ class LevenbergMarquardt(_Optimizer):
         self.strategy = TrustRegion() if strategy is None else strategy
         defaults = {**{'min':min, 'max':max}, **self.strategy.defaults}
         super().__init__(model.parameters(), defaults=defaults)
-        # self.jackwargs = {'vectorize': vectorize, 'flatten': True}
         self.jackwargs = {'vectorize': vectorize}
         self.solver = Cholesky() if solver is None else solver
         self.reject, self.reject_count = reject, 0
@@ -455,22 +460,17 @@ class LevenbergMarquardt(_Optimizer):
         '''
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
-            R = self.model(input, target)
-            # J = modjac(self.model, input=(input, target), **self.jackwargs)
+            R = list(self.model(input, target))
             J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
             params = dict(self.model.named_parameters())
+            params_values = tuple(params.values())
             J = [J] if len(R) == 1 else J
-            J = [flatten_jacobian(Jr, params) for Jr in J]
+            J = [self.model.flatten_jacobian(Jr, params_values) for Jr in J]
             for i in range(len(R)):
-                R[i], J[i] = self.corrector(R = R[i], J = J[i])
+                R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
+                    else self.corrector[i](R = R[i], J = J[i])
+            R, weight, J = self.model.normalize_RWJ(R, weight, J)
 
-            R, weight, J = normalize_RWJ(R, weight, J)
-
-
-            # print(R)
-            # R, weight = self.model.normalize_residuals_weights(R, weight)
-            # print(J[1][0].shape)
-            # R, J = self.corrector(R = R, J = J)
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target)
             J_T = J.T @ weight if weight is not None else J.T

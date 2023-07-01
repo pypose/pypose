@@ -298,7 +298,6 @@ class TestOptim:
         inputs = pp.randn_SE3(B2, B1, M, N, sigma=0.0001).to(device)
         invnet = PoseInv(M, N).to(device)
         strategy = pp.optim.strategy.TrustRegion(radius=1e6)
-        # kernel = nn.ModuleList([ppok.Huber(), ppok.Scale()]).to(device)
         kernel = [ppok.Huber().to(device), ppok.Scale().to(device)]
         weight = [torch.eye(6, device=device), torch.ones(1, device=device)]
         optimizer = pp.optim.LM(invnet, strategy=strategy, kernel=kernel)
