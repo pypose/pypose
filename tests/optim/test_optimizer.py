@@ -323,5 +323,5 @@ if __name__ == '__main__':
     # test.test_optim_strategy_adaptive()
     # test.test_optim_trustregion()
     # test.test_optim_multiparameter()
-    # test.test_optim_anybatch()
-    test.test_optim_multi_input()
+    test.test_optim_anybatch()
+    # test.test_optim_multi_input()

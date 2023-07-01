@@ -80,7 +80,7 @@ class RobustModel(nn.Module):
         if len(self.kernel) > 1:
             residuals = [k(r.square().sum(-1)).sum() for k, r in zip(self.kernel, residuals)]
         else:
-            residuals = [self.kernel(r.square().sum(-1)).sum() for r in residuals]
+            residuals = [self.kernel[0](r.square().sum(-1)).sum() for r in residuals]
         return sum(residuals)
 
 
@@ -464,7 +464,7 @@ class LevenbergMarquardt(_Optimizer):
             J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
             params = dict(self.model.named_parameters())
             params_values = tuple(params.values())
-            J = [J] if len(R) == 1 else J
+            # J = [J] if len(R) == 1 else J
             J = [self.model.flatten_jacobian(Jr, params_values) for Jr in J]
             for i in range(len(R)):
                 R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
