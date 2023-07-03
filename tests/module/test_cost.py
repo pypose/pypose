@@ -6,7 +6,7 @@ if __name__ == "__main__":
     T = 5
     Q = torch.tile(torch.eye(3, 3), (n_batch, T, 1, 1))
     S = torch.tile(torch.zeros(3, 2), (n_batch, T, 1, 1))
-    R = torch.tile(torch.eye(2, 2), (n_batch, T, 1, 1)) 
+    R = torch.tile(torch.eye(2, 2), (n_batch, T, 1, 1))
     c = torch.zeros(n_batch, T)
     state = torch.randn(n_batch, T, 3)
     input = torch.randn(n_batch, T, 2)
@@ -16,4 +16,4 @@ if __name__ == "__main__":
     print(quadcost.cx.size())
     print(quadcost.cu.size())
     print(quadcost.cxx.size()) # set directly
-    # print(pp.bdot(state, torch.randn(n_batch,T,3)).shape)
+    print(torch.einsum('...j,...j->...', state, torch.randn(n_batch,T,3)).shape)

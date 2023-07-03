@@ -209,7 +209,7 @@ class Cost(nn.Module):
                            - \frac{1}{2} \mathbf{u}^{*\top}c_{\mathbf{uu}}\mathbf{u}^*
         '''
         # Potential performance loss here - involves jacobian eval
-        return self._ref_c - pp.bdot(self._ref_state, self.cx) - pp.bdot(self._ref_input, self.cu) \
+        return self._ref_c - torch.einsum('...j,...j->...', self._ref_state, self.cx) - torch.einsum('...j,...j->...', self._ref_input, self.cu) \
                            - 0.5 * pp.bvmv(self._ref_state, self.cxx, self._ref_state) \
                            - 0.5 * pp.bvmv(self._ref_state, self.cxu, self._ref_input) \
                            - 0.5 * pp.bvmv(self._ref_input, self.cux, self._ref_state) \

@@ -109,10 +109,6 @@ def bvmv(lvec, mat, rvec):
     lvec, rvec = lvec.unsqueeze(-1), rvec.unsqueeze(-1)
     return torch.atleast_1d((lvec.mT @ mat @ rvec).squeeze_(-1).squeeze_(-1))
 
-def bdot(vec1, vec2):
-    # did not use vmap, since vmap will need be nested twice for some cases
-    return (vec1 * vec2).sum(-1)
-
 def btdot(mat1, mat2):
     # mat1 [B, ns]
     # mat2 [B, ns, ns+nc, ns+nc]
