@@ -102,7 +102,7 @@ def chspline(points, num=10):
     return interpoints
 
 
-def bspline(data, num:int=10, pass_end_poses:False):
+def bspline(data, num:int=10, pass_end_poses=False):
     r'''
     B-spline interpolation, which currently only supports SE3 LieTensor.
 
