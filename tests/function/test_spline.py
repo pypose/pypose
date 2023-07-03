@@ -8,24 +8,30 @@ class TestSpline:
         # test two poses
         data = pp.randn_SE3(2,device=device)
         poses = pp.bspline(data, 10)
+        assert poses.lshape[-1] == 10 * (data.lshape[-1]-1)
+        poses = pp.bspline(data, 10, True)
         torch.testing.assert_close(poses[...,[0,-1],:].translation(),
-                                   data[...,[0,-1],:].translation(),atol=1e-4, rtol=1e-2)
+                                   data[...,[0,-1],:].translation())
         torch.testing.assert_close(poses[...,[0,-1],:].rotation(),
-                                   data[...,[0,-1],:].rotation(),atol=1e-4, rtol=1e-2)
+                                   data[...,[0,-1],:].rotation())
         # test for multi batch
         data = pp.randn_SE3(2,3, device=device)
-        poses = pp.bspline(data, 10)
+        poses = pp.bspline(data, 5)
+        assert poses.lshape[-1] == 5 * (data.lshape[-1]-1)
+        poses = pp.bspline(data, 5, True)
         torch.testing.assert_close(poses[...,[0,-1],:].translation(),
-                                   data[...,[0,-1],:].translation(),atol=1e-4, rtol=1e-2)
+                                   data[...,[0,-1],:].translation())
         torch.testing.assert_close(poses[...,[0,-1],:].rotation(),
-                                   data[...,[0,-1],:].rotation(),atol=1e-4, rtol=1e-2)
+                                   data[...,[0,-1],:].rotation())
         # test for high dimension
         data = pp.randn_SE3(2,3,4, device=device)
-        poses = pp.bspline(data, 10)
+        poses = pp.bspline(data, 20)
+        assert poses.lshape[-1] == 20 * (data.lshape[-1]-1)
+        poses = pp.bspline(data, 20, True)
         torch.testing.assert_close(poses[...,[0,-1],:].translation(),
-                                   data[...,[0,-1],:].translation(),atol=1e-4, rtol=1e-2)
+                                   data[...,[0,-1],:].translation())
         torch.testing.assert_close(poses[...,[0,-1],:].rotation(),
-                                   data[...,[0,-1],:].rotation(),atol=1e-4, rtol=1e-2)
+                                   data[...,[0,-1],:].rotation())
 
     def test_chspline(self):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
