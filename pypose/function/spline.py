@@ -102,7 +102,7 @@ def chspline(points, num=10):
     return interpoints
 
 
-def bspline(data, num:int=10):
+def bspline(data, num:int=10, pass_end_poses:False):
     r'''
     B-spline interpolation, which currently only supports SE3 LieTensor.
 
@@ -110,6 +110,7 @@ def bspline(data, num:int=10):
         data (:obj:`LieTensor`): the input sparse poses with
             [batch_size, poses_num, dim] shape.
         num (``int``): the number of interpolated poses between adjcent two poses.
+        pass_end_poses(``bool``): whether the interpolate poses pass the two end poses.
 
     Returns:
         :obj:`LieTensor`: the interpolated SE3 LieTensor.
@@ -193,9 +194,14 @@ def bspline(data, num:int=10):
     assert type(num) == int, "The type of interpolated pose number should be int."
     assert num > 0, "The number of interpolated pose number should be larger than 0."
     batch = data.shape[:-2]
-    data = torch.cat((data[..., :1, :].expand(batch+(2,-1)),
-                      data,
-                      data[..., -1:, :].expand(batch+(2,-1))), dim=-2)
+    if pass_end_poses:
+        data = torch.cat((data[..., :1, :].expand(batch+(3,-1)),
+                          data,
+                          data[..., -1:, :].expand(batch+(3,-1))), dim=-2)
+    else:
+        data = torch.cat((data[..., :1, :],
+                          data,
+                          data[..., -1:, :]), dim=-2)
     Bth, N, D = data.shape[:-2], data.shape[-2], data.shape[-1]
     dargs = {'dtype': data.dtype, 'device': data.device}
     timeline = torch.arange(0, 1, 1.0/num, **dargs)
