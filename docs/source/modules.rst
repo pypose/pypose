@@ -20,6 +20,6 @@ Modules
    module.QuadCost
    module.Constraint
    module.LinCon
-   module.ddpOptimizer
+   module.IPDDP
    module.EPnP
    module.ICP
