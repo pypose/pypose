@@ -2,6 +2,7 @@
 from .lqr import LQR
 from .ekf import EKF
 from .ukf import UKF
+from .mpc import MPC
 from .pf import PF
 from .cost import Cost, QuadCost
 from .constraint import Constraint, LinCon

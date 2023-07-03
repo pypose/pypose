@@ -22,4 +22,5 @@ Modules
    module.LinCon
    module.IPDDP
    module.EPnP
+   module.MPC
    module.ICP
