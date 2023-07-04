@@ -11,6 +11,7 @@ def chspline(points, num=10):
         points (:obj:`Tensor`): the sequence of points for interpolation with shape
             [..., point_num, dim].
         num (:obj:`int`): the number of interpolated points between adjcent two poses.
+            Default: ``10``.  
 
     Returns:
        ``Tensor``: the interpolated points.
@@ -102,7 +103,7 @@ def chspline(points, num=10):
     return interpoints
 
 
-def bspline(data, num:int=10, pass_end_poses=False):
+def bspline(data, num:int=10, clamping=False):
     r'''
     B-spline interpolation, which currently only supports SE3 LieTensor.
 
@@ -110,7 +111,10 @@ def bspline(data, num:int=10, pass_end_poses=False):
         data (:obj:`LieTensor`): the input sparse poses with
             [batch_size, poses_num, dim] shape.
         num (``int``): the number of interpolated poses between adjcent two poses.
-        pass_end_poses(``bool``): whether the interpolate poses pass the two end poses.
+            Default: ``10``.
+        clamping(``bool``): flag to determine whether the interpolate poses pass the 
+            start and end poses. If ``True`` the interpolated poses pass the start and
+            end poses. Default: ``False``.
 
     Returns:
         :obj:`LieTensor`: the interpolated SE3 LieTensor.
@@ -194,7 +198,7 @@ def bspline(data, num:int=10, pass_end_poses=False):
     assert type(num) == int, "The type of interpolated pose number should be int."
     assert num > 0, "The number of interpolated pose number should be larger than 0."
     batch = data.shape[:-2]
-    if pass_end_poses:
+    if clamping:
         data = torch.cat((data[..., :1, :].expand(batch+(3,-1)),
                           data,
                           data[..., -1:, :].expand(batch+(3,-1))), dim=-2)
