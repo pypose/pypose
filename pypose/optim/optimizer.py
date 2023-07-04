@@ -36,9 +36,9 @@ class RobustModel(nn.Module):
         self.model = model
         self.kernel = [Trivial()] if kernel is None else kernel
 
-    def flatten_jacobian(self, J, params_values):
+    def flatten_row_jacobian(self, J, params_values):
         if isinstance(J, (tuple, list)):
-            J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params_values)])
+            J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params_values)], 1)
         return J
 
     def normalize_RWJ(self, R, weight, J):
@@ -259,8 +259,7 @@ class GaussNewton(_Optimizer):
             J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
             params = dict(self.model.named_parameters())
             params_values = tuple(params.values())
-            J = [J] if len(R) == 1 else J
-            J = [self.model.flatten_jacobian(Jr, params_values) for Jr in J]
+            J = [self.model.flatten_row_jacobian(Jr, params_values) for Jr in J]
             for i in range(len(R)):
                 R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
                     else self.corrector[i](R = R[i], J = J[i])
@@ -464,8 +463,7 @@ class LevenbergMarquardt(_Optimizer):
             J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
             params = dict(self.model.named_parameters())
             params_values = tuple(params.values())
-            # J = [J] if len(R) == 1 else J
-            J = [self.model.flatten_jacobian(Jr, params_values) for Jr in J]
+            J = [self.model.flatten_row_jacobian(Jr, params_values) for Jr in J]
             for i in range(len(R)):
                 R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
                     else self.corrector[i](R = R[i], J = J[i])
