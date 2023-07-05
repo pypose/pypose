@@ -50,6 +50,7 @@ if __name__=="__main__":
     xrange = [0., 5.]
     yrange = [0., 1.5]
     zrange = [0., 1.]
-    waypoints = pp.chspline(points, 10)
+    waypoints = pp.chspline(points, 1.)
+    print(waypoints.shape)
     plot_result(waypoints, xrange, yrange, zrange, k=0,
                 oripoints=points, show=args.show, save=args.save)

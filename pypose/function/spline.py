@@ -2,7 +2,7 @@ import torch
 from . import is_SE3
 
 
-def chspline(points, num=10):
+def chspline(points, interval=0.1):
     r"""
     Cubic Hermite Spline, a piecewise-cubic interpolator matching values and first
     derivatives.
@@ -10,8 +10,10 @@ def chspline(points, num=10):
     Args:
         points (:obj:`Tensor`): the sequence of points for interpolation with shape
             [..., point_num, dim].
-        num (:obj:`int`): the number of interpolated points between adjcent two poses.
-            Default: ``10``.  
+        interval (:obj:`float`): the interval betweent interpolated points. If we set
+            :math:`interval = 0.1` and  interpolate points betwewn the points at
+            :math:`t` and :math:`t+1`, and  The time of interpolation should be
+            :math:`[t, t+0.1,...,t+0.9, t+1]`. Default: ``0.1``.
 
     Returns:
        ``Tensor``: the interpolated points.
@@ -19,9 +21,7 @@ def chspline(points, num=10):
     The interpolated points are evenly distributed between a start point and a end point
     according to the number of interpolated points. In this function, the interpolation
     time is aslo evenly distributed between the corresponding time of start point and
-    end point. For example, if 10 points are interpolated between the points at
-    :math:`t_0` and :math:`t_0+1`. The interpolation time is
-    :math:`t\in[t_0, t_0+0.1,...,t_0+0.9]`.
+    end point.
 
     Denote the starting point :math:`p_0` with the starting tangent :math:`m_0` and the
     ending point :math:`p_1` with the ending tagent :math:`m_1`. The interpolated point at
@@ -74,12 +74,12 @@ def chspline(points, num=10):
         Fig. 1. Result of Cubic Spline Interpolation in 3D space.
     """
     assert points.dim() >= 2, "Dimension of points should be [..., N, C]"
-    assert type(num)==int, "The type of interpolated point number should be int."
-    assert num > 0, "The number of interpolated point number should be larger than 0."
+    assert interval<1.0, "The time interval should be smaller than 1."
     batch, N = points.shape[:-2], points.shape[-2]
     dargs = {'device': points.device, 'dtype': points.dtype}
-    interval = 1.0/num
-    timeline = interval*torch.arange(0, num*(N-1)+1, **dargs)
+    intervals = torch.arange(0, 1, interval, **dargs)
+    timeline = torch.arange(0, N, **dargs).unsqueeze(-1)
+    timeline = (timeline + intervals).view(-1)[:-(intervals.shape[0]-1)]
     x = torch.arange(N, **dargs)
     idxs = torch.searchsorted(x[...,1:], timeline[..., :])
     x = x.expand(batch+(-1,))
@@ -102,17 +102,18 @@ def chspline(points, num=10):
     interpoints += hh[..., 3:4] * m[..., idxs + 1, :] * dx[..., None]
     return interpoints
 
-
-def bspline(data, num:int=10, clamping=False):
+def bspline(data, interval=0.1, extrapolate=False):
     r'''
     B-spline interpolation, which currently only supports SE3 LieTensor.
 
     Args:
         data (:obj:`LieTensor`): the input sparse poses with
             [batch_size, poses_num, dim] shape.
-        num (``int``): the number of interpolated poses between adjcent two poses.
-            Default: ``10``.
-        clamping(``bool``): flag to determine whether the interpolate poses pass the 
+        interval (:obj:`float`): the interval betweent interpolated poses. If we set
+            :math:`interval = 0.1` and  interpolate points betwewn the poses at
+            :math:`t` and :math:`t+1`, and  The time of interpolation should be
+            :math:`[t, t+0.1,...,t+0.9, t+1]`. Default: ``0.1``.
+        extrapolate(``bool``): flag to determine whether the interpolate poses pass the
             start and end poses. If ``True`` the interpolated poses pass the start and
             end poses. Default: ``False``.
 
@@ -195,20 +196,21 @@ def bspline(data, num:int=10, clamping=False):
     '''
     assert is_SE3(data), "The input poses are not SE3Type."
     assert data.dim() >= 2, "Dimension of data should be [..., N, C]."
-    assert type(num) == int, "The type of interpolated pose number should be int."
-    assert num > 0, "The number of interpolated pose number should be larger than 0."
+    # assert type(num) == int, "The type of interpolated pose number should be int."
+    # assert num > 0, "The number of interpolated pose number should be larger than 0."
     batch = data.shape[:-2]
-    if clamping:
-        data = torch.cat((data[..., :1, :].expand(batch+(3,-1)),
+    if extrapolate:
+        data = torch.cat((data[..., :1, :].expand(batch+(2,-1)),
                           data,
-                          data[..., -1:, :].expand(batch+(3,-1))), dim=-2)
+                          data[..., -1:, :].expand(batch+(2,-1))), dim=-2)
     else:
-        data = torch.cat((data[..., :1, :],
-                          data,
-                          data[..., -1:, :]), dim=-2)
+        assert data.shape[-2]>=4, "Number of poses is less than 4."
     Bth, N, D = data.shape[:-2], data.shape[-2], data.shape[-1]
     dargs = {'dtype': data.dtype, 'device': data.device}
-    timeline = torch.arange(0, 1, 1.0/num, **dargs)
+    intervals = torch.arange(0, 1+1e-6, interval, **dargs)
+    timeline = torch.zeros(N-2, **dargs).unsqueeze(-1)
+    timeline = (timeline + intervals).view(-1)[:-(intervals.shape[0] - 1)]
+    timeline = torch.arange(0, 1, interval, **dargs)
     tt = timeline ** torch.arange(4, **dargs).view(-1, 1)
     B = torch.tensor([[5, 3,-3, 1],
                       [1, 3, 3,-2],
@@ -217,6 +219,11 @@ def bspline(data, num:int=10, clamping=False):
     w = (B @ tt).unsqueeze(-1)
     index = (torch.arange(0, N-3).unsqueeze(-1) + torch.arange(0, 4)).view(-1)
     P = data[..., index, :].view(Bth + (N-3,4,1,D))
-    A = ((P[..., :3,:, :].Inv() * P[...,1:,:,:]).Log() * w).Exp()
-    A = A[...,0,:,:] * A[...,1,:,:] * A[...,2,:,:]
-    return (dP * A).view(Bth + (num * (N - 3), D))
+    P = (P[..., :3, :, :].Inv() * P[..., 1:, :, :]).Log()
+    A = (P * w).Exp()
+    Aend = (P[..., -1, :] * ((B.sum(dim=1)).unsqueeze(-1))).Exp()
+    Aend = Aend[..., [0], :] * Aend[..., [1], :] * Aend[..., [2], :]
+    A = A[..., 0, :, :] * A[..., 1, :, :] * A[..., 2, :, :]
+    t1, t2 = dP * A,dP[...,-1,:,:]*Aend[...,-1,:,:]
+    poses = torch.cat((t1.view(Bth + (-1, D)),t2), dim=-2)
+    return poses
