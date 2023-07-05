@@ -56,12 +56,23 @@ if __name__=="__main__":
     print(args)
     angle1 = pp.euler2SO3(torch.Tensor([0., 0., 0.]))
     angle2 = pp.euler2SO3(torch.Tensor([torch.pi / 4., torch.pi / 3., torch.pi / 2.]))
-    poses = pp.LieTensor([[[0., 4., 0., 0., angle1[1], angle1[2], angle1[3]],
-                           [1., 3.7, 0., angle1[0], angle1[1], angle1[2], angle1[3]],
-                           [0., 2.8, 0., angle1[0], angle1[1], angle1[2], angle1[3]],
-                           [0., 2., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
-                           [0., 1., 0., angle1[0], angle1[1], angle1[2], angle1[3]]]],
-                           ltype=pp.SE3_type)
+    poses = pp.LieTensor([[[0., 4., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
+                   [0., 3., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
+                   [0., 2., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
+                   [0., 1., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
+                   [1., 0., 1., angle2[0], angle2[1], angle2[2], angle2[3]],
+                   [2., 0., 1., angle2[0], angle2[1], angle2[2], angle2[3]],
+                   [3., 0., 1., angle2[0], angle2[1], angle2[2], angle2[3]],
+                   [4., 0., 1., angle2[0], angle2[1], angle2[2], angle2[3]]],
+                  [[2., 4., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
+                   [3., 3., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
+                   [4., 2., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
+                   [5., 1., 0., angle1[0], angle1[1], angle1[2], angle1[3]],
+                   [1., 0., 2., angle2[0], angle2[1], angle2[2], angle2[3]],
+                   [2., 0., 3., angle2[0], angle2[1], angle2[2], angle2[3]],
+                   [2., 0., 4., angle2[0], angle2[1], angle2[2], angle2[3]],
+                   [3., 0., 5., angle2[0], angle2[1], angle2[2], angle2[3]]]],
+                 ltype=pp.SE3_type)
     wayposes = pp.bspline(poses, 0.1, True)
     xrange = [0, 5.]
     yrange = [0, 5.]

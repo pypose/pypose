@@ -224,6 +224,6 @@ def bspline(data, interval=0.1, extrapolate=False):
     Aend = (P[..., -1, :] * ((B.sum(dim=1)).unsqueeze(-1))).Exp()
     Aend = Aend[..., [0], :] * Aend[..., [1], :] * Aend[..., [2], :]
     A = A[..., 0, :, :] * A[..., 1, :, :] * A[..., 2, :, :]
-    t1, t2 = dP * A,dP[...,-1,:,:]*Aend[...,-1,:,:]
-    poses = torch.cat((t1.view(Bth + (-1, D)),t2), dim=-2)
+    ps, pend = dP * A,dP[...,-1,:,:]*Aend[...,-1,:,:]
+    poses = torch.cat((ps.view(Bth + (-1, D)), pend), dim=-2)
     return poses
