@@ -207,9 +207,6 @@ def bspline(data, interval=0.1, extrapolate=False):
         assert data.shape[-2]>=4, "Number of poses is less than 4."
     Bth, N, D = data.shape[:-2], data.shape[-2], data.shape[-1]
     dargs = {'dtype': data.dtype, 'device': data.device}
-    intervals = torch.arange(0, 1+1e-6, interval, **dargs)
-    timeline = torch.zeros(N-2, **dargs).unsqueeze(-1)
-    timeline = (timeline + intervals).view(-1)[:-(intervals.shape[0] - 1)]
     timeline = torch.arange(0, 1, interval, **dargs)
     tt = timeline ** torch.arange(4, **dargs).view(-1, 1)
     B = torch.tensor([[5, 3,-3, 1],
