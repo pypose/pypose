@@ -124,7 +124,7 @@ def bspline(data, interval=0.1, extrapolate=False):
     only relies on the poses at four time steps :math:`\{t_{i-1},t_i,t_{i+1},t_{i+2}\}`.
     It means that the interpolation between adjacent poses needs four consecutive poses.
     In this function, the interpolation time :math:`t` is evenly distributed between a
-    poses query according to the number of interpolated poses.
+    poses query according to the interval parameter.
 
     The absolute pose of the spline :math:`T_{s}^w(t)`, where :math:`w` denotes the world
     and :math:`s` is the spline coordinate frame, can be calculated:
