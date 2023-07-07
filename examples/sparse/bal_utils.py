@@ -134,8 +134,10 @@ def visualize_loss_per_observation(loss, path_to_img="loss_per_observation.png",
 
 def _test():
     # test reprojerr
+    def filter_problem(x):
+        return x['problem_name'] == 'problem-49-7776-pre'
     dataset_pipeline = build_pipeline(dataset='ladybug', cache_dir='bal_data')\
-        .filter(lambda x: x['problem_name'] == 'problem-49-7776-pre')
+        .filter(filter_problem)
     dataset_iterator = iter(dataset_pipeline)
     dataset = next(dataset_iterator)
     loss_l2 = reprojerr(dataset['camera_extrinsics'],

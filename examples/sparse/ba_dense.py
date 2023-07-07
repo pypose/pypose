@@ -104,8 +104,10 @@ if __name__ == '__main__':
     parser.add_argument('--problem', type=str, default='problem-49-7776-pre', help='BAL problem name.')
     args = parser.parse_args()
     # load dataset
+    def filter_problem(x):
+        return x['problem_name'] == args.problem
     dataset_pipeline = build_pipeline(dataset=args.dataset, cache_dir='bal_data')\
-        .filter(lambda x: x['problem_name'] == args.problem)
+        .filter(filter_problem)
     dataset_iterator = iter(dataset_pipeline)
     # run bundle adjustment
     dataset = next(dataset_iterator)
