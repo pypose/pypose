@@ -1,3 +1,14 @@
+"""
+This file contains the dense bundle adjustment solver for the Bundle Adjustment in the Large dataset.
+
+The dataset is from the following paper:
+Sameer Agarwal, Noah Snavely, Steven M. Seitz, and Richard Szeliski.
+Bundle adjustment in the large.
+In European Conference on Computer Vision (ECCV), 2010.
+
+Link to the dataset: https://grail.cs.washington.edu/projects/bal/
+"""
+
 import torch, argparse, os
 import pypose as pp
 from bal_loader import build_pipeline
@@ -86,8 +97,16 @@ def bundle_adjustment(dataset: dict, num_opt_steps: int = 1000):
 
 
 if __name__ == '__main__':
-    dataset_pipeline = build_pipeline(dataset='ladybug', cache_dir='bal_data')\
-        .filter(lambda x: x['problem_name'] == 'problem-49-7776-pre')
+    # parse arguments
+    parser = argparse.ArgumentParser(description='Bundle adjustment for the BAL dataset.')
+    parser.add_argument('--steps', type=int, default=1000, help='Number of optimization steps.')
+    parser.add_argument('--dataset', type=str, default='ladybug', help='BAL dataset name.')
+    parser.add_argument('--problem', type=str, default='problem-49-7776-pre', help='BAL problem name.')
+    args = parser.parse_args()
+    # load dataset
+    dataset_pipeline = build_pipeline(dataset=args.dataset, cache_dir='bal_data')\
+        .filter(lambda x: x['problem_name'] == args.problem)
     dataset_iterator = iter(dataset_pipeline)
+    # run bundle adjustment
     dataset = next(dataset_iterator)
-    bundle_adjustment(dataset)
+    bundle_adjustment(dataset, args.steps)
