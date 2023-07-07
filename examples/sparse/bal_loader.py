@@ -145,17 +145,12 @@ def read_bal_data(file_name: str) -> dict:
 
     # convert Rodrigues vector to unit quaternion for camera rotation
     # camera_params[0:3] is the Rodrigues vector
-    theta = np.linalg.norm(camera_params[:, :3], axis=1)[:, np.newaxis]
-    with np.errstate(invalid='ignore'):
-        v = camera_params[:, :3] / theta
-        v = np.nan_to_num(v)
-    r = Rotation.from_rotvec(v)
+    r = Rotation.from_rotvec(camera_params[:, :3])
     q = r.as_quat()
 
-    # use torch.Tensor of shape (n_cameras, 7) to represent camera extrinsics
+    # use pp.LieTensor of shape (n_cameras, 7) to represent camera extrinsics
     # camera_params[3:6] is the camera translation
-    camera_extrinsics = pp.LieTensor(np.concatenate([camera_params[:, 3:6], q], axis=1),
-                                     ltype=pp.SE3_type)
+    camera_extrinsics = pp.LieTensor(np.concatenate([camera_params[:, 3:6], q], axis=1), ltype=pp.SE3_type)
 
     # use torch.Tensor of shape (n_cameras, 3, 3) to represent camera intrinsics
     # camera_params[6] is focal length, camera_params[7] and camera_params[8] are two radial distortion parameters
@@ -222,7 +217,7 @@ def build_pipeline(dataset='ladybug', cache_dir='bal_data'):
     bal_data_dp = download_dp.map(read_bal_data)
     return bal_data_dp
 
-if __name__ == '__main__':
+def _test():
     dp = build_pipeline()
     print("Testing dataset pipeline...")
     for i in dp:
@@ -242,3 +237,6 @@ if __name__ == '__main__':
         assert torch.float32 == points.dtype == pixels.dtype == intrinsics.dtype == extrinsics.dtype
         print(problem_name, 'ok')
     print("All tests passed!")
+
+if __name__ == '__main__':
+    _test()
