@@ -1,10 +1,10 @@
 import torch, argparse, os
 import pypose as pp
 from bal_loader import build_pipeline
-from bal_utils import reprojerr
+from bal_utils import reprojerr, visualize_loss_history, visualize_loss_per_observation
+from tqdm import trange
 
-
-def bundle_adjustment(dataset: dict):
+def bundle_adjustment(dataset: dict, num_opt_steps: int = 1000):
     """
     Bundle adjustment for the BAL dataset.
 
@@ -29,11 +29,18 @@ def bundle_adjustment(dataset: dict):
             contains indices of cameras (from 0 to n_cameras - 1) involved in each observation.
         - point_index_of_observations: torch.Tensor (n_observations,)
             contains indices of points (from 0 to n_points - 1) involved in each observation.
+    num_opt_steps : int, optional
+        Number of optimization steps, by default 1000
+
     Returns
     -------
-    ...
+    camera_extrinsics : pp.LieTensor (n_cameras, 7)
+        The optimized camera extrinsics.
+    points_3d : torch.Tensor (n_points, 3)
+        The optimized 3D points.
     """
     print(f'Solving {dataset["problem_name"]}')
+    print(f'Number of optimization steps: {num_opt_steps}')
 
     # use pytorch's adam for dense ba, device is automatically set to cuda if available
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -43,13 +50,15 @@ def bundle_adjustment(dataset: dict):
       if isinstance(v, torch.Tensor):
           dataset[k] = v.to(device)
 
-
     dataset['camera_extrinsics'].requires_grad_(True)
     dataset['points_3d'].requires_grad_(True)
 
-    optimizer = torch.optim.Adam([dataset['camera_extrinsics'], dataset['points_3d']], lr=1e-2)
+    optimizer = torch.optim.Adam([dataset['camera_extrinsics'], dataset['points_3d']], lr=3e-4)
+    t = trange(num_opt_steps, desc='Loss', leave=True)
+    loss_history = []
+    loss_vector_history = []
 
-    for i in range(1000):
+    for i in t:
         optimizer.zero_grad()
         loss = reprojerr(dataset['camera_extrinsics'],
                  dataset['points_3d'],
@@ -58,10 +67,23 @@ def bundle_adjustment(dataset: dict):
                  dataset['camera_distortions'],
                  dataset['point_index_of_observations'],
                  dataset['camera_index_of_observations'])
+
+        loss_vector_history.append(loss.detach().cpu().numpy())
         loss = torch.mean(loss)
         loss.backward()
         optimizer.step()
-        print(f'Iter {i+1} loss: {loss.item()}')
+
+        loss_history.append(loss.item())
+        t.set_description(f'Loss: {loss.item():.4f}')
+
+    print(f'Initial loss: {loss_history[0]}')
+    print(f'Final loss: {loss_history[-1]}')
+    visualize_loss_history(loss_history)
+    visualize_loss_per_observation(loss_vector_history[0], path_to_img="loss_per_observation_initial.png", title="Loss per observation (initial)")
+    visualize_loss_per_observation(loss_vector_history[-1], path_to_img="loss_per_observation_final.png", title="Loss per observation (final)")
+
+    return dataset['camera_extrinsics'], dataset['points_3d']
+
 
 if __name__ == '__main__':
     dataset_pipeline = build_pipeline(dataset='ladybug', cache_dir='bal_data')\

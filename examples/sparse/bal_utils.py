@@ -11,6 +11,7 @@ Link to the dataset: https://grail.cs.washington.edu/projects/bal/
 
 import os, torch
 import pypose as pp
+import matplotlib.pyplot as plt
 from bal_loader import build_pipeline
 
 def reprojerr(pose, points, pixels, intrinsics, distortions, point_index, camera_index):
@@ -93,6 +94,43 @@ def reprojerr_native(pose, points, pixels, intrinsics, point_index, camera_index
                         intrinsics[camera_index],
                         pose[camera_index]).squeeze(-1)
     return loss
+
+def visualize_loss_history(loss_history, path_to_img="loss_history.png", title="Loss history"):
+    """
+    Visualize the loss history.
+
+    Args:
+        loss_history (list): A list of loss values.
+        path_to_img (str, optional): Path to save the image. Defaults to "loss_history.png".
+    Returns:
+        None
+    """
+    plt.plot(loss_history)
+    plt.xlabel('Iteration')
+    plt.ylabel('Loss')
+    plt.title(title)
+    plt.savefig(path_to_img)
+    plt.close()
+    print(f"Loss history saved to {path_to_img}")
+
+def visualize_loss_per_observation(loss, path_to_img="loss_per_observation.png", title="Loss per observation"):
+    """
+    Visualize the loss per observation.
+
+    Args:
+        loss (np.ndarray): A numpy array of loss values.
+        path_to_img (str, optional): Path to save the image. Defaults to "loss_per_observation.png".
+    Returns:
+        None
+    """
+    plt.plot(loss)
+    plt.xlabel('Pixel Observation')
+    plt.ylabel('Loss')
+    plt.title(title)
+    plt.savefig(path_to_img)
+    plt.close()
+    print(f"Loss per observation saved to {path_to_img}")
+
 
 def _test():
     # test reprojerr

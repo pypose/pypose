@@ -7,7 +7,7 @@ An example for Bundle Adjustment (BA) using Bundle Adjustment in the Large (BAL)
 
 ## Installation
 
-    pip install torchdata "portalocker>=2.0.0"
+    pip install torchdata "portalocker>=2.0.0" matplotlib
 
 ## Run:
 
