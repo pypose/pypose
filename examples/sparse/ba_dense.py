@@ -1,14 +1,7 @@
 import torch, argparse, os
 import pypose as pp
 from bal_loader import build_pipeline
-
-
-def f(pose, points, pixels, intrinsics, point_index, camera_index):
-    loss = pp.reprojerr(points[point_index, None],
-                        pixels[:, None],
-                        intrinsics[camera_index],
-                        pose[camera_index])
-    return loss
+from bal_utils import reprojerr
 
 
 def bundle_adjustment(dataset: dict):
@@ -56,21 +49,19 @@ def bundle_adjustment(dataset: dict):
 
     optimizer = torch.optim.Adam([dataset['camera_extrinsics'], dataset['points_3d']], lr=1e-2)
 
-    for i in range(100):
+    for i in range(1000):
         optimizer.zero_grad()
-        loss = f(dataset['camera_extrinsics'],
+        loss = reprojerr(dataset['camera_extrinsics'],
                  dataset['points_3d'],
                  dataset['points_2d'],
                  dataset['camera_intrinsics'],
+                 dataset['camera_distortions'],
                  dataset['point_index_of_observations'],
                  dataset['camera_index_of_observations'])
         loss = torch.mean(loss)
         loss.backward()
         optimizer.step()
         print(f'Iter {i+1} loss: {loss.item()}')
-
-    return dataset['camera_extrinsics'], dataset['points_3d']
-
 
 if __name__ == '__main__':
     dataset_pipeline = build_pipeline(dataset='ladybug', cache_dir='bal_data')\
