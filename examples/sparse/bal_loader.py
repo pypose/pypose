@@ -17,7 +17,7 @@ from operator import itemgetter, methodcaller
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 from torchvision.transforms import Compose
 from scipy.spatial.transform import Rotation
-from torchdata.datapipes.iter import HttpReader, IterableWrapper, OnlineReader
+from torchdata.datapipes.iter import HttpReader, IterableWrapper, FileOpener
 
 # ignore bs4 warning
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
@@ -43,15 +43,23 @@ def _not_none(s):
     return s is not None
 
 # extract problem file urls from the problem url
-def _problem_lister(*problem_url):
-    return OnlineReader(IterableWrapper(problem_url)
+def _problem_lister(*problem_url, cache_dir):
+    problem_list_dp = IterableWrapper(problem_url).on_disk_cache(
+        filepath_fn=Compose([os.path.basename, partial(os.path.join, cache_dir)]),
+    )
+    problem_list_dp = HttpReader(problem_list_dp).end_caching(same_filepath_fn=True)
+
+    # read the cached problem list html file
+    problem_list_dp = FileOpener(problem_list_dp)
+    problem_list_dp = problem_list_dp.readlines(return_path=False
     # parse HTML <a> tag's href attributes using bs4
-    ).readlines(return_path=False
     ).map(partial(BeautifulSoup, features="html.parser")).map(methodcaller('find', 'a')
     # must end with .bz2
     ).filter(_not_none).map(methodcaller('get', 'href')).filter(partial(_endswith, b='.bz2')
     # add base url
     ).map(_with_base_url)
+
+    return problem_list_dp
 
 # download and decompress the problem files
 def _download_pipe(cache_dir, url_dp, suffix: str):
@@ -212,7 +220,7 @@ def build_pipeline(dataset='ladybug', cache_dir='bal_data'):
     global ALL_DATASETS
     assert dataset in ALL_DATASETS, f"dataset_name must be one of {ALL_DATASETS}"
     print(f"Streaming data for {dataset}...")
-    url_dp = _problem_lister(_with_base_url(dataset + '.html'))
+    url_dp = _problem_lister(_with_base_url(dataset + '.html'), cache_dir=cache_dir)
     download_dp = _download_pipe(cache_dir=cache_dir, url_dp=url_dp, suffix='.bz2')
     bal_data_dp = download_dp.map(read_bal_data)
     return bal_data_dp
