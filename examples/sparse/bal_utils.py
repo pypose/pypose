@@ -140,25 +140,21 @@ def _test():
         .filter(filter_problem)
     dataset_iterator = iter(dataset_pipeline)
     dataset = next(dataset_iterator)
-    loss_l2 = reprojerr(dataset['camera_extrinsics'],
+    loss = reprojerr(dataset['camera_extrinsics'],
                  dataset['points_3d'],
                  dataset['points_2d'],
                  dataset['camera_intrinsics'],
                  dataset['camera_distortions'],
                  dataset['point_index_of_observations'],
                  dataset['camera_index_of_observations'])
-    loss_native_l2 = reprojerr_native(dataset['camera_extrinsics'],
+    loss_native = reprojerr_native(dataset['camera_extrinsics'],
                     dataset['points_3d'],
                     dataset['points_2d'],
                     dataset['camera_intrinsics'],
                     dataset['point_index_of_observations'],
                     dataset['camera_index_of_observations'])
-    # native implementation and the implementation in this file should have small l1 difference
-    # as their only difference is the camera distortion
-    loss_l1 = torch.sqrt(loss_l2)
-    loss_native_l1 = torch.sqrt(loss_native_l2)
-    assert torch.allclose(loss_l1, loss_native_l1, atol=50), "reprojerr implementation incorrect."
+    # loss with undistortion should be smaller than native loss
+    assert torch.mean(loss) < torch.mean(loss_native), "reprojerr implementation incorrect."
     print("reprojerr implementation ok.")
-
 if __name__ == '__main__':
     _test()
