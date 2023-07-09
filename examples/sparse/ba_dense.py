@@ -111,4 +111,4 @@ if __name__ == '__main__':
     dataset_iterator = iter(dataset_pipeline)
     # run bundle adjustment
     dataset = next(dataset_iterator)
-    bundle_adjustment(dataset, args.steps)
+    _, _ = bundle_adjustment(dataset, args.steps)

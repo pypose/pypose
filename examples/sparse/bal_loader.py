@@ -59,6 +59,10 @@ def _problem_lister(*problem_url, cache_dir):
     # add base url
     ).map(_with_base_url)
 
+    # sort the problem files by the number of images
+    problem_list_sorted = sorted(list(problem_list_dp), key=lambda x: int(os.path.basename(x).split('-')[1]))
+    problem_list_dp = IterableWrapper(problem_list_sorted)
+
     return problem_list_dp
 
 # download and decompress the problem files
