@@ -469,7 +469,6 @@ class sim3_Exp(torch.autograd.Function):
 
 
 class SO3_Act(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, X, p):
         Xv, Xw = X[..., :3], X[..., 3:]
