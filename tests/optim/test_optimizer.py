@@ -136,8 +136,8 @@ class TestOptim:
         inputs = pp.randn_SE3(2, 2).to(device)
         posnet = PoseInv(2, 2).to(device)
         solver = ppos.Cholesky()
-        kernel = [ppok.Cauchy()]
-        corrector = [ppoc.FastTriggs(kernel[0])]
+        kernel = ppok.Cauchy()
+        corrector = ppoc.FastTriggs(kernel)
         optimizer = pp.optim.LM(posnet, solver=solver, kernel=kernel, corrector=corrector)
 
         for idx in range(10):

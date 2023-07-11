@@ -190,12 +190,15 @@ class GaussNewton(_Optimizer):
         self.jackwargs = {'vectorize': vectorize}
         self.solver = PINV() if solver is None else solver
         self.weight = weight
-        self.model = RobustModel(model, kernel)
         if kernel is not None:
+            kernel = [kernel] if not isinstance(kernel, (tuple, list)) else kernel
+            kernel = [k if k is not None else Trivial() for k in kernel]
             self.corrector = [FastTriggs(k) for k in kernel] if corrector is None else corrector
         else:
             self.corrector = [Trivial()] if corrector is None else corrector
-
+        self.corrector = [self.corrector] if not isinstance(self.corrector, (tuple, list)) else self.corrector
+        self.corrector = [c if c is not None else Trivial() for c in self.corrector]
+        self.model = RobustModel(model, kernel)
 
 
     @torch.no_grad()
@@ -384,11 +387,16 @@ class LevenbergMarquardt(_Optimizer):
         self.solver = Cholesky() if solver is None else solver
         self.reject, self.reject_count = reject, 0
         self.weight = weight
-        self.model = RobustModel(model, kernel)
         if kernel is not None:
+            kernel = [kernel] if not isinstance(kernel, (tuple, list)) else kernel
+            kernel = [k if k is not None else Trivial() for k in kernel]
             self.corrector = [FastTriggs(k) for k in kernel] if corrector is None else corrector
         else:
             self.corrector = [Trivial()] if corrector is None else corrector
+        self.corrector = [self.corrector] if not isinstance(self.corrector, (tuple, list)) else self.corrector
+        self.corrector = [c if c is not None else Trivial() for c in self.corrector]
+        self.model = RobustModel(model, kernel)
+
 
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
