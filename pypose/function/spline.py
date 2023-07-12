@@ -11,9 +11,9 @@ def chspline(points, interval=0.1):
         points (:obj:`Tensor`): the sequence of points for interpolation with shape
             [..., point_num, dim].
         interval (:obj:`float`): the unit interval between interpolated points. 
-            We assume there is 1 unit between adjacent points. If we set unit interval
-            :math:`interval = 0.1` and  interpolate points between the points at
-            :math:`t` and :math:`t+1`, and  The interpolated points should be at
+            We assume there is 1 unit between adjacent points. If we set
+            :math:`interval = 0.1` and interpolate points between the points at
+            :math:`t` and :math:`t+1`, the interpolated points should be at
             :math:`[t, t+0.1,...,t+0.9, t+1]`. Default: ``0.1``.
 
     Returns:
@@ -111,8 +111,8 @@ def bspline(data, interval=0.1, extrapolate=False):
             [batch_size, poses_num, dim] shape.
         interval (:obj:`float`): the unit interval between interpolated poses. 
             We assume there is 1 unit between adjacent poses If we set
-            :math:`interval = 0.1` and  interpolate points between the poses at
-            :math:`t` and :math:`t+1`, and  The interpolated poses should be at 
+            :math:`interval = 0.1` and interpolate poses between the poses at
+            :math:`t` and :math:`t+1`, and interpolated poses should be at 
             :math:`[t, t+0.1,...,t+0.9, t+1]`. Default: ``0.1``.
         extrapolate(``bool``): flag to determine whether the interpolate poses pass the
             start and end poses. If ``True`` the interpolated poses pass the start and
