@@ -10,22 +10,22 @@ def chspline(points, interval=0.1):
     Args:
         points (:obj:`Tensor`): the sequence of points for interpolation with shape
             [..., point_num, dim].
-        interval (:obj:`float`): the interval betweent interpolated points. If we set
-            :math:`interval = 0.1` and  interpolate points betwewn the points at
-            :math:`t` and :math:`t+1`, and  The time of interpolation should be
+        interval (:obj:`float`): the unit interval between interpolated points. 
+            We assume there is 1 unit between adjacent points. If we set unit interval
+            :math:`interval = 0.1` and  interpolate points between the points at
+            :math:`t` and :math:`t+1`, and  The interpolated points should be at
             :math:`[t, t+0.1,...,t+0.9, t+1]`. Default: ``0.1``.
 
     Returns:
        ``Tensor``: the interpolated points.
 
     The interpolated points are evenly distributed between a start point and a end point
-    according to the number of interpolated points. In this function, the interpolation
-    time is aslo evenly distributed between the corresponding time of start point and
-    end point.
+    according to the number of interpolated points. In this function, the interpolated points
+    are also evenly distributed between the start point and end point.
 
     Denote the starting point :math:`p_0` with the starting tangent :math:`m_0` and the
     ending point :math:`p_1` with the ending tagent :math:`m_1`. The interpolated point at
-    time :math:`t` can be defined as:
+    :math:`t` can be defined as:
 
     .. math::
         \begin{aligned}
@@ -109,9 +109,10 @@ def bspline(data, interval=0.1, extrapolate=False):
     Args:
         data (:obj:`LieTensor`): the input sparse poses with
             [batch_size, poses_num, dim] shape.
-        interval (:obj:`float`): the interval betweent interpolated poses. If we set
-            :math:`interval = 0.1` and  interpolate points betwewn the poses at
-            :math:`t` and :math:`t+1`, and  The time of interpolation should be
+        interval (:obj:`float`): the unit interval between interpolated poses. 
+            We assume there is 1 unit between adjacent poses If we set
+            :math:`interval = 0.1` and  interpolate points between the poses at
+            :math:`t` and :math:`t+1`, and  The interpolated poses should be at 
             :math:`[t, t+0.1,...,t+0.9, t+1]`. Default: ``0.1``.
         extrapolate(``bool``): flag to determine whether the interpolate poses pass the
             start and end poses. If ``True`` the interpolated poses pass the start and
@@ -120,11 +121,11 @@ def bspline(data, interval=0.1, extrapolate=False):
     Returns:
         :obj:`LieTensor`: the interpolated SE3 LieTensor.
 
-    A poses query at any time :math:`t \in [t_i, t_{i+1})` (i.e. a segment of the spline)
-    only relies on the poses at four time steps :math:`\{t_{i-1},t_i,t_{i+1},t_{i+2}\}`.
+    A poses query at :math:`t \in [t_i, t_{i+1})` (i.e. a segment of the spline)
+    only relies on the poses at four steps :math:`\{t_{i-1},t_i,t_{i+1},t_{i+2}\}`.
     It means that the interpolation between adjacent poses needs four consecutive poses.
-    In this function, the interpolation time :math:`t` is evenly distributed between a
-    poses query according to the interval parameter.
+    In this function, the interpolated poses are evenly distributed between a
+    pose query according to the interval parameter.
 
     The absolute pose of the spline :math:`T_{s}^w(t)`, where :math:`w` denotes the world
     and :math:`s` is the spline coordinate frame, can be calculated:
