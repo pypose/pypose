@@ -10,11 +10,11 @@ def chspline(points, interval=0.1):
     Args:
         points (:obj:`Tensor`): the sequence of points for interpolation with shape
             [..., point_num, dim].
-        interval (:obj:`float`): the unit interval between interpolated points. 
-            We assume there is 1 unit between adjacent points. If we set
-            :math:`interval = 0.1` and interpolate points between the points at
-            :math:`t` and :math:`t+1`, the interpolated points should be at
-            :math:`[t, t+0.1,...,t+0.9, t+1]`. Default: ``0.1``.
+        interval (:obj:`float`): the unit interval between interpolated points.
+            We assume the interval of adjacent input points is 1. Therefore, if we set
+            ``interval`` as ``0.1``, the interpolated points between the points at
+            :math:`t` and :math:`t+1` will be :math:`[t, t+0.1, ..., t+0.9, t+1]`.
+            Default: ``0.1``.
 
     Returns:
        ``Tensor``: the interpolated points.
@@ -66,7 +66,7 @@ def chspline(points, interval=0.1):
         ...                         [5., 1., 0.2],
         ...                         [4., 0.75, 0.2],
         ...                         [5., 0., 0.]]])
-        >>> waypoints = pp.chspline(points, 10)
+        >>> waypoints = pp.chspline(points, 0.1)
 
     .. figure:: /_static/img/module/liespline/CsplineR3.png
         :width: 600
@@ -74,7 +74,7 @@ def chspline(points, interval=0.1):
         Fig. 1. Result of Cubic Spline Interpolation in 3D space.
     """
     assert points.dim() >= 2, "Dimension of points should be [..., N, C]"
-    assert interval<1.0, "The time interval should be smaller than 1."
+    assert interval < 1.0, "The interval should be smaller than 1."
     batch, N = points.shape[:-2], points.shape[-2]
     dargs = {'device': points.device, 'dtype': points.dtype}
     intervals = torch.arange(0, 1, interval, **dargs)
@@ -109,14 +109,13 @@ def bspline(data, interval=0.1, extrapolate=False):
     Args:
         data (:obj:`LieTensor`): the input sparse poses with
             [batch_size, poses_num, dim] shape.
-        interval (:obj:`float`): the unit interval between interpolated poses. 
-            We assume there is 1 unit between adjacent poses If we set
-            :math:`interval = 0.1` and interpolate poses between the poses at
-            :math:`t` and :math:`t+1`, and interpolated poses should be at 
-            :math:`[t, t+0.1,...,t+0.9, t+1]`. Default: ``0.1``.
+        interval (:obj:`float`): the unit interval between interpolated poses.
+            We assume the interval of adjacent input poses is 1. Therefore, if we set
+            ``interval`` as ``0.1``, the interpolated poses between the poses at
+            :math:`t` and :math:`t+1` will be at :math:`[t, t+0.1, ..., t+0.9, t+1]`.
+            Default: ``0.1``.
         extrapolate(``bool``): flag to determine whether the interpolate poses pass the
-            start and end poses. If ``True`` the interpolated poses pass the start and
-            end poses. Default: ``False``.
+            start and end poses. Default: ``False``.
 
     Returns:
         :obj:`LieTensor`: the interpolated SE3 LieTensor.
@@ -189,16 +188,15 @@ def bspline(data, interval=0.1, extrapolate=False):
         ...                  [2., 0., 1., a2[0], a2[1], a2[2], a2[3]],
         ...                  [3., 0., 1., a2[0], a2[1], a2[2], a2[3]],
         ...                  [4., 0., 1., a2[0], a2[1], a2[2], a2[3]]]])
-        >>> wayposes = pp.bspline(poses, 10)
+        >>> wayposes = pp.bspline(poses, 0.1)
 
-    - .. figure:: /_static/img/module/liespline/BsplineSE3.png
+    .. figure:: /_static/img/module/liespline/BsplineSE3.png
 
         Fig. 1. Result of B Spline Interpolation in SE3.
     '''
     assert is_SE3(data), "The input poses are not SE3Type."
     assert data.dim() >= 2, "Dimension of data should be [..., N, C]."
-    # assert type(num) == int, "The type of interpolated pose number should be int."
-    # assert num > 0, "The number of interpolated pose number should be larger than 0."
+    assert interval < 1.0, "The interval should be smaller than 1."
     batch = data.shape[:-2]
     if extrapolate:
         data = torch.cat((data[..., :1, :].expand(batch+(2,-1)),
