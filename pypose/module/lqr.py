@@ -1,6 +1,5 @@
 import torch
-import time
-import torch.nn as nn
+from torch import nn
 from .. import bmv, bvmv
 from torch.linalg import vecdot
 

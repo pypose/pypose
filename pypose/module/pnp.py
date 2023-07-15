@@ -1,4 +1,5 @@
 import torch
+from torch import nn
 from torch.linalg import vecdot
 from torch import broadcast_shapes
 
@@ -9,7 +10,7 @@ from ..optim.scheduler import StopOnPlateau
 from ..function import reprojerr, cart2homo, svdtf
 
 
-class BetaObjective(torch.nn.Module):
+class BetaObjective(nn.Module):
     # Optimize the beta according to the objective in the ePnP paper.
     def __init__(self, beta):
         super().__init__()
@@ -25,7 +26,7 @@ class BetaObjective(torch.nn.Module):
         return dist_w - dist_c
 
 
-class EPnP(torch.nn.Module):
+class EPnP(nn.Module):
     r'''
     Batched EPnP Solver - a non-iterative :math:`\mathcal{O}(n)` solution to the
     Perspective-:math:`n`-Point (PnP) problem for :math:`n \geq 4`.
