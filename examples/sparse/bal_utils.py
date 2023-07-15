@@ -9,7 +9,7 @@ In European Conference on Computer Vision (ECCV), 2010.
 Link to the dataset: https://grail.cs.washington.edu/projects/bal/
 """
 
-import os, torch
+import torch
 import pypose as pp
 import matplotlib.pyplot as plt
 from bal_loader import build_pipeline
@@ -17,7 +17,8 @@ from bal_loader import build_pipeline
 def reprojerr(pose, points, pixels, intrinsics, distortions, point_index, camera_index):
     """
     Calculates batched per-pixel reprojection error considering camera distortion.
-    Using BAL's suggestion:
+    The implementation is based on the BAL dataset: https://grail.cs.washington.edu/projects/bal/
+    Following BAL's suggestion:
 
     We use a pinhole camera model; the parameters we estimate for each camera area rotation R, a translation t, a focal length f and two radial distortion parameters k1 and k2. The formula for projecting a 3D point X into a camera R,t,f,k1,k2 is:
     P  =  R * X + t       (conversion from world to camera coordinates)

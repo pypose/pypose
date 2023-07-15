@@ -9,7 +9,7 @@ In European Conference on Computer Vision (ECCV), 2010.
 Link to the dataset: https://grail.cs.washington.edu/projects/bal/
 """
 
-import torch, argparse, os
+import torch, argparse
 import pypose as pp
 from bal_loader import build_pipeline
 from bal_utils import reprojerr, visualize_loss_history, visualize_loss_per_observation
@@ -69,7 +69,7 @@ def bundle_adjustment(dataset: dict, num_opt_steps: int = 1000):
     loss_history = []
     loss_vector_history = []
 
-    for i in t:
+    for _ in t:
         optimizer.zero_grad()
         loss = reprojerr(dataset['camera_extrinsics'],
                  dataset['points_3d'],
@@ -98,10 +98,12 @@ def bundle_adjustment(dataset: dict, num_opt_steps: int = 1000):
 
 if __name__ == '__main__':
     # parse arguments
-    parser = argparse.ArgumentParser(description='Bundle adjustment for the BAL dataset.')
+    parser = argparse.ArgumentParser(description="This script runs bundle adjustment on the BAL dataset. To understand what datasets and problems are available, please refer to https://grail.cs.washington.edu/projects/bal",
+                                     epilog="Example of optimizing `problem-49-7776-pre` in the `ladybug` dataset:\n python3 ba_dense.py --dataset ladybug --problem problem-49-7776-pre --steps 1000",
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--steps', type=int, default=1000, help='Number of optimization steps.')
-    parser.add_argument('--dataset', type=str, default='ladybug', help='BAL dataset name.')
-    parser.add_argument('--problem', type=str, default='problem-49-7776-pre', help='BAL problem name.')
+    parser.add_argument('--dataset', type=str, default='ladybug', help='BAL dataset name, please refer to https://grail.cs.washington.edu/projects/bal for possible values.')
+    parser.add_argument('--problem', type=str, default='problem-49-7776-pre', help='BAL problem name, please refer to https://grail.cs.washington.edu/projects/bal for possible values.')
     args = parser.parse_args()
     # load dataset
     def filter_problem(x):

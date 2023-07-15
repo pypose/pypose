@@ -222,8 +222,8 @@ def build_pipeline(dataset='ladybug', cache_dir='bal_data'):
             contains indices of points (from 0 to n_points - 1) involved in each observation.
     """
     global ALL_DATASETS
-    assert dataset in ALL_DATASETS, f"dataset_name must be one of {ALL_DATASETS}"
     print(f"Streaming data for {dataset}...")
+    assert dataset in ALL_DATASETS, f"dataset_name must be one of {ALL_DATASETS}"
     url_dp = _problem_lister(_with_base_url(dataset + '.html'), cache_dir=cache_dir)
     download_dp = _download_pipe(cache_dir=cache_dir, url_dp=url_dp, suffix='.bz2')
     bal_data_dp = download_dp.map(read_bal_data)
