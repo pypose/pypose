@@ -111,7 +111,7 @@ def point2pixel(points, intrinsics, extrinsics=None):
     return homo2cart(points @ intrinsics.mT)
 
 
-def reprojerr(points, pixels, intrinsics, extrinsics=None, reduction="none"):
+def reprojerr(points, pixels, intrinsics, extrinsics=None, reduction='none'):
     r'''
     Calculates batched per-pixel reprojection error (pixel distance) for points either in
     the camera or world frame given camera intrinsics or extrinsics, respectively.
