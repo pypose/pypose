@@ -346,8 +346,7 @@ class LQR(nn.Module):
             qx, qu = qt[..., :ns], qt[..., ns:]
 
             K[...,t,:,:] = Kt = -lstsq(Quu, Qux).solution
-            k[...,t,:] = kt = -lstsq(Quu, qu.unsqueeze(-1)).\
-                solution.squeeze(-1)
+            k[...,t,:] = kt = -lstsq(Quu, qu.unsqueeze(-1)).solution.squeeze(-1)
 
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
             v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
