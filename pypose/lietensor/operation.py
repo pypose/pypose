@@ -482,7 +482,7 @@ class SO3_Act(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx, inputs, output):
         X, p = inputs
-        out, = output
+        out = output
         ctx.save_for_backward(X, out)
         return
 
@@ -507,7 +507,7 @@ class SE3_Act(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx: Any, inputs, output) -> Any:
         X, p = inputs
-        out, = output
+        out = output
         ctx.save_for_backward(X, out)
         return
 
