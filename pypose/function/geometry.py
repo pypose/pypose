@@ -127,14 +127,19 @@ def reprojerr(points, pixels, intrinsics, extrinsics=None, reduction="none"):
         extrinsics (``LieTensor``, optional): The camera extrinsics.
             The shape has to be (..., 7). Default: ``None``.
         reduction (``str``, optional): The reduction to apply on the output: ``'none'``
-            | ``'sum'`` | ``'norm'``;
-            ``'none'``: No reduction is applied;
+            | ``'sum'`` | ``'norm'``
+
+            ``'none'``: No reduction is applied
+
             ``'sum'``: The reprojection error on each component (u, v) is summed for
-            each pixel (L1 Norm);
+            each pixel (L1 Norm)
+
             ``'norm'``: The reprojection error's L2 norm for each pixel
     Returns:
-        Per-pixel reprojection error.;
-        The shape is (..., N) if reduction is ``'sum'`` or ``'norm'``.;
+        Per-pixel reprojection error.
+
+        The shape is (..., N) if reduction is ``'sum'`` or ``'norm'``.
+
         The shape is (..., N, 2) if reduction is ``'none'``.
 
     Example:
