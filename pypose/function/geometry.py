@@ -126,14 +126,16 @@ def reprojerr(points, pixels, intrinsics, extrinsics=None, reduction="none"):
             The shape has to be (..., 3, 3).
         extrinsics (``LieTensor``, optional): The camera extrinsics.
             The shape has to be (..., 7). Default: ``None``.
-        reduction (``str``, optional): The reduction to apply on the output: ``"none"`` | ``"sum"`` | ``"norm"``
-            ``"none"``: No reduction is applied
-            ``"sum"``: The reprojection error on each component (u, v) is summed for each pixel (L1 Norm)
-            ``"norm"``: The reprojection error's L2 norm for each pixel
+        reduction (``str``, optional): The reduction to apply on the output: ``'none'``
+            | ``'sum'`` | ``'norm'``
+            ``'none'``: No reduction is applied
+            ``'sum'``: The reprojection error on each component (u, v) is summed for
+            each pixel (L1 Norm)
+            ``'norm'``: The reprojection error's L2 norm for each pixel
     Returns:
         Per-pixel reprojection error.
-        The shape is (..., N) if reduction is ``"sum"`` or ``"norm"``.
-        The shape is (..., N, 2) if reduction is ``"none"``.
+        The shape is (..., N) if reduction is ``'sum'`` or ``'norm'``.
+        The shape is (..., N, 2) if reduction is ``'none'``.
 
     Example:
         >>> import torch, pypose as pp
@@ -144,18 +146,19 @@ def reprojerr(points, pixels, intrinsics, extrinsics=None, reduction="none"):
         >>> object = torch.randn(6, 3)
         >>> pose = pp.randn_SE3()
         >>> pixels = pp.point2pixel(object, intrinsics, pose)
-        >>> err = pp.reprojerr(object, pixels, intrinsics, pose, reduction="norm")
+        >>> err = pp.reprojerr(object, pixels, intrinsics, pose, reduction='norm')
         tensor([0., 0., 0., 0., 0., 0.])
     '''
     torch.broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
     assert points.size(-1) == 3 and pixels.size(-1) == 2 and \
            intrinsics.size(-1) == intrinsics.size(-2) == 3, "Shape not compatible."
-    assert reduction in {"norm", "sum", "none"}, "Reduction method can only be 'norm'|'sum'|'none'."
+    assert reduction in {'norm', 'sum', 'none'}, \
+           "Reduction method can only be 'norm'|'sum'|'none'."
     img_repj = point2pixel(points, intrinsics, extrinsics)
 
-    if reduction == "norm":
+    if reduction == 'norm':
         return (img_repj - pixels).norm(dim=-1)
-    elif reduction == "sum":
+    elif reduction == 'sum':
         return (img_repj - pixels).sum(dim=-1)
     return img_repj - pixels
 
