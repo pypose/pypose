@@ -159,7 +159,7 @@ class EPnP(nn.Module):
         l_mat, rho = self._compute_lrho(nullv, bases)
         betas = self._compute_betas(l_mat, rho)
         poses, scales = self._compute_solution(betas, nullv, alpha, points)
-        errors = reprojerr(points, pixels, intrinsics, poses)
+        errors = reprojerr(points, pixels, intrinsics, poses, reduction="norm")
         pose, beta, scale = self._best_solution(errors, poses, betas, scales)
 
         if self.refine:
