@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from .. import bmv, bvmv
-from torch.linalg import vecdot
+from torch.linalg import lstsq, vecdot
 
 
 class LQR(nn.Module):
@@ -345,8 +345,8 @@ class LQR(nn.Module):
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
             qx, qu = qt[..., :ns], qt[..., ns:]
 
-            K[...,t,:,:] = Kt = -torch.linalg.lstsq(Quu, Qux).solution
-            k[...,t,:] = kt = -torch.linalg.lstsq(Quu, qu.unsqueeze(-1)).\
+            K[...,t,:,:] = Kt = -lstsq(Quu, Qux).solution
+            k[...,t,:] = kt = -lstsq(Quu, qu.unsqueeze(-1)).\
                 solution.squeeze(-1)
 
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
