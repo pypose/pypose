@@ -2,9 +2,11 @@ import copy
 import torch
 import pypose as pp
 from torch import nn
-from torch.func import functional_call
+from torch.func import functional_call, jacfwd, jacrev
 from torch.utils._pytree import tree_map
 from torch.autograd.functional import jacobian
+
+from pypose.lietensor.lietensor import WrappableLT
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -116,6 +118,26 @@ class TestJacobian:
         jackwargs = {'vectorize': True, 'flatten': False}
         J = pp.optim.functional.modjac(invnet, input=inputs, **jackwargs)
         assert not pp.hasnan(J)
+
+    def test_lietensor_jacfwd(self):
+        pose = pp.randn_SE3(1).to(device)
+        points = torch.randn(1, 3).to(device)
+        def func(pose, points):
+            return pose @ points
+        out = func(pose, points)
+
+        try: # the torch behavior since ver 2.0.0
+            jac_func = jacfwd(func)
+            jac = jac_func(pose, points)
+            raise AssertionError('should not reach here')
+        except RuntimeError as e:
+            assert 'shapes cannot be multiplied' in str(e)
+
+        with WrappableLT():
+            jac_func = jacrev(func)
+            jac = jac_func(pose, points)
+            assert not pp.hasnan(jac)
+
 
 if __name__ == '__main__':
     test = TestJacobian()

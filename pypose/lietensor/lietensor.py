@@ -1220,3 +1220,32 @@ class Parameter(LieTensor, nn.Parameter):
             result = type(self)(self.clone(memory_format=torch.preserve_format))
             memo[id(self)] = result
             return result
+
+
+class WrappableLT:
+    tmp_md = torch.autograd.forward_ad.make_dual
+    tmp_w = torch._functorch.eager_transforms._wrap_tensor_for_grad
+    def __enter__(self):
+        torch.autograd.forward_ad.make_dual = self.make_dual_wrapper
+        torch._functorch.eager_transforms._wrap_tensor_for_grad = self._wrap_tensor_for_grad
+    
+    @classmethod
+    def make_dual_wrapper(cls, tensor, tangent, *args, level=None):
+        ltype = tensor.ltype if isinstance(tensor, LieTensor) else None
+        res = WrappableLT.tmp_md.__call__(tensor, tangent, *args, level=level)
+        if ltype is not None:
+            res = torch.Tensor.as_subclass(res, LieTensor)
+            res.ltype = ltype
+        return res
+
+    @classmethod
+    def _wrap_tensor_for_grad(cls, tensor, level):
+        ltype = tensor.ltype if isinstance(tensor, LieTensor) else None
+        res = WrappableLT.tmp_w.__call__(tensor, level)
+        if ltype is not None:
+            res = torch.Tensor.as_subclass(res, LieTensor)
+            res.ltype = ltype
+        return res
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        torch.autograd.forward_ad.make_dual = self.tmp_md
