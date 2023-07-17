@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from contextlib import contextmanager
 from .basics import vec2skew
-import collections, numbers, warnings
+import collections, numbers, warnings, importlib
 from .operation import broadcast_inputs
 from torch.utils._pytree import tree_map, tree_flatten
 from .operation import SO3_Log, SE3_Log, RxSO3_Log, Sim3_Log
@@ -1225,31 +1225,31 @@ class Parameter(LieTensor, nn.Parameter):
 @contextmanager
 def wrappable_lt():
     # save the original PyTorch functions
-    torch_make_dual = torch.autograd.forward_ad.make_dual
-    torch_wrap_tensor_for_grad = torch._functorch.eager_transforms._wrap_tensor_for_grad
+    NATIVE_FUNCTIONS = {
+        torch.autograd.forward_ad.make_dual,
+        torch._functorch.eager_transforms._wrap_tensor_for_grad,
+    }
 
-    def make_dual_wrapper(tensor, tangent, *args, level=None):
-        ltype = tensor.ltype if isinstance(tensor, LieTensor) else None
-        res = torch_make_dual(tensor, tangent, *args, level=level)
-        if ltype is not None:
-            res = torch.Tensor.as_subclass(res, LieTensor)
-            res.ltype = ltype
-        return res
-
-    def wrap_tensor_for_grad_wrapper(tensor, level):
-        ltype = tensor.ltype if isinstance(tensor, LieTensor) else None
-        res = torch_wrap_tensor_for_grad(tensor, level)
-        if ltype is not None:
-            res = torch.Tensor.as_subclass(res, LieTensor)
-            res.ltype = ltype
-        return res
+    def native_function_wrapper(func):
+        def wrapper(*args, **kwargs):
+            ltype = args[0].ltype if isinstance(args[0], LieTensor) else None
+            res = func(*args, **kwargs)
+            if ltype is not None:
+                res = torch.Tensor.as_subclass(res, LieTensor)
+                res.ltype = ltype
+            return res
+        return wrapper
 
     try:
         # swap the original PyTorch functions with the wrapper
-        torch.autograd.forward_ad.make_dual = make_dual_wrapper
-        torch._functorch.eager_transforms._wrap_tensor_for_grad = wrap_tensor_for_grad_wrapper
+        for func in NATIVE_FUNCTIONS:
+            module, name = func.__module__, func.__name__
+            module = importlib.import_module(module)
+            setattr(module, name, native_function_wrapper(func))
         yield
     finally:
         # restore the original PyTorch functions
-        torch.autograd.forward_ad.make_dual = torch_make_dual
-        torch._functorch.eager_transforms._wrap_tensor_for_grad = torch_wrap_tensor_for_grad
+        for func in NATIVE_FUNCTIONS:
+            module, name = func.__module__, func.__name__
+            module = importlib.import_module(module)
+            setattr(module, name, func)
