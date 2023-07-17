@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from contextlib import contextmanager
 from .basics import vec2skew
 import collections, numbers, warnings
 from .operation import broadcast_inputs
@@ -1221,31 +1222,34 @@ class Parameter(LieTensor, nn.Parameter):
             memo[id(self)] = result
             return result
 
+@contextmanager
+def wrappable_lt():
+    # save the original PyTorch functions
+    torch_make_dual = torch.autograd.forward_ad.make_dual
+    torch_wrap_tensor_for_grad = torch._functorch.eager_transforms._wrap_tensor_for_grad
 
-class WrappableLT:
-    tmp_md = torch.autograd.forward_ad.make_dual
-    tmp_w = torch._functorch.eager_transforms._wrap_tensor_for_grad
-    def __enter__(self):
-        torch.autograd.forward_ad.make_dual = self.make_dual_wrapper
-        torch._functorch.eager_transforms._wrap_tensor_for_grad = self._wrap_tensor_for_grad
-    
-    @classmethod
-    def make_dual_wrapper(cls, tensor, tangent, *args, level=None):
+    def make_dual_wrapper(tensor, tangent, *args, level=None):
         ltype = tensor.ltype if isinstance(tensor, LieTensor) else None
-        res = WrappableLT.tmp_md.__call__(tensor, tangent, *args, level=level)
+        res = torch_make_dual(tensor, tangent, *args, level=level)
         if ltype is not None:
             res = torch.Tensor.as_subclass(res, LieTensor)
             res.ltype = ltype
         return res
 
-    @classmethod
-    def _wrap_tensor_for_grad(cls, tensor, level):
+    def wrap_tensor_for_grad_wrapper(tensor, level):
         ltype = tensor.ltype if isinstance(tensor, LieTensor) else None
-        res = WrappableLT.tmp_w.__call__(tensor, level)
+        res = torch_wrap_tensor_for_grad(tensor, level)
         if ltype is not None:
             res = torch.Tensor.as_subclass(res, LieTensor)
             res.ltype = ltype
         return res
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        torch.autograd.forward_ad.make_dual = self.tmp_md
+    try:
+        # swap the original PyTorch functions with the wrapper
+        torch.autograd.forward_ad.make_dual = make_dual_wrapper
+        torch._functorch.eager_transforms._wrap_tensor_for_grad = wrap_tensor_for_grad_wrapper
+        yield
+    finally:
+        # restore the original PyTorch functions
+        torch.autograd.forward_ad.make_dual = torch_make_dual
+        torch._functorch.eager_transforms._wrap_tensor_for_grad = torch_wrap_tensor_for_grad

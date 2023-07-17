@@ -6,7 +6,7 @@ from torch.func import functional_call, jacfwd, jacrev
 from torch.utils._pytree import tree_map
 from torch.autograd.functional import jacobian
 
-from pypose.lietensor.lietensor import WrappableLT
+from pypose.lietensor.lietensor import wrappable_lt
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -122,9 +122,9 @@ class TestJacobian:
     def test_lietensor_jacfwd(self):
         pose = pp.randn_SE3(1).to(device)
         points = torch.randn(1, 3).to(device)
+
         def func(pose, points):
             return pose @ points
-        out = func(pose, points)
 
         try: # the torch behavior since ver 2.0.0
             jac_func = jacfwd(func)
@@ -133,7 +133,7 @@ class TestJacobian:
         except RuntimeError as e:
             assert 'shapes cannot be multiplied' in str(e)
 
-        with WrappableLT():
+        with wrappable_lt():
             jac_func = jacrev(func)
             jac = jac_func(pose, points)
             assert not pp.hasnan(jac)
