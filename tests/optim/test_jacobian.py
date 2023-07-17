@@ -133,6 +133,13 @@ class TestJacobian:
         except RuntimeError as e:
             assert 'shapes cannot be multiplied' in str(e)
 
+    def test_lie_tensor_jacrev(self):
+        pose = pp.randn_SE3(1).to(device)
+        points = torch.randn(1, 3).to(device)
+
+        def func(pose, points):
+            return pose @ points
+
         with wrappable_lt():
             jac_func = jacrev(func)
             jac = jac_func(pose, points)
@@ -145,3 +152,5 @@ if __name__ == '__main__':
     test.test_tensor_jacobian_multi_param()
     test.test_lietensor_jacobian()
     test.test_modjac()
+    test.test_lietensor_jacfwd()
+    test.test_lie_tensor_jacrev()
