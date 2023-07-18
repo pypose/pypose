@@ -30,6 +30,12 @@ class ReprojErrDataset(Dataset):
     def _load_depth(self, f: Path):
         return torch.tensor(np.load(str(f))).unsqueeze(dim=0)
 
+    def _image_to_display_image(self, img: torch.Tensor):
+        display_img = np.array(img.permute((1, 2, 0)).clone().cpu().numpy() * 255, dtype=np.uint8)
+        display_img = cv2.cvtColor(display_img, cv2.COLOR_BGR2GRAY)
+        display_img = np.stack([display_img] * 3, axis=2)
+        return display_img
+
     def _load_tartanair_gt(self, path: Path):
         poses = pp.SE3(np.loadtxt(str(path)))
         num_pose = poses.size()[0]
@@ -82,18 +88,15 @@ class ReprojErrDataset(Dataset):
         pts2 = self._match_points(pts1, flow)
         pts1_z = depth[0, pts1[0], pts1[1]]
 
-        return image1, image2, pts1_z, pts1, pts2, self.gt_motions[index]
+        display_img1 = self._image_to_display_image(image1)
+        display_img2 = self._image_to_display_image(image2)
 
-
-
-
-
-
+        return display_img1, display_img2, pts1_z, pts1, pts2, self.gt_motions[index]
 
 
 if __name__ == "__main__":
     ROOT = "/data/TartanAirSample"
-    data = ReprojErrDataset(Path(ROOT, "image_left"), Path(ROOT, "flow"), Path(ROOT, "depth_left"))
+    data = ReprojErrDataset(Path(ROOT, "image_left"), Path(ROOT, "flow"), Path(ROOT, "depth_left"), Path(ROOT, "pose_left.txt"))
 
-    i1, i2, f, d, p1, p2 = data[0]
-    print(i1.shape, i2.shape, f.shape, d.shape, p1[0].shape, p1[1].shape, p2[0].shape, p2[1].shape)
+    display_image1, display_image2, depth, pts1, pts2, gt_motion = data[0]
+    print(display_image1.shape, display_image2.shape, depth.shape, pts1[0].shape, pts1[1].shape, pts2[0].shape, pts2[1].shape, gt_motion.shape)

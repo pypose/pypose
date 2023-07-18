@@ -1,4 +1,3 @@
-import cv2
 import torch
 import argparse
 import numpy  as np
@@ -10,7 +9,7 @@ import pypose.optim as ppopt
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from minimum_dataset import ReprojErrDataset
+from dataset import ReprojErrDataset
 
 class ReprojectErrorModel(torch.nn.Module):
     def __init__(self, K, pts1, pts2, depth, est_T12) -> None:
@@ -23,35 +22,34 @@ class ReprojectErrorModel(torch.nn.Module):
         self.fx, self.fy = K[0, 0], K[1, 1]
         self.cx, self.cy = K[0, 2], K[1, 2]
 
-        self.reproj2d = None
         self.T_12 = pp.Parameter(est_T12)
         self.depth = torch.nn.Parameter(depth)
 
     @property
     def N(self): return self.pts1_v.shape[0]
 
-    def reproject(self) -> None:
+    def pts3d(self):
         pts3d_z = self.depth
         pts3d_x = ((self.pts1_u - self.cx) * pts3d_z) / self.fx
         pts3d_y = ((self.pts1_v - self.cy) * pts3d_z) / self.fy
-        pts3d = torch.stack([pts3d_x, pts3d_y, pts3d_z], dim=1)  # Nx3
+        return torch.stack([pts3d_x, pts3d_y, pts3d_z], dim=1)  # Nx3
 
-        reproj_uv = self.K @ (self.T_12.Inv().Act(pts3d)).T
-        reproj_uv = reproj_uv[:2] / reproj_uv[2]
-        reproj_vu = torch.roll(reproj_uv, shifts=1, dims=0)
-
-        self.reproj2d = reproj_vu.T
+    @torch.no_grad()
+    def reproject(self):
+        pts3d = self.pts3d()
+        reproj_uv = pp.function.point2pixel(pts3d, self.K, self.T_12.Inv())
+        return torch.roll(reproj_uv, shifts=1, dims=1)
 
     @torch.no_grad()
     def error(self) -> float:
-        self.reproject()
-        err_vu = self.reproj2d - torch.stack([self.pts2_v, self.pts2_u], dim=1)
-        return torch.mean(torch.norm(err_vu, dim=1, p=2)).item()
+        pts2 = torch.stack([self.pts2_u, self.pts2_v], dim=1)
+        err_uv = pp.function.reprojerr(self.pts3d(), pts2, self.K, self.T_12.Inv(), reduction='none')
+        return torch.mean(torch.norm(err_uv, dim=1, p=2)).item()
 
     def forward(self) -> torch.Tensor:
-        self.reproject()
-        err_vu = self.reproj2d - torch.stack([self.pts2_v, self.pts2_u], dim=1)
-        return err_vu.contiguous()
+        pts2 = torch.stack([self.pts2_u, self.pts2_v], dim=1)
+        err_uv = pp.function.reprojerr(self.pts3d(), pts2, self.K, self.T_12.Inv(), reduction='none')
+        return err_uv
 
 class ReprojectionErrorBackend:
     def __init__(self,
@@ -93,19 +91,11 @@ class ReprojectionErrorBackend:
         pts1_v, pts1_u = pts1[0].int(), pts1[1].int()
 
         while scheduler.continual():
-            reproj_vu  = target.reproj2d.detach().cpu()
+            reproj_vu  = target.reproject().detach().cpu()
             reproj_err = torch.norm(pts2_vu - reproj_vu, dim=1).detach().cpu().numpy()
             reproj_vu  = reproj_vu.int()
 
-            display_img0 = np.array(image1.permute((1, 2, 0)).clone().cpu().numpy() * 255, dtype=np.uint8)
-            display_img0 = cv2.cvtColor(display_img0, cv2.COLOR_BGR2GRAY)
-            display_img0 = np.stack([display_img0] * 3, axis=2)
-
-            display_img1 = np.array(image2.permute((1, 2, 0)).clone().cpu().numpy() * 255, dtype=np.uint8)
-            display_img1 = cv2.cvtColor(display_img1, cv2.COLOR_BGR2GRAY)
-            display_img1 = np.stack([display_img1] * 3, axis=2)
-
-            display_img  = np.concatenate([display_img0, display_img1], axis=1)
+            display_img  = np.concatenate([image1, image2], axis=1)
 
             plt.clf()
             plt.axis('off')
@@ -114,7 +104,7 @@ class ReprojectionErrorBackend:
                 err = reproj_err[idx].item()
                 v1      , u1       = pts1_v[idx].item()  , pts1_u[idx].item()
                 reproj_v, reproj_u = reproj_vu[idx, 0].item(), reproj_vu[idx, 1].item()
-                plt.plot([u1, reproj_u + display_img0.shape[1]], [v1, reproj_v], color=self.colorbar(err))
+                plt.plot([u1, reproj_u + image1.shape[1]], [v1, reproj_v], color=self.colorbar(err))
             plt.title(f"Step: {scheduler.steps}, Error: {target.error()}")
             divider = make_axes_locatable(plt.gca())
             cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -168,18 +158,21 @@ if __name__ == "__main__":
     )
     backend = ReprojectionErrorBackend(K, device=DEVICE, vectorize=VECTORIZE)
 
-    for image1, image2, depth, pts1, pts2, gt_motion in dataset:
+    for display_image1, display_image2, depth, pts1, pts2, gt_motion in dataset:
         gt_motion = backend.NED2CV @ gt_motion.to(DEVICE) @ backend.CV2NED
 
-        initial_T12 = gt_motion * pp.randn_SE3(sigma=.2).to(DEVICE)
-        initial_err_rot = (initial_T12.Inv() * gt_motion).rotation().Log().norm(dim=-1).item()
+        # Noisy initial pose and depth  noise ~ N(avg=0, std=.1)
+        initial_T12 = gt_motion * pp.randn_SE3(sigma=.1).to(DEVICE)
+        depth       = depth + torch.randn_like(depth) * .1
+
+        initial_err_rot = (initial_T12.Inv() * gt_motion).rotation().Log().norm(dim=-1).item() * (180 / np.pi)
         initial_err_trans = (initial_T12.Inv() * gt_motion).translation().norm(dim=-1).item()
-        print(f"Initial guess error: Rot - {round(initial_err_rot, 4)} | Trans - {round(initial_err_trans, 4)}")
+        print(f"Initial Err: Rot (deg) - {round(initial_err_rot, 4)} | Trans (m) - {round(initial_err_trans, 4)}")
 
-        final_T12 = backend.solve(image1, image2, depth, pts1, pts2, initial_T12)
+        final_T12 = backend.solve(display_image1, display_image2, depth, pts1, pts2, initial_T12)
 
-        final_err_rot = (final_T12.Inv() * gt_motion).rotation().Log().norm(dim=-1).item()
+        final_err_rot = (final_T12.Inv() * gt_motion).rotation().Log().norm(dim=-1).item() * (180 / np.pi)
         final_err_trans = (final_T12.Inv() * gt_motion).translation().norm(dim=-1).item()
-        print(f"Final error: Rot - {round(final_err_rot, 4)} | Trans - {round(final_err_trans, 4)}")
+        print(f"Final Err: Rot (deg) - {round(final_err_rot, 4)} | Trans (m) - {round(final_err_trans, 4)}")
         print("\n\n")
 
