@@ -328,13 +328,19 @@ class LevenbergMarquardt(_Optimizer):
             Default: ``None``.
         strategy (object, optional): strategy for adjusting the damping factor. If ``None``, the
             :meth:`strategy.TrustRegion` will be used. Defult: ``None``.
-        kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
-        corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit the kernel
-            function. If a kernel is given but a corrector is not specified, auto correction is
+        kernel (nn.Module, or :obj:`list`, optional): the robust kernel function. If a :obj:`list`,
+            the element must be nn.Module or ``None`` and the length must be 1 or the number of errors.
+            Default: ``None``.
+        corrector: (nn.Module, or :obj:`list`, optional): the Jacobian and model residual corrector to
+            fit the kernel function. If a :obj:`list`, the element must be nn.Module or ``None`` and
+            the length must be 1 or the number of errors.
+            If a kernel is given but a corrector is not specified, auto correction is
             used. Auto correction can be unstable when the robust model has indefinite Hessian.
             Default: ``None``.
-        weight (Tensor, optional): a square positive definite matrix defining the weight of
-            model residual. Use this only when all inputs shared the same weight matrices. This is
+        weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
+            the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
+            the length must be equal to the number of errors.
+            Use this only when all inputs shared the same weight matrices. This is
             ignored when weight is given when calling :meth:`.step` or :meth:`.optimize` method.
             Default: ``None``.
         reject (integer, optional): the maximum number of rejecting unsuccessfull steps.
@@ -407,8 +413,9 @@ class LevenbergMarquardt(_Optimizer):
             input (Tensor/LieTensor or tuple of Tensors/LieTensors): the input to the model.
             target (Tensor/LieTensor): the model target to optimize.
                 If not given, the squared model output is minimized. Defaults: ``None``.
-            weight (Tensor, optional): a square positive definite matrix defining the weight of
-                model residual. Default: ``None``.
+            weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
+                the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
+                the length must be equal to the number of errors. Default: ``None``.
 
         Return:
             Tensor: the minimized model loss.
