@@ -9,9 +9,6 @@ from torch.linalg import cholesky_ex
 from .corrector import FastTriggs
 
 
-
-
-
 class Trivial(torch.nn.Module):
     r"""
     A trivial module. Get anything, return anything.
@@ -137,13 +134,19 @@ class GaussNewton(_Optimizer):
         solver (nn.Module, optional): a linear solver. Available linear solvers include
             :meth:`solver.PINV` and :meth:`solver.LSTSQ`. If ``None``, :meth:`solver.PINV` is used.
             Default: ``None``.
-        kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
-        corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit
-            the kernel function. If a kernel is given but a corrector is not specified, auto
-            correction is used. Auto correction can be unstable when the robust model has
-            indefinite Hessian. Default: ``None``.
-        weight (Tensor, optional): a square positive definite matrix defining the weight of
-            model residual. Use this only when all inputs shared the same weight matrices. This is
+        kernel (nn.Module, or :obj:`list`, optional): the robust kernel function. If a :obj:`list`,
+            the element must be nn.Module or ``None`` and the length must be 1 or the number of residuals.
+            Default: ``None``.
+        corrector: (nn.Module, or :obj:`list`, optional): the Jacobian and model residual corrector to
+            fit the kernel function. If a :obj:`list`, the element must be nn.Module or ``None`` and
+            the length must be 1 or the number of residuals.
+            If a kernel is given but a corrector is not specified, auto correction is
+            used. Auto correction can be unstable when the robust model has indefinite Hessian.
+            Default: ``None``.
+        weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
+            the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
+            the length must be equal to the number of residuals.
+            Use this only when all inputs shared the same weight matrices. This is
             ignored when weight is given when calling :meth:`.step` or :meth:`.optimize` method.
             Default: ``None``.
         vectorize (bool, optional): the method of computing Jacobian. If ``True``, the
@@ -210,8 +213,9 @@ class GaussNewton(_Optimizer):
             input (Tensor/LieTensor or tuple of Tensors/LieTensors): the input to the model.
             target (Tensor/LieTensor): the model target to approximate.
                 If not given, the model output is minimized. Default: ``None``.
-            weight (Tensor, optional): a square positive definite matrix defining the weight of
-                model residual. Default: ``None``.
+            weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
+                the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
+                the length must be equal to the number of residuals. Default: ``None``.
 
         Return:
             Tensor: the minimized model loss.
@@ -329,17 +333,17 @@ class LevenbergMarquardt(_Optimizer):
         strategy (object, optional): strategy for adjusting the damping factor. If ``None``, the
             :meth:`strategy.TrustRegion` will be used. Defult: ``None``.
         kernel (nn.Module, or :obj:`list`, optional): the robust kernel function. If a :obj:`list`,
-            the element must be nn.Module or ``None`` and the length must be 1 or the number of errors.
+            the element must be nn.Module or ``None`` and the length must be 1 or the number of residuals.
             Default: ``None``.
         corrector: (nn.Module, or :obj:`list`, optional): the Jacobian and model residual corrector to
             fit the kernel function. If a :obj:`list`, the element must be nn.Module or ``None`` and
-            the length must be 1 or the number of errors.
+            the length must be 1 or the number of residuals.
             If a kernel is given but a corrector is not specified, auto correction is
             used. Auto correction can be unstable when the robust model has indefinite Hessian.
             Default: ``None``.
         weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
             the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
-            the length must be equal to the number of errors.
+            the length must be equal to the number of residuals.
             Use this only when all inputs shared the same weight matrices. This is
             ignored when weight is given when calling :meth:`.step` or :meth:`.optimize` method.
             Default: ``None``.
@@ -415,7 +419,7 @@ class LevenbergMarquardt(_Optimizer):
                 If not given, the squared model output is minimized. Defaults: ``None``.
             weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
                 the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
-                the length must be equal to the number of errors. Default: ``None``.
+                the length must be equal to the number of residuals. Default: ``None``.
 
         Return:
             Tensor: the minimized model loss.
