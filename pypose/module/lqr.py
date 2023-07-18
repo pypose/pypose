@@ -1,5 +1,5 @@
 import torch
-import torch.nn as nn
+from torch import nn
 from .. import bmv, bvmv
 from torch.linalg import vecdot
 import pypose.optim.solver as ppos
@@ -305,6 +305,7 @@ class LQR(nn.Module):
         '''
         K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
         x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
+        
         return x, u, cost
 
     def lqr_backward(self, x_init, dt, u_traj=None, u_lower=None, u_upper=None, du=None):
