@@ -265,6 +265,7 @@ class LQR(nn.Module):
         self.Q, self.p, self.T = Q, p, T
         self.x_traj = None
         self.u_traj = None
+        self.cholesky_solver = ppos.Cholesky()
 
         if self.Q.ndim == 3:
             self.Q = torch.tile(self.Q.unsqueeze(-3), (1, self.T, 1, 1))
@@ -305,7 +306,7 @@ class LQR(nn.Module):
         '''
         K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
         x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
-        
+
         return x, u, cost
 
     def lqr_backward(self, x_init, dt, u_traj=None, u_lower=None, u_upper=None, du=None):
@@ -347,9 +348,8 @@ class LQR(nn.Module):
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
             qx, qu = qt[..., :ns], qt[..., ns:]
 
-            solver = ppos.Cholesky()
-            K[...,t,:,:] = Kt = -solver(Quu, Qux)
-            k[...,t,:] = kt = -solver(Quu, qu.unsqueeze(-1)).squeeze(-1)
+            K[...,t,:,:] = Kt = -self.cholesky_solver(Quu, Qux)
+            k[...,t,:] = kt = -self.cholesky_solver(Quu, qu.unsqueeze(-1)).squeeze(-1)
 
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
             v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
