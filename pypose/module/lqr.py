@@ -1,5 +1,5 @@
 import torch
-from torch import nn
+import torch.nn as nn
 from .. import bmv, bvmv
 from torch.linalg import vecdot
 import pypose.optim.solver as ppos
