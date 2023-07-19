@@ -1,6 +1,6 @@
-# Reprojection Error Optimization
+# Reprojection Error Pose Graph Optimization
 
-An example for reprojection error optimization between adjacent frames
+An example for pose graph optimization between adjacent frames
 
 ## Installation
 
@@ -11,13 +11,13 @@ An example for reprojection error optimization between adjacent frames
 ## Run:
 
 ```bash
-python examples/module/reproject/reproject.py
+python examples/module/reprojpgo/reprojpgo.py
 ```
 
 Or
 
 ```bash
-python examples/module/reproject/reproject.py --device cuda --dataroot DATAROOT
+python examples/module/reprojpgo/reprojpgo.py --device cuda --vectorize
 ```
 
 Note: change `DATAROOT` to the folder you select.
