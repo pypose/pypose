@@ -1,8 +1,7 @@
 import torch
 from torch import nn
 from .. import bmv, bvmv
-from torch.linalg import vecdot
-import pypose.optim.solver as ppos
+from torch.linalg import vecdot, cholesky
 
 
 class LQR(nn.Module):
@@ -265,7 +264,6 @@ class LQR(nn.Module):
         self.Q, self.p, self.T = Q, p, T
         self.x_traj = None
         self.u_traj = None
-        self.cholesky_solver = ppos.Cholesky()
 
         if self.Q.ndim == 3:
             self.Q = torch.tile(self.Q.unsqueeze(-3), (1, self.T, 1, 1))
@@ -348,8 +346,9 @@ class LQR(nn.Module):
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
             qx, qu = qt[..., :ns], qt[..., ns:]
 
-            K[...,t,:,:] = Kt = -self.cholesky_solver(Quu, Qux)
-            k[...,t,:] = kt = -self.cholesky_solver(Quu, qu.unsqueeze(-1)).squeeze(-1)
+            L = cholesky(Quu)
+            K[...,t,:,:] = Kt = -torch.cholesky_solve(Qux, L)
+            k[...,t,:] = kt = -torch.cholesky_solve(qu.unsqueeze(-1), L).squeeze(-1)
 
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
             v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
