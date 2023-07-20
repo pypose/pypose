@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from .. import bmv, bvmv
-from torch.linalg import vecdot, cholesky
+from torch.linalg import cholesky, vecdot
 
 
 class LQR(nn.Module):
