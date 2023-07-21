@@ -8,7 +8,7 @@ from dataset import ReprojErrDataset, visualize, report_pose_error
 
 
 class ReprojectErrorGraph(torch.nn.Module):
-    def __init__(self, K, pts1, pts2, depth, est_T) -> None:
+    def __init__(self, K, pts1, pts2, depth, init_T) -> None:
         super().__init__()
         self.register_buffer("K", K)
         self.register_buffer("pts1_v", pts1[0])
@@ -18,20 +18,17 @@ class ReprojectErrorGraph(torch.nn.Module):
         self.fx, self.fy = K[0, 0], K[1, 1]
         self.cx, self.cy = K[0, 2], K[1, 2]
 
-        self.T = pp.Parameter(est_T)
+        self.T = pp.Parameter(init_T)
         self.depth = torch.nn.Parameter(depth)
 
-    @property
-    def N(self): return self.pts1_v.shape[0]
-
-    def pts3d(self):
+    def pts3d(self) -> torch.Tensor:
         pts3d_z = self.depth
         pts3d_x = ((self.pts1_u - self.cx) * pts3d_z) / self.fx
         pts3d_y = ((self.pts1_v - self.cy) * pts3d_z) / self.fy
         return torch.stack([pts3d_x, pts3d_y, pts3d_z], dim=1)  # Nx3
 
     @torch.no_grad()
-    def reproject(self):
+    def reproject(self) -> torch.Tensor:
         pts3d = self.pts3d()
         reproj_uv = pp.function.point2pixel(pts3d, self.K, self.T.Inv())
         return torch.roll(reproj_uv, shifts=1, dims=1)
@@ -52,48 +49,34 @@ if __name__ == "__main__":
     plt.ion()
     parser = argparse.ArgumentParser(
         description="Estimate trajectory by minimize reprojection error in adjacent frames")
-    parser.add_argument(
-        "--device", action="store", default="cuda",
-        help="Device to run optimization (cuda / cpu)"
-    )
-    parser.add_argument(
-        "--save", action="store", default="est_traj.txt",
-        help="Path to save the estimated trajectory"
-    )
-    parser.add_argument(
-        "--dataroot", action="store", default="/data/TartanAirSample_Compressed",
-        help="Root directory for the dataset"
-    )
-    parser.add_argument(
-        "--vectorize", action="store_true", default=False,
-        help="Add this flag to use 8-point-algorithm for Essential matrix instead of 5-point algorithm"
-    )
+    parser.add_argument("--device", action="store", default="cuda",
+                        help="Device to run optimization (cuda / cpu)")
+    parser.add_argument("--save", action="store", default="est_traj.txt",
+                        help="Path to save the estimated trajectory")
+    parser.add_argument("--dataroot", action="store", default="/data/TartanAirSample_Compressed",
+                        help="Root directory for the dataset")
+    parser.add_argument("--vectorize", action="store_true", default=False,
+        help="Add this flag to use 8-point-algorithm for Essential matrix instead of 5-point algorithm")
     args = parser.parse_args()
-    data_root, save_path = Path(args.dataroot), Path(args.save)
+    dataroot = Path(args.dataroot)
     device, vectorize = args.device, args.vectorize
     K = torch.tensor([[320., 0., 320.], [0., 320., 240.], [0., 0., 1.]])
 
-    dataset = ReprojErrDataset(
-        data_root,
-        Path(data_root, 'image_left'),
-        Path(data_root, 'flow'),
-        Path(data_root, 'depth_left'),
-        Path(data_root, 'pose_left.txt')
-    )
+    dataset = ReprojErrDataset(dataroot=dataroot)
 
-    for display_image1, display_image2, depth, pts1, pts2, gt_motion in dataset:
+    for img1, img2, depth, pts1, pts2, gt_motion in dataset:
         # Noisy initial pose and depth  noise ~ N(avg=0, std=.1)
-        initial_T = (gt_motion * pp.randn_SE3(sigma=.1)).to(device)
+        init_T = (gt_motion * pp.randn_SE3(sigma=.1)).to(device)
         depth = depth + torch.randn_like(depth) * .1
 
-        print('Initial Motion Error')
-        report_pose_error(initial_T, gt_motion.to(device))
+        print('Initial Motion Error:')
+        report_pose_error(init_T, gt_motion.to(device))
 
-        target = ReprojectErrorGraph(K, pts1, pts2, depth, initial_T).to(device)
+        graph = ReprojectErrorGraph(K, pts1, pts2, depth, init_T).to(device)
         kernel = ppopt.kernel.Huber(delta=0.1)
         corrector = ppopt.corrector.FastTriggs(kernel)
         optimizer = ppopt.LM(
-            target,
+            graph,
             solver=ppopt.solver.Cholesky(),
             strategy=ppopt.strategy.TrustRegion(radius=1e3),
             kernel=kernel, corrector=corrector,
@@ -102,15 +85,15 @@ if __name__ == "__main__":
         scheduler = ppopt.scheduler.StopOnPlateau(optimizer, steps=25, patience=4, decreasing=1e-6, verbose=True)
 
         # Optimize Reproject Pose Graph Optimization ##########################
-        print('\tInitial_error:', target.error())
+        print('\tInitial graph error:', graph.error())
         while scheduler.continual():
-            visualize(display_image1, display_image2, pts1, pts2, target, scheduler.steps)
+            visualize(img1, img2, pts1, pts2, graph, scheduler.steps)
             loss = optimizer.step(input=())
             scheduler.step(loss)
-        print('\tFinal_error:', target.error())
+        print('\tFinal graph error:', graph.error())
         #######################################################################
 
-        final_T = pp.SE3(target.T.data.detach())
+        final_T = pp.SE3(graph.T.data.detach())
 
         print('Optimized Motion Error')
         report_pose_error(final_T, gt_motion.to(device))

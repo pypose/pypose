@@ -10,8 +10,12 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 class ReprojErrDataset(Dataset):
-    def __init__(self, data_root: Path, image_dir: Path, flow_dir: Path, depth_dir: Path, gtmotion_path: Path):
+    def __init__(self, dataroot: Path):
         super().__init__()
+        image_dir = Path(dataroot, 'image_left')
+        flow_dir = Path(dataroot, 'flow')
+        depth_dir = Path(dataroot, 'depth_left')
+        gtmotion_path = Path(dataroot, 'pose_left.txt')
         assert image_dir.exists() and flow_dir.exists() and depth_dir.exists() and gtmotion_path.exists()
         self.NED2CV = pp.from_matrix(torch.tensor(
             [[0., 1., 0., 0.],
@@ -82,7 +86,8 @@ class ReprojErrDataset(Dataset):
         du = flow[0, pts1_v, pts1_u]
         return pts1_v + dv, pts1_u + du
 
-    def __len__(self): return self.length
+    def __len__(self):
+        return self.length
 
     def __getitem__(self, index):
         image1_name, image2_name, flow_name, depth_name = self.load_pairs[index]
@@ -126,6 +131,7 @@ def visualize(img1, img2, pts1, pts2, target, step):
 
 
 def report_pose_error(curr_pose: pp.SE3, gt_pose: pp.SE3):
-    initial_err_rot = (curr_pose.Inv() * gt_pose).rotation().Log().norm(dim=-1).item() * (180 / np.pi)
-    initial_err_trans = (curr_pose.Inv() * gt_pose).translation().norm(dim=-1).item()
-    print(f"Err Rot (deg) - {round(initial_err_rot, 4)} | Err Trans (m) - {round(initial_err_trans, 4)}")
+    _err = (curr_pose.Inv() * gt_pose)
+    _err_rot = _err.rotation().Log().norm(dim=-1).item() * (180 / np.pi)
+    _err_trans = _err.translation().norm(dim=-1).item()
+    print(f"Err Rot (deg) - {round(_err_rot, 4)} | Err Trans (m) - {round(_err_trans, 4)}")
