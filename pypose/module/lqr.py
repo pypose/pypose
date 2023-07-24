@@ -1,7 +1,8 @@
 import torch
-import torch.nn as nn
+from torch import nn
 from .. import bmv, bvmv, bvv
-from torch.linalg import vecdot
+from torch.linalg import lstsq, vecdot
+
 
 class LQR(nn.Module):
     r'''
@@ -257,9 +258,9 @@ class LQR(nn.Module):
                      [-0.3017, -0.2897,  0.7251],
                      [-0.0728,  0.7290, -0.3117]]])
     '''
+
     def __init__(self, system, Q, p, T):
         super().__init__()
-
         self.system = system
         self.Q, self.p, self.T = Q, p, T
         self.x_traj = None
@@ -267,6 +268,7 @@ class LQR(nn.Module):
 
         if self.Q.ndim == 3:
             self.Q = torch.tile(self.Q.unsqueeze(-3), (1, self.T, 1, 1))
+
         if self.p.ndim == 2:
             self.p = torch.tile(self.p.unsqueeze(-2), (1, self.T, 1))
 
@@ -301,6 +303,7 @@ class LQR(nn.Module):
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
             associated quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
+
         K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
         x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
 
@@ -337,10 +340,7 @@ class LQR(nn.Module):
                                          input=self.u_traj[...,t,:],
                                          t=torch.tensor(t*dt))
                 A = self.system.A.squeeze(-2)
-                if self.system.B.dim() > 2:
-                    B = self.system.B.squeeze(-1)
-                else:
-                    B = self.system.B
+                B = self.system.B.squeeze(-2)
                 F = torch.cat((A, B), dim=-1)
                 Qt = self.Q[...,t,:,:] + F.mT @ V @ F
                 qt = p[...,t,:] + bmv(F.mT, v)
@@ -348,11 +348,11 @@ class LQR(nn.Module):
             Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
             qx, qu = qt[..., :ns], qt[..., ns:]
-            Quu_inv = torch.linalg.pinv(Quu)
 
             if u_lower is None:
-                K[...,t,:,:] = Kt = - Quu_inv @ Qux
-                k[...,t,:] = kt = - bmv(Quu_inv, qu)
+                K[...,t,:,:] = Kt = -lstsq(Quu, Qux).solution
+                k[...,t,:] = kt = -lstsq(Quu, qu.unsqueeze(-1)).solution.squeeze(-1)
+
             else:
                 lb = u_lower[...,t,:] - self.u_traj[...,t,:]
                 ub = u_upper[...,t,:] - self.u_traj[...,t,:]
