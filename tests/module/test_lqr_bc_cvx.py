@@ -9,12 +9,12 @@ class TestLQR:
 
     def test_lqr_linear_bounded(self):
 
-        npr.seed(1)
+        npr.seed(2)
 
-        n_batch = 2
-        n_state, n_ctrl = 3, 2
+        n_batch = 1
+        n_state, n_ctrl = 4, 3
         n_sc = n_state + n_ctrl
-        T = 3
+        T = 7
         C = npr.randn(T, n_batch, n_sc, n_sc)
         C = np.matmul(C.transpose(0, 1, 3, 2), C)
         c = npr.randn(T, n_batch, n_sc)
@@ -25,8 +25,11 @@ class TestLQR:
         F = np.concatenate((R, S), axis=3)
         f = np.tile(npr.randn(n_state), (T, n_batch, 1))
         x_init = npr.randn(n_batch, n_state)
-        u_lower = -npr.random((T, n_batch, n_ctrl))
-        u_upper = npr.random((T, n_batch, n_ctrl))
+        u_lower = -5*npr.random((T, n_batch, n_ctrl))
+        #u_upper = npr.random((T, n_batch, n_ctrl))
+        u_upper = -u_lower
+        #u_lower = -1e-4*np.ones((T, n_batch, n_ctrl))
+        #u_upper = 1e-4*np.ones((T, n_batch, n_ctrl))
 
         def lqr_cp(C, c, F, f, x_init, T, n_state, n_ctrl, u_lower, u_upper):
             """Solve min_{tau={x,u}} sum_t 0.5 tau_t^T C_t tau_t + c_t^T tau_t
@@ -61,10 +64,10 @@ class TestLQR:
         C[:,0], c[:,0], F[:,0], f[:,0], x_init[0], T, n_state, n_ctrl,
         u_lower[:,0], u_upper[:,0]
         )
+
         tau_cp = tau_cp.T #transpose
         x_cp = tau_cp[:,:n_state]
         u_cp = tau_cp[:,n_state:]
-        print(tau_cp)
 
         C, c, R, S, F, f, x_init, u_lower, u_upper = [
         torch.tensor(x).to(torch.float32) if x is not None else None
@@ -82,14 +85,14 @@ class TestLQR:
         u_lower = u_lower.permute(1, 0, 2)
         u_upper = u_upper.permute(1, 0, 2)
 
-        dt = 1
-
         lti = pp.module.LTI(A, B, C, D, c1, c2)
-        LQR = pp.module.LQR2(lti, Q, p, T)
-        x_lqr, u_lqr, cost_lqr = LQR(x_init, dt, u_lower=u_lower, u_upper=u_upper)
+        LQR = pp.module.LQR(lti, Q, p, T)
+        x_lqr, u_lqr, cost_lqr = LQR(x_init, u_lower=u_lower, u_upper=u_upper)
 
-        print(x_lqr)
-        #print(u_lqr)
+        print("u_lower", u_lower)
+        print("u_upper", u_upper)
+        print("u_cp", u_cp)
+        print("u_lqr", u_lqr)
 
 
 if __name__ == '__main__':
