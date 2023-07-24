@@ -25,10 +25,6 @@ class TestLQR:
         F = np.concatenate((R, S), axis=3)
         f = np.tile(npr.randn(n_state), (T, n_batch, 1))
         x_init = npr.randn(n_batch, n_state)
-        # u_lower = -100.*npr.random((T, n_batch, n_ctrl))
-        # u_upper = 100.*npr.random((T, n_batch, n_ctrl))
-        u_lower = -1e4*np.ones((T, n_batch, n_ctrl))
-        u_upper = 1e4*np.ones((T, n_batch, n_ctrl))
 
         def lqr_cp(C, c, F, f, x_init, T, n_state, n_ctrl, u_lower, u_upper):
             """Solve min_{tau={x,u}} sum_t 0.5 tau_t^T C_t tau_t + c_t^T tau_t
@@ -67,9 +63,9 @@ class TestLQR:
         x_cp = tau_cp[:,:n_state]
         u_cp = tau_cp[:,n_state:]
 
-        C, c, R, S, F, f, x_init, u_lower, u_upper = [
+        C, c, R, S, F, f, x_init = [
         torch.tensor(x).to(torch.float32) if x is not None else None
-        for x in [C, c, R, S, F, f, x_init, u_lower, u_upper]
+        for x in [C, c, R, S, F, f, x_init]
         ]
 
 
