@@ -66,7 +66,6 @@ class TestLQR:
         tau_cp = tau_cp.T #transpose
         x_cp = tau_cp[:,:n_state]
         u_cp = tau_cp[:,n_state:]
-        print(tau_cp)
 
         C, c, R, S, F, f, x_init, u_lower, u_upper = [
         torch.tensor(x).to(torch.float32) if x is not None else None
@@ -89,8 +88,10 @@ class TestLQR:
         LQR = pp.module.LQRO(lti, Q, p, T)
         x_lqr, u_lqr, cost_lqr = LQR(x_init, dt)
 
-        print(x_lqr)
-        print(u_lqr)
+        torch.testing.assert_close(torch.tensor(x_cp).to(torch.float32), x_lqr[0],
+                                   rtol=1e-5, atol=1e-3)
+        torch.testing.assert_close(torch.tensor(u_cp).to(torch.float32), u_lqr[0],
+                                   rtol=1e-5, atol=1e-3)
 
 
 if __name__ == '__main__':
