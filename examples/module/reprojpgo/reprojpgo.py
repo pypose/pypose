@@ -11,10 +11,8 @@ class ReprojectErrorGraph(torch.nn.Module):
     def __init__(self, K, pts1, pts2, depth, init_T) -> None:
         super().__init__()
         self.register_buffer("K", K)
-        self.register_buffer("pts1_v", pts1[0])
-        self.register_buffer("pts1_u", pts1[1])
-        self.register_buffer("pts2_v", pts2[0])
-        self.register_buffer("pts2_u", pts2[1])
+        self.register_buffer("pts1_vu", pts1)
+        self.register_buffer("pts2_vu", pts2)
         self.fx, self.fy = K[0, 0], K[1, 1]
         self.cx, self.cy = K[0, 2], K[1, 2]
 
@@ -23,8 +21,8 @@ class ReprojectErrorGraph(torch.nn.Module):
 
     def pts3d(self) -> torch.Tensor:
         pts3d_z = self.depth
-        pts3d_x = ((self.pts1_u - self.cx) * pts3d_z) / self.fx
-        pts3d_y = ((self.pts1_v - self.cy) * pts3d_z) / self.fy
+        pts3d_x = ((self.pts1_vu[..., 1] - self.cx) * pts3d_z) / self.fx
+        pts3d_y = ((self.pts1_vu[..., 0] - self.cy) * pts3d_z) / self.fy
         return torch.stack([pts3d_x, pts3d_y, pts3d_z], dim=1)  # Nx3
 
     @torch.no_grad()
@@ -35,13 +33,13 @@ class ReprojectErrorGraph(torch.nn.Module):
 
     @torch.no_grad()
     def error(self) -> float:
-        pts2 = torch.stack([self.pts2_u, self.pts2_v], dim=1)
-        err_uv = pp.function.reprojerr(self.pts3d(), pts2, self.K, self.T.Inv(), reduction='none')
+        pts2_uv = torch.roll(self.pts2_vu, shifts=1, dims=[1])
+        err_uv = pp.function.reprojerr(self.pts3d(), pts2_uv, self.K, self.T.Inv(), reduction='none')
         return torch.mean(torch.norm(err_uv, dim=1, p=2)).item()
 
     def forward(self) -> torch.Tensor:
-        pts2 = torch.stack([self.pts2_u, self.pts2_v], dim=1)
-        err_uv = pp.function.reprojerr(self.pts3d(), pts2, self.K, self.T.Inv(), reduction='none')
+        pts2_uv = torch.roll(self.pts2_vu, shifts=1, dims=[1])
+        err_uv = pp.function.reprojerr(self.pts3d(), pts2_uv, self.K, self.T.Inv(), reduction='none')
         return err_uv
 
 
