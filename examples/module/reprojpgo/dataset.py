@@ -51,12 +51,13 @@ class ReprojErrDataset(Dataset):
 
         # Randomly select points, only take 100 points
         perm = torch.randperm(indices.shape[0])[:100]
-        pts_vu = indices[perm][..., 1:]
-        return pts_vu
+        # .roll(...): vu -> uv coordinate
+        pts_uv = indices[perm][..., 1:].roll(shifts=1, dims=[1])
+        return pts_uv
 
-    def _match_points(self, pts1_vu, flow: torch.Tensor):
-        delta_vu = flow[..., pts1_vu[:, 0], pts1_vu[:, 1]].roll(shifts=1, dims=[0])
-        return pts1_vu + delta_vu.T
+    def _match_points(self, pts1_uv, flow: torch.Tensor):
+        delta_uv = flow[..., pts1_uv[..., 1], pts1_uv[..., 0]]
+        return pts1_uv + delta_uv.T
 
     def __len__(self):
         return self.length
@@ -70,7 +71,7 @@ class ReprojErrDataset(Dataset):
 
         pts1 = self._select_points(image1)
         pts2 = self._match_points(pts1, flow)
-        pts1_z = depth[0, pts1[..., 0], pts1[..., 1]]
+        pts1_z = depth[0, pts1[..., 1], pts1[..., 0]]
 
         display_img1 = self._visualize_image(image1)
         display_img2 = self._visualize_image(image2)
@@ -81,16 +82,16 @@ def visualize(img1, img2, pts1, pts2, target, step):
     color_map = mpl.colormaps['coolwarm']
     color_normalizer = mpl.colors.Normalize(vmin=0, vmax=1)
     display_img = np.concatenate([img1, img2], axis=1)
-    reproj_vu = target.reproject().detach().cpu()
-    reproj_err = torch.norm(pts2 - reproj_vu, dim=1).detach().cpu().numpy()
+    reproj_uv = target.reproject().detach().cpu()
+    reproj_err = torch.norm(pts2 - reproj_uv, dim=1).detach().cpu().numpy()
 
     plt.clf()
     plt.axis('off')
     plt.imshow(display_img, interpolation='nearest')
-    for idx in range(target.pts1_v.size(0)):
+    for idx in range(target.pts1.size(0)):
         err = reproj_err[idx].item()
-        v1, u1 = pts1[idx, 0].item(), pts1[idx, 1].item()
-        reproj_v, reproj_u = reproj_vu[idx, 0].item(), reproj_vu[idx, 1].item()
+        u1, v1 = pts1[idx, 0].item(), pts1[idx, 1].item()
+        reproj_u, reproj_v = reproj_uv[idx, 0].item(), reproj_uv[idx, 1].item()
         plt.plot([u1, reproj_u + img1.shape[1]], [v1, reproj_v], color=color_map(err))
     plt.title(f"Step: {step}, Error: {target.error()}")
     divider = make_axes_locatable(plt.gca())
