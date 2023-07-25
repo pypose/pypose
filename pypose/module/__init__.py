@@ -11,3 +11,5 @@ from .icp import ICP
 
 from .lqr2 import LQR2
 from .mpc2 import MPC2
+from .lqr_ls import LQRLS
+from .mpc_ls import MPCLS
