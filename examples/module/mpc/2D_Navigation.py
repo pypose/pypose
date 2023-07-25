@@ -1,9 +1,6 @@
 import torch
 import matplotlib.pyplot as plt
 import pypose as pp
-from torch.nn import Sequential, Linear, ReLU
-from torch.optim import Adam
-from torch.nn.functional import mse_loss
 
 class Simple2DNav(pp.module.NLS):
     """
@@ -19,16 +16,24 @@ class Simple2DNav(pp.module.NLS):
         """
         The simple 2D nav has state: (x, y, theta) and input: (v, omega)
         """
-        x, y, theta = state.squeeze().moveaxis(-1, 0)
-        v, omega = input.squeeze().moveaxis(-1, 0)
+        def dynamics(state, input):
+            x, y, theta = state.squeeze().moveaxis(-1, 0)
+            v, omega = input.squeeze().moveaxis(-1, 0)
 
-        xDot = v * torch.cos(theta)
-        yDot = v * torch.sin(theta)
-        thetaDot = omega
+            xDot = v * torch.cos(theta)
+            yDot = v * torch.sin(theta)
+            thetaDot = omega
 
-        _dstate = torch.stack((xDot, yDot, thetaDot), dim=-1)
+            _dstate = torch.stack((xDot, yDot, thetaDot), dim=-1)
 
-        return (state.squeeze() + torch.mul(_dstate, self._tau)).unsqueeze(0)
+            return _dstate
+
+        f1 = dynamics(state, input)
+        f2 = dynamics(state + 0.5 * self._tau * f1, input)
+        f3 = dynamics(state + 0.5 * self._tau * f2, input)
+        f4 = dynamics(state + self._tau * f3, input)
+
+        return (state.squeeze() + torch.mul(f1 + 2 * f2 + 2 * f3 + f4, self._tau/6.0)).unsqueeze(0)
 
     def observation(self, state, input, t=None):
         """
@@ -85,24 +90,23 @@ def visualize(system, traj, controls, costs):
 
 
 if __name__ == '__main__':
-    # Define initial state
+
     x_init = torch.tensor([[0., 0., 0.]], requires_grad=False)
     x_goal = torch.tensor([[1.5, 1.5, 0.]], requires_grad=False)
     dt = 0.1
     T = 25
-    # Define cost function
-
     n_batch = 1
     n_state, n_ctrl = 3, 2
+
     Q = torch.tile(torch.eye(n_state + n_ctrl), (n_batch, T, 1, 1))
     Q[...,0,0], Q[...,1,1], Q[...,2,2], Q[...,3,3], Q[...,4,4] = 1, 5, 0.1, 0.5, 0.05
     #p = torch.tile(torch.ones(n_state + n_ctrl), (n_batch, T, 1))
     p = torch.tile(torch.zeros(n_state + n_ctrl), (n_batch, T, 1))
     dynamics=Simple2DNav(dt)
-    stepper = pp.utils.ReduceToBason(steps=1, verbose=False)
+    stepper = pp.utils.ReduceToBason(steps=3, verbose=False)
     MPC = pp.module.MPC(dynamics, Q, p, T, stepper=stepper)
 
-    N = 30
+    N = 100
 
     xt = x_init
 
@@ -133,6 +137,7 @@ if __name__ == '__main__':
         u_new = u_mpc[...,1:,:]
         u_last = u_mpc[...,-1,:]
         u_init = torch.cat((u_new, u_last.unsqueeze(0)), dim=1)
+        print(xt)
         X.append(xt.squeeze())
         U.append(ut_mpc.squeeze())
 
