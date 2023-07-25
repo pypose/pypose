@@ -3,7 +3,6 @@ import argparse
 import pypose as pp
 from pathlib import Path
 import pypose.optim as ppopt
-import matplotlib.pyplot as plt
 from dataset import ReprojErrDataset, visualize, report_pose_error
 
 
@@ -32,24 +31,29 @@ class ReprojectErrorGraph(torch.nn.Module):
 
     @torch.no_grad()
     def error(self) -> float:
-        err_uv = pp.function.reprojerr(self.pts3d(), self.pts2, self.K, self.T.Inv(), reduction='none')
+        err_uv = pp.function.reprojerr(
+            self.pts3d(), self.pts2, self.K, self.T.Inv(), reduction='none'
+        )
         return torch.mean(torch.norm(err_uv, dim=1, p=2)).item()
 
     def forward(self) -> torch.Tensor:
-        err_uv = pp.function.reprojerr(self.pts3d(), self.pts2, self.K, self.T.Inv(), reduction='none')
+        err_uv = pp.function.reprojerr(
+            self.pts3d(), self.pts2, self.K, self.T.Inv(), reduction='none'
+        )
         return err_uv
 
 
 if __name__ == "__main__":
-    plt.ion()
     parser = argparse.ArgumentParser(
-        description="Estimate trajectory by optimize reprojection error graph between adjacent frames")
-    parser.add_argument("--dataroot", action="store", default="/data/TartanAirSample_Compressed",
+        description="Estimate camera motion by optimizing reprojerr graph "
+                    "between adjacent frames")
+    parser.add_argument("--dataroot", action="store",
+                        default="/data/Reprojerr_Example/reproj_dataset.pth",
                         help="Root directory for the dataset")
     parser.add_argument("--device", action="store", default="cuda",
                         help="Device to run optimization (cuda / cpu)")
     parser.add_argument("--vectorize", action="store_true", default=False,
-                        help="Vectorize when optimizing reprojection error graph.")
+                        help="Vectorize when optimizing reprojerr graph.")
     args = parser.parse_args()
     dataroot = Path(args.dataroot)
     device, vectorize = args.device, args.vectorize
@@ -75,16 +79,18 @@ if __name__ == "__main__":
             kernel=kernel, corrector=corrector,
             min=1e-8, vectorize=vectorize, reject=128,
         )
-        scheduler = ppopt.scheduler.StopOnPlateau(optimizer, steps=25, patience=4, decreasing=1e-6, verbose=True)
+        scheduler = ppopt.scheduler.StopOnPlateau(
+            optimizer, steps=25, patience=4, decreasing=1e-6, verbose=True
+        )
 
-        # Optimize Reproject Pose Graph Optimization ##########################
+        # Optimize Reproject Pose Graph Optimization ###########################
         print('\tInitial graph error:', graph.error())
         while scheduler.continual():
             visualize(img1, img2, pts1, pts2, graph, scheduler.steps)
             loss = optimizer.step(input=())
             scheduler.step(loss)
         print('\tFinal graph error:', graph.error())
-        #######################################################################
+        ########################################################################
 
         final_T = pp.SE3(graph.T.data.detach())
 
