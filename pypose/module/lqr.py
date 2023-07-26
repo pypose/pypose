@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from .. import bmv, bvmv
-from torch.linalg import vecdot
+from torch.linalg import cholesky, vecdot
 
 
 class LQR(nn.Module):
@@ -302,16 +302,8 @@ class LQR(nn.Module):
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
             associated quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
-        torch.mps.synchronize()
-        time1 = time.time()
         K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
-        torch.mps.synchronize()
-        time2 = time.time()
         x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
-        torch.mps.synchronize()
-        time3 = time.time()
-        print("backward time: ", time2 - time1)
-        print("forward time: ", time3 - time2)
         return x, u, cost
 
     def lqr_backward(self, x_init, dt, u_traj=None, u_lower=None, u_upper=None, du=None):
@@ -353,14 +345,9 @@ class LQR(nn.Module):
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
             qx, qu = qt[..., :ns], qt[..., ns:]
 
-            # Edit here
-            K[...,t,:,:] = Kt = -torch.linalg.lstsq(Quu, Qux).solution
-            k[...,t,:] = kt = -torch.linalg.lstsq(Quu, qu.unsqueeze(-1)).solution.squeeze(-1)
-            
-            # Initial Code
-            # Quu_inv = torch.linalg.pinv(Quu)
-            # K[...,t,:,:] = Kt1 = - Quu_inv @ Qux
-            # k[...,t,:] = kt1 = - bmv(Quu_inv, qu)
+            L = cholesky(Quu)
+            K[...,t,:,:] = Kt = -torch.cholesky_solve(Qux, L)
+            k[...,t,:] = kt = -torch.cholesky_solve(qu.unsqueeze(-1), L).squeeze(-1)
 
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
             v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
