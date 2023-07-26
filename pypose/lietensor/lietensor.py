@@ -908,7 +908,7 @@ class LieTensor(torch.Tensor):
         if data is not None and func.__name__ in HANDLED_FUNCTIONS:
             args, spec = tree_flatten(args)
             ltype = [arg.ltype for arg in args if isinstance(arg, LieTensor)][0]
-            def warp(t):
+            def wrap(t):
                 if isinstance(t, torch.Tensor) and not isinstance(t, cls):
                     lt = torch.Tensor.as_subclass(t, LieTensor)
                     lt.ltype = ltype
@@ -918,7 +918,7 @@ class LieTensor(torch.Tensor):
                             'go to {}'.format(func, link))
                     return lt
                 return t
-            return tree_map(warp, data)
+            return tree_map(wrap, data)
         return data
 
     @property

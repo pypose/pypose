@@ -1,6 +1,6 @@
 import torch
 from .lqr import LQR
-import torch.nn as nn
+from torch import nn
 from ..utils.stepper import ReduceToBason
 
 
