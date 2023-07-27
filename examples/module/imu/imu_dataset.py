@@ -61,7 +61,6 @@ class KITTI_IMU(Data.Dataset):
             'dt': self.dt[frame_id: end_frame_id],
             'acc': self.acc[frame_id: end_frame_id],
             'gyro': self.gyro[frame_id: end_frame_id],
-            'gyro': self.gyro[frame_id: end_frame_id],
             'gt_pos': self.gt_pos[frame_id+1 : end_frame_id+1],
             'gt_rot': self.gt_rot[frame_id+1 : end_frame_id+1],
             'gt_vel': self.gt_vel[frame_id+1 : end_frame_id+1],
