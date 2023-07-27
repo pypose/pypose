@@ -6,7 +6,7 @@ from torch.func import functional_call, jacfwd, jacrev
 from torch.utils._pytree import tree_map
 from torch.autograd.functional import jacobian
 
-from pypose.lietensor.lietensor import wrappable_lt
+from pypose.lietensor.lietensor import retain_ltype
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -140,11 +140,15 @@ class TestJacobian:
         def func(pose, points):
             return pose @ points
 
-        with wrappable_lt():
+        with retain_ltype():
             jac_func = jacrev(func)
             jac = jac_func(pose, points)
             assert not pp.hasnan(jac)
 
+        # without context manager, call pp.func.jacrev
+        jac_func = pp.func.jacrev(func)
+        jac = jac_func(pose, points)
+        assert not pp.hasnan(jac)
 
 if __name__ == '__main__':
     test = TestJacobian()

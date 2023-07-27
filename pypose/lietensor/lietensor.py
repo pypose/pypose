@@ -1223,7 +1223,7 @@ class Parameter(LieTensor, nn.Parameter):
             return result
 
 @contextmanager
-def wrappable_lt():
+def retain_ltype():
     # save the original PyTorch functions
     NATIVE_FUNCTIONS = {
         torch.autograd.forward_ad.make_dual,
