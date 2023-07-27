@@ -137,7 +137,6 @@ if __name__ == '__main__':
         u_new = u_mpc[...,1:,:]
         u_last = u_mpc[...,-1,:]
         u_init = torch.cat((u_new, u_last.unsqueeze(0)), dim=1)
-        print(xt)
         X.append(xt.squeeze())
         U.append(ut_mpc.squeeze())
 
