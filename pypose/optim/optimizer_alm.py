@@ -51,20 +51,18 @@ class AugmentedLagrangian(_Optimizer):
         optimizer = self.optim
         self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                 else self.alm_model(input)
-        # print('-------------------------------------------')
         for idx in range(self.inner_iter):
             optimizer.zero_grad()
             self.loss = self.alm_model(input)
             self.loss.backward() 
             optimizer.step()
-            # if idx % 50 == 0:
-                # print('loss:', self.loss)
+
         self.scheduler.step()
         with torch.no_grad():
             violation = self.alm_model.constraints()
             # print('lambda: ', self.alm_model.lmd)
-            # print('absolute violation:', torch.norm(violation).tolist())
-            # print("object decrease", torch.norm(self.last_object_value-self.alm_model.model(input)).item())
+            print('absolute violation:', torch.norm(violation).tolist())
+            print("object decrease", torch.norm(self.last_object_value-self.alm_model.model(input)).item())
             if torch.norm(violation) <= torch.norm(self.best_violation) * self.decrease_rate:
                 if torch.norm(self.last_object_value-self.alm_model.model(input)) <= self.object_decrease_tolerance \
                     and torch.norm(violation) <= self.violation_tolerance:
