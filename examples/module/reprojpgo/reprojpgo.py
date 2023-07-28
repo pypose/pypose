@@ -48,7 +48,7 @@ if __name__ == "__main__":
         description="Estimate camera motion by optimizing reprojerr graph "
                     "between adjacent frames")
     parser.add_argument("--dataroot", action="store",
-                        default="/data/Reprojerr_Example/reproj_dataset.pth",
+                        default="./data/Reprojerr_Example",
                         help="Root directory for the dataset")
     parser.add_argument("--device", action="store", default="cuda",
                         help="Device to run optimization (cuda / cpu)")

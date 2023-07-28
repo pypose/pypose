@@ -8,11 +8,15 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset
 from matplotlib.cm import ScalarMappable
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from torchvision.datasets.utils import download_and_extract_archive
 
 
 class ReprojErrDataset(Dataset):
-    def __init__(self, dataroot: Path):
+    link = 'https://github.com/pypose/pypose/releases/download/v0.5.0/MiniTartanAir.pt.zip'
+    def __init__(self, dataroot: Path, download = True):
         super().__init__()
+        if download:
+            download_and_extract_archive(self.link, dataroot)
         self.NED2CV = pp.from_matrix(torch.tensor(
             [[0., 1., 0., 0.],
              [0., 0., 1., 0.],
@@ -21,7 +25,7 @@ class ReprojErrDataset(Dataset):
             pp.SE3_type)
         self.CV2NED = self.NED2CV.Inv()
 
-        data_source = torch.load(dataroot)
+        data_source = torch.load(Path(dataroot, "MiniTartanAir.pt"))
         self.images = data_source["images"]
         self.flows: torch.Tensor = data_source["flows"]
         self.depths = data_source["depths"]
