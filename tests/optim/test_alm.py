@@ -153,7 +153,6 @@ def test_tensor_complex():
             break
     print('-----------optimized result----------------')
     print('Done', timer.toc())
-    print("iteration:", idx)
     print('object f(x):', posnet())
     print('final violation:\n', torch.norm(constraints()))
     print("Lambda*:\n", lmd)
