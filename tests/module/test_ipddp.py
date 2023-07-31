@@ -40,6 +40,8 @@ if __name__ == "__main__":
     n_batch = 3
     state_all = torch.zeros(n_batch, T + 1, ns, device=device)
     input_all = torch.ones(n_batch, T, nc, device=device) * 0.02
+    # input of an infeasible traj test
+    # input_all = torch.ones(n_batch, T, nc, device=device) * 0.02 + 0.25
     state_all[...,0,:] = state
     init_traj = {'state': state_all,
                  'input': input_all}
@@ -68,4 +70,4 @@ if __name__ == "__main__":
         init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1],
                             'input': init_traj['input'][batch_id:batch_id+1]}
         ipddp = IPDDP(sys, stage_cost, terminal_cost, lincon, gx.shape[-2], init_traj_sample)
-        traj_opt[batch_id] = ipddp.solver()
+        traj_opt[batch_id] = ipddp.solver(verbose=True)

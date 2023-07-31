@@ -273,9 +273,10 @@ class IPDDP(nn.Module):
     def resetfilter(self):
         if (self.infeas):
             self.logcost = self.cost - self.mu * self.y.log().sum(-1).sum(-1)
-            self.err = torch.linalg.vector_norm(self.c + self.y, -1).sum(-1)
+            aa = torch.linalg.vector_norm(self.c + self.y, -1)
+            self.err =  torch.linalg.norm(self.c + self.y, dim=-1).sum(-1)
             if (self.err < self.tol):
-                self.err = torch.zeros(self.x.shape[:-2])
+                self.err = torch.zeros(self.x.shape[:-2], dtype=self.x.dtype, device=self.x.device)
         else:
             self.logcost = self.cost - self.mu * (-self.c).log().sum(-1).sum(-1)
             self.err = torch.zeros(self.x.shape[:-2], dtype=self.x.dtype, device=self.x.device)
@@ -336,7 +337,8 @@ class IPDDP(nn.Module):
             if (self.infeas): #  start from infeasible/feasible trajs.
                 Wt = self.W[...,t,:,:]
                 st, ct, yt = self.s[...,t,:], self.c[...,t,:], self.y[...,t,:]
-                r, rhat, yinv = st * yt - self.mu, st * (ct + yt) - r, 1. / yt
+                r = st * yt - self.mu
+                rhat, yinv = st * (ct + yt) - r, 1. / yt
                 SYinv = torch.diag_embed(st * yinv)
 
                 Qt += Wt.mT @ SYinv @ Wt
@@ -490,6 +492,7 @@ class IPDDP(nn.Module):
         for t in range(self.T):
             self.x[...,t+1,:], _ = self.f_fn(self.x[...,t,:],self.u[...,t,:])
         self.c = self.c_fn(self.x[...,:-1,:], self.u)
+        if (self.c > 0).any(): self.infeas = True
         self.cost = self.q_fn(self.x[...,:-1,:], self.u).sum(-1) \
                     + self.p_fn(self.x[...,-1,:],torch.zeros_like(self.u[...,-1,:])).sum(-1)
         self.mu = self.cost / self.T / self.s[...,0,:].shape[-1]
