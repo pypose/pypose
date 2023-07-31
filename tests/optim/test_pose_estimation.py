@@ -60,19 +60,20 @@ class PoseEstimation(nn.Module):
 if __name__ == '__main__':
     point_noise, pose_noise = 5, 0.2
     f, H, W = 200, 600, 600
+    Np = 100
 
     intrinsics = torch.tensor([[f, 0, H / 2],
                                [0, f, W / 2],
                                [0, 0,   1  ]])
     true_points_3d = torch.cat([
-            torch.rand((100, 1))*2,
-            torch.rand((100, 1))*2 + 1.0,
-            torch.rand((100, 1)) + 1.0,], 1)
+            torch.rand((Np, 1))*2,
+            torch.rand((Np, 1))*2 + 1.0,
+            torch.rand((Np, 1)) + 1.0,], 1)
     true_pose = pp.SE3([1, 1.5, 0, 0, 0, 0, 1]).Inv()
     true_points_2d = point2pixel(true_points_3d, intrinsics, true_pose)
     detected_points = true_points_2d + torch.cat([
-            (torch.rand((100, 1))-0.5)*point_noise,
-            (torch.rand((100, 1))-0.5)*point_noise], 1)
+            (torch.rand((Np, 1))-0.5)*point_noise,
+            (torch.rand((Np, 1))-0.5)*point_noise], 1)
     prior_pose = true_pose * pp.randn_SE3(sigma=pose_noise)
 
     # move data to device
