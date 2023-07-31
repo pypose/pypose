@@ -42,6 +42,8 @@ class IPDDP(nn.Module):
     :math:`\mathbf{c}` is the stage-wise inequality constraints. In addition to the notations
     defined above, two additional variables :math:`\mathbf{s}` and :math:`\mathbf{y}` are
     introduced, which denote the dual variable and the slack variable, respectively.
+    We use :math:`\mathrm{infeas} = 0` (resp., :math:`\mathrm{infeas} = 1`) to denote
+    the case where the initial trajectory is feasible (resp., infeasible).
 
     The IPDDP process can be summarised as iterative backward and forward recursions.
 
@@ -51,20 +53,48 @@ class IPDDP(nn.Module):
 
         .. math::
             \begin{align*}
-                \mathbf{Q}_t &= \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t
+                \mathbf{Q}_t &= \begin{cases}
+                \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t
                                     + \mathbf{v}_{t+1} \odot \mathbf{G}_t
-                                    - \mathbf{W}_t^\top \mathbf{S}_t \mathbf{C}_t^{-1} \mathbf{W}_t   \\
-                \mathbf{q}_t &= \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1}
+                                    - \mathbf{W}_t^\top \mathbf{S}_t \mathbf{C}_t^{-1} \mathbf{W}_t, \mathrm{if ~infeas} = 0 \\
+                 \mathbf{Q}_t + \mathbf{F}_t^\top\mathbf{V}_{t+1}\mathbf{F}_t
+                                    + \mathbf{v}_{t+1} \odot \mathbf{G}_t
+                                    + \mathbf{W}_t^\top \mathbf{S}_t \mathbf{Y}_t^{-1} \mathbf{W}_t, \mathrm{if ~infeas} = 1 \\
+                                \end{cases}                           \\
+                \mathbf{q}_t &= \begin{cases}
+                \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1}
                                           + \mathbf{W}_t^\top\mathbf{s}_t
-                                          - \mathbf{W}_t^\top \mathbf{C}_t^{-1}\mathbf{r}_t\\
+                                          - \mathbf{W}_t^\top \mathbf{C}_t^{-1}\mathbf{r}_t, \mathrm{if ~infeas} = 0 \\
+                \mathbf{q}_t + \mathbf{F}_t^\top\mathbf{v}_{t+1}
+                                          + \mathbf{W}_t^\top\mathbf{s}_t
+                                          + \mathbf{W}_t^\top \mathbf{Y}_t^{-1}\hat{\mathbf{r}}_t, \mathrm{if ~infeas} = 1 \\
+                                \end{cases}            \\
                 \mathbf{K}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}
                                                      \mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t} \\
                 \mathbf{k}_t &= -\mathbf{Q}_{\mathbf{u}_t, \mathbf{u}_t}^{-1}
                                                            \mathbf{q}_{\mathbf{u}_t}         \\
-                \mathbf{K}_t^{\mathbf{s}} &= - \mathbf{S}_t\mathbf{C}_t^{-1} (\mathbf{c}_{\mathbf{x}_t}
-                                        + \mathbf{c}_{\mathbf{u}_t} \mathbf{K}_t) \\
-                \mathbf{k}_t^{\mathbf{s}} &= - \mathbf{C}_t^{-1} (\mathbf{r}_t + \mathbf{S}_t
-                                                    \mathbf{c}_{\mathbf{u}_t} \mathbf{k}_t) \\
+                \mathbf{K}_t^{\mathbf{s}} &= \begin{cases}
+                - \mathbf{S}_t\mathbf{C}_t^{-1} (\mathbf{c}_{\mathbf{x}_t}
+                                        + \mathbf{c}_{\mathbf{u}_t} \mathbf{K}_t), \mathrm{if ~infeas} = 0 \\
+                \mathbf{S}_t\mathbf{Y}_t^{-1} (\mathbf{c}_{\mathbf{x}_t}
+                                        + \mathbf{c}_{\mathbf{u}_t} \mathbf{K}_t), \mathrm{if ~infeas} = 1 \\
+                                \end{cases}
+                                 \\
+                \mathbf{k}_t^{\mathbf{s}} &= \begin{cases}
+                - \mathbf{C}_t^{-1} (\mathbf{r}_t + \mathbf{S}_t
+                                                    \mathbf{c}_{\mathbf{u}_t} \mathbf{k}_t), \mathrm{if ~infeas} = 0 \\
+                \mathbf{Y}_t^{-1} (\hat{\mathbf{r}}_t + \mathbf{S}_t
+                                                    \mathbf{c}_{\mathbf{u}_t} \mathbf{k}_t), \mathrm{if ~infeas} = 1 \\
+                                \end{cases}                 \\
+                \mathbf{K}_t^{\mathbf{y}} &= \begin{cases}
+                \mathbf{0}, \mathrm{if ~infeas} = 0 \\
+                - (\mathbf{c}_{\mathbf{x}_t}  + \mathbf{c}_{\mathbf{u}_t} \mathbf{K}_t), \mathrm{if ~infeas} = 1 \\
+                                \end{cases}
+                                 \\
+                \mathbf{k}_t^{\mathbf{y}} &= \begin{cases}
+                \mathbf{0}, \mathrm{if ~infeas} = 0 \\
+                - (\mathbf{c}_{t} + \mathbf{y}_{t}) - \mathbf{c}_{\mathbf{u}_t} \mathbf{k}_t, \mathrm{if ~infeas} = 1 \\
+                                \end{cases}                 \\
                 \mathbf{V}_t &= \mathbf{Q}_{\mathbf{x}_t, \mathbf{x}_t}
                     + \mathbf{Q}_{\mathbf{x}_t, \mathbf{u}_t}\mathbf{K}_t
                     + \mathbf{K}_t^\top\mathbf{Q}_{\mathbf{u}_t, \mathbf{x}_t}
@@ -89,7 +119,11 @@ class IPDDP(nn.Module):
                                 \mathbf{f}_{\mathbf{u}_t, \mathbf{x}_t}, \mathbf{f}_{\mathbf{u}_t, \mathbf{u}_t}\\  \end{bmatrix} \\
                 \mathbf{S}_t &= \mathbf{diag}(\mathbf{s}_t) \\
                 \mathbf{C}_t &= \mathbf{diag}(\mathbf{c}_t) \\
-                \mathbf{r}_t &= \mathbf{S}_t \mathbf{c}_t + \mu  \mathbf{1}  \\
+                \mathbf{r}_t &= \begin{cases}
+                \mathbf{S}_t \mathbf{c}_t + \mu  \mathbf{1}, \mathrm{if ~infeas} = 0 \\
+                \mathbf{S}_t \mathbf{y}_t - \mu  \mathbf{1}, \mathrm{if ~infeas} = 1 \\
+                                \end{cases}  \\
+                \hat{\mathbf{r}}_t &= \mathbf{S}_t(\mathbf{c}_t+\mathbf{y}_t) - \mathbf{r}_t
             \end{align*}
 
       As seen from the above equations, compared with LQR, additional terms involving
@@ -99,12 +133,16 @@ class IPDDP(nn.Module):
 
     - The forward recursion.
 
-      For :math:`t` = 0 to :math:`T-1`:
+      For :math:`t = 0` to :math:`T-1`:
 
         .. math::
             \begin{align*}
                 \mathbf{u}_t &= \mathbf{K}_t(\mathbf{x}_t - \mathbf{x}_t^{-}) + \mathbf{k}_t + \mathbf{u}_t^{-}\\
                 \mathbf{s}_t &= \mathbf{K}_t^{\mathbf{s}}(\mathbf{x}_t - \mathbf{x}_t^{-}) + \mathbf{k}_t^{\mathbf{s}}  + \mathbf{s}_t^{-}\\
+                \mathbf{y}_t &= \begin{cases}
+                \mathbf{0}, \mathrm{if ~infeas} = 0 \\
+                \mathbf{K}_t^{\mathbf{y}}(\mathbf{x}_t - \mathbf{x}_t^{-}) + \mathbf{k}_t^{\mathbf{y}}  + \mathbf{y}_t^{-}, \mathrm{if ~infeas} = 1 \\
+                                \end{cases}  \\
                 \mathbf{x}_{t+1} &= \mathbf{f}(\mathbf{x}_t,\mathbf{u}_t,t)  \\
             \end{align*}
 
@@ -177,7 +215,7 @@ class IPDDP(nn.Module):
         >>>     terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
         >>>     lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
         >>>     init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1], 'input': init_traj['input'][batch_id:batch_id+1]}
-        >>>     solver = IPDDP(sys, stage_cost, terminal_cost, lincon, gx.shape[-2], init_traj_sample)
+        >>>     solver = IPDDP(sys, stage_cost, terminal_cost, lincon, init_traj_sample)
         >>>     traj_opt[batch_id] = solver.optimizer()
 
     '''
