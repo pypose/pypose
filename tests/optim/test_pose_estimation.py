@@ -1,12 +1,8 @@
 import time
-import numpy as np
 import torch
 import pypose as pp
 from torch import nn
-import pypose.optim.solver as ppos
 import pypose.optim.kernel as ppok
-import pypose.optim.corrector as ppoc
-import pypose.optim.strategy as ppst
 from pypose.function.geometry import point2pixel, reprojerr
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -63,8 +59,8 @@ class PoseEstimation(nn.Module):
 
 if __name__ == '__main__':
     point_noise, pose_noise = 5, 0.2
-
     f, H, W = 200, 600, 600
+
     intrinsics = torch.tensor([[f, 0, H / 2],
                                [0, f, W / 2],
                                [0, 0,   1  ]])
@@ -104,4 +100,4 @@ if __name__ == '__main__':
 
     print("Time of optimization : {}".format(timer.toc()))
     print("True pose : \n{}".format(true_pose))
-    print("Optimizaed pose : \n{}".format(model.get_pose().to("cpu")))
+    print("Optimized pose : \n{}".format(model.get_pose().to("cpu")))
