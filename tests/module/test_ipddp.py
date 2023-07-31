@@ -69,5 +69,5 @@ if __name__ == "__main__":
         lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
         init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1],
                             'input': init_traj['input'][batch_id:batch_id+1]}
-        ipddp = IPDDP(sys, stage_cost, terminal_cost, lincon, gx.shape[-2], init_traj_sample)
+        ipddp = IPDDP(sys, stage_cost, terminal_cost, lincon, init_traj_sample)
         traj_opt[batch_id] = ipddp.solver(verbose=True)

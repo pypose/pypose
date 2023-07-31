@@ -111,8 +111,7 @@ def main():
             lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
             init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1],
                                 'input': init_traj['input'][batch_id:batch_id+1]}
-            ipddp_list[batch_id] = IPDDP(sys, stage_cost, terminal_cost, lincon,
-                                    gx.shape[-2], init_traj_sample)
+            ipddp_list[batch_id] = IPDDP(sys, stage_cost, terminal_cost, lincon, init_traj_sample)
             fp_list[batch_id] = ipddp_list[batch_id].solver()
         x_true, u_true = torch.cat([fp_list[batch_id].x for batch_id in range(n_batch)],dim=0), \
                          torch.cat([fp_list[batch_id].u for batch_id in range(n_batch)],dim=0)

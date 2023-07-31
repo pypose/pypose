@@ -181,7 +181,7 @@ class IPDDP(nn.Module):
         >>>     traj_opt[batch_id] = solver.optimizer()
 
     '''
-    def __init__(self, sys=None, stage_cost=None, terminal_cost=None, cons=None, n_cons=0, init_traj=None):
+    def __init__(self, sys=None, stage_cost=None, terminal_cost=None, cons=None, init_traj=None):
         super().__init__()
         self.f_fn = sys
         self.p_fn = terminal_cost
@@ -192,8 +192,9 @@ class IPDDP(nn.Module):
         self.contraction_flag = True
 
         self.x, self.u = init_traj['state'], init_traj['input']
+        self.c = self.c_fn(self.x[...,:-1,:], self.u)
         B = self.x.shape[:-2]
-        ns, nc, ncons, self.T = self.x.size(-1), self.u.size(-1), n_cons, self.u.size(-2)
+        ns, nc, ncons, self.T = self.x.size(-1), self.u.size(-1), self.c.size(-1), self.u.size(-2)
 
         # algorithm parameter
         self.mu, self.maxiter, self.tol, self.infeas = 1.0, 50, torch.tensor([1.0e-7], dtype=self.x.dtype, device=self.x.device), False
