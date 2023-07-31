@@ -37,10 +37,6 @@ def main():
     T = args.T
     expert_seed = 26
     state = torch.tensor([[-2.,0.],
-                          [-1., 0.],
-                          [-2.5, 1.]],
-                          device=device)
-    state = torch.tensor([[-2.,0.],
                           [-1., 0.]],
                           device=device)
     n_batch = state.shape[0]

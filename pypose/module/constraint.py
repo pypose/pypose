@@ -8,7 +8,7 @@ class Constraint(nn.Module):
     r'''
     The base class of a constraint function.
 
-    The cost function :math:`\mathrm{cons}` is given by:
+    The inequality constraint :math:`\mathrm{cons} \leq \mathbf{0}` with
 
     .. math::
         \begin{aligned}
@@ -104,14 +104,14 @@ class Constraint(nn.Module):
 
 class LinCon(Constraint):
     r'''
-    Linear constraint.
+    Linear inequlity constraint.
 
     Args:
         gx (:obj:`Tensor`): The state coefficient of linear constraint.
         gu (:obj:`Tensor`): The input coefficient of linear constraint.
         g (:obj:`Tensor`): The constant term of linear constraint.
 
-    A linear constraint can be described by equation of the form:
+    A linear inequality constraint :math:`\mathrm{cons} \leq \mathbf{0}` with
 
     .. math::
         \begin{align*}
