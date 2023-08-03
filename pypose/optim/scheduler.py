@@ -1,6 +1,6 @@
 import torch
 from .optimizer import _Optimizer
-
+import torch.optim.lr_scheduler as lr_scheduler
 
 class _Scheduler(object):
     class Continual:
@@ -87,6 +87,8 @@ class StopOnPlateau(_Scheduler):
     def __init__(self, optimizer, steps, patience=5, decreasing=1e-3, verbose=False):
         super().__init__(optimizer, steps, verbose)
         self.decreasing = decreasing
+
+        self.scheduler = lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
         self.patience, self.patience_count = patience, 0
 
     def step(self, loss):
@@ -126,7 +128,7 @@ class StopOnPlateau(_Scheduler):
         '''
         assert self.optimizer.loss is not None, \
             'scheduler.step() should be called after optimizer.step()'
-
+        print('sfasfasfasfasfasfa-----------', loss)
         if self.verbose:
             print('StopOnPlateau on step {} Loss {:.6e} --> Loss {:.6e} '\
                   '(reduction/loss: {:.4e}).'.format(self.steps, self.optimizer.last,
@@ -145,6 +147,8 @@ class StopOnPlateau(_Scheduler):
         else:
             self.patience_count = 0
 
+        self.scheduler.step()
+		
         if self.patience_count >= self.patience:
             self._continual = False
             if self.verbose:

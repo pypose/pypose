@@ -1,16 +1,10 @@
 import torch
 import time
 import numpy as np
-<<<<<<< HEAD
 import pypose as pp
 from torch import nn
 import numpy as np
-from pypose.optim.optimizer_alm import AugmentedLagrangian as ALM
-=======
-from torch import nn
-import numpy as np
 from pypose.optim import ALM
->>>>>>> 6bc4e99 (active_test_0)
 from torch import matmul as mult
 
 class LQR_Solver(torch.nn.Module):
@@ -153,15 +147,9 @@ def test_tensor_complex():
     timer = Timer()
 
     for idx in range(100):
-<<<<<<< HEAD
-        loss, lmd, terminate = optimizer.step(input=None)
-        # scheduler.step()
-        if terminate:
-=======
         loss, lmd, = optimizer.step(input=None)
         # scheduler.step()
         if optimizer.terminate:
->>>>>>> 6bc4e99 (active_test_0)
             break
     print('-----------optimized result----------------')
     print('Done', timer.toc())
@@ -181,11 +169,7 @@ def test_tensor():
             init = torch.randn(*dim)
             self.pose = torch.nn.Parameter(init) # torch([x1,x2])
 
-<<<<<<< HEAD
-        def forward(self, inputs):
-=======
         def forward(self, input):
->>>>>>> 6bc4e99 (active_test_0)
             result = -self.pose.prod() # get tensor(-x1*x2)
             return result
 
@@ -203,14 +187,6 @@ def test_tensor():
     posnet = PoseNet(5).to(device)
     constraints = ConstrainNet(posnet).to(device)
     optimizer = ALM(model=posnet, constraints=constraints, penalty_safeguard=1e3, inner_iter=400)
-<<<<<<< HEAD
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer.optim, step_size=5, gamma=0.5, verbose=True)
-    for idx in range(20):
-        loss, lmd, terminate = optimizer.step(input)
-        scheduler.step()
-        if terminate:
-            break
-=======
     
     
     for idx in range(20):
@@ -218,7 +194,6 @@ def test_tensor():
         if optimizer.terminate:
             break
             
->>>>>>> 6bc4e99 (active_test_0)
     print('-----------optimized result----------------')
     print("Lagrangian Multiplier Lambda:",lmd)
     print(posnet.pose)
@@ -230,13 +205,8 @@ def test_lietensor():
             # self.pose = pp.Parameter(pp.so3([[0, 0, 1.0]]))
             self.pose = pp.Parameter(pp.randn_so3(*dim))
 
-<<<<<<< HEAD
-        def forward(self, inputs):
-            result = (self.pose.Exp() @ inputs).matrix() - torch.eye(3)
-=======
         def forward(self, input):
             result = (self.pose.Exp() @ input).matrix() - torch.eye(3)
->>>>>>> 6bc4e99 (active_test_0)
             return torch.norm(result)
 
     class ConstrainNet(nn.Module):
@@ -265,20 +235,11 @@ def test_lietensor():
     constraints = ConstrainNet(posnet).to(device)
 
     optimizer = ALM(model=posnet, constraints=constraints, inner_iter=200)
-<<<<<<< HEAD
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer.optim, step_size=5, gamma=0.5)
-
-    for idx in range(20):
-        loss, lmd, terminate = optimizer.step(input)
-        scheduler.step()
-        if terminate:
-=======
    
 
     for idx in range(20):
         loss, lmd, = optimizer.step(input)
         if optimizer.terminate:
->>>>>>> 6bc4e99 (active_test_0)
             break
     print('-----------optimized result----------------')
     decimal_places = 4
