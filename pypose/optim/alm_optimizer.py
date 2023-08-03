@@ -5,6 +5,7 @@ from .optimizer import _Optimizer
 ### Inner Class: updating largragian related parameters
 	### Updating largragian related parameters
 
+
 class _Unconstrained_Model(nn.Module):
     def __init__(self, model, constraints, penalty_factor):
         super().__init__()
@@ -25,6 +26,7 @@ class _Unconstrained_Model(nn.Module):
         self.lmd = self.lmd if hasattr(self, 'lmd') \
                 else torch.zeros((self.constraints(input).shape[0], ))
         R = self.model(input).to(torch.float32)
+
         C = self.constraints(input).to(torch.float32)
         penalty_term = torch.square(torch.norm(C))
         L = R + (self.lmd @ C) + self.pf * penalty_term / 2
@@ -89,6 +91,7 @@ class Augmented_Lagrangian_Algorithm(_Optimizer):
             
         
             if torch.norm(violation) <= torch.norm(self.best_violation) * self.decrease_rate:
+
                 if torch.norm(self.last_object_value-self.alm_model.model(input=input)) <= self.object_decrease_tolerance \
                     and torch.norm(violation) <= self.violation_tolerance:
                     print("found optimal")
@@ -102,16 +105,5 @@ class Augmented_Lagrangian_Algorithm(_Optimizer):
             else:
                 self.alm_model.update_penalty_factor(self.pf_rate, self.pf_safeguard)
             
+
         return self.loss, self.alm_model.lmd
-
-    
-    def log_generation(self, alm_model, violation, inputs, last_object_value):
-        print('--------------------NEW-ALM-EPOCH-------------------')
-        print('current_lambda: ', alm_model.lmd)
-        print('parameters: ', alm_model.model.parameters())
-        print('object_loss:', self.alm_model.model(inputs))
-        print('absolute violation:', torch.norm(violation))
-        print("object_loss_decrease", torch.norm(last_object_value-alm_model.model(inputs)))
-
-            
-
