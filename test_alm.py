@@ -147,6 +147,7 @@ def test_tensor_complex():
     timer = Timer()
 
     for idx in range(100):
+
         loss, lmd, = optimizer.step(input=None)
         # scheduler.step()
         if optimizer.terminate:
@@ -186,14 +187,13 @@ def test_tensor():
     input = None
     posnet = PoseNet(5).to(device)
     constraints = ConstrainNet(posnet).to(device)
-    optimizer = ALM(model=posnet, constraints=constraints, penalty_safeguard=1e3, inner_iter=400)
-    
-    
+    optimizer = ALM(model=posnet, constraints=constraints, penalty_safeguard=1e3, inner_iter=400)    
     for idx in range(20):
         loss, lmd, = optimizer.step(input)
         if optimizer.terminate:
             break
             
+
     print('-----------optimized result----------------')
     print("Lagrangian Multiplier Lambda:",lmd)
     print(posnet.pose)
@@ -207,6 +207,7 @@ def test_lietensor():
 
         def forward(self, input):
             result = (self.pose.Exp() @ input).matrix() - torch.eye(3)
+
             return torch.norm(result)
 
     class ConstrainNet(nn.Module):
@@ -235,7 +236,7 @@ def test_lietensor():
     constraints = ConstrainNet(posnet).to(device)
 
     optimizer = ALM(model=posnet, constraints=constraints, inner_iter=200)
-   
+
 
     for idx in range(20):
         loss, lmd, = optimizer.step(input)

@@ -37,12 +37,12 @@ class _Unconstrained_Model(nn.Module):
     #   1. model params: \thetta, update with SGD
     #   2. lambda multiplier: \lambda, \lambda_{t+1} = \lambda_{t} + pf * error_C 
     #   3. penalty factor(Optional): update_para * penalty factor
-class Augmented_Lagrangian_Algorithm(_Optimizer):
+class AugmentedLagrangianMethod(_Optimizer):
     def __init__(self, model, constraints, unconstrained_optimizer=None, penalty_factor=1, penalty_safeguard=1e5, \
                        penalty_update_factor=2, object_decrease_tolerance=1e-6, violation_tolerance=1e-6, momentum=0.9, \
                        decrease_rate=0.9, min=1e-6, max=1e32,  inner_iter=400, learning_rate=1e-2, scl_step_size=20, scl_gamma=0.5, clip_value=None,
                 ):        
-        defaults = {**{'lr': learning_rate, 'min':min, 'max':max}}
+        defaults = {**{'min':min, 'max':max}}
         super().__init__(model.parameters(), defaults=defaults)
         #### choose your own optimizer for unconstrained opt.
         #self.unconstrained_optimizer =  unconstrained_optimizer if unconstrained_optimizer \
@@ -50,7 +50,7 @@ class Augmented_Lagrangian_Algorithm(_Optimizer):
         
         ### Shared Augments
         self.model = model
-        self.lr = learning_rate
+
         self.clip_value = clip_value
         self.inner_iter = inner_iter
         self.constraints = constraints
@@ -64,7 +64,7 @@ class Augmented_Lagrangian_Algorithm(_Optimizer):
         self.object_decrease_tolerance = object_decrease_tolerance
        
         self.alm_model = _Unconstrained_Model(self.model, self.constraints, penalty_factor=penalty_factor) 
-        self.optim = torch.optim.SGD(self.alm_model.parameters(), lr=self.lr, momentum=momentum)
+        self.optim = torch.optim.SGD(self.alm_model.parameters(), lr=learning_rate, momentum=momentum)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optim, step_size=scl_step_size, gamma=scl_gamma)
 
 
@@ -107,3 +107,11 @@ class Augmented_Lagrangian_Algorithm(_Optimizer):
             
 
         return self.loss, self.alm_model.lmd
+
+    def log_generation(self, alm_model, violation, inputs, last_object_value):
+        print('--------------------NEW-ALM-EPOCH-------------------')
+        print('current_lambda: ', alm_model.lmd)
+        print('parameters: ', alm_model.model.parameters())
+        print('object_loss:', self.alm_model.model(inputs))
+        print('absolute violation:', torch.norm(violation))
+        print("object_loss_decrease", torch.norm(last_object_value-alm_model.model(inputs)))
