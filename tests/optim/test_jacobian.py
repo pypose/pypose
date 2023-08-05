@@ -1,7 +1,9 @@
 import copy
 import torch
+import importlib
 import pypose as pp
 from torch import nn
+from contextlib import contextmanager
 from torch.func import functional_call, jacfwd, jacrev
 from torch.utils._pytree import tree_map
 from torch.autograd.functional import jacobian
@@ -140,15 +142,41 @@ class TestJacobian:
         def func(pose, points):
             return pose @ points
 
-        with retain_ltype():
-            jac_func = jacrev(func)
-            jac = jac_func(pose, points)
-            assert not pp.hasnan(jac)
+        @contextmanager
+        def assert_fn_equal():
+            # save functions to be changed
+            TO_BE_CHANGED = {
+                torch.autograd.forward_ad.make_dual,
+                torch._functorch.eager_transforms._wrap_tensor_for_grad,
+            }
+            # assert func1 and func2 are equal according to memory reference, module name,
+            # function name, and bytecode
+            def assert_equal(func1, func2):
+                assert func1 == func2 \
+                and func1.__module__  == func2.__module__ \
+                and func1.__name__  == func2.__name__ \
+                and func1.__code__.co_code == func2.__code__.co_code
+            try:
+                yield
+            finally:
+                # make sure functions has been restored
+                for func1 in TO_BE_CHANGED:
+                    module, name = func1.__module__, func1.__name__
+                    module = importlib.import_module(module)
+                    func2 = getattr(module, name)
+                    assert_equal(func1, func2)
+
+        with assert_fn_equal():
+            with retain_ltype():
+                jac_func = jacrev(func)
+                jac = jac_func(pose, points)
+                assert not pp.hasnan(jac)
 
         # without context manager, call pp.func.jacrev
-        jac_func = pp.func.jacrev(func)
-        jac = jac_func(pose, points)
-        assert not pp.hasnan(jac)
+        with assert_fn_equal():
+            jac_func = pp.func.jacrev(func)
+            jac = jac_func(pose, points)
+            assert not pp.hasnan(jac)
 
 if __name__ == '__main__':
     test = TestJacobian()
