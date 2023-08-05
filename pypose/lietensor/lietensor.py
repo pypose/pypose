@@ -1225,12 +1225,12 @@ class Parameter(LieTensor, nn.Parameter):
 @contextmanager
 def retain_ltype():
     # save the original PyTorch functions
-    NATIVE_FUNCTIONS = {
+    TO_BE_WRAPPED = {
         torch.autograd.forward_ad.make_dual,
         torch._functorch.eager_transforms._wrap_tensor_for_grad,
     }
 
-    def native_function_wrapper(func):
+    def wrap_function(func):
         def wrapper(*args, **kwargs):
             ltype = args[0].ltype if isinstance(args[0], LieTensor) else None
             res = func(*args, **kwargs)
@@ -1242,14 +1242,10 @@ def retain_ltype():
 
     try:
         # swap the original PyTorch functions with the wrapper
-        for func in NATIVE_FUNCTIONS:
+        for func in TO_BE_WRAPPED:
             module, name = func.__module__, func.__name__
             module = importlib.import_module(module)
-            setattr(module, name, native_function_wrapper(func))
+            setattr(module, name, wrap_function(func))
         yield
     finally:
-        # restore the original PyTorch functions
-        for func in NATIVE_FUNCTIONS:
-            module, name = func.__module__, func.__name__
-            module = importlib.import_module(module)
-            setattr(module, name, func)
+        pass
