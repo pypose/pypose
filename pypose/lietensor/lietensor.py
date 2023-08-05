@@ -1248,4 +1248,7 @@ def retain_ltype():
             setattr(module, name, wrap_function(func))
         yield
     finally:
-        pass
+        for func in TO_BE_WRAPPED:
+             module, name = func.__module__, func.__name__
+             module = importlib.import_module(module)
+             setattr(module, name, func)
