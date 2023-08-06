@@ -1249,6 +1249,6 @@ def retain_ltype():
         yield
     finally:
         for func in TO_BE_WRAPPED:
-             module, name = func.__module__, func.__name__
-             module = importlib.import_module(module)
-             setattr(module, name, func)
+            module, name = func.__module__, func.__name__
+            module = importlib.import_module(module)
+            setattr(module, name, func)
