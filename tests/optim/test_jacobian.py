@@ -4,9 +4,9 @@ import importlib
 import pypose as pp
 from torch import nn
 from contextlib import contextmanager
-from torch.func import functional_call, jacfwd, jacrev
 from torch.utils._pytree import tree_map
 from torch.autograd.functional import jacobian
+from torch.func import functional_call, jacfwd, jacrev
 
 from pypose.lietensor.lietensor import retain_ltype
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -135,7 +135,7 @@ class TestJacobian:
         except RuntimeError as e:
             assert 'shapes cannot be multiplied' in str(e)
 
-    def test_lie_tensor_jacrev(self):
+    def test_lietensor_jacrev(self):
         pose = pp.randn_SE3(1).to(device)
         points = torch.randn(1, 3).to(device)
 
@@ -145,7 +145,7 @@ class TestJacobian:
         @contextmanager
         def assert_fn_equal():
             # save functions to be changed
-            TO_BE_CHANGED = {
+            TO_BE_CHECKED = {
                 torch.autograd.forward_ad.make_dual,
                 torch._functorch.eager_transforms._wrap_tensor_for_grad,
             }
@@ -160,7 +160,7 @@ class TestJacobian:
                 yield
             finally:
                 # make sure functions has been restored
-                for func1 in TO_BE_CHANGED:
+                for func1 in TO_BE_CHECKED:
                     module, name = func1.__module__, func1.__name__
                     module = importlib.import_module(module)
                     func2 = getattr(module, name)
@@ -185,4 +185,4 @@ if __name__ == '__main__':
     test.test_lietensor_jacobian()
     test.test_modjac()
     test.test_lietensor_jacfwd()
-    test.test_lie_tensor_jacrev()
+    test.test_lietensor_jacrev()
