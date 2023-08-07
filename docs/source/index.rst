@@ -8,6 +8,7 @@ PyPose Documentation
    :caption: Contents:
 
    lietensor
+   func
    functions
    convert
    modules
