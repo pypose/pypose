@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from torch.utils._pytree import tree_map
 from torch.autograd.functional import jacobian
 from torch.func import functional_call, jacfwd, jacrev
+from typing import Collection, Callable
 
 from pypose.lietensor.lietensor import retain_ltype
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -143,15 +144,10 @@ class TestJacobian:
             return pose @ points
 
         @contextmanager
-        def assert_fn_equal():
-            # save functions to be changed
-            TO_BE_CHECKED = {
-                torch.autograd.forward_ad.make_dual,
-                torch._functorch.eager_transforms._wrap_tensor_for_grad,
-            }
+        def check_fn_equal(TO_BE_CHECKED: Collection[Callable]):
             # assert func1 and func2 are equal according to memory reference, module name,
             # function name, and bytecode
-            def assert_equal(func1, func2):
+            def assert_fn_equal(func1, func2):
                 assert func1 == func2 \
                 and func1.__module__  == func2.__module__ \
                 and func1.__name__  == func2.__name__ \
@@ -164,16 +160,22 @@ class TestJacobian:
                     module, name = func1.__module__, func1.__name__
                     module = importlib.import_module(module)
                     func2 = getattr(module, name)
-                    assert_equal(func1, func2)
+                    assert_fn_equal(func1, func2)
 
-        with assert_fn_equal():
+        # save functions to be checked
+        TO_BE_CHECKED = {
+            torch.autograd.forward_ad.make_dual,
+            torch._functorch.eager_transforms._wrap_tensor_for_grad,
+        }
+
+        with check_fn_equal(TO_BE_CHECKED):
             with retain_ltype():
                 jac_func = jacrev(func)
                 jac = jac_func(pose, points)
                 assert not pp.hasnan(jac)
 
         # without context manager, call pp.func.jacrev
-        with assert_fn_equal():
+        with check_fn_equal(TO_BE_CHECKED):
             jac_func = pp.func.jacrev(func)
             jac = jac_func(pose, points)
             assert not pp.hasnan(jac)
