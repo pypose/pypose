@@ -103,7 +103,7 @@ if __name__ == '__main__':
     #p = torch.tile(torch.ones(n_state + n_ctrl), (n_batch, T, 1))
     p = torch.tile(torch.zeros(n_state + n_ctrl), (n_batch, T, 1))
     dynamics=Simple2DNav(dt)
-    stepper = pp.utils.ReduceToBason(steps=3, verbose=False)
+    stepper = pp.utils.ReduceToBason(steps=8, verbose=False)
     MPC = pp.module.MPC(dynamics, Q, p, T, stepper=stepper)
 
     N = 100
