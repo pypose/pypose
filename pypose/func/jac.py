@@ -26,8 +26,8 @@ def jacrev(func: Callable, argnums: Union[int, Tuple[int]] = 0, *, has_aux=False
             (equivalent to doing a single vmap over vjp to compute the jacobian).
             If 1, then compute the jacobian row-by-row with a for-loop.
             If not None, then compute the jacobian :attr:`chunk_size` rows at a time
-            (equivalent to doing multiple vmap over vjp). If you run into memory issues computing
-            the jacobian, please try to specify a non-None chunk_size.
+            (equivalent to doing multiple vmap over vjp). If you run into memory issues
+            computing the jacobian, please try to specify a non-None chunk_size.
 
     Returns:
         Returns a function that takes in the same inputs as ``func`` and
