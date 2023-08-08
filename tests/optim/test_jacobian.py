@@ -4,12 +4,11 @@ import importlib
 import pypose as pp
 from torch import nn
 from contextlib import contextmanager
+from typing import Collection, Callable
 from torch.utils._pytree import tree_map
 from torch.autograd.functional import jacobian
 from torch.func import functional_call, jacfwd, jacrev
-from typing import Collection, Callable
 
-from pypose.lietensor.lietensor import retain_ltype
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -169,7 +168,7 @@ class TestJacobian:
         }
 
         with check_fn_equal(TO_BE_CHECKED):
-            with retain_ltype():
+            with pp.retain_ltype():
                 jac_func = jacrev(func)
                 jac = jac_func(pose, points)
                 assert not pp.hasnan(jac)

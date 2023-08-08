@@ -1,6 +1,6 @@
 import torch
+from .. import retain_ltype
 from typing import Callable, Union, Tuple, Optional
-from pypose.lietensor.lietensor import retain_ltype
 
 
 def jacrev(func: Callable, argnums: Union[int, Tuple[int]] = 0, *, has_aux=False,
@@ -36,7 +36,7 @@ def jacrev(func: Callable, argnums: Union[int, Tuple[int]] = 0, *, has_aux=False
         instead returns a ``(jacobian, aux)`` tuple where ``jacobian``
         is the Jacobian and ``aux`` is auxiliary objects returned by ``func``.
 
-    A basic usage with our LieTensor type would be the transformation function. 
+    A basic usage with our LieTensor type would be the transformation function.
 
         >>> import pypose as pp
         >>> import torch

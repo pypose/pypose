@@ -12,7 +12,8 @@ from .lietensor import SO3_type, so3_type, SE3_type, se3_type
 from .lietensor import Sim3_type, sim3_type, RxSO3_type, rxso3_type
 from .lietensor import tensor, translation, rotation, scale, matrix, euler
 from .lietensor import mat2SO3, mat2SE3, mat2Sim3, mat2RxSO3, from_matrix, matrix, euler2SO3, vec2skew
-from .func import *
+from .lietensor.lietensor import retain_ltype
+from . import func
 from .function import *
 from .basics import *
 from . import module
