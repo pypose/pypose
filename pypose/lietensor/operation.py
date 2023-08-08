@@ -1,3 +1,4 @@
+from typing import Any, Tuple
 import torch
 from .basics import vec2skew
 from ..basics import pm, cumops, cummul, cumprod
@@ -44,15 +45,15 @@ def calcQ(x):
     # coef1
     coef1 = torch.zeros_like(theta, requires_grad=False)
     coef1[idx] = (theta[idx] - theta[idx].sin()) / (theta2[idx] * theta[idx])
-    coef1[~idx] = 1.0 / 6.0 - (1.0 / 120.0) * theta2[~idx] 
+    coef1[~idx] = 1.0 / 6.0 - (1.0 / 120.0) * theta2[~idx]
     # coef2
     coef2 = torch.zeros_like(theta, requires_grad=False)
     coef2[idx] = (theta2[idx] + 2 * theta[idx].cos() - 2) / (2 * theta4[idx])
-    coef2[~idx] = 1.0 / 24.0 - (1.0 / 720.0) * theta2[~idx] 
+    coef2[~idx] = 1.0 / 24.0 - (1.0 / 720.0) * theta2[~idx]
     # coef3
     coef3 = torch.zeros_like(theta, requires_grad=False)
     coef3[idx] = (2 * theta[idx] - 3 * theta[idx].sin() + theta[idx] * theta[idx].cos()) / (2 * theta4[idx] * theta[idx])
-    coef3[~idx] = 1.0 / 120.0 - (1.0 / 2520.0) * theta2[~idx] 
+    coef3[~idx] = 1.0 / 120.0 - (1.0 / 2520.0) * theta2[~idx]
     Q = 0.5 * Tau + coef1 * (Phi@Tau + Tau@Phi + Phi@Tau@Phi) + \
         coef2 * (Phi@Phi@Tau + Tau@Phi@Phi - 3*Phi@Tau@Phi) + coef3 * (Phi@Tau@Phi@Phi + Phi@Phi@Tau@Phi)
     return Q
@@ -103,11 +104,11 @@ def rxso3_Ws(x):
     C[(~sigma_larger)], A[condition1], B[condition1] = 1.0, 0.5, 1.0 / 6
 
     # condition2
-    theta_c2 = theta[condition2]      
+    theta_c2 = theta[condition2]
     A[condition2] = (1.0 - theta_c2.cos()) * theta2_inv[condition2]
     B[condition2] = (theta_c2 - theta_c2.sin()) / (theta2[condition2] * theta_c2)
 
-    # condition3        
+    # condition3
     C[sigma_larger] = (scale[sigma_larger] - 1.0) / sigma[sigma_larger]
     sigma_c3, scale_c3, sigma2_c3 = sigma[condition3], scale[condition3], sigma2[condition3]
     A[condition3] = (1.0 + (sigma_c3 - 1.0) * scale_c3) / sigma2_c3
@@ -471,13 +472,19 @@ class sim3_Exp(torch.autograd.Function):
 class SO3_Act(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, X, p):
+    def forward(X, p):
         Xv, Xw = X[..., :3], X[..., 3:]
         uv = torch.linalg.cross(Xv, p, dim=-1)
         uv += uv
         out = p + Xw * uv + torch.linalg.cross(Xv, uv, dim=-1)
-        ctx.save_for_backward(X, out)
         return out
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        X, p = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -493,10 +500,16 @@ class SO3_Act(torch.autograd.Function):
 class SE3_Act(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, X, p):
+    def forward(X, p):
         out = X[..., :3] + SO3_Act.apply(X[..., 3:], p)
-        ctx.save_for_backward(X, out)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, p = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -708,7 +721,7 @@ class SO3_Mul(torch.autograd.Function):
         X = ctx.saved_tensors[0]
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
         X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
-        dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), SO3_Adj(X)).squeeze(-2) 
+        dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), SO3_Adj(X)).squeeze(-2)
         Y_grad = torch.cat((dZxX, zero), dim = -1)
         return X_grad, Y_grad
 
@@ -727,9 +740,9 @@ class SE3_Mul(torch.autograd.Function):
         X = ctx.saved_tensors[0]
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
         X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
-        dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), SE3_Adj(X)).squeeze(-2) 
+        dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), SE3_Adj(X)).squeeze(-2)
         Y_grad = torch.cat((dZxX, zero), dim = -1)
-        return X_grad, Y_grad        
+        return X_grad, Y_grad
 
 
 class RxSO3_Mul(torch.autograd.Function):
@@ -746,9 +759,9 @@ class RxSO3_Mul(torch.autograd.Function):
         X = ctx.saved_tensors[0]
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
         X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
-        dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), RxSO3_Adj(X)).squeeze(-2) 
+        dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), RxSO3_Adj(X)).squeeze(-2)
         Y_grad = torch.cat((dZxX, zero), dim = -1)
-        return X_grad, Y_grad    
+        return X_grad, Y_grad
 
 
 class Sim3_Mul(torch.autograd.Function):
@@ -765,9 +778,9 @@ class Sim3_Mul(torch.autograd.Function):
         X = ctx.saved_tensors[0]
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
         X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
-        dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), Sim3_Adj(X)).squeeze(-2) 
+        dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), Sim3_Adj(X)).squeeze(-2)
         Y_grad = torch.cat((dZxX, zero), dim = -1)
-        return X_grad, Y_grad   
+        return X_grad, Y_grad
 
 
 class SO3_Inv(torch.autograd.Function):
@@ -788,7 +801,7 @@ class SO3_Inv(torch.autograd.Function):
 class SE3_Inv(torch.autograd.Function):
     @staticmethod
     def forward(ctx, X):
-        q_inv = SO3_Inv.apply(X[..., 3:]) 
+        q_inv = SO3_Inv.apply(X[..., 3:])
         t_inv = -SO3_Act.apply(q_inv, X[..., :3])
         Y = torch.cat((t_inv, q_inv), dim = -1)
         ctx.save_for_backward(Y)
@@ -805,7 +818,7 @@ class SE3_Inv(torch.autograd.Function):
 class RxSO3_Inv(torch.autograd.Function):
     @staticmethod
     def forward(ctx, X):
-        q_inv = SO3_Inv.apply(X[..., :4]) 
+        q_inv = SO3_Inv.apply(X[..., :4])
         s_inv = 1.0 / X[..., 4:]
         Y = torch.cat((q_inv, s_inv), dim = -1)
         ctx.save_for_backward(Y)
@@ -822,7 +835,7 @@ class RxSO3_Inv(torch.autograd.Function):
 class Sim3_Inv(torch.autograd.Function):
     @staticmethod
     def forward(ctx, X):
-        qs_inv = RxSO3_Inv.apply(X[..., 3:]) 
+        qs_inv = RxSO3_Inv.apply(X[..., 3:])
         t_inv = -RxSO3_Act.apply(qs_inv, X[..., :3])
         Y = torch.cat((t_inv, qs_inv), dim = -1)
         ctx.save_for_backward(Y)
