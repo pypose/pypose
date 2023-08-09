@@ -57,7 +57,7 @@ class PoseEstimation(nn.Module):
 
 
 if __name__ == '__main__':
-    point_noise, pose_noise = 5, 0.2
+    point_noise, pose_noise = 3, 0.2
     f, H, W = 200, 600, 600
     Np = 100
 
@@ -98,6 +98,7 @@ if __name__ == '__main__':
             break
         last_loss = loss
 
+    torch.testing.assert_close(true_pose, model.get_pose().to("cpu"), atol=1e-2, rtol=1e-2)
     print("Time of optimization : {}".format(timer.toc()))
     print("True pose : \n{}".format(true_pose))
     print("Optimized pose : \n{}".format(model.get_pose().to("cpu")))
