@@ -288,8 +288,8 @@ class TestOptim:
                 super().__init__()
                 self.pose = pp.Parameter(pp.randn_SE3(*dim))
 
-            def forward(self, inputs):
-                error = (self.pose @ inputs).Log().tensor()
+            def forward(self, poses):
+                error = (self.pose @ poses).Log().tensor()
                 constraint = self.pose.Log().tensor().sum(-1)
                 return error, constraint
 
@@ -304,7 +304,7 @@ class TestOptim:
         # optimizer = pp.optim.GN(invnet, kernel=kernel)
 
         for idx in range(10):
-            loss = optimizer.step(inputs, weight=weight)
+            loss = optimizer.step(input={'poses':inputs}, weight=weight)
             print('Pose loss %.7f @ %dit'%(loss, idx))
             if loss < 1e-5:
                 print('Early Stoping!')

@@ -57,6 +57,8 @@ class RobustModel(nn.Module):
         return self.residuals(output, target)
 
     def model_forward(self, input):
+        if isinstance(input, dict):
+            return self.model(**input)
         if isinstance(input, (tuple, list)):
             return self.model(*input)
         else:
@@ -210,7 +212,7 @@ class GaussNewton(_Optimizer):
         Performs a single optimization step.
 
         Args:
-            input (Tensor/LieTensor or tuple of Tensors/LieTensors): the input to the model.
+            input (Tensor/LieTensor, tuple or a dict of Tensors/LieTensors): the input to the model.
             target (Tensor/LieTensor): the model target to approximate.
                 If not given, the model output is minimized. Default: ``None``.
             weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
@@ -414,7 +416,7 @@ class LevenbergMarquardt(_Optimizer):
         Performs a single optimization step.
 
         Args:
-            input (Tensor/LieTensor or tuple of Tensors/LieTensors): the input to the model.
+            input (Tensor/LieTensor, tuple or a dict of Tensors/LieTensors): the input to the model.
             target (Tensor/LieTensor): the model target to optimize.
                 If not given, the squared model output is minimized. Defaults: ``None``.
             weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
