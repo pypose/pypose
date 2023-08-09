@@ -47,8 +47,7 @@ class PoseEstimation(nn.Module):
         super().__init__()
         self.pose = pp.Parameter(prior_pose)
 
-    def forward(self, inputs):
-        intrinsics, points_3d, detected_points, prior_pose = inputs
+    def forward(self, intrinsics, points_3d, detected_points, prior_pose):
         prior_pose_error = (self.pose.Inv() @ prior_pose).Log().tensor()
         reprojection_error = reprojerr(points_3d, detected_points, intrinsics, self.pose)
         return prior_pose_error, reprojection_error
@@ -80,12 +79,12 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     intrinsics, true_points_3d, detected_points, prior_pose = intrinsics.to(device), \
             true_points_3d.to(device), detected_points.to(device), prior_pose.to(device)
-    inputs = [intrinsics, true_points_3d, detected_points, prior_pose]
+    inputs = (intrinsics, true_points_3d, detected_points, prior_pose)
     model = PoseEstimation(prior_pose).to(device)
 
     strategy = pp.optim.strategy.TrustRegion(radius=1e6)
-    kernel = [ppok.Scale().to(device), ppok.Huber().to(device)]
-    weight = [torch.eye(6, device=device), torch.ones(1, device=device)]
+    kernel = (ppok.Scale().to(device), ppok.Huber().to(device))
+    weight = (torch.eye(6, device=device), torch.ones(1, device=device))
     optimizer = pp.optim.LM(model, strategy=strategy, kernel=kernel)
 
     last_loss = float("inf")

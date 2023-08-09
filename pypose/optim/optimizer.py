@@ -57,7 +57,7 @@ class RobustModel(nn.Module):
         return self.residuals(output, target)
 
     def model_forward(self, input):
-        if isinstance(input, tuple):
+        if isinstance(input, (tuple, list)):
             return self.model(*input)
         else:
             return self.model(input)
