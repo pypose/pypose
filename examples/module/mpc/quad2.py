@@ -61,6 +61,7 @@ class Quad(pp.module.NLS):
 
 def visualize(system, traj, controls):
 
+
     fig, axs = plt.subplots(4, 3, figsize=(18, 6))
 
     axs[0, 0].plot(traj[:, 9], label='x')
@@ -105,19 +106,38 @@ def visualize(system, traj, controls):
 
     fig.suptitle('inputs', fontsize=16)
 
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    x = traj[:, 9]
+    y = traj[:, 10]
+    z = traj[:, 11]
+
+    ax.plot(x, y, z)
+
+    ax.set_xlabel('x(m)')
+    ax.set_ylabel('y(m)')
+    ax.set_zlabel('z(m)')
+
+    last_x = x[-1]
+    last_y = y[-1]
+    last_z = z[-1]
+
+    ax.scatter(last_x, last_y, last_z, color='red', s=50)
+
     plt.show(block=False)
 
 
 if __name__ == '__main__':
 
     dt = 0.001
-    T = 30
+    T = 25
     n_batch = 1
     n_state, n_ctrl = 12, 4
 
-    x_init = torch.tensor([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., -8.]], requires_grad=False)
+    x_init = torch.tensor([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.05, 3.5, -8.]], requires_grad=False)
     x_goal = torch.tensor([[0., 0., 0., 0., 0., 0.,
-                            0., 0., 0., 0., 0., -9.]], requires_grad=False)
+                            0., 0., 0., 0, 4.0, -9.]], requires_grad=False)
 
     u_init = torch.tile(torch.tensor([9.8, 0.0, 0.0, 0.0]), (n_batch, T, 1))
 
@@ -126,15 +146,17 @@ if __name__ == '__main__':
                       [0., 0., 0.02848]])
 
     Q = torch.tile(torch.eye(n_state + n_ctrl), (n_batch, T, 1, 1))
-    Q[...,11,11], Q[...,0,0], Q[...,1,1], Q[...,2,2], Q[...,8,8] = 10000000000, 0.1, 0.1, 0.1, 1000
+    Q[...,0,0], Q[...,1,1], Q[...,2,2], Q[...,8,8] = 0.1, 0.1, 0.1, 1000
     Q[...,12,12], Q[...,13,13], Q[...,14,14], Q[...,15,15] = 0.01, 0.05, 0.05, 0.05
-    #Q[...,10,10] = 1000000
+    Q[...,9,9] = 100000000000
+    Q[...,10,10] = 100000000
+    Q[...,11,11] = 100000000
     p = torch.tile(torch.zeros(n_state + n_ctrl), (n_batch, T, 1))
     dynamics=Quad(dt, J)
-    stepper = pp.utils.ReduceToBason(steps=10, verbose=False)
+    stepper = pp.utils.ReduceToBason(steps=3, verbose=False)
     MPC = pp.module.MPC(dynamics, Q, p, T, stepper=stepper)
 
-    N = 200
+    N = 15
 
     xt = x_init
 
