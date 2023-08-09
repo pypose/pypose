@@ -58,8 +58,8 @@ class PoseEstimation(nn.Module):
 
 if __name__ == '__main__':
     point_noise, pose_noise = 3, 0.2
-    f, H, W = 200, 600, 600
-    Np = 100
+    f, H, W, Np = 200, 600, 600, 100
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     intrinsics = torch.tensor([[f, 0, H / 2],
                                [0, f, W / 2],
@@ -68,7 +68,7 @@ if __name__ == '__main__':
             torch.rand((Np, 1))*2,
             torch.rand((Np, 1))*2 + 1.0,
             torch.rand((Np, 1)) + 1.0,], 1)
-    true_pose = pp.SE3([1, 1.5, 0, 0, 0, 0, 1]).Inv()
+    true_pose = pp.SE3(torch.tensor([1, 1.5, 0, 0, 0, 0, 1], device=device)).Inv()
     true_points_2d = point2pixel(true_points_3d, intrinsics, true_pose)
     detected_points = true_points_2d + torch.cat([
             (torch.rand((Np, 1))-0.5)*point_noise,
@@ -76,7 +76,6 @@ if __name__ == '__main__':
     prior_pose = true_pose * pp.randn_SE3(sigma=pose_noise)
 
     # move data to device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     intrinsics, true_points_3d, detected_points, prior_pose = intrinsics.to(device), \
             true_points_3d.to(device), detected_points.to(device), prior_pose.to(device)
     inputs = (intrinsics, true_points_3d, detected_points, prior_pose)
@@ -98,7 +97,7 @@ if __name__ == '__main__':
             break
         last_loss = loss
 
-    torch.testing.assert_close(true_pose, model.get_pose().to("cpu"), atol=1e-2, rtol=1e-2)
+    torch.testing.assert_close(true_pose, model.get_pose(), atol=1e-2, rtol=1e-2)
     print("Time of optimization : {}".format(timer.toc()))
     print("True pose : \n{}".format(true_pose))
-    print("Optimized pose : \n{}".format(model.get_pose().to("cpu")))
+    print("Optimized pose : \n{}".format(model.get_pose()))
