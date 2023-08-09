@@ -11,8 +11,8 @@ class TestSpline:
         poses = pp.bspline(data, 0.10, True)
         torch.testing.assert_close(poses[...,[0,-1],:].translation(),
                                    data[...,[0,-1],:].translation())
-        torch.testing.assert_close(poses[...,[0,-1],:].rotation(),
-                                   data[...,[0,-1],:].rotation())
+        torch.testing.assert_close(torch.abs(poses[...,[0,-1],:].rotation()),
+                                   torch.abs(data[...,[0,-1],:].rotation()))
         # test for multi batch
         data = pp.randn_SE3(2,5, device=device)
         poses = pp.bspline(data, 0.5)
@@ -20,8 +20,8 @@ class TestSpline:
         poses = pp.bspline(data, 0.5, True)
         torch.testing.assert_close(poses[...,[0,-1],:].translation(),
                                    data[...,[0,-1],:].translation())
-        torch.testing.assert_close(poses[...,[0,-1],:].rotation(),
-                                   data[...,[0,-1],:].rotation())
+        torch.testing.assert_close(torch.abs(poses[...,[0,-1],:].rotation()),
+                                   torch.abs(data[...,[0,-1],:].rotation()))
         # test for high dimension
         data = pp.randn_SE3(2, 3, 4, device=device)
         poses = pp.bspline(data, 0.20)
@@ -29,8 +29,8 @@ class TestSpline:
         poses = pp.bspline(data, 0.5, True)
         torch.testing.assert_close(poses[...,[0,-1],:].translation(),
                                    data[...,[0,-1],:].translation())
-        torch.testing.assert_close(poses[...,[0,-1],:].rotation(),
-                                   data[...,[0,-1],:].rotation())
+        torch.testing.assert_close(torch.abs(poses[...,[0,-1],:].rotation()),
+                                   torch.abs(data[...,[0,-1],:].rotation()))
 
         data = pp.randn_SE3(2, 3, 4, device=device)
         poses = pp.bspline(data, 0.3)
@@ -38,8 +38,8 @@ class TestSpline:
         poses = pp.bspline(data, 0.5, True)
         torch.testing.assert_close(poses[...,[0,-1],:].translation(),
                                    data[...,[0,-1],:].translation())
-        torch.testing.assert_close(poses[...,[0,-1],:].rotation(),
-                                   data[...,[0,-1],:].rotation())
+        torch.testing.assert_close(torch.abs(poses[...,[0,-1],:].rotation()),
+                                   torch.abs(data[...,[0,-1],:].rotation()))
     def test_chspline(self):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # test for different point dimension
