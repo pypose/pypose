@@ -80,8 +80,10 @@ def visualize(system, traj):
     ax.set_ylabel('y(m)')
 
     ax.scatter(1.5, 1.5, color='red', label='Goal Position')
-    
+
     ax.legend()
+    ax.grid(True)
+    ax.grid(which='major', alpha=0.5, linestyle='-')
 
     plt.show(block=False)
 
