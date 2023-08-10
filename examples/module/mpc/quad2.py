@@ -119,11 +119,7 @@ def visualize(system, traj, controls):
     ax.set_ylabel('y(m)')
     ax.set_zlabel('z(m)')
 
-    last_x = x[-1]
-    last_y = y[-1]
-    last_z = z[-1]
-
-    ax.scatter(last_x, last_y, last_z, color='red', s=50)
+    ax.scatter(0., 4., -9., color='red', s=50, label='Goal Position')
 
     plt.show(block=False)
 
@@ -135,7 +131,7 @@ if __name__ == '__main__':
     n_batch = 1
     n_state, n_ctrl = 12, 4
 
-    x_init = torch.tensor([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0.05, 3.5, -8.]], requires_grad=False)
+    x_init = torch.tensor([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 3.5, -8.]], requires_grad=False)
     x_goal = torch.tensor([[0., 0., 0., 0., 0., 0.,
                             0., 0., 0., 0, 4.0, -9.]], requires_grad=False)
 
@@ -148,15 +144,14 @@ if __name__ == '__main__':
     Q = torch.tile(torch.eye(n_state + n_ctrl), (n_batch, T, 1, 1))
     Q[...,0,0], Q[...,1,1], Q[...,2,2], Q[...,8,8] = 0.1, 0.1, 0.1, 1000
     Q[...,12,12], Q[...,13,13], Q[...,14,14], Q[...,15,15] = 0.01, 0.05, 0.05, 0.05
-    Q[...,9,9] = 100000000000
     Q[...,10,10] = 100000000
-    Q[...,11,11] = 100000000
+    Q[...,11,11] = 10000000
     p = torch.tile(torch.zeros(n_state + n_ctrl), (n_batch, T, 1))
     dynamics=Quad(dt, J)
     stepper = pp.utils.ReduceToBason(steps=3, verbose=False)
     MPC = pp.module.MPC(dynamics, Q, p, T, stepper=stepper)
 
-    N = 15
+    N = 30
 
     xt = x_init
 
@@ -172,7 +167,8 @@ if __name__ == '__main__':
         xt = dynamics.forward(xt, ut_mpc)[0]
         X.append(xt.squeeze())
         U.append(ut_mpc.squeeze())
-        #print(xt)
+
+    print(xt)
 
     visualize(dynamics, torch.stack(X), torch.stack(U))
     plt.show(block=True)
