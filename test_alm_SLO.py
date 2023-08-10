@@ -4,7 +4,7 @@ import numpy as np
 import pypose as pp
 from torch import nn
 import numpy as np
-from pypose.optim import ALM
+from pypose.optim import ALM, ALM_SLO
 from torch import matmul as mult
 
 class LQR_Solver(torch.nn.Module):
@@ -82,6 +82,74 @@ class Timer:
         if reset:
             self.start_time = time.time()
         return self.duration
+
+def test_tensor():
+    class PoseNet(nn.Module):
+        def __init__(self, *dim):
+            super().__init__()
+            init = torch.randn(*dim)
+            self.pose = torch.nn.Parameter(init) # torch([x1,x2])
+
+        def forward(self, input):
+            result = -self.pose.prod() # get tensor(-x1*x2)
+            return result
+
+    class ConstrainNet(nn.Module):
+        def __init__(self, objective_net):
+            super().__init__()
+            self.net = objective_net
+            
+        def forward(self, input=None):
+            constraint_violation = torch.square(torch.norm(self.net.pose, p=2)) - 2
+            # constraint_violation = torch.square(self.net.pose[0]) + torch.square(self.net.pose[1]) + torch.square(self.net.pose[2]) - 2
+            return constraint_violation.unsqueeze(0)
+    device = torch.device("cpu")
+    input = None
+    posnet = PoseNet(5).to(device)
+    constraints = ConstrainNet(posnet).to(device)
+
+    sgd_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=torch.optim.SGD(params=[torch.tensor(0.0)], lr=0.01), step_size=20, gamma=0.5)
+    optimizer = ALM(model=posnet, constraints=constraints, penalty_safeguard=1e3, inner_scheduler=sgd_scheduler, inner_iter=400)
+    
+    for idx in range(20):
+        loss, lmd, = optimizer.step(input)
+        if optimizer.terminate:
+            break
+    print('-----------optimized result----------------')
+    print("Lagrangian Multiplier Lambda:",lmd)
+    print(posnet.pose)
+
+def test_tensor_SLO():
+    class InnerModel(nn.Module):
+        def __init__(self, *dim) -> None:
+            super().__init__()
+            init = torch.randn(*dim)
+            self.pose = torch.nn.Parameter(init) # torch([x1,x2])
+            
+        def inner_cost(self, input):
+            result = -self.pose.prod()
+            return result
+
+        def constrain(self, input):
+            constraint_violation = torch.square(torch.norm(self.pose, p=2)) - 2
+            return constraint_violation.unsqueeze(0)
+
+        def forward(self):
+            return self.inner_cost(), self.constrain()
+    device = torch.device("cpu")
+    input = None
+    InnerNet = InnerModel(5).to(device)
+
+    sgd_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=torch.optim.SGD(params=[torch.tensor(0.0)], lr=0.01), step_size=20, gamma=0.5)
+    optimizer = ALM_SLO(model=InnerNet, penalty_safeguard=1e3, inner_scheduler=sgd_scheduler, inner_iter=400)
+    
+    for idx in range(20):
+        loss, lmd, = optimizer.step(input)
+        if optimizer.terminate:
+            break
+    print('-----------optimized result----------------')
+    print("Lagrangian Multiplier Lambda:",lmd)
+    print(InnerNet.pose)
 
 def test_tensor_complex():
     class PoseNet(nn.Module):
@@ -162,43 +230,6 @@ def test_tensor_complex():
     print('Lambda true:\n', mu)
     print('tau true:\n', tau)
 
-
-def test_tensor():
-    class PoseNet(nn.Module):
-        def __init__(self, *dim):
-            super().__init__()
-            init = torch.randn(*dim)
-            self.pose = torch.nn.Parameter(init) # torch([x1,x2])
-
-        def forward(self, input):
-            result = -self.pose.prod() # get tensor(-x1*x2)
-            return result
-
-    class ConstrainNet(nn.Module):
-        def __init__(self, objective_net):
-            super().__init__()
-            self.net = objective_net
-            
-        def forward(self, input=None):
-            constraint_violation = torch.square(torch.norm(self.net.pose, p=2)) - 2
-            # constraint_violation = torch.square(self.net.pose[0]) + torch.square(self.net.pose[1]) + torch.square(self.net.pose[2]) - 2
-            return constraint_violation.unsqueeze(0)
-    device = torch.device("cpu")
-    input = None
-    posnet = PoseNet(5).to(device)
-    constraints = ConstrainNet(posnet).to(device)
-
-    sgd_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=torch.optim.SGD(params=[torch.tensor(0.0)], lr=0.01), step_size=20, gamma=0.5)
-    optimizer = ALM(model=posnet, constraints=constraints, penalty_safeguard=1e3, inner_scheduler=sgd_scheduler, inner_iter=400)
-    
-    for idx in range(20):
-        loss, lmd, = optimizer.step(input)
-        if optimizer.terminate:
-            break
-    print('-----------optimized result----------------')
-    print("Lagrangian Multiplier Lambda:",lmd)
-    print(posnet.pose)
-
 def test_lietensor():
     class PoseNet(nn.Module):
         def __init__(self, *dim):
@@ -218,7 +249,7 @@ def test_lietensor():
             
         def forward(self, input=None):
             fixed_euler_angles = np.array([[0.0, 0.0, 0.0]])
-            fixed_quaternion = pp.euler2SO3(fixed_euler_angles)
+            fixed_quaternion = pp.euler2SO3(fixed_euler_angles).to(torch.float)
             quaternion = self.net.pose.Exp()
             difference_quaternions = torch.sub(quaternion, fixed_quaternion)
             distance = torch.norm(difference_quaternions, p=2, dim=1)
@@ -228,8 +259,7 @@ def test_lietensor():
 
     device = torch.device("cpu")
     euler_angles = np.array([[0.0, 0.0, np.pi/4]])
-    quaternion = pp.euler2SO3(euler_angles)
-    quaternion = torch.tensor(quaternion, dtype=torch.float)
+    quaternion = pp.euler2SO3(euler_angles).to(torch.float)
     input = pp.SO3(quaternion)
     
     posnet = PoseNet(1).to(device)
@@ -248,8 +278,11 @@ def test_lietensor():
     print('x axis:', np.around(posnet.pose.detach().numpy(), decimals=decimal_places))
     print('f(x):', posnet(input))
     print('final violation:', constraints())
+
+
     
 if __name__ == "__main__":
     # test_tensor()
+    # test_tensor_SLO()
     # test_tensor_complex()
     test_lietensor()
