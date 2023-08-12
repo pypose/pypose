@@ -12,10 +12,11 @@ class System(nn.Module):
     such as linear time invariant system :meth:`LTI`, Linear Time-Variant :meth:`LTV`,
     and a non-linear system :meth:`NLS`.
     '''
-    def __init__(self):
+    def __init__(self, xdim = None, udim = None, ydim = None):
         super().__init__()
         self.register_buffer('_t',torch.tensor(0, dtype=torch.int64))
         self.register_forward_hook(self.forward_hook)
+        self._xdim, self._udim, self._ydim = xdim, udim, ydim
 
     def forward_hook(self, module, inputs, outputs):
         r'''
@@ -113,6 +114,27 @@ class System(nn.Module):
         if not isinstance(t, torch.Tensor):
             t = torch.tensor(t)
         self._t.copy_(t)
+
+    @property
+    def xdim(self):
+        r'''
+        dim of state
+        '''
+        return self._xdim
+
+    @property
+    def udim(self):
+        r'''
+        dim of input
+        '''
+        return self._udim
+
+    @property
+    def ydim(self):
+        r'''
+        dim of observation
+        '''
+        return self._ydim
 
     # second order derivative
     @property
@@ -230,8 +252,8 @@ class LTI(System):
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
     '''
 
-    def __init__(self, A, B, C, D, c1=None, c2=None):
-        super().__init__()
+    def __init__(self, A, B, C, D, c1=None, c2=None, xdim = None, udim = None, ydim = None):
+        super().__init__(xdim, udim, ydim)
         self.register_buffer('_A', A)
         self.register_buffer('_B', B)
         self.register_buffer('_C', C)
@@ -426,8 +448,8 @@ class LTV(LTI):
         More practical examples can be found at `examples/module/dynamics
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
     '''
-    def __init__(self, A=None, B=None, C=None, D=None, c1=None, c2=None):
-        super().__init__(A, B, C, D, c1, c2)
+    def __init__(self, A=None, B=None, C=None, D=None, c1=None, c2=None, xdim = None, udim = None, ydim = None):
+        super().__init__(A, B, C, D, c1, c2, xdim, udim, ydim)
 
     def set_refpoint(self, state=None, input=None, t=None):
         r'''
@@ -565,8 +587,8 @@ class NLS(System):
         linearization, and more practical examples can be found at `examples/module/dynamics
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
     '''
-    def __init__(self):
-        super().__init__()
+    def __init__(self, xdim = None, udim = None, ydim = None):
+        super().__init__(xdim, udim, ydim)
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
 
     def forward(self, state, input):

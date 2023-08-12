@@ -23,10 +23,11 @@ class Constraint(nn.Module):
         <https://github.com/pypose/pypose/tree/main/examples/module/constraint>`_.
     '''
 
-    def __init__(self):
+    def __init__(self, cdim = None):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
         # self.jacargs = {'vectorize':False, 'strategy':'reverse-mode'}
+        self._cdim = cdim
 
     def forward(self, state, input):
         r'''
@@ -67,6 +68,13 @@ class Constraint(nn.Module):
         self._ref_state = torch.tensor(self.state) if state is None else torch.atleast_1d(state)
         self._ref_input = torch.tensor(self.input) if input is None else torch.atleast_1d(input)
         self._ref_c = self.constraint(self._ref_state, self._ref_input)
+
+    @property
+    def cdim(self):
+        r'''
+        dim of constraint
+        '''
+        return self._cdim
 
     @property
     def gx(self):
@@ -137,10 +145,12 @@ class LinCon(Constraint):
     '''
 
     def __init__(self, gx, gu, g=None):
-        super(LinCon, self).__init__()
+        super(LinCon, self).__init__(gx.shape[-2])
         # assert gx.ndim in (2, 3), "Invalid constraint state coefficient dimensions"
         assert gx.ndim == gu.ndim, "Invalid coefficient matrices dimensions"
-        self.gx, self.gu, self.g = gx, gu, g
+        self.register_buffer('_gx', gx)
+        self.register_buffer('_gu', gu)
+        self.register_buffer('_g', g)
 
     def forward(self, state, input):
         r'''
@@ -170,10 +180,6 @@ class LinCon(Constraint):
         '''
         return self._gx
 
-    @gx.setter
-    def gx(self, gx):
-        self._gx = gx
-
     @property
     def gu(self):
         r'''
@@ -181,17 +187,9 @@ class LinCon(Constraint):
         '''
         return self._gu
 
-    @gu.setter
-    def gu(self, gu):
-        self._gu = gu
-
     @property
     def g(self):
         r'''
         Constant :obj:`g`
         '''
         return self._g
-
-    @g.setter
-    def g(self, g):
-        self._g = g

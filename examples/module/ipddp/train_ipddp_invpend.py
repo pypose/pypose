@@ -40,6 +40,7 @@ def main():
                           [-1., 0.]],
                           device=device)
     n_batch = state.shape[0]
+    input_all = 0.02*torch.ones(n_batch,    T,  nc, device=device)
 
     assert expert_seed != args.seed
     torch.manual_seed(expert_seed)
@@ -67,13 +68,6 @@ def main():
     torch.manual_seed(args.seed)
     param = torch.Tensor([8.0]).to(device).requires_grad_()
 
-    state_all =      torch.zeros(n_batch, T+1,  ns, device=device)
-    input_all = 0.02*torch.ones(n_batch,    T,  nc, device=device)
-    state_all[...,0,:] = state
-
-    init_traj = {'state': state_all,
-                 'input': input_all}
-
     fname = os.path.join(args.save, 'pypose losses.csv')
     loss_f = open(fname, 'w')
     loss_f.write('im_loss,mse\n')
@@ -92,13 +86,11 @@ def main():
             stage_cost = pp.module.QuadCost(Q[batch_id:batch_id+1], R[batch_id:batch_id+1], S[batch_id:batch_id+1], c[batch_id:batch_id+1])
             terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
             lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
-            init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1],
-                                'input': init_traj['input'][batch_id:batch_id+1]}
-            _ipddp_list[batch_id] = IPDDP(sys_, stage_cost, terminal_cost, lincon,
-                                    gx.shape[-2], init_traj_sample)
+            _ipddp_list[batch_id] = IPDDP(sys_, stage_cost, terminal_cost, lincon, T, B=(1,))
             # detached version to solve the best traj
+            x_init, u_init = state[batch_id:batch_id+1], input_all[batch_id:batch_id+1]
             with torch.no_grad():
-                _fp_best_list[batch_id] = _ipddp_list[batch_id].solver()
+                _fp_best_list[batch_id] = _ipddp_list[batch_id].solver(x_init, u_init)
 
         x_pred, u_pred, _ = _ipddp_list[0].forward(_fp_best_list) # call any one class instantiation, but perform batch grad computation
         print('x_pred solved')
@@ -109,10 +101,9 @@ def main():
             stage_cost = pp.module.QuadCost(Q[batch_id:batch_id+1], R[batch_id:batch_id+1], S[batch_id:batch_id+1], c[batch_id:batch_id+1])
             terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
             lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
-            init_traj_sample = {'state': init_traj['state'][batch_id:batch_id+1],
-                                'input': init_traj['input'][batch_id:batch_id+1]}
-            ipddp_list[batch_id] = IPDDP(sys, stage_cost, terminal_cost, lincon, init_traj_sample)
-            fp_list[batch_id] = ipddp_list[batch_id].solver()
+            ipddp_list[batch_id] = IPDDP(sys, stage_cost, terminal_cost, lincon, T, B=(1,))
+            x_init, u_init = state[batch_id:batch_id+1], input_all[batch_id:batch_id+1]
+            fp_list[batch_id] = ipddp_list[batch_id].solver(x_init, u_init)
         x_true, u_true = torch.cat([fp_list[batch_id].x for batch_id in range(n_batch)],dim=0), \
                          torch.cat([fp_list[batch_id].u for batch_id in range(n_batch)],dim=0)
         print('x_true solved')
