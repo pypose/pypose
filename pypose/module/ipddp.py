@@ -316,8 +316,6 @@ class IPDDP(nn.Module):
 
             self.reg = torch.clamp(self.reg, torch.tensor([0.], **self.dargs), torch.tensor([24.], **self.dargs))
 
-            # recompute the first, second derivatives of the updated trajectory
-            if not self.fp_failed: self.getDerivatives()
             V, v = self.pxx, self.px
         else:
             V, v = self.Qxx_terminal, self.Qx_terminal
@@ -501,6 +499,8 @@ class IPDDP(nn.Module):
 
         for iter in range(self.maxiter):
             while True:
+                # recompute the first, second derivatives of the updated trajectory
+                if not self.fp_failed: self.getDerivatives()
                 self.backwardpasscompact()
                 if not self.bp_failed:
                     break
