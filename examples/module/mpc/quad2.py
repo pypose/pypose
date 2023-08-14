@@ -2,6 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import pypose as pp
 from pypose.function import bmv
+import numpy as np
 
 class Quad(pp.module.NLS):
     """
@@ -62,9 +63,9 @@ class Quad(pp.module.NLS):
 def visualize(system, traj, controls):
 
 
-    fig, axs = plt.subplots(4, 3, figsize=(18, 6))
+    #fig, axs = plt.subplots(4, 3, figsize=(18, 6))
 
-    axs[0, 0].plot(traj[:, 9], label='x')
+    """ axs[0, 0].plot(traj[:, 9], label='x')
     axs[0, 1].plot(traj[:, 10], label='y')
     axs[0, 2].plot(traj[:, 11], label='z')
     axs[1, 0].plot(traj[:, 0], label='roll')
@@ -88,9 +89,39 @@ def visualize(system, traj, controls):
     axs[2, 2].set_title('vz')
     axs[3, 0].set_title('wx')
     axs[3, 1].set_title('wy')
-    axs[3, 2].set_title('wz')
+    axs[3, 2].set_title('wz') """
 
-    fig.suptitle('states', fontsize=16)
+    fig, axs = plt.subplots(1, 3, figsize=(10,4))
+
+    #axs[0].plot(np.radians(traj[:, 0]), label='roll')
+    #axs[1].plot(np.radians(traj[:, 1]), label='pitch')
+    #axs[2].plot(np.radians(traj[:, 2]), label='yaw')
+
+    axs[0].plot(np.arange(traj.size(0)) * system._tau, np.radians(traj[:, 0]))
+    axs[1].plot(np.arange(traj.size(0)) * system._tau, np.radians(traj[:, 1]))
+    axs[2].plot(np.arange(traj.size(0)) * system._tau, np.radians(traj[:, 2]))
+
+    axs[0].set_title('roll')
+    axs[1].set_title('pitch')
+    axs[2].set_title('yaw')
+
+    axs[0].set_xlabel('Time(s)')
+    axs[1].set_xlabel('Time(s)')
+    axs[2].set_xlabel('Time(s)')
+
+    axs[0].set_ylabel('radian(rad)')
+    axs[1].set_ylabel('radian(rad)')
+    axs[2].set_ylabel('radian(rad)')
+
+    axs[0].grid(True)
+    axs[1].grid(True)
+    axs[2].grid(True)
+
+    axs[0].grid(which='major', alpha=0.5, linestyle='-')
+    axs[1].grid(which='major', alpha=0.5, linestyle='-')
+    axs[2].grid(which='major', alpha=0.5, linestyle='-')
+
+    """ fig.suptitle('states', fontsize=16)
 
     fig, axs = plt.subplots(2, 2, figsize=(18, 6))
 
@@ -104,9 +135,9 @@ def visualize(system, traj, controls):
     axs[1, 0].set_title('my')
     axs[1, 1].set_title('mz')
 
-    fig.suptitle('inputs', fontsize=16)
+    fig.suptitle('inputs', fontsize=16) """
 
-    fig = plt.figure(figsize=(10, 8))
+    fig = plt.figure(figsize=(8, 8))
     ax = fig.add_subplot(111, projection='3d')
 
     x = traj[:, 9]
@@ -121,6 +152,8 @@ def visualize(system, traj, controls):
 
     ax.scatter(0., 4., -9., color='red', s=50, label='Goal Position')
 
+    ax.legend()
+
     plt.show(block=False)
 
 
@@ -133,7 +166,7 @@ if __name__ == '__main__':
 
     x_init = torch.tensor([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 3.5, -8.]], requires_grad=False)
     x_goal = torch.tensor([[0., 0., 0., 0., 0., 0.,
-                            0., 0., 0., 0, 4.0, -9.]], requires_grad=False)
+                            0., 0., 0., 0, 4., -9.]], requires_grad=False)
 
     u_init = torch.tile(torch.tensor([9.8, 0.0, 0.0, 0.0]), (n_batch, T, 1))
 
@@ -151,7 +184,7 @@ if __name__ == '__main__':
     stepper = pp.utils.ReduceToBason(steps=3, verbose=False)
     MPC = pp.module.MPC(dynamics, Q, p, T, stepper=stepper)
 
-    N = 30
+    N = 200
 
     xt = x_init
 
