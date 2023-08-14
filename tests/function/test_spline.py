@@ -16,21 +16,20 @@ class TestSpline:
         poses = pp.bspline(data, 0.5)
         assert poses.lshape[-1] == 2 * (data.lshape[-1]-3)+1
         poses = pp.bspline(data, 0.5, True)
-
         pp.testing.assert_lietensor_close(poses[...,[0,-1],:],
                                           data[...,[0,-1],:])
         # test for high dimension
         data = pp.randn_SE3(2,3,4, device=device)
-        poses = pp.bspline(data, 0.20)
+        poses = pp.bspline(data, 0.2)
         assert poses.lshape[-1] == 5 * (data.lshape[-1]-3)+1
-        poses = pp.bspline(data, 20, True)
+        poses = pp.bspline(data, 0.2, True)
         pp.testing.assert_lietensor_close(poses[...,[0,-1],:],
                                           data[...,[0,-1],:])
 
         data = pp.randn_SE3(2,3,4, device=device)
         poses = pp.bspline(data, 0.3)
         assert poses.lshape[-1] == 4 * (data.lshape[-1]-3)+1
-        poses = pp.bspline(data, 20, True)
+        poses = pp.bspline(data, 0.3, True)
         pp.testing.assert_lietensor_close(poses[...,[0,-1],:],
                                           data[...,[0,-1],:])
 
