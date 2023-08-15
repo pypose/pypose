@@ -71,17 +71,23 @@ def visualize(system, traj):
     x = traj[:, 0]
     y = traj[:, 1]
 
-    ax.plot(x, y, alpha=0.3, c='b')
+    ax.plot(x, y, alpha=0.3, c='b', linewidth=2.2)
 
     ax.set_xlim(min(x)-1., max(x)+1.)
     ax.set_ylim(min(y)-1., max(y)+1.)
 
-    ax.set_xlabel('x(m)')
-    ax.set_ylabel('y(m)')
+    ax.set_xlabel('x(m)', fontsize=16)
+    ax.set_ylabel('y(m)', fontsize=16)
 
-    ax.scatter(1.5, 1.5, color='red', label='Goal Position')
+    ax.scatter(1.5, 1.5, color='red', label='Goal Position', s=100)
+    ax.legend(fontsize=16)
 
-    ax.legend()
+    for label in ax.legend().get_texts():
+        label.set_fontsize(16)
+
+
+    ax.tick_params(axis='both', which='major', labelsize=16)
+
     ax.grid(True)
     ax.grid(which='major', alpha=0.5, linestyle='-')
 
