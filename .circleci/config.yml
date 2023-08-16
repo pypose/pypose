@@ -135,13 +135,13 @@ jobs:
           at: .
       - run:
           name: Setup tests
+          no_output_timeout: 60m
           command: |
             pip install dist/pypose-*.whl
             mkdir pytest-results
             pytest --junitxml=pytest-results/junit.xml
       - store_test_results:
           path: pytest-results
-      no_output_timeout: 60m
 
 ##############################################################################
 # Workflows
