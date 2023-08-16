@@ -157,52 +157,52 @@ class TestOptim:
     #     print('Lambda true:\n', mu)
     #     print('tau true:\n', tau)
 
-    # def test_lietensor(self):
-    #     class PoseInvConstrained(nn.Module):
-    #         def __init__(self, *dim) -> None:
-    #             super().__init__()
-    #             self.pose = pp.Parameter(pp.randn_so3(*dim))
+    def test_lietensor(self):
+        class PoseInvConstrained(nn.Module):
+            def __init__(self, *dim) -> None:
+                super().__init__()
+                self.pose = pp.Parameter(pp.randn_so3(*dim))
                 
-    #         def objective(self, inputs):
-    #             result = (self.pose.Exp() @ input).matrix() - torch.eye(3)
-    #             return torch.norm(result)
-    #             # return result
+            def objective(self, inputs):
+                result = (self.pose.Exp() @ input).matrix() - torch.eye(3)
+                return torch.norm(result)
+                # return result
 
-    #         def constrain(self, inputs):
-    #             fixed_euler_angles = np.array([[0.0, 0.0, 0.0]])
-    #             fixed_quaternion = pp.euler2SO3(fixed_euler_angles).to(torch.float)
-    #             quaternion = self.pose.Exp()
-    #             difference_quaternions = torch.sub(quaternion, fixed_quaternion)
-    #             distance = torch.norm(difference_quaternions, p=2, dim=1)
-    #             d_fixed = 0.35
-    #             constraint_violation = distance - d_fixed
-    #             return constraint_violation
+            def constrain(self, inputs):
+                fixed_euler_angles = np.array([[0.0, 0.0, 0.0]])
+                fixed_quaternion = pp.euler2SO3(fixed_euler_angles).to(torch.float)
+                quaternion = self.pose.Exp()
+                difference_quaternions = torch.sub(quaternion, fixed_quaternion)
+                distance = torch.norm(difference_quaternions, p=2, dim=1)
+                d_fixed = 0.35
+                constraint_violation = distance - d_fixed
+                return constraint_violation
 
-    #         def forward(self, inputs):
-    #             return self.objective(inputs), self.constrain(inputs)
+            def forward(self, inputs):
+                return self.objective(inputs), self.constrain(inputs)
 
-    #     euler_angles = np.array([[0.0, 0.0, np.pi/4]])
-    #     quaternion = pp.euler2SO3(euler_angles).to(torch.float)
-    #     input = pp.SO3(quaternion).to(device)
+        euler_angles = np.array([[0.0, 0.0, np.pi/4]])
+        quaternion = pp.euler2SO3(euler_angles).to(torch.float)
+        input = pp.SO3(quaternion).to(device)
         
-    #     posnet = PoseInvConstrained(1).to(device)
-    #     inner_optimizer = torch.optim.SGD(posnet.parameters(), lr=1e-2, momentum=0.9)
-    #     inner_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
-    #     optimizer = ALM(model=posnet, inner_optimizer=inner_optimizer, inner_scheduler=inner_scheduler, inner_iter=400, penalty_safeguard=1e3)
+        posnet = PoseInvConstrained(1).to(device)
+        inner_optimizer = torch.optim.SGD(posnet.parameters(), lr=1e-2, momentum=0.9)
+        inner_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
+        optimizer = ALM(model=posnet, inner_optimizer=inner_optimizer, inner_scheduler=inner_scheduler, inner_iter=400, penalty_safeguard=1e3)
 
-    #     for idx in range(20):
-    #         loss, lmd, = optimizer.step(input)
-    #         if optimizer.terminate:
-    #             break
-    #     print('-----------optimized result----------------')
-    #     decimal_places = 4
-    #     print("Lambda:",lmd)
-    #     print('x axis:', np.around(posnet.pose.detach().numpy(), decimals=decimal_places))
-    #     print('f(x):', posnet.objective(input))
-    #     print('final violation:', posnet.constrain(input))
+        for idx in range(20):
+            loss, lmd, = optimizer.step(input)
+            if optimizer.terminate:
+                break
+        print('-----------optimized result----------------')
+        decimal_places = 4
+        print("Lambda:",lmd)
+        print('x axis:', np.around(posnet.pose.detach().numpy(), decimals=decimal_places))
+        print('f(x):', posnet.objective(input))
+        print('final violation:', posnet.constrain(input))
     
 if __name__ == "__main__":
     test = TestOptim()
     test.test_tensor()
     # test.test_tensor_complex()
-    # test.test_lietensor()
+    test.test_lietensor()
