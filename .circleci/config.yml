@@ -141,7 +141,7 @@ jobs:
             pytest --junitxml=pytest-results/junit.xml
       - store_test_results:
           path: pytest-results
-      timeout: 120m
+      no_output_timeout: 60m
 
 ##############################################################################
 # Workflows
