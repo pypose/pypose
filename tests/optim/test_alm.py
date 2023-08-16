@@ -1,11 +1,11 @@
 import torch
-import time
 import numpy as np
 import pypose as pp
 from torch import nn
 import numpy as np
 from pypose.optim import ALM
 from torch import matmul as mult
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class LQR_Solver(torch.nn.Module):
     def __init__(self) -> None:
@@ -48,41 +48,6 @@ class LQR_Solver(torch.nn.Module):
 
         return tau_star, mu_star
 
-class Timer:
-    def __init__(self):
-        self.synchronize()
-        self.start_time = time.time()
-    
-    def synchronize(self):
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()  
-
-    def tic(self):
-        self.start()
-
-    def show(self, prefix="", output=True):
-        self.synchronize()
-        duration = time.time()-self.start_time
-        if output:
-            print(prefix+"%fs" % duration)
-        return duration
-
-    def toc(self, prefix=""):
-        self.end()
-        print(prefix+"%fs = %fHz" % (self.duration, 1/self.duration))
-        return self.duration
-
-    def start(self):
-        self.synchronize()
-        self.start_time = time.time()
-
-    def end(self, reset=True):
-        self.synchronize()
-        self.duration = time.time()-self.start_time
-        if reset:
-            self.start_time = time.time()
-        return self.duration
-
 def test_tensor():
     class TensorModel(nn.Module):
         def __init__(self, *dim) -> None:
@@ -100,7 +65,6 @@ def test_tensor():
 
         def forward(self, inputs):
             return self.objective(inputs), self.constrain(inputs)
-    device = torch.device("cpu")
     input = None
     TensorNet = TensorModel(5).to(device)
 
@@ -155,7 +119,6 @@ def test_tensor_complex():
         def forward(self, inputs):
             return self.objective(inputs), self.constrain(inputs)
 
-    device = torch.device("cpu")
     torch.manual_seed(6)
     n_state = 3
     n_ctrl = 3
@@ -176,14 +139,12 @@ def test_tensor_complex():
     inner_optimizer = torch.optim.SGD(InnerNet.parameters(), lr=1e-2, momentum=0.9)
     inner_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
     optimizer = ALM(model=InnerNet, inner_optimizer=inner_optimizer, inner_scheduler=inner_scheduler, object_decrease_tolerance=1e-7, inner_iter=300)
-    timer = Timer()
 
     for idx in range(100):
         loss, lmd, = optimizer.step(input)
         if optimizer.terminate:
             break
     print('-----------optimized result----------------')
-    print('Done', timer.toc())
     print('object f(x):', InnerNet.objective(input))
     print('final violation:\n', torch.norm(InnerNet.constrain(input)))
     print("Lambda*:\n", lmd)
@@ -217,7 +178,6 @@ def test_lietensor():
         def forward(self, inputs):
             return self.objective(inputs), self.constrain(inputs)
 
-    device = torch.device("cpu")
     euler_angles = np.array([[0.0, 0.0, np.pi/4]])
     quaternion = pp.euler2SO3(euler_angles).to(torch.float)
     input = pp.SO3(quaternion)
@@ -239,6 +199,6 @@ def test_lietensor():
     print('final violation:', posnet.constrain(input))
     
 if __name__ == "__main__":
-    test_tensor()
-    test_tensor_complex()
+    # test_tensor()
+    # test_tensor_complex()
     test_lietensor()
