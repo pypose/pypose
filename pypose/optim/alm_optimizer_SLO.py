@@ -20,26 +20,25 @@ class _Unconstrained_Model(nn.Module):
         pf = self.pf * pnf_update_step
         self.pf = pf if pf < safe_guard else safe_guard
         
-    def forward(self, input=None, target=None):
+    def forward(self, inputs=None, target=None):
 
+        R, C = self.model(inputs)
         self.lmd = self.lmd if hasattr(self, 'lmd') \
-                else torch.zeros((self.model.constrain(input).shape[0], ))
-        R = self.model.inner_cost(input)
-
-        C = self.model.constrain(input)
+                else torch.zeros((C.shape[0], ))
+        
         penalty_term = torch.square(torch.norm(C))
         L = R + (self.lmd @ C) + self.pf * penalty_term / 2
         return L
 
 ############
     # Update Needed Parameters:
-    #   1. model params: \thetta, update with SGD
+    #   1. model params: \theta, update with SGD
     #   2. lambda multiplier: \lambda, \lambda_{t+1} = \lambda_{t} + pf * error_C 
     #   3. penalty factor(Optional): update_para * penalty factor
 class AugmentedLagrangianMethod(_Optimizer):
-    def __init__(self, model, penalty_factor=1, penalty_safeguard=1e5, \
-                       penalty_update_factor=2, object_decrease_tolerance=1e-6, violation_tolerance=1e-6, momentum=0.9, \
-                       decrease_rate=0.9, min=1e-6, max=1e32, inner_scheduler=None, inner_iter=400, learning_rate=1e-2):      
+    def __init__(self, model, inner_optimizer, inner_scheduler=None, penalty_factor=1, penalty_safeguard=1e5, \
+                       penalty_update_factor=2, object_decrease_tolerance=1e-6, violation_tolerance=1e-6, \
+                       decrease_rate=0.9, min=1e-6, max=1e32, inner_iter=400):      
         defaults = {**{'min':min, 'max':max}}
         super().__init__(model.parameters(), defaults=defaults)
         #### choose your own optimizer for unconstrained opt.        
@@ -57,38 +56,37 @@ class AugmentedLagrangianMethod(_Optimizer):
         self.violation_tolerance = violation_tolerance
         self.object_decrease_tolerance = object_decrease_tolerance
        
-        self.alm_model = _Unconstrained_Model(self.model, penalty_factor=penalty_factor) 
-        self.optim = torch.optim.SGD(self.alm_model.parameters(), lr=learning_rate, momentum=momentum)
+        self.alm_model = _Unconstrained_Model(self.model, penalty_factor=penalty_factor)
+        self.optim = inner_optimizer
         self.scheduler = inner_scheduler
-        if inner_scheduler:
-            self.scheduler.optimizer = self.optim
-        # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optim, step_size=scl_step_size, gamma=scl_gamma)
 
 
     #### f(x) - y = loss_0, f(x) + C(x) - 0 - y 
-    def step(self, input=None):     
+    def step(self, inputs=None): 
+        inner_cost, constrain = self.model(inputs)
         self.best_violation = self.best_violation if hasattr(self, 'best_violation') \
-        else torch.norm(self.model.constrain(input=input))
+            else torch.norm(constrain)
+        self.last_object_value = inner_cost
 
         self.last = self.loss = self.loss if hasattr(self, 'loss') \
-                                    else self.alm_model(input)  
-        self.last_object_value = self.model.inner_cost(input)
+                                    else self.alm_model(inputs)  
+        
         for _ in range(self.inner_iter):
             self.optim.zero_grad()
-            self.loss = self.alm_model(input)
-            self.loss.backward() 
+            self.loss = self.alm_model(inputs)
+            self.loss.backward()
             self.optim.step()
         if self.scheduler:
             self.scheduler.step()
             
         with torch.no_grad():
-            violation = self.model.constrain(input)
-            self.log_generation(alm_model=self.alm_model, violation=violation,\
-             inputs=input, last_object_value=self.last_object_value)
+            object_value, violation = self.model(inputs)
+            self.log_generation(alm_model=self.alm_model, violation=violation, \
+                                last_object_value=self.last_object_value, object_value=object_value)
             
             if torch.norm(violation) <= torch.norm(self.best_violation) * self.decrease_rate:
 
-                if torch.norm(self.last_object_value-self.alm_model.model.inner_cost(input=input)) <= self.object_decrease_tolerance \
+                if torch.norm(self.last_object_value-object_value) <= self.object_decrease_tolerance \
                     and torch.norm(violation) <= self.violation_tolerance:
                     print("found optimal")
                     self.terminate = True
@@ -101,13 +99,12 @@ class AugmentedLagrangianMethod(_Optimizer):
             else:
                 self.alm_model.update_penalty_factor(self.pf_rate, self.pf_safeguard)
             
-
         return self.loss, self.alm_model.lmd
 
-    def log_generation(self, alm_model, violation, inputs, last_object_value):
+    def log_generation(self, alm_model, violation, last_object_value, object_value):
         print('--------------------NEW-ALM-EPOCH-------------------')
         print('current_lambda: ', alm_model.lmd)
-        print('parameters: ', alm_model.model.parameters())
-        print('object_loss:', self.alm_model.model.inner_cost(inputs))
+        # print('parameters: ', alm_model.model.parameters())
+        print('object_loss:', object_value)
         print('absolute violation:', torch.norm(violation))
-        print("object_loss_decrease", torch.norm(last_object_value-alm_model.model.inner_cost(inputs)))
+        print("object_loss_decrease", torch.norm(last_object_value-object_value))
