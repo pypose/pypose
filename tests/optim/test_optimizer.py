@@ -31,7 +31,10 @@ class Timer:
 
     def toc(self, prefix=""):
         self.end()
-        print(prefix+"%fs = %fHz" % (self.duration, 1/self.duration))
+        if self.duration > 0:
+            print(prefix+"%fs = %fHz" % (self.duration, 1/self.duration))
+        else:
+            print('INVALID Duration')
         return self.duration
 
     def start(self):
