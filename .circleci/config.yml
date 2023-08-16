@@ -135,7 +135,6 @@ jobs:
           at: .
       - run:
           name: Setup tests
-          no_output_timeout: 60m
           command: |
             pip install dist/pypose-*.whl
             mkdir pytest-results
