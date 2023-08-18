@@ -51,7 +51,7 @@ class ReprojErrDataset(Dataset):
         return image1, image2, pts1_z, pts1, pts2, gt_motion
 
 
-def select_points(image: torch.Tensor):
+def select_points(image: torch.Tensor, num_point: int = 100):
     image_grad = torch.nn.functional.conv2d(
         image.unsqueeze(dim=0),
         torch.tensor(
@@ -62,23 +62,22 @@ def select_points(image: torch.Tensor):
     image_grad_avg = image_grad.mean(dim=(1, 2), keepdim=True)
     image_grad_std = image_grad.std(dim=(1, 2), keepdim=True)
     # Positions with sufficient gradient (feature) > +3std
-    selected_points = image_grad > image_grad_avg + 3. * image_grad_std
-    border_mask = torch.zeros_like(selected_points)
+    points = image_grad > image_grad_avg + 3. * image_grad_std
+    border_mask = torch.zeros_like(points)
     border_mask[..., 5:-5, 5:-5] = 1.
 
-    result_points = selected_points * border_mask
-    indices = torch.nonzero(result_points, as_tuple=False)
+    points = points * border_mask
+    selected_points = torch.nonzero(points, as_tuple=False)
 
-    # Randomly select points, only take 100 points
-    perm = torch.randperm(indices.shape[0])[:100]
-    # .roll(...): vu -> uv coordinate
-    pts_uv = indices[perm][..., 1:].roll(shifts=1, dims=[1])
+    # Randomly select points
+    perm = torch.randperm(selected_points.shape[0])[:num_point]
+    # vu -> uv coordinate
+    pts_uv = selected_points[perm][..., 1:].roll(shifts=1, dims=[1])
     return pts_uv
 
 
 def match_points(pts1: torch.Tensor, flow: torch.Tensor):
-    delta_uv = flow[..., pts1[..., 1], pts1[..., 0]]
-    return pts1 + delta_uv.T
+    return pts1 + flow[..., pts1[..., 1], pts1[..., 0]].T
 
 
 def visualize_image(img: torch.Tensor):
@@ -120,6 +119,4 @@ def report_pose_error(curr_pose: pp.SE3, gt_pose: pp.SE3):
     _err = (curr_pose.Inv() * gt_pose)
     _err_rot = _err.rotation().Log().norm(dim=-1).item() * (180 / np.pi)
     _err_trans = _err.translation().norm(dim=-1).item()
-    _err_rot = round(_err_rot, 4)
-    _err_trans = round(_err_trans, 4)
-    print(f"Err Rot (deg) - {_err_rot} | Err Trans (m) - {_err_trans}")
+    print(f"Err Rot (deg) - {round(_err_rot, 4)} | Err Trans (m) - {round(_err_trans, 4)}")

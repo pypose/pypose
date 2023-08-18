@@ -54,6 +54,10 @@ if __name__ == "__main__":
                         help="Device to run optimization (cuda / cpu)")
     parser.add_argument("--vectorize", action="store_true", default=False,
                         help="Vectorize when optimizing reprojerr graph.")
+    parser.add_argument("--dnoise", default=0.1, type=float,
+                        help="Noise level of the depth")
+    parser.add_argument("--pnoise", default=0.1, type=float,
+                        help="Noise level of the pose")
     args = parser.parse_args()
     dataroot = Path(args.dataroot)
     device, vectorize = args.device, args.vectorize
@@ -63,8 +67,8 @@ if __name__ == "__main__":
 
     for img1, img2, depth, pts1, pts2, gt_motion in dataset:
         # Noisy initial pose and depth  noise ~ N(avg=0, std=.1)
-        init_T = (gt_motion * pp.randn_SE3(sigma=.1)).to(device)
-        depth = depth + torch.randn_like(depth) * .1
+        init_T = (gt_motion * pp.randn_SE3(sigma=args.pnoise)).to(device)
+        depth = depth + torch.randn_like(depth) * args.dnoise
 
         print('Initial Motion Error:')
         report_pose_error(init_T, gt_motion.to(device))
@@ -92,8 +96,8 @@ if __name__ == "__main__":
         print('\tFinal graph error:', graph.error())
         ########################################################################
 
-        final_T = pp.SE3(graph.T.data.detach())
+        optimized_T = pp.SE3(graph.T.data.detach())
 
         print('Optimized Motion Error')
-        report_pose_error(final_T, gt_motion.to(device))
+        report_pose_error(optimized_T, gt_motion.to(device))
         print("\n\n")
