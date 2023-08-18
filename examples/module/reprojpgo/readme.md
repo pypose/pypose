@@ -23,11 +23,14 @@ python examples/module/reprojpgo/reprojpgo.py --device cuda --vectorize
 ```
 
 * Other supported arguments:
+  ```
+    Pose Graph Optimization
 
-        Pose Graph Optimization
-
-        optional arguments:
-          -h, --help           show this help message and exit
-          --device DEVICE      cuda or cpu (default: cuda)
-          --dataroot DATAROOT  dataset location (default: ./data/Reprojerr_Example)
-          --vectorize          to accelerate computation (will use more RAM)
+    optional arguments:
+      -h, --help           show this help message and exit
+      --dataroot DATAROOT  dataset location (default: ./data/Reprojerr_Example)
+      --device DEVICE      cuda or cpu (default: cuda)
+      --vectorize          to accelerate computation (will use more RAM)
+      --dnoise DEPTH_NOISE noise level on point depth (default: 0.1)
+      --pnoise POSE_NOISE  noise level on initial pose (default: 0.1)
+  ```
