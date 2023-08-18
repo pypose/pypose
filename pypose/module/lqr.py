@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from .. import bmv, bvmv
-from torch.linalg import lstsq, vecdot
+from torch.linalg import cholesky, vecdot
 
 
 class LQR(nn.Module):
@@ -345,8 +345,9 @@ class LQR(nn.Module):
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
             qx, qu = qt[..., :ns], qt[..., ns:]
 
-            K[...,t,:,:] = Kt = -lstsq(Quu, Qux).solution
-            k[...,t,:] = kt = -lstsq(Quu, qu.unsqueeze(-1)).solution.squeeze(-1)
+            L = cholesky(Quu)
+            K[...,t,:,:] = Kt = -torch.cholesky_solve(Qux, L)
+            k[...,t,:] = kt = -torch.cholesky_solve(qu.unsqueeze(-1), L).squeeze(-1)
 
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
             v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
