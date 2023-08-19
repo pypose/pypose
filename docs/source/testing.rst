@@ -8,4 +8,4 @@ Testing
    :nosignatures:
 
    :template: autosummary/class-no-inherit.rst
-   testing.assert_lietensor_close
+   testing.assert_close
