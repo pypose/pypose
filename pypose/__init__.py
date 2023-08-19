@@ -18,6 +18,7 @@ from .function import *
 from .basics import *
 from . import module
 from . import optim
+from . import testing
 
 
 min_torch = '2.0'
