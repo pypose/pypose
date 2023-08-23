@@ -4,9 +4,6 @@ import pypose as pp
 from pypose.function import bmv
 
 class Quad(pp.module.NLS):
-    """
-    A simple 2D navigation model for testing MPPI on non-linear system
-    """
 
     def __init__(self, dt, J, mass=1.0, gravity=9.81):
         super().__init__()
