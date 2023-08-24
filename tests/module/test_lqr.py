@@ -1,7 +1,6 @@
 import torch, pypose as pp
 
 
-
 class TestLQR:
 
     def test_lqr_linear(self, device='cpu'):
@@ -160,3 +159,4 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     test.test_lqr_linear(device)
     test.test_lqr_ltv(device)
+    
