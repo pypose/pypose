@@ -325,7 +325,6 @@ class LQR(nn.Module):
         As = vmap(jacoA, in_dims=(1, 1))(states, inputs)
         Bs = vmap(jacoB, in_dims=(1, 1))(states, inputs)
         return As, Bs
-    
 
     def lqr_backward(self, x_init, dt, u_traj=None, u_lower=None, u_upper=None, du=None):
 
@@ -360,8 +359,8 @@ class LQR(nn.Module):
                                          input=self.u_traj[...,t,:],
                                          t=torch.tensor(t*dt))
                 if self.is_TI:
-                    A = torch.stack([As[t,0,:,0], As[t,1,:,1]], dim = 0)
-                    B = torch.stack([Bs[t,0,:,0], Bs[t,1,:,1]], dim = 0)
+                    A = torch.stack([As[t, i, :, i] for i in range(As.shape[1])], dim=0)
+                    B = torch.stack([Bs[t, i, :, i] for i in range(Bs.shape[1])], dim=0)
                 else:
                     A = self.system.A.squeeze(-2)
                     B = self.system.B.squeeze(-2)
