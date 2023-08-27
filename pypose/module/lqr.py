@@ -283,7 +283,7 @@ class LQR(nn.Module):
         assert self.Q.dtype == self.p.dtype, "Tensor data type not compatible."
         self.dargs = {'dtype': self.p.dtype, 'device': self.p.device}
 
-    def forward(self, x_init, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
+    def forward(self, x_init, dt=1, x_target=None, u_traj=None, u_lower=None, u_upper=None, du=None):
         r'''
         Performs LQR for the discrete system.
 
@@ -305,8 +305,8 @@ class LQR(nn.Module):
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
             associated quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
-        K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
-        x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
+        K, k = self.lqr_backward(x_init, dt, x_target, u_traj, u_lower, u_upper, du)
+        x, u, cost = self.lqr_forward(x_init, K, k, x_target, u_lower, u_upper, du)
         return x, u, cost
 
     def getmat(self):
@@ -326,7 +326,7 @@ class LQR(nn.Module):
         Bs = vmap(jacoB, in_dims=(1, 1))(states, inputs)
         return As, Bs
 
-    def lqr_backward(self, x_init, dt, u_traj=None, u_lower=None, u_upper=None, du=None):
+    def lqr_backward(self, x_init, dt, x_target=None, u_traj=None, u_lower=None, u_upper=None, du=None):
 
         ns, nsc = x_init.size(-1), self.p.size(-1)
         nc = nsc - ns
@@ -345,7 +345,11 @@ class LQR(nn.Module):
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
 
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
+        xu_target = torch.zeros((self.n_batch[0], nsc))
+        if x_target is not None:
+            xu_target[:, :ns] = x_target
         p = bmv(self.Q, xut) + self.p
+        p[:,-1,:] = bmv(self.Q[:,-1,...], xut[:,-1,:]-xu_target)
 
         if self.is_TI:
             As, Bs = self.getmat()
@@ -381,7 +385,7 @@ class LQR(nn.Module):
 
         return K, k
 
-    def lqr_forward(self, x_init, K, k, u_lower=None, u_upper=None, du=None):
+    def lqr_forward(self, x_init, K, k, x_target=None, u_lower=None, u_upper=None, du=None):
 
         assert x_init.device == K.device == k.device
         assert x_init.dtype == K.dtype == k.dtype
