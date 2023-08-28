@@ -1,6 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 import pypose as pp
+import numpy as np
 
 class Simple2DNav(pp.module.NLS):
 
@@ -66,31 +67,38 @@ def visualize(system, traj):
 
         plt.pause(system._tau) """
 
-    fig, ax = plt.subplots(figsize=(8, 8))
+    fig, ax = plt.subplots(figsize=(9, 9))
 
     x = traj[:, 0]
     y = traj[:, 1]
 
-    ax.plot(x, y, alpha=0.3, c='b', linewidth=2.2)
+    ax.plot(x, y, alpha=0.3, c='b', linewidth=3.2)
 
     ax.set_xlim(min(x)-1., max(x)+1.)
     ax.set_ylim(min(y)-1., max(y)+1.)
 
-    ax.set_xlabel('x(m)', fontsize=16)
-    ax.set_ylabel('y(m)', fontsize=16)
+    ax.set_xlabel('x(m)', fontsize=26)
+    ax.set_ylabel('y(m)', fontsize=26)
 
-    ax.scatter(1.5, 1.5, color='red', label='Goal Position', s=100)
+    ax.scatter(1.5, 1.5, color='red', label='Goal Position', s=200)
     ax.legend(fontsize=16)
 
     for label in ax.legend().get_texts():
-        label.set_fontsize(16)
+        label.set_fontsize(26)
 
 
-    ax.tick_params(axis='both', which='major', labelsize=16)
+    ax.tick_params(axis='both', which='major', labelsize=26)
 
+    ax.set_aspect('equal')
     ax.grid(True)
     ax.grid(which='major', alpha=0.5, linestyle='-')
 
+    x_ticks_interval = 0.5
+    y_ticks_interval = 0.5
+    ax.set_xticks(np.arange(min(x)-1., max(x) + 1.1, x_ticks_interval))
+    ax.set_yticks(np.arange(min(y)-1., max(y) + 1., y_ticks_interval))
+
+    plt.savefig('/Users/anaishe/Desktop/dubin car traj grid.png', bbox_inches='tight')
     plt.show(block=False)
 
 
