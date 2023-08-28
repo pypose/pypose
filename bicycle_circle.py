@@ -1,7 +1,8 @@
 import torch
+import numpy as np
 import pypose as pp
-import matplotlib.pyplot as plt
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 dt = 0.1
 
@@ -24,12 +25,17 @@ class Bicycle(pp.module.NLS):
 
 def visualize_X(X, waypoints=None):
     X = torch.stack(X).detach().numpy()
-    plt.plot(X[:, 0], X[:, 1], 'o-')
+    plt.plot(X[:, 0], X[:, 1], 'o-', label='trajectory', zorder = 1, alpha = 0.5)
 
     waypoints = waypoints.detach().numpy()
     if waypoints is not None:
-        plt.plot(waypoints[:, 0], waypoints[:, 1], 'o-')
+        plt.scatter(waypoints[:, 0], waypoints[:, 1], color = "red", marker = "o", s = 100, label='waypoints', zorder = 3)
+        for waypoint in waypoints:
+            theta = np.arctan2(waypoint[3], waypoint[2])
+            plt.arrow(waypoint[0], waypoint[1], 1*np.cos(theta), 1*np.sin(theta), color='black', width=0.1, zorder = 2)
     plt.axis('equal')
+    plt.title('Bicycle trajectory')
+    plt.legend()
     plt.show()
 
 def main():
@@ -37,13 +43,35 @@ def main():
     T, max_iter = 7, 50
     dt = 0.1
     r = 5
-    thetas = torch.tensor([torch.pi/2+0.01, 0, -torch.pi/2, -torch.pi])
+    # thetas = torch.tensor([torch.pi/2, 0, -torch.pi/2, -torch.pi])
+    thetas = torch.tensor([torch.pi/2, torch.pi/4, 0, -torch.pi/4, -torch.pi/2, -torch.pi*3/4, -torch.pi, torch.pi*3/4, torch.pi/2, 
+                           torch.pi*3/4, torch.pi, -torch.pi*3/4, -torch.pi/2, -torch.pi/4, 0, torch.pi/4, torch.pi/2])
+    # waypoints = \
+    #     torch.tensor([[
+    #         [0, 0, thetas[0].cos(), thetas[0].sin()],
+    #         [r, r, thetas[1].cos(), thetas[1].sin()],
+    #         [2*r, 0, thetas[2].cos(), thetas[2].sin()],
+    #         [r, -r, thetas[3].cos(), thetas[3].sin()],
+    #         [0, 0, thetas[0].cos(), thetas[0].sin()]]], requires_grad=True)
+    sqrt2 = 2**0.5
     waypoints = \
         torch.tensor([[
             [0, 0, thetas[0].cos(), thetas[0].sin()],
-            [r, r, thetas[1].cos(), thetas[1].sin()],
-            [2*r, 0, thetas[2].cos(), thetas[2].sin()],
-            [r, -r, thetas[3].cos(), thetas[3].sin()],
+            [r-r/sqrt2, r/sqrt2, thetas[1].cos(), thetas[1].sin()],
+            [r, r, thetas[2].cos(), thetas[2].sin()],
+            [r+r/sqrt2, r/sqrt2, thetas[3].cos(), thetas[3].sin()],
+            [2*r, 0, thetas[4].cos(), thetas[4].sin()],
+            [r+r/sqrt2, -r/sqrt2, thetas[5].cos(), thetas[5].sin()],
+            [r, -r, thetas[6].cos(), thetas[6].sin()],
+            [r-r/sqrt2, -r/sqrt2, thetas[7].cos(), thetas[7].sin()],
+            [0, 0, thetas[8].cos(), thetas[8].sin()],
+            [r/sqrt2-r, r/sqrt2, thetas[9].cos(), thetas[9].sin()],
+            [-r, r, thetas[10].cos(), thetas[10].sin()],
+            [-r/sqrt2-r, r/sqrt2, thetas[11].cos(), thetas[11].sin()],
+            [-2*r, 0, thetas[12].cos(), thetas[12].sin()],
+            [-r/sqrt2-r, -r/sqrt2, thetas[13].cos(), thetas[13].sin()],
+            [-r, -r, thetas[14].cos(), thetas[14].sin()],
+            [r/sqrt2-r, -r/sqrt2, thetas[15].cos(), thetas[15].sin()],
             [0, 0, thetas[0].cos(), thetas[0].sin()]]], requires_grad=True)
 
     n_batch = 1
@@ -66,7 +94,7 @@ def main():
         target = waypoints[:, pt, :]
         
         for t in tqdm(range(max_iter)):
-            dx = target - xt
+            # dx = target - xt
             _, u_mpc, _ = MPC(dt, xt, target)
             u_mpc = torch.clamp(u_mpc, -5, 5)
             
