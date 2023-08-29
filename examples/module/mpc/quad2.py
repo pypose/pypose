@@ -5,9 +5,6 @@ from pypose.function import bmv
 import numpy as np
 
 class Quad(pp.module.NLS):
-    """
-    A simple 2D navigation model for testing MPPI on non-linear system
-    """
 
     def __init__(self, dt, J, mass=1.0, gravity=9.81):
         super().__init__()
@@ -63,9 +60,9 @@ class Quad(pp.module.NLS):
 def visualize(system, traj, controls):
 
 
-    #fig, axs = plt.subplots(4, 3, figsize=(18, 6))
+    """ fig, axs = plt.subplots(4, 3, figsize=(18, 6))
 
-    """ axs[0, 0].plot(traj[:, 9], label='x')
+    axs[0, 0].plot(traj[:, 9], label='x')
     axs[0, 1].plot(traj[:, 10], label='y')
     axs[0, 2].plot(traj[:, 11], label='z')
     axs[1, 0].plot(traj[:, 0], label='roll')
@@ -91,27 +88,27 @@ def visualize(system, traj, controls):
     axs[3, 1].set_title('wy')
     axs[3, 2].set_title('wz') """
 
-    fig, axs = plt.subplots(1, 3, figsize=(10,4))
+    fig, axs = plt.subplots(1, 3, figsize=(18,8))
 
     #axs[0].plot(np.radians(traj[:, 0]), label='roll')
     #axs[1].plot(np.radians(traj[:, 1]), label='pitch')
     #axs[2].plot(np.radians(traj[:, 2]), label='yaw')
 
-    axs[0].plot(np.arange(traj.size(0)) * system._tau, np.radians(traj[:, 0]))
-    axs[1].plot(np.arange(traj.size(0)) * system._tau, np.radians(traj[:, 1]))
-    axs[2].plot(np.arange(traj.size(0)) * system._tau, np.radians(traj[:, 2]))
+    axs[0].plot(np.arange(traj.size(0)) * system._tau, np.radians(traj[:, 0]), linewidth=3.2)
+    axs[1].plot(np.arange(traj.size(0)) * system._tau, np.radians(traj[:, 1]), linewidth=3.2)
+    axs[2].plot(np.arange(traj.size(0)) * system._tau, np.radians(traj[:, 2]), linewidth=3.2)
 
-    axs[0].set_title('roll')
-    axs[1].set_title('pitch')
-    axs[2].set_title('yaw')
+    axs[0].set_title('roll', fontsize=26)
+    axs[1].set_title('pitch', fontsize=26)
+    axs[2].set_title('yaw', fontsize=26)
 
-    axs[0].set_xlabel('Time(s)')
-    axs[1].set_xlabel('Time(s)')
-    axs[2].set_xlabel('Time(s)')
+    axs[0].set_xlabel('Time(s)', fontsize=26)
+    axs[1].set_xlabel('Time(s)', fontsize=26)
+    axs[2].set_xlabel('Time(s)', fontsize=26)
 
-    axs[0].set_ylabel('radian(rad)')
-    axs[1].set_ylabel('radian(rad)')
-    axs[2].set_ylabel('radian(rad)')
+    axs[0].set_ylabel('radian(rad)', fontsize=26)
+    axs[1].set_ylabel('radian(rad)', fontsize=26)
+    axs[2].set_ylabel('radian(rad)', fontsize=26)
 
     axs[0].grid(True)
     axs[1].grid(True)
@@ -120,6 +117,18 @@ def visualize(system, traj, controls):
     axs[0].grid(which='major', alpha=0.5, linestyle='-')
     axs[1].grid(which='major', alpha=0.5, linestyle='-')
     axs[2].grid(which='major', alpha=0.5, linestyle='-')
+
+    axs[0].tick_params(axis='x', labelsize=26)
+    axs[1].tick_params(axis='x', labelsize=26)
+    axs[2].tick_params(axis='x', labelsize=26)
+
+    axs[0].tick_params(axis='y', labelsize=26)
+    axs[1].tick_params(axis='y', labelsize=26)
+    axs[2].tick_params(axis='y', labelsize=26)
+
+    plt.subplots_adjust(wspace=1.4)
+
+    plt.tight_layout()
 
     """ fig.suptitle('states', fontsize=16)
 
@@ -137,22 +146,27 @@ def visualize(system, traj, controls):
 
     fig.suptitle('inputs', fontsize=16) """
 
-    fig = plt.figure(figsize=(8, 8))
+    fig = plt.figure(figsize=(9, 9))
     ax = fig.add_subplot(111, projection='3d')
 
     x = traj[:, 9]
     y = traj[:, 10]
     z = traj[:, 11]
 
-    ax.plot(x, y, z)
+    ax.plot(x, y, z, linewidth=3.2)
 
-    ax.set_xlabel('x(m)')
-    ax.set_ylabel('y(m)')
-    ax.set_zlabel('z(m)')
+    ax.set_xlabel('x(m)', fontsize=26, labelpad=26)
+    ax.set_ylabel('y(m)', fontsize=26, labelpad=26)
+    ax.set_zlabel('z(m)', fontsize=26, labelpad=26)
+    ax.tick_params(axis='x', labelsize=22)
+    ax.tick_params(axis='y', labelsize=22)
+    ax.tick_params(axis='z', labelsize=22)
 
-    ax.scatter(0., 4., -9., color='red', s=50, label='Goal Position')
+    ax.scatter(0., 4., -9., color='red', label='Goal Position', s=200)
 
-    ax.legend()
+    ax.legend( fontsize=26)
+    #plt.tight_layout()
+    plt.savefig('/Users/anaishe/Desktop/quadrotor traj.png')
 
     plt.show(block=False)
 
@@ -168,23 +182,23 @@ if __name__ == '__main__':
     x_goal = torch.tensor([[0., 0., 0., 0., 0., 0.,
                             0., 0., 0., 0, 4., -9.]], requires_grad=False)
 
-    u_init = torch.tile(torch.tensor([9.8, 0.0, 0.0, 0.0]), (n_batch, T, 1))
+    u_init = torch.tile(torch.tensor([9.81, 0.0, 0.0, 0.0]), (n_batch, T, 1))
 
     J = torch.tensor([[0.01466, 0., 0.],
                       [0., 0.01466, 0.],
                       [0., 0., 0.02848]])
 
     Q = torch.tile(torch.eye(n_state + n_ctrl), (n_batch, T, 1, 1))
-    Q[...,0,0], Q[...,1,1], Q[...,2,2], Q[...,8,8] = 0.1, 0.1, 0.1, 1000
+    Q[...,0,0], Q[...,1,1], Q[...,2,2], Q[...,8,8] = 1000, 0.1, 0.1, 1000
     Q[...,12,12], Q[...,13,13], Q[...,14,14], Q[...,15,15] = 0.01, 0.05, 0.05, 0.05
-    Q[...,10,10] = 100000000
-    Q[...,11,11] = 10000000
+    Q[...,10,10] = 70000000
+    Q[...,11,11] = 20000000
     p = torch.tile(torch.zeros(n_state + n_ctrl), (n_batch, T, 1))
     dynamics=Quad(dt, J)
     stepper = pp.utils.ReduceToBason(steps=3, verbose=False)
     MPC = pp.module.MPC(dynamics, Q, p, T, stepper=stepper)
 
-    N = 200
+    N = 210
 
     xt = x_init
 
