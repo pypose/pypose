@@ -111,6 +111,38 @@ def point2pixel(points, intrinsics, extrinsics=None):
     return homo2cart(points @ intrinsics.mT)
 
 
+def pixel2point(pixels, depth, intrinsics):
+    r'''
+    Convert batch of pixels with depth into points (in camera coordinate)
+
+    Args:
+        pixels: (``torch.Tensor``) The 2d coordinates of pixels in the camera pixel
+            coordinate.
+            Shape has to be (..., N, 2)
+
+        depth: (``torch.Tensor``) The depths of pixels with respect to the optical
+            center of camera.
+            Shape has to be (..., N)
+
+        intrinsics: (``torch.Tensor``): The intrinsic parameters of cameras.
+            The shape has to be (..., 3, 3).
+
+    Returns:
+        ``torch.Tensor`` The associated 3D-points with shape (..., N, 3)
+    '''
+    assert pixels.size(-1) == 2, "Pixels shape incorrect"
+    assert depth.size(-1) == pixels.size(-2), "Depth shape does not match pixels"
+    assert intrinsics.size(-1) == intrinsics.size(-2) == 3, "Intrinsics shape incorrect."
+
+    fx, fy = intrinsics[0, 0], intrinsics[1, 1]
+    cx, cy = intrinsics[0, 2], intrinsics[1, 2]
+
+    pts3d_z = depth
+    pts3d_x = ((pixels[..., 0] - cx) * pts3d_z) / fx
+    pts3d_y = ((pixels[..., 1] - cy) * pts3d_z) / fy
+    return torch.stack([pts3d_x, pts3d_y, pts3d_z], dim=1)
+
+
 def reprojerr(points, pixels, intrinsics, extrinsics=None, reduction='none'):
     r'''
     Calculates batched per-pixel reprojection error (pixel distance) for points either in

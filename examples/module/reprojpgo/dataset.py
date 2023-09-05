@@ -11,12 +11,12 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchvision.datasets.utils import download_and_extract_archive
 
 
-class ReprojErrDataset(Dataset):
+class MiniTartanAir(Dataset):
     link = 'https://github.com/pypose/pypose/releases/download/v0.5.0/MiniTartanAir.pt.zip'
     def __init__(self, dataroot: Path, download = True):
         super().__init__()
         if download:
-            download_and_extract_archive(self.link, dataroot)
+            download_and_extract_archive(self.link, str(dataroot))
         self.NED2CV = pp.from_matrix(torch.tensor(
             [[0., 1., 0., 0.],
              [0., 0., 1., 0.],
@@ -38,7 +38,7 @@ class ReprojErrDataset(Dataset):
     def __getitem__(self, index):
         image1 = self.images[index] / 255.            # image size [3, 480, 640]
         image2 = self.images[index + 1] / 255.        # image size [3, 480, 640]
-        flow = self.flows[index].to(torch.float32)    # flow size [2, 480, 640]
+        flow = self.flows[index].to(torch.float32)    # flow size  [2, 480, 640]
         depth = self.depths[index].to(torch.float32)  # depth size [1, 480, 640]
         gt_motion = self.NED2CV @ self.gt_motions[index] @ self.CV2NED
 
@@ -93,7 +93,11 @@ def visualize(img1, img2, pts1, pts2, target, step):
     color_map = mpl.colormaps['coolwarm']
     color_normalizer = mpl.colors.Normalize(vmin=0, vmax=1)
     display_img = np.concatenate([img1, img2], axis=1)
-    reproj_uv = target.reproject().detach().cpu()
+
+    pts3d = pp.function.geometry.pixel2point(target.pts1, target.depth, target.K)
+    reproj_uv = pp.function.point2pixel(pts3d, target.K, target.T.Inv())
+    reproj_uv = reproj_uv.detach().cpu()
+
     reproj_err = torch.norm(pts2 - reproj_uv, dim=1).detach().cpu().numpy()
 
     plt.clf()
