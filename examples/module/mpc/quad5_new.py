@@ -82,7 +82,7 @@ class Quad(pp.module.NLS):
         return state
 
 
-def visualize(system, traj, controls):
+def visualize(system, traj, controls, Costs):
 
     fig, axs = plt.subplots(4, 3, figsize=(18, 6))
 
@@ -190,6 +190,12 @@ def visualize(system, traj, controls):
 
     ax.legend( fontsize=16) """
 
+    plt.figure(figsize=(8, 6))
+
+    plt.plot(np.arange(1, len(Costs) + 1) * system._tau, Costs, linewidth=2.2)
+    plt.xlabel('Time(s)')
+    plt.ylabel('Cost')
+
     plt.show(block=False)
 
 
@@ -220,7 +226,7 @@ if __name__ == '__main__':
 
     X = [xt.squeeze()]
     U = []
-    costs = []
+    Costs = []
 
     for i in range(N):
         x_init_mpc = xt - x_goal
@@ -228,14 +234,15 @@ if __name__ == '__main__':
         ut_mpc = u_mpc[...,0,:]
         #print(ut_mpc)
         xt = dynamics.forward(xt, ut_mpc)[0]
-        print(xt)
+        #print(xt)
         u_new = u_mpc[...,1:,:]
         u_last = u_mpc[...,-1,:]
         u_init = torch.cat((u_new, u_last.unsqueeze(0)), dim=1) #u shift, not necessary
         X.append(xt.squeeze())
         U.append(ut_mpc.squeeze())
+        Costs.append(cost)
 
     #print(xt)
 
-    visualize(dynamics, torch.stack(X), torch.stack(U))
+    visualize(dynamics, torch.stack(X), torch.stack(U), torch.stack(Costs))
     plt.show(block=True)
