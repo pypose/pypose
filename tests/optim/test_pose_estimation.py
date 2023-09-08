@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     strategy = pp.optim.strategy.TrustRegion(radius=1e6)
     kernel = (ppok.Scale().to(device), ppok.Huber().to(device))
-    weight = (torch.eye(6, device=device), torch.ones(1, device=device))
+    weight = (torch.eye(6, device=device), torch.eye(2, device=device))
     optimizer = pp.optim.LM(model, strategy=strategy, kernel=kernel)
 
     last_loss = float("inf")

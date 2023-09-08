@@ -336,7 +336,7 @@ class LQR(nn.Module):
                                          input=self.u_traj[...,t,:],
                                          t=torch.tensor(t*dt))
                 A = self.system.A.squeeze(-2)
-                B = self.system.B.squeeze(-1)
+                B = self.system.B.squeeze(-2)
                 F = torch.cat((A, B), dim=-1)
                 Qt = self.Q[...,t,:,:] + F.mT @ V @ F
                 qt = p[...,t,:] + bmv(F.mT, v)
