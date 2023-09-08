@@ -46,9 +46,9 @@ class RobustModel(nn.Module):
             weight_diag = []
             for w, r in zip(weight, R):
                 ni = r.numel() * w.shape[-1] / w.numel()
-                ws = w.view(-1, w.shape[-2], w.shape[-1])
-                ws = ws.split(1, 0) if len(ws.shape) > 2 else [ws]
-                ws = [wsi.squeeze(0) if len(wsi.shape) > 2 else wsi for wsi in ws]
+                w = w.view(*w.shape, 1, 1) if r.shape[-1] == 1 else w
+                ws = w.view(-1, w.shape[-2], w.shape[-1]).split(1, 0)
+                ws = [wsi.squeeze(0) for wsi in ws]
                 weight_diag += ws * int(ni)
             weight_diag = torch.block_diag(*weight_diag)
         R = [r.reshape(-1) for r in R]
