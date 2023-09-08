@@ -289,9 +289,9 @@ class TestOptim:
                 self.pose = pp.Parameter(pp.randn_SE3(*dim))
 
             def forward(self, poses):
-                error = (self.pose @ poses).Log().tensor()
-                constraint = self.pose.Log().tensor().sum(-1, keepdim=True)
-                return error, constraint
+                error1 = (self.pose @ poses).Log().tensor()
+                error2 = self.pose.Log().tensor().sum(-1, keepdim=True)
+                return error1, error2
 
         B1, B2, M, N = 2, 3, 2, 2
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -322,9 +322,9 @@ class TestOptim:
                 self.pose = pp.Parameter(pp.randn_SE3(*dim))
 
             def forward(self, poses):
-                error = (self.pose @ poses).Log().tensor()
-                constraint = self.pose.Log().tensor().sum(-1, keepdim=True)
-                return error, constraint
+                error1 = (self.pose @ poses).Log().tensor()
+                error2 = self.pose.Log().tensor().sum(-1, keepdim=True)
+                return error1, error2
 
         B1, B2, M, N = 2, 3, 2, 2
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
