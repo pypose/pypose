@@ -1,5 +1,5 @@
 import torch
-from .optimizer import _Optimizer
+from .scndopt import _Optimizer
 
 
 class _Scheduler(object):

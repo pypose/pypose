@@ -3,9 +3,10 @@ import numpy as np
 import pypose as pp
 from torch import nn
 import numpy as np
-from pypose.optim.optimizer_alm import AugmentedLagrangianMethod as ALM
+from pypose.optim import SAL
 from torch import matmul as mult
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class LQR_Solver(torch.nn.Module):
     def __init__(self) -> None:
@@ -60,7 +61,7 @@ class AlmOptimExample:
                 self.B = B
                 self.x0 = x0
                 self.T = T
-                
+
             def objective(self, inputs):
                 cost = 0.5 * mult(mult(self.x, torch.block_diag(*self.C)), self.x)
                 return cost
@@ -94,20 +95,23 @@ class AlmOptimExample:
         n_all = n_state + n_ctrl
         alpha = 0.2
         T = 5
-        
+
         C = torch.squeeze(torch.randn(T, 1, n_all, n_all))
         C = torch.matmul(C.mT, C)
-        
+
         A = torch.eye(n_state) + alpha*torch.randn(n_state, n_state)
         B = torch.randn(n_state, n_ctrl)
         x0 = torch.randn(n_state)
 
         InnerNet = TensorModel(T, C, n_all, A, B, x0).to(device)
         input = None
-        
+
         inner_optimizer = torch.optim.SGD(InnerNet.parameters(), lr=1e-2, momentum=0.9)
         inner_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
-        optimizer = ALM(model=InnerNet, inner_optimizer=inner_optimizer, inner_scheduler=inner_scheduler, object_decrease_tolerance=1e-7, inner_iter=300)
+        optimizer = SAL(model=InnerNet,
+                        inner_optimizer=inner_optimizer,
+                        inner_scheduler=inner_scheduler,
+                        object_decrease_tolerance=1e-7, inner_iter=300)
 
         for idx in range(100):
             loss, lmd, = optimizer.step(input)
@@ -128,7 +132,7 @@ class AlmOptimExample:
             def __init__(self, *dim) -> None:
                 super().__init__()
                 self.pose = pp.Parameter(pp.randn_so3(*dim))
-                
+
             def objective(self, inputs):
                 result = (self.pose.Exp() @ input).matrix() - torch.eye(3)
                 return torch.norm(result)
@@ -150,11 +154,11 @@ class AlmOptimExample:
         euler_angles = np.array([[0.0, 0.0, np.pi/4]])
         quaternion = pp.euler2SO3(euler_angles).to(torch.float)
         input = pp.SO3(quaternion).to(device)
-        
+
         posnet = PoseInvConstrained(1).to(device)
         inner_optimizer = torch.optim.SGD(posnet.parameters(), lr=1e-2, momentum=0.9)
         inner_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
-        optimizer = ALM(model=posnet, inner_optimizer=inner_optimizer, inner_scheduler=inner_scheduler, inner_iter=400, penalty_safeguard=1e3)
+        optimizer = SAL(model=posnet, inner_optimizer=inner_optimizer, inner_scheduler=inner_scheduler, inner_iter=400, penalty_safeguard=1e3)
 
         for idx in range(20):
             loss, lmd, = optimizer.step(input)
@@ -166,7 +170,7 @@ class AlmOptimExample:
         print('x axis:', np.around(posnet.pose.detach().numpy(), decimals=decimal_places))
         print('f(x):', posnet.objective(input))
         print('final violation:', posnet.constrain(input))
-    
+
 if __name__ == "__main__":
     alm = AlmOptimExample()
     alm.tensor_complex()

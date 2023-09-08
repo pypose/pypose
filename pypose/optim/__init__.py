@@ -1,8 +1,6 @@
 from . import functional, solver, kernel, corrector, strategy, scheduler
-from .optimizer import GaussNewton
-from .optimizer import GaussNewton as GN
-from .optimizer import LevenbergMarquardt
-from .optimizer import LevenbergMarquardt as LM
-# from .alm_optimizer import AugmentedLagrangianMethod
-# from .alm_optimizer import AugmentedLagrangianMethod as ALM
-from .optimizer_alm import AugmentedLagrangianMethod as ALM
+from .scndopt import GaussNewton
+from .scndopt import GaussNewton as GN
+from .scndopt import LevenbergMarquardt
+from .scndopt import LevenbergMarquardt as LM
+from .cnstopt import SAL
