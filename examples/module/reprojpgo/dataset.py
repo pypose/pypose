@@ -45,8 +45,6 @@ class MiniTartanAir(Dataset):
         pts1 = select_points(image1)
         pts2 = match_points(pts1, flow)
         pts1_z = depth[0, pts1[..., 1], pts1[..., 0]]
-        image1 = visualize_image(image1)
-        image2 = visualize_image(image2)
 
         return image1, image2, pts1_z, pts1, pts2, gt_motion
 
@@ -88,8 +86,12 @@ def visualize_image(img: torch.Tensor):
     return display_img
 
 
-def visualize(img1, img2, pts1, pts2, target, step):
+def visualize(img1, img2, pts1, pts2, target, loss, step):
     plt.ion()
+
+    img1 = visualize_image(img1)    # Convert to black&white OpenCV displayable
+    img2 = visualize_image(img2)    # format
+
     color_map = mpl.colormaps['coolwarm']
     color_normalizer = mpl.colors.Normalize(vmin=0, vmax=1)
     display_img = np.concatenate([img1, img2], axis=1)
@@ -112,7 +114,8 @@ def visualize(img1, img2, pts1, pts2, target, step):
             [v1, reproj_v]
             , color=color_map(err)
         )
-    plt.title(f"Step: {step}, Error: {target.error()}")
+    plt.title(f"Step: {step}, ReprojErr: {round(reproj_err.mean().item(), 3)},"
+              f"Residual: {round(loss.item(), 3)}")
     divider = make_axes_locatable(plt.gca())
     cax = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(ScalarMappable(norm=color_normalizer, cmap=color_map), cax=cax)

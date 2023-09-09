@@ -23,10 +23,6 @@ class LocalBundleAdjustment(torch.nn.Module):
         self.T = pp.Parameter(init_T)
         self.depth = torch.nn.Parameter(depth)
 
-    @torch.no_grad()
-    def error(self) -> float:
-        return self.forward().norm(dim=1, p=2).mean().item()
-
     def forward(self) -> torch.Tensor:
         pts3d = pp.function.geometry.pixel2point(self.pts1, self.depth, self.K)
         return pp.function.reprojerr(
@@ -72,6 +68,7 @@ if __name__ == "__main__":
                               kernel=kernel,
                               corrector=corrector,
                               min=1e-8,
+                              reject=128,
                               vectorize=vectorize)
         scheduler = StopOnPlateau(optimizer, steps=25,
                                              patience=4,
@@ -79,12 +76,10 @@ if __name__ == "__main__":
                                              verbose=True)
 
         # Optimize Reproject Pose Graph Optimization ###########################
-        print('\tInitial graph error:', graph.error())
         while scheduler.continual():
-            visualize(img1, img2, pts1, pts2, graph, scheduler.steps)
             loss = optimizer.step(input=())
+            visualize(img1, img2, pts1, pts2, graph, loss, scheduler.steps)
             scheduler.step(loss)
-        print('\tFinal graph error:', graph.error())
         ########################################################################
 
         optimized_T = pp.SE3(graph.T.data.detach())
