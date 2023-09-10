@@ -1,16 +1,16 @@
 import torch
+from torch import nn
 from torch.linalg import vecdot
 from torch import broadcast_shapes
 
-from .. import mat2SE3
-from .. import bmv, bvv
+from .. import bmv
 from ..optim import GaussNewton
 from ..optim.solver import LSTSQ
 from ..optim.scheduler import StopOnPlateau
-from ..function import reprojerr, cart2homo
+from ..function import reprojerr, cart2homo, svdtf
 
 
-class BetaObjective(torch.nn.Module):
+class BetaObjective(nn.Module):
     # Optimize the beta according to the objective in the ePnP paper.
     def __init__(self, beta):
         super().__init__()
@@ -26,7 +26,7 @@ class BetaObjective(torch.nn.Module):
         return dist_w - dist_c
 
 
-class EPnP(torch.nn.Module):
+class EPnP(nn.Module):
     r'''
     Batched EPnP Solver - a non-iterative :math:`\mathcal{O}(n)` solution to the
     Perspective-:math:`n`-Point (PnP) problem for :math:`n \geq 4`.
@@ -159,7 +159,7 @@ class EPnP(torch.nn.Module):
         l_mat, rho = self._compute_lrho(nullv, bases)
         betas = self._compute_betas(l_mat, rho)
         poses, scales = self._compute_solution(betas, nullv, alpha, points)
-        errors = reprojerr(points, pixels, intrinsics, poses)
+        errors = reprojerr(points, pixels, intrinsics, poses, reduction='norm')
         pose, beta, scale = self._best_solution(errors, poses, betas, scales)
 
         if self.refine:
@@ -171,7 +171,7 @@ class EPnP(torch.nn.Module):
     def _compute_solution(self, beta, nullv, alpha, points):
         bases = bmv(nullv.mT, beta)
         bases, transp, scale = self._compute_scale(bases, alpha, points)
-        pose = self._points_transform(points, transp)
+        pose = svdtf(points, transp)
         return pose, scale
 
     @staticmethod
@@ -289,20 +289,3 @@ class EPnP(torch.nn.Module):
         scalep = sign[..., None, None] * scalep
         scale = (sign * scale).unsqueeze(-1)
         return bases, scalep, scale
-
-    @staticmethod
-    def _points_transform(pts_w, pts_c):
-        # Get transform for two associated batched point sets.
-        Cw = pts_w.mean(dim=-2, keepdim=True)
-        Pw = pts_w - Cw
-        Cc = pts_c.mean(dim=-2, keepdim=True)
-        Pc = pts_c - Cc
-        M = bvv(Pc, Pw).sum(dim=-3)
-        U, S, Vh = torch.linalg.svd(M)
-        R = U @ Vh
-        # mirror improper rotation that det(R) = -1
-        mask = (R.det() + 1).abs() < 1e-6
-        R[mask] = - R[mask]
-        t = Cc.mT - R @ Cw.mT
-        T = torch.cat((R, t), dim=-1)
-        return mat2SE3(T, check=False)

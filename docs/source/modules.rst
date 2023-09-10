@@ -17,3 +17,5 @@ Modules
    module.LQR
    module.IMUPreintegrator
    module.EPnP
+   module.MPC
+   module.ICP

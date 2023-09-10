@@ -6,6 +6,7 @@ from .strategy import TrustRegion
 from torch.optim import Optimizer
 from .solver import PINV, Cholesky
 from torch.linalg import cholesky_ex
+from .corrector import FastTriggs
 
 
 class Trivial(torch.nn.Module):
@@ -30,17 +31,38 @@ class RobustModel(nn.Module):
     def __init__(self, model, kernel=None, auto=False):
         super().__init__()
         self.model = model
-        self.kernel = Trivial() if kernel is None else kernel
+        self.kernel = [Trivial()] if kernel is None else kernel
 
-        if auto:
-            self.register_forward_hook(self.kernel_forward)
+    def flatten_row_jacobian(self, J, params_values):
+        if isinstance(J, (tuple, list)):
+            J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params_values)], 1)
+        return J
+
+    def normalize_RWJ(self, R, weight, J):
+        weight_diag = None
+        if weight is not None:
+            weight = weight if isinstance(weight, (tuple, list)) else [weight]
+            assert len(R)==len(weight)
+            weight_diag = []
+            for w, r in zip(weight, R):
+                ni = r.numel() * w.shape[-1] / w.numel()
+                w = w.view(*w.shape, 1, 1) if r.shape[-1] == 1 else w
+                ws = w.view(-1, w.shape[-2], w.shape[-1]).split(1, 0)
+                ws = [wsi.squeeze(0) for wsi in ws]
+                weight_diag += ws * int(ni)
+            weight_diag = torch.block_diag(*weight_diag)
+        R = [r.reshape(-1) for r in R]
+        J = torch.cat(J) if isinstance(J, (tuple, list)) else J
+        return torch.cat(R), weight_diag, J
 
     def forward(self, input, target):
         output = self.model_forward(input)
-        return self.residual(output, target)
+        return self.residuals(output, target)
 
     def model_forward(self, input):
-        if isinstance(input, tuple):
+        if isinstance(input, dict):
+            return self.model(**input)
+        if isinstance(input, (tuple, list)):
             return self.model(*input)
         else:
             return self.model(input)
@@ -48,16 +70,20 @@ class RobustModel(nn.Module):
     def residual(self, output, target):
         return output if target is None else output - target
 
-    def kernel_forward(self, module, input, output):
-        # eps is to prevent grad of sqrt() from being inf
-        assert torch.is_floating_point(output), "model output have to be float type."
-        eps = finfo(output.dtype).eps
-        return self.kernel(output.square().sum(-1)).clamp(min=eps).sqrt()
+    def residuals(self, outputs, targets):
+        if isinstance(outputs, (tuple, list)):
+            targets = [None] * len(outputs) if targets is None else targets
+            return tuple([self.residual(out, targets[i]) for i, out in enumerate(outputs)])
+        return tuple([self.residual(outputs, targets)])
 
     def loss(self, input, target):
         output = self.model_forward(input)
-        residual = self.residual(output, target)
-        return self.kernel(residual.square().sum(-1)).sum()
+        residuals = self.residuals(output, target)
+        if len(self.kernel) > 1:
+            residuals = [k(r.square().sum(-1)).sum() for k, r in zip(self.kernel, residuals)]
+        else:
+            residuals = [self.kernel[0](r.square().sum(-1)).sum() for r in residuals]
+        return sum(residuals)
 
 
 class _Optimizer(Optimizer):
@@ -66,7 +92,7 @@ class _Optimizer(Optimizer):
     '''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-    
+
     def update_parameter(self, params, step):
         r'''
         params will be updated by calling this function
@@ -82,7 +108,7 @@ class GaussNewton(_Optimizer):
     Tensor/LieTensor or a tuple of Tensors/LieTensors.
 
     .. math::
-        \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
+        \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i
             \rho\left((\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)^T \mathbf{W}_i
             (\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\right),
 
@@ -113,13 +139,19 @@ class GaussNewton(_Optimizer):
         solver (nn.Module, optional): a linear solver. Available linear solvers include
             :meth:`solver.PINV` and :meth:`solver.LSTSQ`. If ``None``, :meth:`solver.PINV` is used.
             Default: ``None``.
-        kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
-        corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit
-            the kernel function. If a kernel is given but a corrector is not specified, auto
-            correction is used. Auto correction can be unstable when the robust model has
-            indefinite Hessian. Default: ``None``.
-        weight (Tensor, optional): a square positive definite matrix defining the weight of
-            model residual. Use this only when all inputs shared the same weight matrices. This is
+        kernel (nn.Module, or :obj:`list`, optional): the robust kernel function. If a :obj:`list`,
+            the element must be nn.Module or ``None`` and the length must be 1 or the number of residuals.
+            Default: ``None``.
+        corrector: (nn.Module, or :obj:`list`, optional): the Jacobian and model residual corrector to
+            fit the kernel function. If a :obj:`list`, the element must be nn.Module or ``None`` and
+            the length must be 1 or the number of residuals.
+            If a kernel is given but a corrector is not specified, auto correction is
+            used. Auto correction can be unstable when the robust model has indefinite Hessian.
+            Default: ``None``.
+        weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
+            the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
+            the length must be equal to the number of residuals.
+            Use this only when all inputs shared the same weight matrices. This is
             ignored when weight is given when calling :meth:`.step` or :meth:`.optimize` method.
             Default: ``None``.
         vectorize (bool, optional): the method of computing Jacobian. If ``True``, the
@@ -149,7 +181,7 @@ class GaussNewton(_Optimizer):
           Conference on Computer Vision (ECCV), 2014.
 
         **Therefore, the users need to keep the last dimension of model output and target to
-        1, even if the model residual is a scalar. If the users flatten all sample residuals 
+        1, even if the model residual is a scalar. If the users flatten all sample residuals
         into a vector (residual inner product will be a scalar), the model Jacobian will be a
         row vector, instead of a matrix, which loses sample-level structural information,
         although computing Jacobian vector is faster.**
@@ -163,17 +195,19 @@ class GaussNewton(_Optimizer):
     '''
     def __init__(self, model, solver=None, kernel=None, corrector=None, weight=None, vectorize=True):
         super().__init__(model.parameters(), defaults={})
+        self.jackwargs = {'vectorize': vectorize}
         self.solver = PINV() if solver is None else solver
-        self.jackwargs = {'vectorize': vectorize, 'flatten': True}
-        if kernel is not None and corrector is None:
-            # auto diff of robust model will be computed
-            self.model = RobustModel(model, kernel, auto=True)
-            self.corrector = Trivial()
-        else:
-            # manually Jacobian correction will be computed
-            self.model = RobustModel(model, kernel, auto=False)
-            self.corrector = Trivial() if corrector is None else corrector
         self.weight = weight
+        if kernel is not None:
+            kernel = [kernel] if not isinstance(kernel, (tuple, list)) else kernel
+            kernel = [k if k is not None else Trivial() for k in kernel]
+            self.corrector = [FastTriggs(k) for k in kernel] if corrector is None else corrector
+        else:
+            self.corrector = [Trivial()] if corrector is None else corrector
+        self.corrector = [self.corrector] if not isinstance(self.corrector, (tuple, list)) else self.corrector
+        self.corrector = [c if c is not None else Trivial() for c in self.corrector]
+        self.model = RobustModel(model, kernel)
+
 
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
@@ -181,11 +215,12 @@ class GaussNewton(_Optimizer):
         Performs a single optimization step.
 
         Args:
-            input (Tensor/LieTensor or tuple of Tensors/LieTensors): the input to the model.
+            input (Tensor/LieTensor, tuple or a dict of Tensors/LieTensors): the input to the model.
             target (Tensor/LieTensor): the model target to approximate.
                 If not given, the model output is minimized. Default: ``None``.
-            weight (Tensor, optional): a square positive definite matrix defining the weight of
-                model residual. Default: ``None``.
+            weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
+                the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
+                the length must be equal to the number of residuals. Default: ``None``.
 
         Return:
             Tensor: the minimized model loss.
@@ -232,13 +267,17 @@ class GaussNewton(_Optimizer):
         '''
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
-            R = self.model(input, target)
-            J = modjac(self.model, input=(input, target), **self.jackwargs)
-            R, J = self.corrector(R = R, J = J)
-            A, b = J.T.reshape((-1,) + R.shape), R
-            if weight is not None:
-                A, b = (weight @ A.unsqueeze(-1)).squeeze(-1), (weight @ b.unsqueeze(-1)).squeeze(-1)
-            D = self.solver(A = A.reshape(A.shape[0], -1).T, b = -b.view(-1, 1))
+            R = list(self.model(input, target))
+            J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
+            params = dict(self.model.named_parameters())
+            params_values = tuple(params.values())
+            J = [self.model.flatten_row_jacobian(Jr, params_values) for Jr in J]
+            for i in range(len(R)):
+                R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
+                    else self.corrector[i](R = R[i], J = J[i])
+            R, weight, J = self.model.normalize_RWJ(R, weight, J)
+            A, b = (J, -R) if weight is None else (weight @ J, -weight @ R)
+            D = self.solver(A = A, b = b.view(-1, 1))
             self.last = self.loss if hasattr(self, 'loss') \
                         else self.model.loss(input, target)
             self.update_parameter(params = pg['params'], step = D)
@@ -254,7 +293,7 @@ class LevenbergMarquardt(_Optimizer):
     Tensor/LieTensor or a tuple of Tensors/LieTensors.
 
     .. math::
-        \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i 
+        \bm{\theta}^* = \arg\min_{\bm{\theta}} \sum_i
             \rho\left((\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)^T \mathbf{W}_i
             (\bm{f}(\bm{\theta},\bm{x}_i)-\bm{y}_i)\right),
 
@@ -298,13 +337,19 @@ class LevenbergMarquardt(_Optimizer):
             Default: ``None``.
         strategy (object, optional): strategy for adjusting the damping factor. If ``None``, the
             :meth:`strategy.TrustRegion` will be used. Defult: ``None``.
-        kernel (nn.Module, optional): a robust kernel function. Default: ``None``.
-        corrector: (nn.Module, optional): a Jacobian and model residual corrector to fit the kernel
-            function. If a kernel is given but a corrector is not specified, auto correction is
+        kernel (nn.Module, or :obj:`list`, optional): the robust kernel function. If a :obj:`list`,
+            the element must be nn.Module or ``None`` and the length must be 1 or the number of residuals.
+            Default: ``None``.
+        corrector: (nn.Module, or :obj:`list`, optional): the Jacobian and model residual corrector to
+            fit the kernel function. If a :obj:`list`, the element must be nn.Module or ``None`` and
+            the length must be 1 or the number of residuals.
+            If a kernel is given but a corrector is not specified, auto correction is
             used. Auto correction can be unstable when the robust model has indefinite Hessian.
             Default: ``None``.
-        weight (Tensor, optional): a square positive definite matrix defining the weight of
-            model residual. Use this only when all inputs shared the same weight matrices. This is
+        weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
+            the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
+            the length must be equal to the number of residuals.
+            Use this only when all inputs shared the same weight matrices. This is
             ignored when weight is given when calling :meth:`.step` or :meth:`.optimize` method.
             Default: ``None``.
         reject (integer, optional): the maximum number of rejecting unsuccessfull steps.
@@ -353,18 +398,20 @@ class LevenbergMarquardt(_Optimizer):
         self.strategy = TrustRegion() if strategy is None else strategy
         defaults = {**{'min':min, 'max':max}, **self.strategy.defaults}
         super().__init__(model.parameters(), defaults=defaults)
-        self.jackwargs = {'vectorize': vectorize, 'flatten': True}
+        self.jackwargs = {'vectorize': vectorize}
         self.solver = Cholesky() if solver is None else solver
         self.reject, self.reject_count = reject, 0
-        if kernel is not None and corrector is None:
-            # auto diff of robust model will be computed
-            self.model = RobustModel(model, kernel, auto=True)
-            self.corrector = Trivial()
-        else:
-            # manually Jacobian correction will be computed
-            self.model = RobustModel(model, kernel, auto=False)
-            self.corrector = Trivial() if corrector is None else corrector
         self.weight = weight
+        if kernel is not None:
+            kernel = [kernel] if not isinstance(kernel, (tuple, list)) else kernel
+            kernel = [k if k is not None else Trivial() for k in kernel]
+            self.corrector = [FastTriggs(k) for k in kernel] if corrector is None else corrector
+        else:
+            self.corrector = [Trivial()] if corrector is None else corrector
+        self.corrector = [self.corrector] if not isinstance(self.corrector, (tuple, list)) else self.corrector
+        self.corrector = [c if c is not None else Trivial() for c in self.corrector]
+        self.model = RobustModel(model, kernel)
+
 
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
@@ -372,11 +419,12 @@ class LevenbergMarquardt(_Optimizer):
         Performs a single optimization step.
 
         Args:
-            input (Tensor/LieTensor or tuple of Tensors/LieTensors): the input to the model.
+            input (Tensor/LieTensor, tuple or a dict of Tensors/LieTensors): the input to the model.
             target (Tensor/LieTensor): the model target to optimize.
                 If not given, the squared model output is minimized. Defaults: ``None``.
-            weight (Tensor, optional): a square positive definite matrix defining the weight of
-                model residual. Default: ``None``.
+            weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
+                the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
+                the length must be equal to the number of residuals. Default: ``None``.
 
         Return:
             Tensor: the minimized model loss.
@@ -431,19 +479,23 @@ class LevenbergMarquardt(_Optimizer):
         Note:
             More practical examples, e.g., pose graph optimization (PGO), can be found at
             `examples/module/pgo
-            <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.    
+            <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.
         '''
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
-            R = self.model(input, target)
-            J = modjac(self.model, input=(input, target), **self.jackwargs)
-            R, J = self.corrector(R = R, J = J)
+            R = list(self.model(input, target))
+            J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
+            params = dict(self.model.named_parameters())
+            params_values = tuple(params.values())
+            J = [self.model.flatten_row_jacobian(Jr, params_values) for Jr in J]
+            for i in range(len(R)):
+                R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
+                    else self.corrector[i](R = R[i], J = J[i])
+            R, weight, J = self.model.normalize_RWJ(R, weight, J)
+
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target)
-            J_T = J.T.reshape((-1,) + R.shape)
-            if weight is not None:
-                J_T = (J_T.unsqueeze(-2) @ weight).squeeze(-2)
-            J_T = J_T.reshape(J_T.shape[0], -1)
+            J_T = J.T @ weight if weight is not None else J.T
             A, self.reject_count = J_T @ J, 0
             A.diagonal().clamp_(pg['min'], pg['max'])
             while self.last <= self.loss:
