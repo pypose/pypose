@@ -2,46 +2,9 @@ from typing import List, Optional
 import torch
 from torch import jit
 
-'''Sparse Block Tensor for PyPose.
+'''Sparse Block Tensor (SbkTensor) for PyPose.
 
-This module implements the sparse block tensor (referred to as SBT) for PyPose. SBT is designed
-to be primarily used to represent sparse block matrices. We make extensive use of PyTorch's
-sparse tensor for the current implementation, especially the COO tensor and the hybrid COO
-tensor (referred to as Hybrid tensor). Some highlights:
-
-* A block is a 2-dimensional dense tensor. So the dimension of an SBT is [ sH, sW, bH, bW ]
-  where sH and sW are the sparse shape and bH and bW are block shape. See the following for the
-  terminology.
-* An SBT consists of a Hybrid tensor to represent the data storage and a plain COO tensor to
-  preserve the block structure. We term them as the Storage and Proxy, respectively.
-* All operations are implemented by using the PyTorch sparse tensor API. On high level, we
-  convert a Hybrid tensor to the COO format, perform the operation by PyTorch, and then convert
-  the result back to the Hybrid format.
-* For all supported operations, we try to handle the Proxy correctly preserving the block
-  structure where applicable.
-* Gradient is supported where underlying PyTorch's operation supports it.
-
-The following terminology is specific to our SBT implementation:
-
-* block: A 2-dimensional dense tensor.
-* block shape, dense shape, dense dimension: The shape of a single block.
-* sparse shape, sparse dimension: The shape of the sparse tensor without irrespect to the block
-  shape. Thus for a 3x3 SBT with block shape 2x2, the sparse shape is 3x3. The sparse shape of
-  this SBT's COO equivalent is 6x6.
-* non-zero structure: The block pattern of a Hybrid tensor or a non-zero pattern of a COO tensor.
-
-For PyTorhc's sparse tensor, please refer to `Pytorch Sparse tensor`_.
-
-Example:
-    Examples to be added
-
-        $ Awesome_exmaples.py
-
-Attributes:
-    module_level_variable1 (int): Module level variables.
-
-.. _PyTorch Sparse tensor:
-   https://pytorch.org/docs/stable/sparse.html#torch-sparse
+This module implements the sparse block tensor (referred to as SbkTensor) for PyPose.
 
 '''
 
