@@ -315,8 +315,8 @@ class SBTGetOp(SBTOperation):
         s_array = []
         p_array = []
         for arg in args:
-            s_array.append( arg._s if isinstance(arg, SparseBlockTensor) else arg )
-            p_array.append( arg._p if isinstance(arg, SparseBlockTensor) else arg )
+            s_array.append( arg._s if isinstance(arg, SbkTensor) else arg )
+            p_array.append( arg._p if isinstance(arg, SbkTensor) else arg )
         return s_array, p_array
 
 class ComputeViaHybrid(SBTOperation):
@@ -349,8 +349,8 @@ class ComputeViaHybrid(SBTOperation):
         s_array = []
         p_array = []
         for arg in args:
-            s_array.append( arg._s if isinstance(arg, SparseBlockTensor) else arg )
-            p_array.append( arg._p if isinstance(arg, SparseBlockTensor) else arg )
+            s_array.append( arg._s if isinstance(arg, SbkTensor) else arg )
+            p_array.append( arg._p if isinstance(arg, SbkTensor) else arg )
         return s_array, p_array
 
     def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
@@ -423,11 +423,11 @@ class ComputeViaCOO(SBTOperation):
         for arg in args:
             # Convert the sparse Hybrid tensor _s to COO tensor.
             s_array.append( hybrid_2_coo( arg._s )
-                           if isinstance(arg, SparseBlockTensor)
+                           if isinstance(arg, SbkTensor)
                            else arg )
 
             # Do nothing about the Proxy tensor.
-            p_array.append( arg._p if isinstance(arg, SparseBlockTensor) else arg )
+            p_array.append( arg._p if isinstance(arg, SbkTensor) else arg )
         return s_array, p_array
 
     # def storage_op(self, func, stripped_types, s_args=(), kwargs={}):
@@ -565,7 +565,7 @@ HFS.add_op('tanh', ComputeViaHybrid, proxy_reduction=None, clone=True)
 # ========== End of supported operation registration. ==========
 # ==============================================================
 
-class SparseBlockTensor(torch.Tensor):
+class SbkTensor(torch.Tensor):
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs={}):
@@ -581,7 +581,7 @@ class SparseBlockTensor(torch.Tensor):
         args_storage, args_proxy = sbt_op.storage_pre(func, types, args, kwargs)
 
         # Strip types
-        stripped_types = (torch.Tensor if t is SparseBlockTensor else t for t in types)
+        stripped_types = (torch.Tensor if t is SbkTensor else t for t in types)
         # if func.__name__ == 'matmul':
         #     import ipdb; ipdb.set_trace()
         #     pass
@@ -685,7 +685,7 @@ class SparseBlockTensor(torch.Tensor):
     #     return torch.abs(self)
 
 
-def sparse_block_tensor(
+def sbktensor(
         indices, values, size=None, dtype=None, device=None, requires_grad=False):
     # Figure out the block shape.
     num_b, shape_b = values.shape[0], values.shape[1:]
@@ -707,7 +707,7 @@ def sparse_block_tensor(
         device=device,
         requires_grad=False ).coalesce()
 
-    x = SparseBlockTensor()
+    x = SbkTensor()
     x._s = storage # s for storage.
     x._p = proxy
     return x
