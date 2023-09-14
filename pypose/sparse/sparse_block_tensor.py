@@ -3,9 +3,7 @@ import torch
 from torch import jit
 
 '''Sparse Block Tensor (SbkTensor) for PyPose.
-
 This module implements the sparse block tensor (referred to as SbkTensor) for PyPose.
-
 '''
 
 DENSE_SAFE_PROXY_THRES = 0
@@ -57,8 +55,8 @@ def unravel_index(index, shape: List[int]):
 
 
 def prod(xs: List[int]) -> int:
-    '''Compute the product of a list of integers.
-
+    '''Compute the product of a list of integers. This function is used to replace the
+    torch.prod function, which is not supported by TorchScript.
     Args:
         l (list of int): The list of integers.
 
@@ -87,7 +85,6 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
     # Get the coalesced version such that we can operate on the indices.
     hybrid = hybrid.coalesce()
 
-    # The block dimension.
     assert hybrid.dim() % 2 == 0, 'The hybrid tensor must have even number of dims, ' \
                                         'but got {}'.format(hybrid.dim())
     assert hybrid.dim() >= 4, f'hybrid should have dims >= 4, but got {hybrid.dim()}'
@@ -95,8 +92,6 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
     shape_b = hybrid.shape[num_dim:]  # Desne/block shape.
     shape_p = hybrid.shape[:num_dim]  # Sparse/proxy shape.
     numel_b = prod(shape_b)  # Number of elements per block.
-
-    # === Compose target coo indices. ===
 
     # Index shift in block
     # the same as torch.cartesian_prod(*[torch.arange(i) for i in shape_b]).T
@@ -146,8 +141,6 @@ def repeated_value_as_hybrid_value(coo: torch.Tensor,
     Returns:
         Hybrid tensor (torch.Tensor): The created Hybrid tensor.
 
-    Example:
-        # TODO
     '''
     coo = coo.coalesce()
     num_b = coo.values().shape[0]
@@ -425,20 +418,15 @@ class ComputeViaCOO(SBTOperation):
             s_array.append( hybrid_2_coo( arg._s )
                            if isinstance(arg, SbkTensor)
                            else arg )
-
-            # Do nothing about the Proxy tensor.
             p_array.append( arg._p if isinstance(arg, SbkTensor) else arg )
         return s_array, p_array
-
-    # def storage_op(self, func, stripped_types, s_args=(), kwargs={}):
-    #     # Forward all the arguments to parent's interface.
-    #     return super().storage_op(func, stripped_types, s_args, kwargs)
 
     def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
         '''Opertion on the Proxy tensor.
 
         Note:
-            This method only gets called when the operation on the Storage returns sparse Tensor.
+            This method only gets called when the operation on the Storage returns sparse
+            Tensor.
         '''
         return torch.Tensor.__torch_function__(func, stripped_types, p_args, kwargs)
 
@@ -450,8 +438,8 @@ class ComputeViaCOO(SBTOperation):
             p_outs (tuple): A tuple of Proxy tensors.
 
         Note:
-            s_outs (outs for Storage) and p_outs (outs for Proxy) are assumed to have the exact
-            same order.
+            s_outs (outs for Storage) and p_outs (outs for Proxy) are assumed to have the
+            exact same order.
         '''
         s_outs = [ coo_2_hybrid(s, p)
                     if isinstance(s, torch.Tensor) and s.is_sparse == True
@@ -476,15 +464,10 @@ class OpType(object):
         self.op_type = op_type
         self.func_name = func_name
 
-# HFS: Handled Functions by SBT.
-class HFS:
 
+class registry:
     HANDLED_FUNCS = dict()
-    '''dict: A dictionary of all supported operations on SparseBlockTensor.
-
-    Key: The name of the operation.
-    Value: An SBTOperation object.
-    '''
+    # Key: The name of the operation. Value: An SBTOperation object.
 
     @classmethod
     def is_handled(cls, func_name):
@@ -524,46 +507,32 @@ class HFS:
             return func
         return decorator
 
-# =========================================================================
-# ========== Register supported operations through HFS directly. ==========
-# =========================================================================
-
 # Operations can be registered in two ways:
 # 1. Register the operation directly through HFS.add_op().
 # 2. Register the operation through the @HFS.register() decorator.
-# The second way can be used if the operation is an override of a torch.Tensor method.
 
 # ========== Special Python methods. ==========
-# HFS.add_op( '__format__', SBTOperation )
-HFS.add_op( '__get__', SBTGetOp )
+registry.add_op( '__get__', SBTGetOp )
 
 # ========== Linear Algebra operations. ==========
-# HFS.add_op( 'matmul', SBTProxySameOpAsStorage )
+registry.add_op( 'matmul', ComputeViaCOO )
 
-# ========== Tensor methods. ==========
+# ========== elementwise functions ==========
+registry.add_op('abs', ComputeViaHybrid, proxy_reduction=None, clone=True)
+registry.add_op('add', ComputeViaHybrid, proxy_reduction='add')
+registry.add_op('asin', ComputeViaHybrid, proxy_reduction=None, clone=True)
+registry.add_op('atan', ComputeViaHybrid, proxy_reduction=None, clone=True)
+registry.add_op('ceil', ComputeViaHybrid, proxy_reduction=None, clone=True)
+registry.add_op('floor', ComputeViaHybrid, proxy_reduction=None, clone=True)
+registry.add_op('round', ComputeViaHybrid, proxy_reduction=None, clone=True)
+registry.add_op('sin', ComputeViaHybrid, proxy_reduction=None, clone=True)
+registry.add_op('sinh', ComputeViaHybrid, proxy_reduction=None, clone=True)
+registry.add_op('sqrt', ComputeViaHybrid, proxy_reduction=None, clone=True)
+registry.add_op('square', ComputeViaHybrid, proxy_reduction=None, clone=True)
+registry.add_op('sub', ComputeViaHybrid, proxy_reduction='add')
+registry.add_op('tan', ComputeViaHybrid, proxy_reduction=None, clone=True)
+registry.add_op('tanh', ComputeViaHybrid, proxy_reduction=None, clone=True)
 
-# ========== Operations for COO tensors. ==========
-
-# ========== Unary functions. ==========
-HFS.add_op('abs', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('add', ComputeViaHybrid, proxy_reduction='add')
-HFS.add_op('asin', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('atan', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('ceil', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('floor', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('round', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('sin', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('sinh', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('sqrt', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('square', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('sub', ComputeViaHybrid, proxy_reduction='add')
-HFS.add_op('tan', ComputeViaHybrid, proxy_reduction=None, clone=True)
-HFS.add_op('tanh', ComputeViaHybrid, proxy_reduction=None, clone=True)
-
-
-# ==============================================================
-# ========== End of supported operation registration. ==========
-# ==============================================================
 
 class SbkTensor(torch.Tensor):
 
@@ -571,12 +540,12 @@ class SbkTensor(torch.Tensor):
     def __torch_function__(cls, func, types, args=(), kwargs={}):
         '''The main entry point for all operations on SparseBlockTensor.'''
 
-        if not HFS.is_handled(func.__name__):
+        if not registry.is_handled(func.__name__):
             raise Exception(
                 f'All operations on SparseBlockTensor must be handled. '
                 f'\n{func.__name__} is not.')
 
-        sbt_op = HFS.HANDLED_FUNCS[func.__name__]
+        sbt_op = registry.HANDLED_FUNCS[func.__name__]
 
         args_storage, args_proxy = sbt_op.storage_pre(func, types, args, kwargs)
 
@@ -645,22 +614,12 @@ class SbkTensor(torch.Tensor):
         '''
         return f"SparseBlockTensor\nstorage:\n{self._s}\nproxy:\n{self._p}"
 
-    @HFS.register(OpType(op_type=SBTOperation))
+    @registry.register(OpType(op_type=SBTOperation))
     def __format__(self, spec):
         return str(self)
 
-    @HFS.register(OpType(op_type=ComputeViaCOO, func_name='matmul'))
-    def __matmul__(self, other):
-        r'''
-        return the corresponding sparse matrix and index matrix
-        '''
-        return torch.matmul(self, other)
-
-    @HFS.register(OpType(op_type=ComputeViaHybrid, func_name='mul'))
+    @registry.register(OpType(op_type=ComputeViaHybrid, func_name='mul'))
     def __mul__(self, other):
-        r'''
-        return the corresponding sparse matrix and index matrix
-        '''
         res = torch.mul(self, other)
         # dim auto correction
         s = res._s
@@ -677,12 +636,6 @@ class SbkTensor(torch.Tensor):
             res._s = s1
 
         return res
-
-    # NOTE: for torch operations that need special treatment, place an override here. Then call
-    # the corresponding function of PyTorch to begin the dispatching. E.g.:
-    # def abs(self):
-    #     print('This is SBT abs(). ')
-    #     return torch.abs(self)
 
 
 def sbktensor(
@@ -711,24 +664,3 @@ def sbktensor(
     x._s = storage # s for storage.
     x._p = proxy
     return x
-
-def test_sparse_coo_2_sparse_hybrid_coo():
-    print()
-
-    i = torch.tensor([
-        [0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5],
-        [0, 1, 0, 1, 4, 5, 4, 5, 2, 3, 2, 3, 4, 5, 4, 5] ], dtype=torch.int64)
-    v = torch.arange(16).float()
-    s = torch.sparse_coo_tensor(i, v, size=(6,6))
-
-    i = torch.Tensor([
-        [0, 0, 1, 2],
-        [0, 2, 1, 2] ]).to(dtype=torch.int64)
-    v = torch.ones(4, dtype=torch.int64)
-    p = torch.sparse_coo_tensor(i, v, size=(3,3))
-
-    print(f's = \n{s.to_dense()}')
-    print(f'p = \n{p.to_dense()}')
-
-    h = coo_2_hybrid(s, p)
-    print(f'h = \n{h.to_dense()}')
