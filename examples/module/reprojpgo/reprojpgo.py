@@ -1,6 +1,7 @@
 import torch
 import argparse
 import pypose as pp
+from torch import nn
 from pathlib import Path
 from pypose.optim import LM
 from pypose.optim.kernel import Huber
@@ -8,10 +9,11 @@ from pypose.optim.solver import Cholesky
 from pypose.optim.strategy import TrustRegion
 from pypose.optim.corrector import FastTriggs
 from pypose.optim.scheduler import StopOnPlateau
+from pypose.function.geometry import pixel2point, reprojerr
 from dataset import MiniTartanAir, visualize, report_pose_error
 
 
-class LocalBundleAdjustment(torch.nn.Module):
+class LocalBundleAdjustment(nn.Module):
     def __init__(self, K, pts1, pts2, depth, init_T) -> None:
         super().__init__()
         self.register_buffer("K", K)
@@ -21,13 +23,11 @@ class LocalBundleAdjustment(torch.nn.Module):
         self.cx, self.cy = K[0, 2], K[1, 2]
 
         self.T = pp.Parameter(init_T)
-        self.depth = torch.nn.Parameter(depth)
+        self.depth = nn.Parameter(depth)
 
     def forward(self) -> torch.Tensor:
-        pts3d = pp.function.geometry.pixel2point(self.pts1, self.depth, self.K)
-        return pp.function.reprojerr(
-            pts3d, self.pts2, self.K, self.T.Inv(), reduction='none'
-        )
+        pts3d = pixel2point(self.pts1, self.depth, self.K)
+        return reprojerr(pts3d, self.pts2, self.K, self.T.Inv(), reduction='none')
 
 
 if __name__ == "__main__":
@@ -35,7 +35,7 @@ if __name__ == "__main__":
         description="Estimate camera motion by optimizing reprojerr graph "
                     "between adjacent frames")
     parser.add_argument("--dataroot", action="store",
-                        default="./data/Reprojerr_Example",
+                        default="./examples/module/reprojpgo/save/",
                         help="Root directory for the dataset")
     parser.add_argument("--device", action="store", default="cuda",
                         help="Device to run optimization (cuda / cpu)")
