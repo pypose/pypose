@@ -46,6 +46,11 @@ class MiniTartanAir(Dataset):
         pts2 = self.match_points(pts1, flow)
         pts1_z = depth[0, pts1[..., 1], pts1[..., 0]]
 
+        mask_in_frame = torch.logical_and(pts2[..., 1] < 480, pts2[..., 0] < 640)
+        pts1 = pts1[mask_in_frame]
+        pts2 = pts2[mask_in_frame]
+        pts1_z = pts1_z[mask_in_frame]
+
         return image1, image2, pts1_z, pts1, pts2, gt_motion
 
     @staticmethod
