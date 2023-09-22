@@ -42,40 +42,40 @@ class MiniTartanAir(Dataset):
         depth = self.depths[index].to(torch.float32)  # depth size [1, 480, 640]
         gt_motion = self.NED2CV @ self.gt_motions[index] @ self.CV2NED
 
-        pts1 = select_points(image1)
-        pts2 = match_points(pts1, flow)
+        pts1 = self.select_points(image1)
+        pts2 = self.match_points(pts1, flow)
         pts1_z = depth[0, pts1[..., 1], pts1[..., 0]]
 
         return image1, image2, pts1_z, pts1, pts2, gt_motion
 
+    @staticmethod
+    def select_points(image: torch.Tensor, num_point: int = 100):
+        image_grad = torch.nn.functional.conv2d(
+            image.unsqueeze(dim=0),
+            torch.tensor(
+                [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
+            ).float().expand((1, 3, 3, 3)),
+            padding=1
+        )[0].abs()
+        image_grad_avg = image_grad.mean(dim=(1, 2), keepdim=True)
+        image_grad_std = image_grad.std(dim=(1, 2), keepdim=True)
+        # Positions with sufficient gradient (feature) > +3std
+        points = image_grad > image_grad_avg + 3. * image_grad_std
+        border_mask = torch.zeros_like(points)
+        border_mask[..., 5:-5, 5:-5] = 1.
 
-def select_points(image: torch.Tensor, num_point: int = 100):
-    image_grad = torch.nn.functional.conv2d(
-        image.unsqueeze(dim=0),
-        torch.tensor(
-            [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
-        ).float().expand((1, 3, 3, 3)),
-        padding=1
-    )[0].abs()
-    image_grad_avg = image_grad.mean(dim=(1, 2), keepdim=True)
-    image_grad_std = image_grad.std(dim=(1, 2), keepdim=True)
-    # Positions with sufficient gradient (feature) > +3std
-    points = image_grad > image_grad_avg + 3. * image_grad_std
-    border_mask = torch.zeros_like(points)
-    border_mask[..., 5:-5, 5:-5] = 1.
+        points = points * border_mask
+        selected_points = torch.nonzero(points, as_tuple=False)
 
-    points = points * border_mask
-    selected_points = torch.nonzero(points, as_tuple=False)
+        # Randomly select points
+        perm = torch.randperm(selected_points.shape[0])[:num_point]
+        # vu -> uv coordinate
+        pts_uv = selected_points[perm][..., 1:].roll(shifts=1, dims=[1])
+        return pts_uv
 
-    # Randomly select points
-    perm = torch.randperm(selected_points.shape[0])[:num_point]
-    # vu -> uv coordinate
-    pts_uv = selected_points[perm][..., 1:].roll(shifts=1, dims=[1])
-    return pts_uv
-
-
-def match_points(pts1: torch.Tensor, flow: torch.Tensor):
-    return pts1 + flow[..., pts1[..., 1], pts1[..., 0]].T
+    @staticmethod
+    def match_points(pts1: torch.Tensor, flow: torch.Tensor):
+        return pts1 + flow[..., pts1[..., 1], pts1[..., 0]].T
 
 
 def visualize_image(img: torch.Tensor):
