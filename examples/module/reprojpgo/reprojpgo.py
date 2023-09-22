@@ -19,8 +19,6 @@ class LocalBundleAdjustment(nn.Module):
         self.register_buffer("K", K)
         self.register_buffer("pts1", pts1)  # N x 2, uv coordinate
         self.register_buffer("pts2", pts2)  # N x 2, uv coordinate
-        self.fx, self.fy = K[0, 0], K[1, 1]
-        self.cx, self.cy = K[0, 2], K[1, 2]
 
         self.T = pp.Parameter(init_T)
         self.depth = nn.Parameter(depth)

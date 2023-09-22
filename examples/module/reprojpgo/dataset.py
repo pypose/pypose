@@ -131,4 +131,4 @@ def report_pose_error(curr_pose: pp.SE3, gt_pose: pp.SE3):
     _err = (curr_pose.Inv() * gt_pose)
     _err_rot = _err.rotation().Log().norm(dim=-1).item() * (180 / np.pi)
     _err_trans = _err.translation().norm(dim=-1).item()
-    print(f"Err Rot (deg) - {round(_err_rot, 4)} | Err Trans (m) - {round(_err_trans, 4)}")
+    print(f"Err Rot (deg): {round(_err_rot, 4)} | Err Trans (m): {round(_err_trans, 4)}")
