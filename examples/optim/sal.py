@@ -23,7 +23,9 @@ class LQR_Solver(torch.nn.Module):
         # Construct dynamics solver matrix
         AB = torch.concat((A, B), dim = 1).unsqueeze(0).repeat(T - 1, 1, 1)
         AB = torch.block_diag(*AB)
+
         dynamics = torch.zeros(n_state * T, n_all * T).to(A.device)
+
         dynamics[:n_state,:n_state] = torch.eye(n_state)
         dynamics[n_state:n_state + AB.size(0), :AB.size(1)] = AB
         idx1c = torch.linspace(n_all, n_all * (T - 1), T - 1, dtype=int)
@@ -32,11 +34,14 @@ class LQR_Solver(torch.nn.Module):
             dynamics[idx1r + i, idx1c + i] = -1
 
         # Create full matrix
+
         zero_mat = torch.zeros(dynamics.size(0), dynamics.size(0)).to(A.device)
+
         full_mat = torch.cat((torch.cat((cost_mat, dynamics.transpose(0, 1)), dim = 1),
                               torch.cat((dynamics, zero_mat),                 dim = 1)), dim = 0)
 
         # Create solution vector
+
         sol = torch.zeros(A.size(0) * T).to(A.device)
         sol[:n_state] = x0
         sol = torch.cat((torch.zeros(cost_mat.size(0)).to(A.device), sol), dim = 0).unsqueeze(-1)
@@ -63,7 +68,9 @@ class AlmOptimExample:
                 self.T = T
 
             def objective(self, inputs):
+
                 self.C = self.C.to(self.x.device)
+
                 cost = 0.5 * mult(mult(self.x, torch.block_diag(*self.C)), self.x)
                 return cost
 
@@ -74,7 +81,9 @@ class AlmOptimExample:
 
                 AB = torch.concat((self.A, self.B), dim = 1).unsqueeze(0).repeat(self.T - 1, 1, 1)
                 AB = torch.block_diag(*AB)
+
                 dynamics = torch.zeros(n_state * self.T, n_all * self.T).to(self.x.device)
+
                 dynamics[:n_state, :n_state] = torch.eye(n_state)
                 dynamics[n_state: n_state + AB.size(0), :AB.size(1)] = AB
                 idx1c = torch.linspace(n_all, n_all * (self.T - 1), self.T - 1, dtype = int)
@@ -82,7 +91,9 @@ class AlmOptimExample:
                 for i in range(0, n_state):
                     dynamics[idx1r + i, idx1c + i] = -1
 
+
                 b = torch.zeros(dynamics.size(0)).to(self.x.device)
+
                 b[:n_state] = self.x0
 
                 return mult(dynamics, self.x) - b
@@ -103,6 +114,7 @@ class AlmOptimExample:
         A = (torch.eye(n_state) + alpha*torch.randn(n_state, n_state)).to(device)
         B = torch.randn(n_state, n_ctrl).to(device)
         x0 = torch.randn(n_state).to(device)
+
 
         InnerNet = TensorModel(T, C, n_all, A, B, x0).to(device)
         input = None
@@ -137,12 +149,15 @@ class AlmOptimExample:
             def objective(self, inputs):
                 
                 result = (self.pose.Exp() @ inputs).matrix() - torch.eye(3).to(inputs.device)
+
                 return torch.norm(result)
                 # return result
 
             def constrain(self, inputs):
                 fixed_euler_angles = np.array([[0.0, 0.0, 0.0]])
+
                 fixed_quaternion = pp.euler2SO3(fixed_euler_angles).to(torch.float).to(inputs.device)
+
                 quaternion = self.pose.Exp()
                 difference_quaternions = torch.sub(quaternion, fixed_quaternion)
                 distance = torch.norm(difference_quaternions, p=2, dim=1)
@@ -170,6 +185,7 @@ class AlmOptimExample:
         decimal_places = 4
         print("Lambda:",lmd)
         print('x axis:', np.around(posnet.pose.cpu().detach().numpy(), decimals=decimal_places))
+
         print('f(x):', posnet.objective(input))
         print('final violation:', posnet.constrain(input))
 

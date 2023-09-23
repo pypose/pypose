@@ -22,10 +22,12 @@ class _Unconstrained_Model(nn.Module):
 
     def forward(self, inputs=None, target=None):
 
+
         R, C = self.model(inputs)
         self.lmd = self.lmd if hasattr(self, 'lmd') \
                 else torch.zeros((C.shape[0], ))
 		self.lmd = self.lmd.to(R.device)
+
         penalty_term = torch.square(torch.norm(C))
         L = R + (self.lmd @ C) + self.pf * penalty_term / 2
         return L
@@ -58,10 +60,10 @@ class SAL(_Optimizer):
         self.pf_safeguard = penalty_safeguard
         self.violation_tolerance = violation_tolerance
         self.object_decrease_tolerance = object_decrease_tolerance
-
         self.alm_model = _Unconstrained_Model(self.model, penalty_factor=penalty_factor)
         self.optim = inner_optimizer
         self.scheduler = inner_scheduler
+
 
 
     #### f(x) - y = loss_0, f(x) + C(x) - 0 - y
