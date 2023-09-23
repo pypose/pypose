@@ -26,7 +26,7 @@ class _Unconstrained_Model(nn.Module):
         R, C = self.model(inputs)
         self.lmd = self.lmd if hasattr(self, 'lmd') \
                 else torch.zeros((C.shape[0], ))
-		self.lmd = self.lmd.to(R.device)
+        self.lmd = self.lmd.to(R.device)
 
         penalty_term = torch.square(torch.norm(C))
         L = R + (self.lmd @ C) + self.pf * penalty_term / 2
