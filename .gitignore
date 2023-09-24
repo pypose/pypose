@@ -151,6 +151,7 @@ examples/module/pcr/data/*
 examples/module/pcr/save/*
 examples/module/spline/save/*
 examples/module/mpc/save/*
+examples/module/reprojpgo/save/*
 *epnp-test-data.pt*
 *icp-test-data.pt*
 *__MACOSX
