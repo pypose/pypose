@@ -252,7 +252,8 @@ class LTI(System):
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
     '''
 
-    def __init__(self, A, B, C, D, c1=None, c2=None, xdim = None, udim = None, ydim = None):
+    def __init__(self, A, B, C, D, c1=None, c2=None):
+        xdim, udim, ydim = A.shape[-2], B.shape[-2], C.shape[-2]
         super().__init__(xdim, udim, ydim)
         self.register_buffer('_A', A)
         self.register_buffer('_B', B)
@@ -448,8 +449,8 @@ class LTV(LTI):
         More practical examples can be found at `examples/module/dynamics
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
     '''
-    def __init__(self, A=None, B=None, C=None, D=None, c1=None, c2=None, xdim = None, udim = None, ydim = None):
-        super().__init__(A, B, C, D, c1, c2, xdim, udim, ydim)
+    def __init__(self, A=None, B=None, C=None, D=None, c1=None, c2=None):
+        super().__init__(A, B, C, D, c1, c2)
 
     def set_refpoint(self, state=None, input=None, t=None):
         r'''

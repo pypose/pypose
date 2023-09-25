@@ -1,5 +1,6 @@
 import os
 import time
+import plot
 import torch
 import shutil
 import argparse
@@ -7,7 +8,7 @@ import pypose as pp
 import pickle as pkl
 import torch.optim as optim
 from pypose.module.ipddp import IPDDP
-from tests.module.test_ipddp import InvPend
+from examples.module.dynamics.invpend import InvPend
 
 def main():
     torch.set_default_dtype(torch.float64)
@@ -114,7 +115,7 @@ def main():
 
     opt = optim.SGD([param], lr=2e-1)
 
-    for i in range(50):
+    for i in range(4):
 
         t1 = time.time()
         traj_loss = get_loss(param)
@@ -144,6 +145,6 @@ def main():
             i, traj_loss.item(), model_loss.item()))
 
     print( args.save)
-    os.system('python .\plot.py "{}" &'.format(args.save))
+    plot.plot(args.save)
 if __name__=='__main__':
     main()

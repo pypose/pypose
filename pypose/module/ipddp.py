@@ -12,8 +12,8 @@ class IPDDP(nn.Module):
         stage_cost (:obj:`instance`): Stage cost of the optimal control problem.
         terminal_cost (:obj:`instance`): Terminal cost of the optimal control problem.
         cons (:obj:`instance`): Constraints of the optimal control problem.
-        n_cons (:obj:`int`): Dimension of constraints.
-        init_traj (:obj:`Dict`): Initial system trajectory.
+        T (:obj:`int`): Horizon of the optimal control problem.
+        B (:obj:`tuple`): Batch size of the optimal control problem, default is (1,).
 
     A discrete-time system can be described as:
 
@@ -162,7 +162,8 @@ class IPDDP(nn.Module):
     which can be integrated into a larger end-to-end learning system.
 
     Note:
-        The implementation is based on paper `Interior Point Differential Dynamic Programming
+        The implementation is based on paper `Pavlov, Andrei, Iman Shames, and Chris Manzie.
+        "Interior point differential dynamic programming." IEEE Transactions on Control Systems Technology 29.6 (2021): 2720-2727.
         <https://arxiv.org/pdf/2004.12710.pdf>`_.
 
     Example:

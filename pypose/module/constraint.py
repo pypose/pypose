@@ -82,7 +82,7 @@ class Constraint(nn.Module):
         Linear/linearized constraint term on state
 
         .. math::
-            \mathbf{g}_{\mathbf_{x}} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{x}} \right|_{\chi^*}
+            \mathbf{g}_{\mathbf{x}} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{x}} \right|_{\chi^*}
         '''
         func = lambda x: self.constraint(x, self._ref_input)
         return excludeBatch(jacobian(func, self._ref_state, **self.jacargs), type=2)
@@ -93,7 +93,7 @@ class Constraint(nn.Module):
         Linear/linearized constraint term on input
 
         .. math::
-            \mathbf{g}_{\mathbf_{u}} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{u}} \right|_{\chi^*}
+            \mathbf{g}_{\mathbf{u}} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
         func = lambda u: self.constraint(self._ref_state, u)
         return excludeBatch(jacobian(func, self._ref_input, **self.jacargs), type=2)

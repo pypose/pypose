@@ -3,24 +3,9 @@ import torch as torch
 import torch.nn as nn
 from pypose.module.ipddp import IPDDP
 from pypose.module.dynamics import NLS
+from examples.module.dynamics.invpend import InvPend
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# Create class for inverted-pendulum dynamics
-class InvPend(NLS):
-    def __init__(self, dt, length=[10.0], gravity=10.0):
-        super(InvPend, self).__init__(xdim=2, udim=1, ydim=2)
-        self.tau = dt
-        self.length = length
-        self.gravity = gravity
-
-    def state_transition(self, state, input, t=None):
-        force = input.squeeze(-1)
-        _dstate = torch.stack([state[...,1], force+self.gravity/self.length[0]*torch.sin(state[...,0].clone())], dim=-1)
-        return state + torch.mul(_dstate, self.tau)
-
-    def observation(self, state, input, t=None):
-        return state
 
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float64)
