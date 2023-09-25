@@ -49,4 +49,4 @@ if __name__ == "__main__":
         lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
         ipddp = IPDDP(sys, stage_cost, terminal_cost, lincon, T, B=(1,))
         x_init, u_init = state[batch_id:batch_id+1], input_all[batch_id:batch_id+1]
-        traj_opt[batch_id] = ipddp.solver(x_init, u_init=None, verbose=True)
+        traj_opt[batch_id] = ipddp.forward(x_init, u_init=None, verbose=True)

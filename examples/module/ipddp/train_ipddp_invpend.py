@@ -82,31 +82,32 @@ def main():
     def get_loss(_param):
         sys_ = InvPend(dt, length=_param)
         _ipddp_list = [None for batch_id in range(n_batch)]
-        _fp_best_list = [None for batch_id in range(n_batch)]
+        x_pred_list = [None for batch_id in range(n_batch)]
+        u_pred_list = [None for batch_id in range(n_batch)]
         for batch_id in range(n_batch): # solved separated
             stage_cost = pp.module.QuadCost(Q[batch_id:batch_id+1], R[batch_id:batch_id+1], S[batch_id:batch_id+1], c[batch_id:batch_id+1])
             terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
             lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
             _ipddp_list[batch_id] = IPDDP(sys_, stage_cost, terminal_cost, lincon, T, B=(1,))
-            # detached version to solve the best traj
+            # solve the best traj with computational graph
             x_init, u_init = state[batch_id:batch_id+1], input_all[batch_id:batch_id+1]
-            with torch.no_grad():
-                _fp_best_list[batch_id] = _ipddp_list[batch_id].solver(x_init, u_init)
+            x_pred_list[batch_id], u_pred_list[batch_id], _= _ipddp_list[batch_id].forward(x_init, u_init)
 
-        x_pred, u_pred, _ = _ipddp_list[0].forward(_fp_best_list) # call any one class instantiation, but perform batch grad computation
+        x_pred, u_pred=  torch.cat(x_pred_list,dim=0), torch.cat(u_pred_list,dim=0)
         print('x_pred solved')
         sys = InvPend(dt, length=expert['param'])
         ipddp_list = [None for batch_id in range(n_batch)]
-        fp_list = [None for batch_id in range(n_batch)]
+        x_true_list = [None for batch_id in range(n_batch)]
+        u_true_list = [None for batch_id in range(n_batch)]
         for batch_id in range(n_batch):
             stage_cost = pp.module.QuadCost(Q[batch_id:batch_id+1], R[batch_id:batch_id+1], S[batch_id:batch_id+1], c[batch_id:batch_id+1])
             terminal_cost = pp.module.QuadCost(10./dt*Q[batch_id:batch_id+1,0:1,:,:], R[batch_id:batch_id+1,0:1,:,:], S[batch_id:batch_id+1,0:1,:,:], c[batch_id:batch_id+1,0:1])
             lincon = pp.module.LinCon(gx[batch_id:batch_id+1], gu[batch_id:batch_id+1], g[batch_id:batch_id+1])
             ipddp_list[batch_id] = IPDDP(sys, stage_cost, terminal_cost, lincon, T, B=(1,))
             x_init, u_init = state[batch_id:batch_id+1], input_all[batch_id:batch_id+1]
-            fp_list[batch_id] = ipddp_list[batch_id].solver(x_init, u_init)
-        x_true, u_true = torch.cat([fp_list[batch_id].x for batch_id in range(n_batch)],dim=0), \
-                         torch.cat([fp_list[batch_id].u for batch_id in range(n_batch)],dim=0)
+            with torch.no_grad():
+                x_true_list[batch_id], u_true_list[batch_id], _ = ipddp_list[batch_id].forward(x_init, u_init)
+        x_true, u_true=  torch.cat(x_true_list,dim=0), torch.cat(u_true_list,dim=0)
         print('x_true solved')
 
         traj_loss = 1e4*(torch.mean((u_true - u_pred)**2) + \

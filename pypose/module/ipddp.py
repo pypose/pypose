@@ -480,95 +480,76 @@ class IPDDP(nn.Module):
             self.x, self.u, self.y, self.s, self.c = xnew, unew, ynew, snew, cnew
             self.cost, self.err, self.stepsize, self.step, self.failed = cost, err, stepsize, step, False
 
-    def solver(self, x_init, u_init=None, verbose=False):
+    def forward(self, x_init, u_init=None, verbose=False):
         r'''
         Call forwardpass and backwardpass to solve an optimal trajectory for general nonlinear system
         '''
-        time_start = time.time()
+        with torch.no_grad():
+            time_start = time.time()
 
-        self.x[...,0,:] = x_init
-        if u_init is not None: self.u = u_init
-        for t in range(self.T):
-            self.x[...,t+1,:], _ = self.f_fn(self.x[...,t,:],self.u[...,t,:])
-        self.c = self.c_fn(self.x[...,:-1,:], self.u)
-        if (self.c > 0).any(): self.infeas = True
-        self.cost = self.q_fn(self.x[...,:-1,:], self.u).sum(-1) \
-                    + self.p_fn(self.x[...,-1,:],torch.zeros_like(self.u[...,-1,:])).sum(-1)
-        self.mu = self.cost / self.T / self.s[...,0,:].shape[-1]
-        self.resetfilter()
-        self.reg, self.bp_failed, self.recovery = 0.0, False, 0
+            self.x[...,0,:] = x_init
+            if u_init is not None: self.u = u_init
+            for t in range(self.T):
+                self.x[...,t+1,:], _ = self.f_fn(self.x[...,t,:],self.u[...,t,:])
+            self.c = self.c_fn(self.x[...,:-1,:], self.u)
+            if (self.c > 0).any(): self.infeas = True
+            self.cost = self.q_fn(self.x[...,:-1,:], self.u).sum(-1) \
+                        + self.p_fn(self.x[...,-1,:],torch.zeros_like(self.u[...,-1,:])).sum(-1)
+            self.mu = self.cost / self.T / self.s[...,0,:].shape[-1]
+            self.resetfilter()
+            self.reg, self.bp_failed, self.recovery = 0.0, False, 0
 
-        for iter in range(self.maxiter):
-            while True:
-                # recompute the first, second derivatives of the updated trajectory
-                if not self.fp_failed: self.getDerivatives()
-                self.backwardpasscompact()
-                if not self.bp_failed:
+            for iter in range(self.maxiter):
+                while True:
+                    # recompute the first, second derivatives of the updated trajectory
+                    if not self.fp_failed: self.getDerivatives()
+                    self.backwardpasscompact()
+                    if not self.bp_failed:
+                        break
+
+                self.forwardpasscompact()
+                time_used = time.time() - time_start
+                if verbose:
+                    if (iter % 5 == 1):
+                        print('\n')
+                        print('Iteration','Time','mu','Cost','Opt. error','Reg. power','Stepsize')
+                        print('\n')
+                    print('%-12d%-12.4g%-12.4g%-12.4g%-12.4g%-12d%-12.3f\n'%(
+                                iter, time_used, self.mu, self.cost, self.opterr, self.reg, self.stepsize))
+
+                #-----------termination conditions---------------
+                if (max(self.opterr, self.mu)<=self.tol):
+                    print("~~~Optimality reached~~~")
                     break
 
-            self.forwardpasscompact()
-            time_used = time.time() - time_start
-            if verbose:
-                if (iter % 5 == 1):
-                    print('\n')
-                    print('Iteration','Time','mu','Cost','Opt. error','Reg. power','Stepsize')
-                    print('\n')
-                print('%-12d%-12.4g%-12.4g%-12.4g%-12.4g%-12d%-12.3f\n'%(
-                            iter, time_used, self.mu, self.cost, self.opterr, self.reg, self.stepsize))
+                if (self.opterr <= 0.2*self.mu):
+                    self.mu = max(self.tol/10.0, min(0.2*self.mu, pow(self.mu, 1.2) ) )
+                    self.resetfilter()
+                    self.reg, self.bp_failed, self.recovery = 0.0, False, 0
 
-            #-----------termination conditions---------------
-            if (max(self.opterr, self.mu)<=self.tol):
-                print("~~~Optimality reached~~~")
-                break
+                if iter == self.maxiter - 1:
+                    print("max iter", self.maxiter, "reached, not the optimal one!")
+                #-----------------------------------------------
 
-            if (self.opterr <= 0.2*self.mu):
-                self.mu = max(self.tol/10.0, min(0.2*self.mu, pow(self.mu, 1.2) ) )
-                self.resetfilter()
-                self.reg, self.bp_failed, self.recovery = 0.0, False, 0
-
-            if iter == self.maxiter - 1:
-                print("max iter", self.maxiter, "reached, not the optimal one!")
-            #-----------------------------------------------
-        return self
-
-    def forward(self, fp_list):
-        r'''
-        Generate the trajectory with computational graph.
-
-        Args:
-            fp_list (List of :obj:`Class IPDDP`): The list of IPDDP class instances, each instance is solved from solver.
-
-        Returns:
-            Tensors (:obj:`Tensor`) including
-            :math:`\mathbf{x}` (:obj:`Tensor`): The solved state sequence.
-            :math:`\mathbf{u}` (:obj:`Tensor`): The solved input sequence.
-            :math:`\mathbf{cost}` (:obj:`Tensor`):  The associated costs over the time horizon.
-        '''
+        # Generate the trajectory with computational graph.
+        # batched version has been removed temporarily, although this step can use batch computation
         with torch.autograd.set_detect_anomaly(True): # for debug
-            # collect fp_list into batch
-            n_batch = len(fp_list)
             with torch.no_grad(): # detach
-                self.c, self.s = torch.cat([fp_list[batch_id].c for batch_id in range(n_batch)],dim=0), \
-                                 torch.cat([fp_list[batch_id].s for batch_id in range(n_batch)],dim=0)
-                self.Qxx_terminal = torch.cat([fp_list[batch_id].pxx for batch_id in range(n_batch)],dim=0)
-                self.Qx_terminal = torch.cat([fp_list[batch_id].px for batch_id in range(n_batch)],dim=0)
-                self.Q = torch.cat([torch.cat( [torch.cat([fp_list[batch_id].qxx,    fp_list[batch_id].qxu],dim=-1),
-                                                torch.cat([fp_list[batch_id].qxu.mT, fp_list[batch_id].quu],dim=-1)], dim=-2)
-                                    for batch_id in range(n_batch)], dim=0)
-                self.p = torch.cat([ torch.cat([fp_list[batch_id].qx, fp_list[batch_id].qu],dim=-1)
-                                                for batch_id in range(n_batch)], dim=0)
-                self.W = torch.cat([ torch.cat([fp_list[batch_id].cx, fp_list[batch_id].cu],dim=-1)
-                                                for batch_id in range(n_batch)], dim=0)
-                self.F = torch.cat([ torch.cat([fp_list[batch_id].fx, fp_list[batch_id].fu],dim=-1)
-                                                for batch_id in range(n_batch)], dim=0)
-                self.G = torch.cat([ torch.cat([torch.cat([fp_list[batch_id].fxx, fp_list[batch_id].fxu],dim=-1),
-                                                torch.cat([fp_list[batch_id].fxu.mT, fp_list[batch_id].fuu],dim=-1)], dim=-2)
-                                    for batch_id in range(n_batch)], dim=0)
+                self.Qxx_terminal = self.pxx
+                self.Qx_terminal = self.px
+                self.Q = torch.cat( [torch.cat([self.qxx, self.qxu],dim=-1),
+                                                torch.cat([self.qxu.mT, self.quu],dim=-1)], dim=-2)
+
+                self.p = torch.cat([self.qx, self.qu],dim=-1)
+                self.W = torch.cat([self.cx, self.cu],dim=-1)
+
+                self.F = torch.cat([self.fx, self.fu],dim=-1)
+                self.G = torch.cat([torch.cat([self.fxx, self.fxu],dim=-1),
+                                    torch.cat([self.fxu.mT, self.fuu],dim=-1)], dim=-2)
 
                 self.T = self.F.size(-3)
-                self.mu = torch.stack([fp_list[batch_id].mu for batch_id in range(n_batch)], dim=0) # use different mu for each sample
-                self.xold = torch.cat([fp_list[batch_id].x for batch_id in range(n_batch)], dim=0)
-                self.uold = torch.cat([fp_list[batch_id].u for batch_id in range(n_batch)], dim=0)
+                self.xold = self.x
+                self.uold = self.u
 
             # run backward and forward once
             self.infeas = False
