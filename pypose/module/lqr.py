@@ -290,29 +290,29 @@ class LQR(nn.Module):
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
             associated quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
+        
         if self.Q is None:
-            self.n_xu=xu_target.shape[-1]
+            self.n_xu = xu_target.shape[-1]
             self.dargs = {'dtype': xu_target.dtype, 'device': xu_target.device}
-            self.Q = torch.tile(torch.eye(self.n_xu), (1, self.T, 1, 1)).float()*1e-9
+            self.Q = torch.tile(torch.eye(self.n_xu), (1, self.T, 1, 1)).float() * 1e-9
             self.p = torch.zeros(1, self.T, self.n_xu).float()
 
-        add_Q = torch.zeros(1, self.T, self.n_xu, self.n_xu).float()
-        add_p = torch.zeros(1, self.T, self.n_xu).float()
+        add_Q = torch.zeros_like(self.Q)
+        add_p = torch.zeros_like(self.p)
 
         if xu_cost is not None:
             if xu_cost.dim() != 1:
                 raise ValueError("xu_cost should be a 1d vector")
             for i in range(xu_cost.shape[0]):
-                add_Q[...,:,i,i] = xu_cost[i]
-                add_p[...,:,i] = -xu_cost[i] * xu_target[i]
-
+                add_Q[..., :, i, i] = xu_cost[i]
+                add_p[..., :, i] = -xu_cost[i] * xu_target[i]
 
         if x_init.dim() > 2:
             self.n_batch = x_init.shape[:-2]
         else:
             self.n_batch = torch.Size([1])
-        
-        K, k = self.lqr_backward(x_init, dt, self.Q+add_Q, self.p+add_p, u_traj, u_lower, u_upper, du)
+
+        K, k = self.lqr_backward(x_init, dt, self.Q + add_Q, self.p + add_p, u_traj, u_lower, u_upper, du)
         x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
 
         return x, u, cost
