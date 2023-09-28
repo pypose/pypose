@@ -31,7 +31,7 @@ def load_requirements(filename: str):
 
 
 requirements_extras = {
-    "runtime": load_requirements("requirements/runtime.txt"), 
+    "runtime": load_requirements("requirements/runtime.txt"),
     "docs": load_requirements("requirements/docs.txt"),}
 
 requirements_extras["all"] = list(set(sum(requirements_extras.values(), [])))
@@ -39,9 +39,9 @@ requirements_extras["all"] = list(set(sum(requirements_extras.values(), [])))
 if __name__ == '__main__':
     setup(
         name = 'pypose',
-        author = 'Chen Wang',
+        author = 'Chen Wang and PyPose Team',
         version = VERSION,
-        author_email = 'chenwang@dr.com',
+        author_email = 'admin@pypose.org',
         url = 'https://pypose.org',
         download_url = 'https://github.com/pypose/pypose',
         license = 'Apache License 2.0',
@@ -52,7 +52,7 @@ if __name__ == '__main__':
         python_requires='>=3.6',
         setup_requires=['pytest-runner'],
         tests_require=['pytest'],
-        packages=find_packages(exclude=('docs', 'test', 'examples')),
+        packages=find_packages(exclude=('docs', 'tests', 'examples')),
         data_files=[('', ['requirements/runtime.txt', 'requirements/docs.txt'])],
         zip_safe=True,
         install_requires = load_requirements("requirements/runtime.txt"),

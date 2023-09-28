@@ -1,6 +1,5 @@
 import time
 import torch
-import warnings
 import pypose as pp
 from torch import nn
 import pypose.optim.solver as ppos
@@ -14,10 +13,10 @@ class Timer:
     def __init__(self):
         self.synchronize()
         self.start_time = time.time()
-    
+
     def synchronize(self):
         if torch.cuda.is_available():
-            torch.cuda.synchronize()  
+            torch.cuda.synchronize()
 
     def tic(self):
         self.start()
@@ -118,7 +117,7 @@ class TestOptim:
                 print('Early Stoping!')
                 print('Optimization Early Done with loss:', loss.sum().item())
                 break
-        
+
         assert idx < 9, "Optimization requires too many steps."
 
 
@@ -279,8 +278,74 @@ class TestOptim:
                 print('Early Stoping!')
                 print('Optimization Early Done with loss:', loss.item())
                 break
-        
+
         assert idx < 9, "Optimization requires too many steps."
+
+    def test_optim_multi_input(self):
+
+        class PoseInv(nn.Module):
+            def __init__(self, *dim):
+                super().__init__()
+                self.pose = pp.Parameter(pp.randn_SE3(*dim))
+
+            def forward(self, poses):
+                error1 = (self.pose @ poses).Log().tensor()
+                error2 = self.pose.Log().tensor().sum(-1, keepdim=True)
+                return error1, error2
+
+        B1, B2, M, N = 2, 3, 2, 2
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        inputs = pp.randn_SE3(B2, B1, M, N, sigma=0.0001).to(device)
+        invnet = PoseInv(M, N).to(device)
+        strategy = pp.optim.strategy.TrustRegion(radius=1e6)
+        kernel = [ppok.Huber().to(device), ppok.Scale().to(device)]
+        weight = [torch.eye(6, device=device), torch.ones(1, device=device)]
+        optimizer = pp.optim.LM(invnet, strategy=strategy, kernel=kernel)
+        # optimizer = pp.optim.GN(invnet, kernel=kernel)
+
+        for idx in range(10):
+            loss = optimizer.step(input={'poses':inputs}, weight=weight)
+            print('Pose loss %.7f @ %dit'%(loss, idx))
+            if loss < 1e-5:
+                print('Early Stoping!')
+                print('Optimization Early Done with loss:', loss.item())
+                break
+
+        assert idx < 9, "Optimization requires too many steps."
+
+
+    def test_batch_weight(self):
+
+        class PoseInv(nn.Module):
+            def __init__(self, *dim):
+                super().__init__()
+                self.pose = pp.Parameter(pp.randn_SE3(*dim))
+
+            def forward(self, poses):
+                error1 = (self.pose @ poses).Log().tensor()
+                error2 = self.pose.Log().tensor().sum(-1, keepdim=True)
+                return error1, error2
+
+        B1, B2, M, N = 2, 3, 2, 2
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        inputs = pp.randn_SE3(B2, B1, M, N, sigma=0.0001).to(device)
+        invnet = PoseInv(M, N).to(device)
+        strategy = pp.optim.strategy.TrustRegion(radius=1e6)
+        kernel = [ppok.Huber().to(device), ppok.Scale().to(device)]
+        weight = [torch.eye(6, device=device).unsqueeze(0).repeat(N, 1, 1), \
+                  torch.ones(1, device=device).unsqueeze(0)]
+        optimizer = pp.optim.LM(invnet, strategy=strategy, kernel=kernel)
+
+        for idx in range(10):
+            loss = optimizer.step(input={'poses':inputs}, weight=weight)
+            print('Pose loss %.7f @ %dit'%(loss, idx))
+            if loss < 1e-5:
+                print('Early Stoping!')
+                print('Optimization Early Done with loss:', loss.item())
+                break
+
+        assert idx < 9, "Optimization requires too many steps."
+
 
 if __name__ == '__main__':
     test = TestOptim()
@@ -292,3 +357,5 @@ if __name__ == '__main__':
     test.test_optim_trustregion()
     test.test_optim_multiparameter()
     test.test_optim_anybatch()
+    test.test_optim_multi_input()
+    test.test_batch_weight()

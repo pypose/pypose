@@ -8,10 +8,14 @@ PyPose Documentation
    :caption: Contents:
 
    lietensor
+   func
    functions
    convert
    modules
    optim
+   sparse
+   utils
+   testing
 
 
 Indices and tables

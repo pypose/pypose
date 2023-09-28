@@ -1,8 +1,9 @@
 import torch
 from torch import nn
 from .basics import vec2skew
-import collections, numbers, warnings
+from contextlib import contextmanager
 from .operation import broadcast_inputs
+import collections, numbers, warnings, importlib
 from torch.utils._pytree import tree_map, tree_flatten
 from .operation import SO3_Log, SE3_Log, RxSO3_Log, Sim3_Log
 from .operation import so3_Exp, se3_Exp, rxso3_Exp, sim3_Exp
@@ -70,7 +71,7 @@ class LieType:
 
     def Inv(self, x):
         if self.on_manifold:
-            return - x
+            return LieTensor(-x, ltype=x.ltype)
         raise NotImplementedError("Instance has no Inv attribute.")
 
     def Act(self, X, p):
@@ -183,7 +184,7 @@ class SO3Type(LieType):
         X = X.tensor() if hasattr(X, 'ltype') else X
         x = SO3_Log.apply(X)
         return LieTensor(x, ltype=so3_type)
-    
+
     def Act(self, X, p):
         assert not self.on_manifold and isinstance(p, torch.Tensor)
         assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
@@ -213,12 +214,12 @@ class SO3Type(LieType):
         if self.on_manifold:
             return LieTensor(torch.mul(X, Y), ltype=SO3_type)
         raise NotImplementedError('Invalid __mul__ operation')
-    
+
     def Inv(self, X):
         X = X.tensor() if hasattr(X, 'ltype') else X
         out = SO3_Inv.apply(X)
         return LieTensor(out, ltype=SO3_type)
-    
+
     def Adj(self, X, a):
         X = X.tensor() if hasattr(X, 'ltype') else X
         a = a.tensor() if hasattr(a, 'ltype') else a
@@ -908,7 +909,7 @@ class LieTensor(torch.Tensor):
         if data is not None and func.__name__ in HANDLED_FUNCTIONS:
             args, spec = tree_flatten(args)
             ltype = [arg.ltype for arg in args if isinstance(arg, LieTensor)][0]
-            def warp(t):
+            def wrap(t):
                 if isinstance(t, torch.Tensor) and not isinstance(t, cls):
                     lt = torch.Tensor.as_subclass(t, LieTensor)
                     lt.ltype = ltype
@@ -918,7 +919,7 @@ class LieTensor(torch.Tensor):
                             'go to {}'.format(func, link))
                     return lt
                 return t
-            return tree_map(warp, data)
+            return tree_map(wrap, data)
         return data
 
     @property
@@ -1018,6 +1019,12 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.Mul(self, other)
 
+    def mul(self, other):
+        r'''
+        See :meth:`pypose.mul`
+        '''
+        return self.ltype.Mul(self, other)
+
     def __matmul__(self, other):
         r'''
         See :meth:`pypose.matmul`
@@ -1108,7 +1115,7 @@ class LieTensor(torch.Tensor):
         flag = t2.abs() < 1. - eps
         yaw1 = torch.atan2(t3, t4)
         yaw2 = -2 * pm(t2) * torch.atan2(x, w)
-        
+
         roll = torch.where(flag, roll1, roll2)
         pitch = torch.asin(t2.clamp(-1, 1))
         yaw = torch.where(flag, yaw1, yaw2)
@@ -1214,3 +1221,34 @@ class Parameter(LieTensor, nn.Parameter):
             result = type(self)(self.clone(memory_format=torch.preserve_format))
             memo[id(self)] = result
             return result
+
+@contextmanager
+def retain_ltype():
+    # save the original PyTorch functions
+    TO_BE_WRAPPED = {
+        torch.autograd.forward_ad.make_dual,
+        torch._functorch.eager_transforms._wrap_tensor_for_grad,
+    }
+
+    def wrap_function(func):
+        def wrapper(*args, **kwargs):
+            ltype = args[0].ltype if isinstance(args[0], LieTensor) else None
+            res = func(*args, **kwargs)
+            if ltype is not None:
+                res = torch.Tensor.as_subclass(res, LieTensor)
+                res.ltype = ltype
+            return res
+        return wrapper
+
+    try:
+        # swap the original PyTorch functions with the wrapper
+        for func in TO_BE_WRAPPED:
+            module, name = func.__module__, func.__name__
+            module = importlib.import_module(module)
+            setattr(module, name, wrap_function(func))
+        yield
+    finally:
+        for func in TO_BE_WRAPPED:
+            module, name = func.__module__, func.__name__
+            module = importlib.import_module(module)
+            setattr(module, name, func)
