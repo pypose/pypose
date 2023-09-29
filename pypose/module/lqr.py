@@ -259,16 +259,14 @@ class LQR(nn.Module):
                      [-0.3017, -0.2897,  0.7251],
                      [-0.0728,  0.7290, -0.3117]]])
     '''
-    def __init__(self, system: dynamics.System, T, Q=None, p=None):
+    def __init__(self, system: dynamics.System, T):
         super().__init__()
         self.system = system
         self.T = T
         self.x_traj = None
         self.u_traj = None
-        self.Q = Q
-        self.p = p
 
-    def forward(self, x_init, xu_target, xu_cost=None, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
+    def forward(self, x_init, tau_target, Q, p=None, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
         r'''
         Performs LQR for the discrete system.
 
@@ -291,29 +289,26 @@ class LQR(nn.Module):
             associated quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
         
-        if self.Q is None:
-            self.n_xu = xu_target.shape[-1]
-            self.dargs = {'dtype': xu_target.dtype, 'device': xu_target.device}
-            self.Q = torch.tile(torch.eye(self.n_xu), (1, self.T, 1, 1)).float() * 1e-9
-            self.p = torch.zeros(1, self.T, self.n_xu).float()
-
-        add_Q = torch.zeros_like(self.Q)
-        add_p = torch.zeros_like(self.p)
-
-        if xu_cost is not None:
-            if xu_cost.dim() != 1:
-                raise ValueError("xu_cost should be a 1d vector")
-            for i in range(xu_cost.shape[0]):
-                add_Q[..., :, i, i] = xu_cost[i]
-                add_p[..., :, i] = -xu_cost[i] * xu_target[i]
+        assert x_init.device == tau_target.device
+        assert x_init.dtype == tau_target.dtype
+        assert x_init.device == Q.device
+        assert x_init.dtype == Q.dtype
 
         if x_init.dim() > 2:
             self.n_batch = x_init.shape[:-2]
         else:
             self.n_batch = torch.Size([1])
+        
+        self.dargs = {'dtype': tau_target.dtype, 'device': tau_target.device}
 
-        K, k = self.lqr_backward(x_init, dt, self.Q + add_Q, self.p + add_p, u_traj, u_lower, u_upper, du)
-        x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
+        if p is None:
+            p = torch.zeros(self.n_batch + (self.T, Q.size(-1)), **self.dargs)
+
+        p_tar = -Q @ tau_target
+        p = p + p_tar
+
+        K, k = self.lqr_backward(x_init, dt, Q, p, u_traj, u_lower, u_upper, du)
+        x, u, cost = self.lqr_forward(x_init, K, k, Q, p, u_lower, u_upper, du)
 
         return x, u, cost
     
@@ -345,7 +340,7 @@ class LQR(nn.Module):
 
     def lqr_backward(self, x_init, dt, Q, p, u_traj=None, u_lower=None, u_upper=None, du=None):
 
-        ns, nsc = x_init.size(-1), self.p.size(-1)
+        ns, nsc = x_init.size(-1), p.size(-1)
         nc = nsc - ns
 
         if u_traj is None:
@@ -391,7 +386,7 @@ class LQR(nn.Module):
 
         return K, k
 
-    def lqr_forward(self, x_init, K, k, u_lower=None, u_upper=None, du=None):
+    def lqr_forward(self, x_init, K, k, Q, p, u_lower=None, u_upper=None, du=None):
 
         assert x_init.device == K.device == k.device
         assert x_init.dtype == K.dtype == k.dtype
@@ -412,6 +407,6 @@ class LQR(nn.Module):
             u[...,t,:] = ut = delta_u[..., t, :] + self.u_traj[...,t,:]
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
-            cost += 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + vecdot(xut, self.p[...,t,:])
+            cost += 0.5 * bvmv(xut, Q[...,t,:,:], xut) + vecdot(xut, p[...,t,:])
 
         return x, u, cost
