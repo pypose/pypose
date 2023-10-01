@@ -294,6 +294,12 @@ class LQR(nn.Module):
         assert x_init.device == Q.device
         assert x_init.dtype == Q.dtype
 
+        if Q.ndim == 3:
+            Q = torch.tile(Q.unsqueeze(-3), (1, self.T, 1, 1))
+
+        if p.ndim == 2:
+            p = torch.tile(p.unsqueeze(-2), (1, self.T, 1))
+
         self.n_batch = x_init.shape[:-1]
 
         
