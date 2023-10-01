@@ -294,10 +294,8 @@ class LQR(nn.Module):
         assert x_init.device == Q.device
         assert x_init.dtype == Q.dtype
 
-        if x_init.dim() > 2:
-            self.n_batch = x_init.shape[:-2]
-        else:
-            self.n_batch = torch.Size([1])
+        self.n_batch = x_init.shape[:-1]
+
         
         self.dargs = {'dtype': tau_target.dtype, 'device': tau_target.device}
 
