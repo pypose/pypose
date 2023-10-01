@@ -266,7 +266,7 @@ class LQR(nn.Module):
         self.x_traj = None
         self.u_traj = None
 
-    def forward(self, x_init, tau_target, Q, p=None, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
+    def forward(self, x_init, xu_target, Q, p=None, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
         r'''
         Performs LQR for the discrete system.
 
@@ -289,8 +289,8 @@ class LQR(nn.Module):
             associated quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
         
-        assert x_init.device == tau_target.device
-        assert x_init.dtype == tau_target.dtype
+        assert x_init.device == xu_target.device
+        assert x_init.dtype == xu_target.dtype
         assert x_init.device == Q.device
         assert x_init.dtype == Q.dtype
 
@@ -303,12 +303,12 @@ class LQR(nn.Module):
         self.n_batch = x_init.shape[:-1]
 
         
-        self.dargs = {'dtype': tau_target.dtype, 'device': tau_target.device}
+        self.dargs = {'dtype': xu_target.dtype, 'device': xu_target.device}
 
         if p is None:
             p = torch.zeros(self.n_batch + (self.T, Q.size(-1)), **self.dargs)
 
-        p_tar = -Q @ tau_target
+        p_tar = -Q @ xu_target
         p = p + p_tar
 
         K, k = self.lqr_backward(x_init, dt, Q, p, u_traj, u_lower, u_upper, du)
