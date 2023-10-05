@@ -1,7 +1,7 @@
 import math, torch
 
 
-def pm(input, *, out=None):
+def pm(input):
     r'''
     Returns plus or minus (:math:`\pm`) states for tensor.
 
