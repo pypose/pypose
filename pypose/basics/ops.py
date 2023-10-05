@@ -21,9 +21,7 @@ def pm(input, *, out=None):
         >>> pp.pm(torch.tensor([0.1, 0, -0.2], dtype=torch.float64))
         tensor([ 1.,  1., -1.], dtype=torch.float64)
     '''
-    out = torch.sign(input, out=None)
-    out[out==0] = 1
-    return out
+    return (torch.sign(input, out=None) + 1).clamp(0, 1) * 2 - 1
 
 
 def cumops_(input, dim, ops):
