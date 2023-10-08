@@ -1,6 +1,6 @@
 # Reprojection Error Pose Graph Optimization
 
-![Reprojerr_Visualization](https://github.com/pypose/pypose/assets/47029019/e5c2ab45-7578-4901-a779-9b7f44cce338)
+![Reprojerr_Visualization](https://github.com/pypose/pypose/assets/47029019/2312b239-896d-4c07-9cdf-56e35728ce08)
 
 An example for pose graph optimization between adjacent frames using cropped trajectory from [the TartanAir dataset](https://theairlab.org/tartanair-dataset/) (Easy, abandoned factory, sequence P001).
 
