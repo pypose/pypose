@@ -593,6 +593,26 @@ class SbkTensor(torch.Tensor):
 
         return res
 
+    def to_sparse_coo(self):
+        '''Convert the SbkTensor to a COO tensor.
+
+        Returns:
+            torch.Tensor: The converted COO tensor.
+        '''
+        return hybrid_2_coo(self._s)
+
+    def sparse_dim(self):
+        '''Return the sparse dimension of the internal storage.'''
+        return self._s.sparse_dim()
+
+    def dense_dim(self):
+        '''Return the dense dimension of the internal storage.'''
+        return self._s.dense_dim()
+
+    def indices(self):
+        '''Return the indices of the internal storage.'''
+        return self._s.indices()
+
 
 def sbktensor(
         indices, values, size=None, dtype=None, device=None, requires_grad=False):
