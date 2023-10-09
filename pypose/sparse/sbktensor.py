@@ -73,7 +73,7 @@ def prod(xs: List[int]) -> int:
 def make_coo_indices_and_dims_from_hybrid(hybrid):
     '''Create index and dimension info for converting a Hybrid tensor to a COO tensor.
 
-    Create the index and dimension information for converting a Hybrid tensor to a COO tensor.
+    Create index and dimension information for converting a Hybrid tensor to a COO tensor.
 
     Args:
         hybrid (torch.Tensor): The Hybrid tensor.
@@ -194,7 +194,7 @@ def coo2hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
     # Figure out the shape of the target Hybrid tensor.
     shape_p = list(proxy.shape)
     assert all(coo.shape[i] % shape_p[i] == 0 for i in range(proxy.dim())), \
-        f'coo and proxy shape are not compatible: coo.shape={coo.shape}, shape_p={shape_p}. '
+        f'coo and proxy shape are incompatible: coo.shape={coo.shape}, shape_p={shape_p}.'
     shape_b: List[int] = [coo.shape[i] // shape_p[i] for i in range(proxy.dim())]
 
     shape_b_t = torch.tensor(shape_b, dtype=torch.int64, device=coo.device).unsqueeze(-1)
@@ -228,8 +228,8 @@ def coo2hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
     return torch.sparse_coo_tensor(proxy.indices(), blocks, size=list(shape_p) + shape_b)
 
 
-class Operation(object):
-    '''Operation base class
+class SbkOps(object):
+    '''Operation base class for SbkTensor
 
     An operation on an SbkTensor will eventually be executed by the __torch_function__
     method. An SbkTensor consists of a Storage tensor and a Proxy tensor. All
@@ -240,7 +240,7 @@ class Operation(object):
     override. They are:
 
     * storage_pre: This method, most of the time, perform the type stripping operations.
-    The Hybrid tensor to COO tensor conversion, if necessary, should also be implemented here.
+    The Hybrid tensor to COO tensor conversion, if necessary, should be implemented here.
     * storage_op: The actual operation performed on the Storage tensor.
     * proxy_op: The appropriate operation that needs to be performed on the Proxy tensor
     to preserve the block structure.
@@ -277,7 +277,7 @@ class Operation(object):
         return s_outs, p_outs
 
 
-class SBTGetOp(Operation):
+class SbkGetOp(SbkOps):
     def __init__(self, func_name):
         super().__init__(func_name=func_name)
 
@@ -293,7 +293,7 @@ class SBTGetOp(Operation):
         return s_array, p_array
 
 
-class ComputeViaHybrid(Operation):
+class ComputeViaHybrid(SbkOps):
     '''An Operation that does not need to disassemble the Storage tensor.
     E.g., mostly the inplace operations such as torch.add_().
 
@@ -349,11 +349,11 @@ class ComputeViaHybrid(Operation):
         return p
 
 
-class ComputeViaCOO(Operation):
-    '''SBT Operations that performs the same operation on the Proxy tensor.
+class ComputeViaCOO(SbkOps):
+    '''SbkOps that performs the same operation on the Proxy tensor.
 
-    This class implements the SBTOperation that performs the same operation on the Proxy tensor.
-    Most of such operations require to convert the Storage tensor from Hybrid to COO format.
+    This class implements the SbkOps that performs the same operation on the Proxy tensor.
+    Most of such operations require converting the Storage tensor from Hybrid to COO format.
 
     E.g., torch.add().
 
@@ -446,19 +446,17 @@ class registry:
         cls.HANDLED_FUNCS[name] = op_type(name, *args, **kwargs)
 
     @classmethod
-    def register(cls, sbt_op_type, *args, **kwargs):
+    def register(cls, op_type, *args, **kwargs):
         '''Thie function is meant to be used as a decorator.
 
         Args:
-            sbt_op_type (OpType): The OpType object describing the operation type and
+            op_type (OpType): The OpType object describing the operation type and
                 the function name.
 
         '''
         def decorator(func):
-            if sbt_op_type.func_name is None:
-                cls.add_op(func.__name__, sbt_op_type.op_type, *args, **kwargs)
-            else:
-                cls.add_op(sbt_op_type.func_name, sbt_op_type.op_type, *args, **kwargs)
+            func_name = func.__name__ if op_type.func_name is None else op_type.func_name
+            cls.add_op(func_name, op_type.op_type, *args, **kwargs)
             return func
         return decorator
 
@@ -467,7 +465,7 @@ class registry:
 # 2. Register the operation through the @registry.register() decorator.
 
 # ========== Special Python methods. ==========
-registry.add_op( '__get__', SBTGetOp )
+registry.add_op( '__get__', SbkGetOp )
 
 # ========== Linear Algebra operations. ==========
 registry.add_op( 'matmul', ComputeViaCOO )
@@ -500,39 +498,39 @@ class SbkTensor(torch.Tensor):
                 f'All operations on SbkTensor must be handled. '
                 f'\n{func.__name__} is not.')
 
-        sbt_op = registry.HANDLED_FUNCS[func.__name__]
-        args_storage, args_proxy = sbt_op.storage_pre(func, types, args, kwargs)
-        stripped_types = (torch.Tensor if t is SbkTensor else t for t in types)
-        outputs_storage = sbt_op.storage_op(func, stripped_types, args_storage, kwargs)
-        outputs_proxy = sbt_op.proxy_op(func, stripped_types, args_proxy, kwargs)
-        if not isinstance(outputs_storage, (list, tuple)):
+        op = registry.HANDLED_FUNCS[func.__name__]
+        args_storage, args_proxy = op.storage_pre(func, types, args, kwargs)
+        types = (torch.Tensor if t is SbkTensor else t for t in types)
+        storages = op.storage_op(func, types, args_storage, kwargs)
+        proxies = op.proxy_op(func, types, args_proxy, kwargs)
+        if not isinstance(storages, (list, tuple)):
             flag_list = False
-            outputs_storage = [outputs_storage]
+            storages = [storages]
         else:
             flag_list = True
 
-        if not isinstance(outputs_proxy, (list, tuple)):
-            outputs_proxy = [outputs_proxy]
+        if not isinstance(proxies, (list, tuple)):
+            proxies = [proxies]
 
-        outputs_list_storage, outputs_list_proxy = \
-            sbt_op.storage_post(func, stripped_types, outputs_storage, outputs_proxy, kwargs)
+        outs_storage, outs_proxy = op.storage_post(func, types, storages, proxies, kwargs)
 
-        if outputs_list_storage[0] is None:
+        if outs_storage[0] is None:
             return None
 
         outputs_final = []
-        for output_storage, output_proxy in zip(outputs_list_storage, outputs_list_proxy):
+        for storage, proxy in zip(outs_storage, outs_proxy):
             # Recover the types
-            if isinstance(output_storage, torch.Tensor) and not isinstance(output_storage, cls):
-                if not output_storage.is_sparse:
-                    outputs_final.append( output_storage )
+            if isinstance(storage, torch.Tensor) and not isinstance(storage, cls):
+                if not storage.is_sparse:
+                    outputs_final.append( storage )
                     continue
                 sbt = cls()
-                sbt._s = output_storage
-                sbt._p = output_proxy
+                sbt._s = storage
+                sbt._p = proxy
                 outputs_final.append(sbt)
-            # noop for the case of not a tensor nor a SbkTensor
-            outputs_final.append(outputs_storage)
+            else:
+               # noop for the case of not a tensor nor a SbkTensor
+                outputs_final.append(storage)
 
         if flag_list:
             return outputs_final
@@ -555,7 +553,7 @@ class SbkTensor(torch.Tensor):
         '''
         return f"SparseBlockTensor\nstorage:\n{self._s}\nproxy:\n{self._p}"
 
-    @registry.register(OpType(op_type=Operation))
+    @registry.register(OpType(op_type=SbkOps))
     def __format__(self, spec):
         return str(self)
 
