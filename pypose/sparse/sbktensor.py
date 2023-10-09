@@ -1,6 +1,6 @@
-from typing import List, Optional
 import torch
 from torch import jit
+from typing import List, Optional
 
 '''Sparse Block Tensor (SbkTensor) for PyPose.
 This module implements the sparse block tensor (referred to as SbkTensor) for PyPose.
@@ -104,10 +104,7 @@ def make_coo_indices_and_dims_from_hybrid(hybrid):
     # (num_dim, num_b, numel_b)
     indices = block_indices * scale[:, None, None] + offset[:, None, :]
     indices = indices.flatten(1, 2)
-
-    shape: List[int] = []
-    for i in range(num_dim):
-        shape.append(shape_p[i] * shape_b[i])
+    shape = [shape_p[i] * shape_b[i] for i in range(num_dim)]
     return indices, shape
 
 
@@ -152,13 +149,11 @@ def repeated_value_as_hybrid_value(coo: torch.Tensor,
 
     shape_p: List[int] = list(coo.shape)
 
-    return torch.sparse_coo_tensor(
-            coo.indices(), val, size=shape_p + shape_b
-        ).coalesce()
+    return torch.sparse_coo_tensor(coo.indices(), val, size=shape_p + shape_b).coalesce()
 
 
 @jit.script
-def hybrid_2_coo(hybrid):
+def hybrid2coo(hybrid):
     '''Covnert a Hybrid tensor to a COO tensor.
 
     This function converts a Hybrid tensor to a COO tensor.
@@ -176,7 +171,7 @@ def hybrid_2_coo(hybrid):
 
 
 @jit.script
-def coo_2_hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
+def coo2hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
     '''Convert a COO tensor to a Hybrid tensor by referring to the proxy.
 
     A proxy is a COO tensor. Any non-zero element in proxy indicates a block of the
@@ -281,6 +276,7 @@ class Operation(object):
     def storage_post(self, func, types, s_outs=(), p_outs=(), kwargs={}):
         return s_outs, p_outs
 
+
 class SBTGetOp(Operation):
     def __init__(self, func_name):
         super().__init__(func_name=func_name)
@@ -292,12 +288,10 @@ class SBTGetOp(Operation):
             s_array (list): A list of Storage tensors. Could be Hybrid tensors.
             p_array (list): A list of Proxy tensors.
         '''
-        s_array = []
-        p_array = []
-        for arg in args:
-            s_array.append( arg._s if isinstance(arg, SbkTensor) else arg )
-            p_array.append( arg._p if isinstance(arg, SbkTensor) else arg )
+        s_array = [arg._s if isinstance(arg, SbkTensor) else arg for arg in args]
+        p_array = [arg._p if isinstance(arg, SbkTensor) else arg for arg in args]
         return s_array, p_array
+
 
 class ComputeViaHybrid(Operation):
     '''An Operation that does not need to disassemble the Storage tensor.
@@ -325,11 +319,8 @@ class ComputeViaHybrid(Operation):
             s_array (list): A list of Storage tensors. Could be Hybrid tensors.
             p_array (list): A list of Proxy tensors.
         '''
-        s_array = []
-        p_array = []
-        for arg in args:
-            s_array.append( arg._s if isinstance(arg, SbkTensor) else arg )
-            p_array.append( arg._p if isinstance(arg, SbkTensor) else arg )
+        s_array = [arg._s if isinstance(arg, SbkTensor) else arg for arg in args]
+        p_array = [arg._p if isinstance(arg, SbkTensor) else arg for arg in args]
         return s_array, p_array
 
     def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
@@ -345,9 +336,8 @@ class ComputeViaHybrid(Operation):
         '''
         # Find the first sparse Tensor in operands.
         if self.proxy_reduction is None:
-            p = [ op for op in p_args
-                if isinstance(op, torch.Tensor) and op.is_sparse == True
-            ][0]
+            func = lambda op: isinstance(op, torch.Tensor) and op.is_sparse
+            p = next(filter(func, p_args), None)
         elif self.proxy_reduction == 'add':
             p = torch.add(*p_args)
         elif self.proxy_reduction == 'mul':
@@ -357,6 +347,7 @@ class ComputeViaHybrid(Operation):
         if self.clone:
             return p.detach().clone()
         return p
+
 
 class ComputeViaCOO(Operation):
     '''SBT Operations that performs the same operation on the Proxy tensor.
@@ -381,14 +372,8 @@ class ComputeViaCOO(Operation):
             s_array (list): A list of Storage tensors that are converted to COO format.
             p_array (list): A list of Proxy tensors.
         '''
-        s_array = []
-        p_array = []
-        for arg in args:
-            # Convert the sparse Hybrid tensor _s to COO tensor.
-            s_array.append( hybrid_2_coo( arg._s )
-                           if isinstance(arg, SbkTensor)
-                           else arg )
-            p_array.append( arg._p if isinstance(arg, SbkTensor) else arg )
+        s_array = [hybrid2coo(arg._s) if isinstance(arg, SbkTensor) else arg for arg in args]
+        p_array = [arg._p if isinstance(arg, SbkTensor) else arg for arg in args]
         return s_array, p_array
 
     def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
@@ -411,7 +396,7 @@ class ComputeViaCOO(Operation):
             s_outs (outs for Storage) and p_outs (outs for Proxy) are assumed to have the
             exact same order.
         '''
-        s_outs = [ coo_2_hybrid(s, p)
+        s_outs = [ coo2hybrid(s, p)
                     if isinstance(s, torch.Tensor) and s.is_sparse == True
                     else s
                     for s, p in zip(s_outs, p_outs) ]
@@ -508,11 +493,11 @@ class SbkTensor(torch.Tensor):
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs={}):
-        '''The main entry point for all operations on SparseBlockTensor.'''
+        '''The main entry point for all operations on SbkTensor.'''
 
         if not registry.is_handled(func.__name__):
             raise Exception(
-                f'All operations on SparseBlockTensor must be handled. '
+                f'All operations on SbkTensor must be handled. '
                 f'\n{func.__name__} is not.')
 
         sbt_op = registry.HANDLED_FUNCS[func.__name__]
@@ -585,11 +570,10 @@ class SbkTensor(torch.Tensor):
             shape_b = s.shape[num_dim:]
             assert p.dim() == num_dim
             assert p.shape == s.shape[:num_dim]
-            s1 = torch.sparse_coo_tensor(
+            res._s = torch.sparse_coo_tensor(
                     indices=torch.tensor([]).reshape((num_dim, 0)),
                     values=torch.tensor([]).reshape(0, *shape_b),
                     size=(*p.shape, *shape_b)).coalesce()
-            res._s = s1
 
         return res
 
@@ -599,7 +583,7 @@ class SbkTensor(torch.Tensor):
         Returns:
             torch.Tensor: The converted COO tensor.
         '''
-        return hybrid_2_coo(self._s)
+        return hybrid2coo(self._s)
 
     def sparse_dim(self):
         '''Return the sparse dimension of the internal storage.'''
@@ -614,29 +598,27 @@ class SbkTensor(torch.Tensor):
         return self._s.indices()
 
 
-def sbktensor(
-        indices, values, size=None, dtype=None, device=None, requires_grad=False):
+def sbktensor(indices, values, size=None, dtype=None, device=None, requires_grad=False):
     # Figure out the block shape.
     num_b, shape_b = values.shape[0], values.shape[1:]
+    x = SbkTensor()
 
     # Storage.
-    storage = torch.sparse_coo_tensor(
+    x._s = torch.sparse_coo_tensor(
         indices,
         values,
         size=(*size, *shape_b),
         dtype=dtype,
         device=device,
-        requires_grad=requires_grad ).coalesce()
+        requires_grad=requires_grad).coalesce()
 
-    proxy = torch.sparse_coo_tensor(
+    # Proxy.
+    x._p = torch.sparse_coo_tensor(
         indices,
         torch.ones(num_b, dtype=dtype, device=device),
         size=size,
         dtype=dtype,
         device=device,
-        requires_grad=False ).coalesce()
+        requires_grad=False).coalesce()
 
-    x = SbkTensor()
-    x._s = storage # s for storage.
-    x._p = proxy
     return x
