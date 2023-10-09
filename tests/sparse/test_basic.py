@@ -3,7 +3,7 @@ import pytest
 import torch
 from torch import tensor
 import pypose as pp
-from pypose.sparse import sbktensor, coo_2_hybrid, hybrid_2_coo, SbkTensor
+from pypose.sparse import sbktensor, coo2hybrid, hybrid2coo, SbkTensor
 import pypose.sparse as sp
 
 
@@ -76,7 +76,7 @@ def random_sbt(proxy_shape, block_shape, dense_zero_prob=0.):
 
 
 @pytest.mark.parametrize('dense_zero_prob', [0., 0.7, 1.0])
-@pytest.mark.parametrize('op,dense_op,type_operands,shape_mode,dim', [
+@pytest.mark.parametrize('op, dense_op, type_operands, shape_mode, dim', [
     (sp.abs, torch.abs, ['sbt'], 'identical', 2),
     (sp.abs, torch.abs, ['sbt'], 'identical', 3),
     (torch.abs, torch.abs, ['sbt'], 'identical', 2),
@@ -104,8 +104,7 @@ def random_sbt(proxy_shape, block_shape, dense_zero_prob=0.):
     (SbkTensor.__sub__, torch.sub, ['sbt', 'sbt'], 'identical', 2),
     (SbkTensor.__sub__, torch.sub, ['sbt', 'sbt'], 'identical', 3),
     (SbkTensor.__matmul__, torch.matmul, ['sbt', 'sbt'], 'mT', 2),
-    (SbkTensor.__matmul__, torch.matmul, ['sbt', 'sbt'], 'identical_square', 2), ],
-                         )
+    (SbkTensor.__matmul__, torch.matmul, ['sbt', 'sbt'], 'identical_square', 2)])
 def test_universal(op, dense_op, type_operands, shape_mode, dim, dense_zero_prob):
     if shape_mode == 'identical':
         proxy_shape = torch.Size(torch.randint(1, 10, (dim,)))
@@ -137,7 +136,7 @@ def test_universal(op, dense_op, type_operands, shape_mode, dim, dense_zero_prob
                                                         block_shapes, dense_shapes):
         if t == 'sbt':
             arg = random_sbt(proxy_shape, block_shape, dense_zero_prob)
-            arg_dense = hybrid_2_coo(arg._s).to_dense()
+            arg_dense = hybrid2coo(arg._s).to_dense()
             assert arg_dense.shape == dense_shape
         elif t == 'dense':
             arg = torch.randn(dense_shape)
@@ -149,7 +148,7 @@ def test_universal(op, dense_op, type_operands, shape_mode, dim, dense_zero_prob
     y_sbt = op(*args)
     y_dense = dense_op(*args_dense)
 
-    torch.testing.assert_close(y_sbt.to_sparse_coo().to_dense(), y_dense,equal_nan=True)
+    torch.testing.assert_close(y_sbt.to_sparse_coo().to_dense(), y_dense, equal_nan=True)
 
 def test_div_beh():
     """pytorch behavior checkpoint"""

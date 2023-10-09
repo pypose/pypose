@@ -1,5 +1,5 @@
 
-from .sparse_block_tensor import SbkTensor
+from .sbktensor import SbkTensor
 
 def abs(sbt):
     assert isinstance(sbt, SbkTensor)
