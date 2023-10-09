@@ -39,7 +39,7 @@ The storage is a
 which is used to store the values of dense blocks.
 The proxy is a
 `Sparse COO tensor <https://pytorch.org/docs/stable/sparse.html#sparse-coo-tensors>`__,
-which is used to record the spatial organization of dense blocks.
+which is used to record the spatial organization of dense blocks. It consists of binary values to indicate the existence of a dense block at a particular location.
 
 The most common use case is its representation of 2 dimensional dense matrix, as shown in figure (left), where we want to represent a dense matrix with shape (9, 9). The most suitable shape of each block is (3, 3), and thus the resulting SbkTensor will have the following internal attributes:
 - a sparse COO proxy with dim=2 and size of (3, 3). It carries the block pattern information, where each non-zero element in the (3, 3) sparse tensor represents the existence of a dense block in the SbkTensor. The size of the proxy is irrelevant to the size of the block size.
