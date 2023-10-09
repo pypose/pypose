@@ -197,6 +197,7 @@ if __name__ == '__main__':
 
     from tqdm import tqdm
 
-    mm_config = (SbkTensor.__matmul__, torch.matmul, 2, 'identical_square', 0.7)
+    mm_config = (SbkTensor.__matmul__, torch.matmul,
+                 ['sbt', 'sbt'], 'identical_square', 2, 0.7)
     for i in tqdm(range(10000)):
         test_universal(*mm_config)
