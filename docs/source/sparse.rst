@@ -15,42 +15,68 @@ sparse
 Why and when to use sparse block tensor
 +++++++++++++++++++++++++++++++++++++++
 
-By default `torch.Tensor` either stores elements contiguously
-physical memory through a strided format or store sparse elements through the interfaces
-offered in `torch.sparse`.
-Similar to `torch.sparse`, sparse block tensors are meant to represent tensors with
-substantial zero or negligible values.
-However, it is a data structure meant to efficiently represent matrices where values are
-contiguous in small blocks but blocks are sparsely distributed.
-In applications like SLAM, they play an instrumental role in large-scale bundle adjustment.
+* By default, ``torch.Tensor`` either stores elements contiguously
+  physical memory through a strided format or store sparse elements through the interfaces
+  offered in ``torch.sparse``.
+* Similar to ``torch.sparse``, ``SbkTensor`` is meant to represent tensors with
+  substantial zero or negligible values.
+* ``SbkTensor`` is a data structure meant to efficiently represent matrices
+  where values are contiguous in small blocks, but blocks are sparsely distributed.
+  In applications like SLAM, they play an instrumental role in large-scale bundle
+  adjustment.
 
-Our SbkTensor is capable of representing tensor of any dimensionality with such sparsity
+``SbkTensor`` is capable of representing tensor of any dimension with such sparsity
 pattern, as indicated in the dense tensor in the figure.
-We next describe the details of the representation (sparsification).
+We next describe the details of the representation (sparsity).
 
-.. image :: https://user-images.githubusercontent.com/24406547/236364949-2b0c3a20-dcaf-4d34-b311-8be244f6d39f.png
+.. image :: https://tinyurl.com/sbk-representation
 
 Format overview
 +++++++++++++++
 
-A SbkTensor object contains a proxy and stroage tensor attribute.
-The storage is a
-`Sparse hybrid COO tensor <https://pytorch.org/docs/stable/sparse.html#sparse-hybrid-coo-tensors>`__,
-which is used to store the values of dense blocks.
-The proxy is a
-`Sparse COO tensor <https://pytorch.org/docs/stable/sparse.html#sparse-coo-tensors>`__,
-which is used to record the spatial organization of dense blocks.
+A ``SbkTensor`` object contains a proxy and storage tensor attribute.
 
-The most common use case is its representation of 2 dimensional dense matrix, as shown in figure (left), where we want to represent a dense matrix with shape (9, 9). The most suitable shape of each block is (3, 3), and thus the resulting SbkTensor will have the following internal attributes:
-- a sparse COO proxy with dim=2 and size of (3, 3). It carries the block pattern information, where each non-zero element in the (3, 3) sparse tensor represents the existence of a dense block in the SbkTensor. The size of the proxy is irrelevant to the size of the block size.
-- a sparse hybrid COO storage, with sparse_dim=2 and dense_dim=2 for a total of (2+2) dimension. The sparse dimension is the same as the proxy, and the dense dimension is the same as each of the individual dense blocks. The sparse_dim and dense_dim should always be equal to the dim of the original dense tensor. The complete .shape attribute of the storage is (3, 3, 3, 3). The first (3, 3) is the size of the proxy, and the second (3, 3) is the size of each dense block.
+- The storage is a
+  `Sparse hybrid COO tensor <https://tinyurl.com/sparse-hybrid-coo-tensors>`__,
+  which is used to store the values of dense blocks.
+- The proxy is a
+  `Sparse COO tensor <https://pytorch.org/docs/stable/sparse.html#sparse-coo-tensors>`__,
+  which is used to record the spatial organization of dense blocks.
 
-Note that we are following PyTorch's notation in all descriptions involving shape and dim of sparse tensors.
+The most common use case is its representation of 2 dimensional dense matrices, as shown
+in figure (left), where we want to represent a dense matrix with shape (9, 9). The most
+suitable shape of each block is (3, 3), and thus the ``SbkTensor`` will have the
+following internal attributes:
 
-Our design is generalized to represent tensors with arbitrary high dimension. Devices such as GPUs require batching for optimal performance and thus we want to support batch dimensions, even when the tensor is sparse. For example, Figure (right) shows an example of batching, where it stacks two 2-d matrix into a single 3-d tensor. The added dimension is called the batch dimension, with length of 2.
-Generally, to represent an n-dimensional dense tensor, the SBT will have an n-dimensional proxy, and an storage with n-sparse-dimension and n-dense dimension.
+- A sparse COO proxy with ``dim=2`` and size of (3, 3). It carries the block pattern
+  information, where each non-zero element in the (3, 3) sparse tensor represents the
+  existence of a dense block in the ``SbkTensor``. The size of the proxy is irrelevant to
+  the size of the block size.
 
-Note that the conversion happens on the right hand side could also results in a proxy with shape `(1, 3, 3)` and a storage with shape `(1, 3, 3, 2, 3, 3)`, aside from the one demonstrated  in figure. The proxy is allowed to have length of 1 on the batch dimension only if the stacked 2-d matrices have the exact same proxy (i.e. spatial element layout). It is up to the user to decide what shape the proxy shall use exactly, whenever they instantiate a SbkTensor tensor.
+- A sparse hybrid COO storage, with sparse_dim=2 and dense_dim=2 for a total of (2 + 2)
+  dimension. The sparse dimension is the same as the proxy, and the dense dimension is the
+  same as each of the individual dense blocks. The sparse_dim and dense_dim should always
+  be equal to the dim of the original dense tensor. The complete ``.shape`` attribute of
+  the storage is (3, 3, 3, 3). The first (3, 3) is the size of the proxy, and the second
+  (3, 3) is the size of each dense block.
+
+Note that we are following PyTorch's notation in all descriptions involving shape and dim
+of sparse tensors.
+
+Our design is generalized to represent tensors with arbitrary high dimension. Devices such
+as GPUs require batching for optimal performance and thus we want to support batch
+dimensions, even when the tensor is sparse. For example, Figure (right) shows an example
+of batching, where it stacks two 2-d matrix into a single 3-d tensor. The added dimension
+is called the batch dimension, with length of 2.
+Generally, to represent an n-dimensional dense tensor, the SBT will have an n-dimensional
+proxy, and an storage with n-sparse-dimension and n-dense dimension.
+
+Note that the conversion happens on the right hand side could also results in a proxy with
+shape (1, 3, 3) and a storage with shape (1, 3, 3, 2, 3, 3), aside from the one
+demonstrated in figure. The proxy is allowed to have length of 1 on the batch dimension
+only if the stacked 2-d matrices have the exact same proxy (i.e. spatial element layout).
+It is up to the user to decide what shape the proxy shall use exactly, whenever they
+instantiate a ``SbkTensor``.
 
 Functionality overview
 ++++++++++++++++++++++
@@ -88,7 +114,7 @@ Supported operations
 
 .. .. csv-table::
 ..    :header: "PyTorch operation", "Sparse grad?", "Layout signature"
-..    :widths: 20, 5, 60
+..    :widths: 40, 5, 40
 ..    :delim: ;
 
 ..    :func:`torch.mv`;no; ``M[sparse_coo] @ V[strided] -> V[strided]``
