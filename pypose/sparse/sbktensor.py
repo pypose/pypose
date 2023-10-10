@@ -54,7 +54,7 @@ def unravel_index(index, shape: List[int]):
     return out
 
 
-# @jit.script
+@jit.script
 def hybrid2coo(hybrid):
     '''Covnert a Hybrid tensor to a COO tensor.
 
@@ -75,17 +75,12 @@ def hybrid2coo(hybrid):
     proxyshape = hybrid.shape[:dim] # proxy shape.
     blknum = hybrid.indices().shape[-1]
     blknumel = 0 if blknum == 0 else hybrid.values().numel() // blknum
-
-    # in-block offset
-    # the same as torch.cartesian_prod(*[torch.arange(i) for i in shape_b]).T
-    offset = unravel_index(torch.arange(blknumel), blkshape)
-
+    offset = unravel_index(torch.arange(blknumel), blkshape) # in-block offset
+    # indices shape (dim, blknum, blknumel)
+    indices = hybrid.indices().unsqueeze(-1).expand(-1, -1, blknumel)
     # scale the block indices by a factor of block shape
-    indices = hybrid.indices().unsqueeze(-1)  # (dim, blknum, 1)
-    indices = indices.expand(-1, -1, blknumel)  # (dim, blknum, blknumel)
     scale = torch.tensor(blkshape, dtype=torch.int64, device=hybrid.device)
-    # scale, offset, indices are all used in the form:
-    # (dim, blknum, blknumel)
+    # scale, offset, indices are all in the form: (dim, blknum, blknumel)
     indices = (indices * scale[:, None, None] + offset[:, None, :]).flatten(1, 2)
     shape = [proxyshape[i] * blkshape[i] for i in range(dim)]
     return torch.sparse_coo_tensor(indices, hybrid.values().flatten(), size=shape)
