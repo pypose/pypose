@@ -1,12 +1,10 @@
 import torch
 from torch import jit
-from typing import List, Optional
+from typing import List
 
 '''Sparse Block Tensor (SbkTensor) for PyPose.
 This module implements the sparse block tensor (referred to as SbkTensor) for PyPose.
 '''
-
-DENSE_SAFE_PROXY_THRES = 0
 
 
 @jit.script
@@ -45,13 +43,10 @@ def unravel_index(index, shape: List[int]):
         Each column in the tensor corresponds to the dimension in shape.
         Shape: (dim, numel)
     '''
-    dims = len(shape)
-    out = torch.empty((dims, index.shape[0]), dtype=index.dtype, device=index.device)
-    for dim_idx in range(dims-1, 0-1, -1):
-        dim = shape[dim_idx]
-        out[dim_idx] = (index % dim)
-        index = index // dim
-    return out
+    index = index.view(-1, 1)  # Ensure index is a column vector
+    strides = torch.tensor(shape[::-1], device=index.device).cumprod(0).flip(dims=(0,))
+    shape = torch.tensor(shape, device=index.device)
+    return ((index % strides) // (strides // shape)).t()
 
 
 @jit.script
@@ -87,7 +82,7 @@ def hybrid2coo(hybrid):
 
 
 @jit.script
-def coo2hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
+def coo2hybrid(coo, proxy, dense_proxy_limit: int=30000):
     '''Convert a COO tensor to a Hybrid tensor by referring to the proxy.
 
     A proxy is a COO tensor. Any non-zero element in proxy indicates a block of the
@@ -96,6 +91,8 @@ def coo2hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
     Args:
         coo (torch.Tensor): The COO tensor.
         proxy (torch.Tensor): The proxy tensor as COO format.
+        dense_proxy_limit (int): a threshold to use dense blocks for faster indexing.
+            Default: 30000.
 
     Returns:
         Hybrid tensor (torch.Tensor): The created Hybrid tensor.
@@ -115,12 +112,11 @@ def coo2hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
 
     shape_b_t = torch.tensor(shape_b, dtype=torch.int64, device=coo.device).unsqueeze(-1)
     offsets = coo.indices() % shape_b_t
-    # block indices.
-    indices_b = coo.indices() // shape_b_t
+    indices_b = coo.indices() // shape_b_t # block indices
     numel_p = torch.numel(proxy)  # dense number of elements
-    if numel_p < dense_proxy_thres:  # check the *dense* shape
-        block_seq = torch.sparse_coo_tensor(
-                proxy.indices(), torch.arange(proxy.values().shape[0]), size=proxy.shape)
+    values = torch.arange(proxy.values().shape[0])
+    if numel_p < dense_proxy_limit:  # check the *dense* shape
+        block_seq = torch.sparse_coo_tensor(proxy.indices(), values, size=proxy.shape)
         block_seq = block_seq.to_dense()  # dense is fast in indexing
         block_seq = block_seq[indices_b[0], indices_b[1]]
     else:
@@ -128,15 +124,13 @@ def coo2hybrid(coo, proxy, dense_proxy_thres: int=DENSE_SAFE_PROXY_THRES):
         coeff = torch.tensor(shape_p+[1, ], dtype=torch.int64, device=coo.device)
         coeff = coeff[1:].flipud().cumprod(dim=0).flipud()
         indices_p = (proxy.indices() * coeff.unsqueeze(-1)).sum(0, keepdim=True)
-        block_seq = torch.sparse_coo_tensor(
-                indices_p, torch.arange(proxy.values().shape[0]), size=(numel_p,))
-        block_seq = block_seq.index_select(
-            0, (indices_b * coeff.unsqueeze(-1)).sum(0)).to_dense()
+        block_seq = torch.sparse_coo_tensor(indices_p, values, size=(numel_p,))
+        select_index = (indices_b * coeff.unsqueeze(-1)).sum(0)
+        block_seq = block_seq.index_select(0, select_index).to_dense()
 
-    blocks = torch.sparse_coo_tensor(
-        indices=torch.cat([block_seq.unsqueeze(0), offsets]),
-        values=coo.values(),
-        size=torch.Size([proxy.values().shape[0]] + shape_b)).to_dense()
+    indices = torch.cat([block_seq.unsqueeze(0), offsets])
+    size = torch.Size(values.shape + shape_b)
+    blocks = torch.sparse_coo_tensor(indices, coo.values(), size).to_dense()
 
     return torch.sparse_coo_tensor(proxy.indices(), blocks, size=list(shape_p) + shape_b)
 
@@ -195,7 +189,7 @@ class SbkGetOp(SbkOps):
         super().__init__(func_name=func_name)
 
     def storage_pre(self, func, types, args=(), kwargs={}):
-        '''Separate the Storange and Proxy tensor.
+        '''Separate the Storage and Proxy tensor.
 
         Returns:
             s_array (list): A list of Storage tensors. Could be Hybrid tensors.
@@ -206,7 +200,7 @@ class SbkGetOp(SbkOps):
         return s_array, p_array
 
 
-class ComputeViaHybrid(SbkOps):
+class HybridOps(SbkOps):
     '''An Operation that does not need to disassemble the Storage tensor.
     E.g., mostly the inplace operations such as torch.add_().
 
@@ -262,7 +256,7 @@ class ComputeViaHybrid(SbkOps):
         return p
 
 
-class ComputeViaCOO(SbkOps):
+class CooOps(SbkOps):
     '''SbkOps that performs the same operation on the Proxy tensor.
 
     This class implements the SbkOps that performs the same operation on the Proxy tensor.
@@ -323,8 +317,8 @@ class OpType(object):
         if func_name is None (or not provided), then the __name__ of a function is used.
 
     Args:
-        op_type (SBTOperation): The type/class of the operation.
-        func_name (str): The name of the operation used by __torch_function__. Optional.
+        op_type (SbkOps): The type/class of the operation.
+        func_name (str, optional): The name of the operation used by __torch_function__.
     '''
 
     def __init__(self, op_type, func_name=None):
@@ -335,24 +329,24 @@ class OpType(object):
 
 class registry:
     HANDLED_FUNCS = dict()
-    # Key: The name of the operation. Value: An SBTOperation object.
+    # Key: The name of the operation. Value: An SbkOps object.
 
     @classmethod
     def is_handled(cls, func_name):
-        '''Check if a operation is supported by SBT.
+        '''Check if a operation is supported by SbkTensor.
 
         Returns:
-            bool: True if the operation is supported by SBT. False otherwise.
+            bool: True if the operation is supported by SbkTensor. False otherwise.
         '''
         return func_name in cls.HANDLED_FUNCS
 
     @classmethod
     def add_op(cls, name, op_type, *args, **kwargs):
-        '''Add an operation to the supported operations on SBT.
+        '''Add an operation to the supported operations on SbkTensor.
 
         Args:
             name (str): The name of the operation.
-            op_type (SBTOperation): The SBTOperation class.
+            op_type (SbkOps): The SbkOps class.
         '''
         if name in cls.HANDLED_FUNCS:
             raise ValueError(f'The operation {name} is already registered. ')
@@ -381,23 +375,23 @@ class registry:
 registry.add_op( '__get__', SbkGetOp )
 
 # ========== Linear Algebra operations. ==========
-registry.add_op( 'matmul', ComputeViaCOO )
+registry.add_op( 'matmul', CooOps )
 
 # ========== elementwise functions ==========
-registry.add_op('abs', ComputeViaHybrid, proxy_reduction=None, clone=True)
-registry.add_op('add', ComputeViaHybrid, proxy_reduction='add')
-registry.add_op('asin', ComputeViaHybrid, proxy_reduction=None, clone=True)
-registry.add_op('atan', ComputeViaHybrid, proxy_reduction=None, clone=True)
-registry.add_op('ceil', ComputeViaHybrid, proxy_reduction=None, clone=True)
-registry.add_op('floor', ComputeViaHybrid, proxy_reduction=None, clone=True)
-registry.add_op('round', ComputeViaHybrid, proxy_reduction=None, clone=True)
-registry.add_op('sin', ComputeViaHybrid, proxy_reduction=None, clone=True)
-registry.add_op('sinh', ComputeViaHybrid, proxy_reduction=None, clone=True)
-registry.add_op('sqrt', ComputeViaHybrid, proxy_reduction=None, clone=True)
-registry.add_op('square', ComputeViaHybrid, proxy_reduction=None, clone=True)
-registry.add_op('sub', ComputeViaHybrid, proxy_reduction='add')
-registry.add_op('tan', ComputeViaHybrid, proxy_reduction=None, clone=True)
-registry.add_op('tanh', ComputeViaHybrid, proxy_reduction=None, clone=True)
+registry.add_op('abs', HybridOps, proxy_reduction=None, clone=True)
+registry.add_op('add', HybridOps, proxy_reduction='add')
+registry.add_op('asin', HybridOps, proxy_reduction=None, clone=True)
+registry.add_op('atan', HybridOps, proxy_reduction=None, clone=True)
+registry.add_op('ceil', HybridOps, proxy_reduction=None, clone=True)
+registry.add_op('floor', HybridOps, proxy_reduction=None, clone=True)
+registry.add_op('round', HybridOps, proxy_reduction=None, clone=True)
+registry.add_op('sin', HybridOps, proxy_reduction=None, clone=True)
+registry.add_op('sinh', HybridOps, proxy_reduction=None, clone=True)
+registry.add_op('sqrt', HybridOps, proxy_reduction=None, clone=True)
+registry.add_op('square', HybridOps, proxy_reduction=None, clone=True)
+registry.add_op('sub', HybridOps, proxy_reduction='add')
+registry.add_op('tan', HybridOps, proxy_reduction=None, clone=True)
+registry.add_op('tanh', HybridOps, proxy_reduction=None, clone=True)
 
 
 class SbkTensor(torch.Tensor):
@@ -437,10 +431,10 @@ class SbkTensor(torch.Tensor):
                 if not storage.is_sparse:
                     outputs_final.append( storage )
                     continue
-                sbt = cls()
-                sbt._s = storage
-                sbt._p = proxy
-                outputs_final.append(sbt)
+                sbk = cls()
+                sbk._s = storage
+                sbk._p = proxy
+                outputs_final.append(sbk)
             else:
                # noop for the case of not a tensor nor a SbkTensor
                 outputs_final.append(storage)
@@ -470,7 +464,7 @@ class SbkTensor(torch.Tensor):
     def __format__(self, spec):
         return str(self)
 
-    @registry.register(OpType(op_type=ComputeViaHybrid, func_name='mul'))
+    @registry.register(OpType(op_type=HybridOps, func_name='mul'))
     def __mul__(self, other):
         res = torch.mul(self, other)
         # dim auto correction
@@ -481,10 +475,10 @@ class SbkTensor(torch.Tensor):
             shape_b = s.shape[num_dim:]
             assert p.dim() == num_dim
             assert p.shape == s.shape[:num_dim]
-            res._s = torch.sparse_coo_tensor(
-                    indices=torch.tensor([]).reshape((num_dim, 0)),
-                    values=torch.tensor([]).reshape(0, *shape_b),
-                    size=(*p.shape, *shape_b)).coalesce()
+            indices = torch.tensor([]).reshape((num_dim, 0))
+            values = torch.tensor([]).reshape(0, *shape_b)
+            size = (*p.shape, *shape_b)
+            res._s = torch.sparse_coo_tensor(indices, values, size).coalesce()
 
         return res
 
