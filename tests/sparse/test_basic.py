@@ -1,9 +1,9 @@
-import pytest
 import torch
-from torch import tensor
+import pytest
 import pypose as pp
-from pypose.sparse import sbktensor, coo2hybrid, hybrid2coo, SbkTensor
+from torch import tensor
 import pypose.sparse as sp
+from pypose.sparse import sbktensor, hybrid2coo, SbkTensor
 
 
 def test_pypose_operation():
