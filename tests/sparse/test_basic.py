@@ -1,4 +1,3 @@
-import numpy as np
 import pytest
 import torch
 from torch import tensor
@@ -118,7 +117,7 @@ def test_universal(op, dense_op, type_operands, shape_mode, dim, dense_zero_prob
                             for idx, _ in enumerate(type_operands)]
     else:
         raise ValueError(f'Unknown shape_mode: {shape_mode}')
-    dense_shapes = [torch.Size(np.multiply(proxy_shape, block_shape))
+    dense_shapes = [torch.Size(torch.tensor(proxy_shape) * torch.tensor(block_shape))
                     for proxy_shape, block_shape in zip(proxy_shapes, block_shapes)]
     args = []
     args_dense = []
