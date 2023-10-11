@@ -29,7 +29,7 @@ Why and when to use sparse block tensor
 pattern, as indicated in the dense tensor in the figure.
 We next describe the details of the representation (sparsity).
 
-.. image :: https://tinyurl.com/sbk-representation
+.. image :: _static/img/sparse/sbk.jpg
 
 Format overview
 +++++++++++++++
