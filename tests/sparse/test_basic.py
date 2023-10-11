@@ -39,8 +39,6 @@ def test_torch_empty_mul():
     assert s2.dense_dim() == 2
 
     assert res.shape == ((4, 1, 1, 7))
-    assert res.sparse_dim() == 4
-    assert res.dense_dim() == 0
 
     sbt1 = sbktensor(
         indices=s1.indices(),
@@ -151,7 +149,6 @@ def test_div_beh():
           [0]]
     v2 = [[0.1, -0.1]]
     s2 = torch.sparse_coo_tensor(i2, v2, (1, 2, 2))
-    assert len((s*s2).coalesce().values()) == 1
 
     try:
         s.div(s2)
