@@ -46,7 +46,7 @@ A ``SbkTensor`` object contains a proxy and storage tensor attribute.
 
 The most common use case is its representation of 2 dimensional dense matrices, as shown
 in figure (left), where we want to represent a dense matrix with shape (9, 9). The most
-suitable shape of each block is (3, 3), and thus the ``SbkTensor`` will have the
+suitable shape of each block is (2, 2), and thus the ``SbkTensor`` will have the
 following internal attributes:
 
 - A sparse COO proxy with ``dim=2`` and size of (3, 3). It carries the block pattern
@@ -58,8 +58,8 @@ following internal attributes:
   (2 + 2) dimension. The sparse dimension is the same as the proxy, and the dense
   dimension is the same as each of the individual dense block. The ``sparse_dim`` and
   ``dense_dim`` are always equal to the dimention of the original dense tensor. The
-  complete ``.shape`` attribute of the storage is (3, 3, 3, 3). The first (3, 3) is the
-  size of the proxy, and the second (3, 3) is the size of each dense block.
+  complete ``.shape`` attribute of the storage is (3, 3, 2, 2). The (3, 3) is the
+  size of the proxy, and (2, 2) is the size of each dense block.
 
 Note that we are following PyTorch's notation in all descriptions involving shape and dim
 of sparse tensors.
@@ -73,7 +73,7 @@ Generally, to represent an n-dimensional dense tensor, ``SbkTensor`` will have a
 n-dimensional proxy, and a storage with n-sparse-dimension and n-dense dimension.
 
 Note that the conversion happens on the right-hand side could also result in a proxy with
-shape (1, 3, 3) and a storage with shape (1, 3, 3, 2, 3, 3), aside from the one
+shape (1, 3, 3) and a storage with shape (1, 3, 3, 2, 2, 2), aside from the one
 demonstrated in figure. The proxy is allowed to have length of 1 on the batch dimension
 only if the stacked 2-D matrices have the exact same proxy, i.e., spatial element layout.
 It is up to the user to decide what shape the proxy shall use exactly, whenever they

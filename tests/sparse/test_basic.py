@@ -18,16 +18,6 @@ def test_pypose_operation():
     print(f'e = \n{e}')
 
 
-def test_sparse_coo_2_sparse_hybrid_coo():
-    i = [[0, 1, 2], [2, 0, 2]]
-    v = torch.tensor([[3, 4], [-5, -6], [7, 8]], dtype=torch.float32)
-    x = sbktensor(i, v, size=(3, 3), dtype=torch.float32)
-
-    print(f'type(x) = {type(x)}')
-    print(f'x._s = \n{x._s}')
-    print(f'x._p = \n{x._p}')
-
-
 def test_torch_empty_mul():
     # required. used to check torch's behavior
     s1 = torch.sparse_coo_tensor(

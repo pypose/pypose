@@ -446,17 +446,17 @@ class SbkTensor(torch.Tensor):
 
     def __repr__(self):
         r'''
-        t = SparseBlockTensor()
+        t = SbkTensor()
         >>>t
-        SparseBlockTensor()
+        SbkTensor()
         '''
         return str(self)
 
     def __str__(self):
         r'''
-        t = SparseBlockTensor()
+        t = SbkTensor()
         print( t )
-        ' SparseBlockTensor() '
+        ' SbkTensor() '
         '''
         return f"SbkTensor Containing:\nStorage:\n{self._s}\nProxy:\n{self._p}"
 
@@ -509,6 +509,8 @@ class SbkTensor(torch.Tensor):
 def sbktensor(indices, values, size=None, dtype=None, device=None, requires_grad=False):
     # Figure out the block shape.
     num_b, shape_b = values.shape[0], values.shape[1:]
+    assert len(indices) == len(shape_b), \
+        f'sparse_dim = {len(indices)}, dense_dim = {len(shape_b)}. The two must be equal.'
     x = SbkTensor()
 
     # Storage.
