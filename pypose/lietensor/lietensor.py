@@ -906,7 +906,7 @@ class LieTensor(torch.Tensor):
     def __torch_function__(cls, func, types, args=(), kwargs={}):
         ltypes = (torch.Tensor if t is LieTensor or Parameter else t for t in types)
         data = torch.Tensor.__torch_function__(func, ltypes, args, kwargs)
-        if data is not None and func.__name__ in HANDLED_FUNCTIONS:
+        if data is not None and hasattr(func, '__name__') and func.__name__ in HANDLED_FUNCTIONS:
             args, spec = tree_flatten(args)
             ltype = [arg.ltype for arg in args if isinstance(arg, LieTensor)][0]
             def wrap(t):
