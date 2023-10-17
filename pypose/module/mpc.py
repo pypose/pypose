@@ -203,13 +203,15 @@ class MPC(nn.Module):
         self.stepper.max_steps -= 1 # n-1 loops, 1 loop with gradient
         self.lqr = LQR(system, Q, p, T)
 
-    def forward(self, dt, x_init, u_init=None, u_lower=None, u_upper=None, du=None):
+    def forward(self, dt, x_init, x_target=None, u_init=None, u_lower=None, u_upper=None, du=None):
         r'''
         Performs MPC for the discrete system.
 
         Args:
             dt (:obj:`int`): The interval (:math:`\delta t`) between two time steps.
             x_init (:obj:`Tensor`): The initial state of the system.
+            x_target (:obj:`Tensor`): The refenrence target state of the system.
+                Default: ``None``.
             u_init (:obj:`Tensor`, optinal): The current inputs of the system along a
                 trajectory. Default: ``None``.
             u_lower (:obj:`Tensor`, optinal): The lower bounds on the controls.
@@ -230,10 +232,10 @@ class MPC(nn.Module):
         self.stepper.reset()
         with torch.no_grad():
             while self.stepper.continual():
-                x, u, cost = self.lqr(x_init, dt, u)
+                x, u, cost = self.lqr(x_init, dt, x_target, u)
                 self.stepper.step(cost)
 
                 if best['cost'] == None or cost < best['cost']:
                     best = {'x': x, 'u': u, 'cost': cost}
 
-        return self.lqr(x_init, dt, u_traj=best['u'])
+        return self.lqr(x_init, dt, x_target, u_traj=best['u'])
