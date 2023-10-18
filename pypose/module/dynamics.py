@@ -2,7 +2,7 @@ import torch
 from .. import bmv
 from torch import nn
 from torch.autograd.functional import jacobian
-
+import torch.jit as jit
 
 class System(nn.Module):
     r'''
@@ -511,6 +511,7 @@ class NLS(System):
     '''
     def __init__(self):
         super().__init__()
+        self.tracedModel = None
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
 
     def forward(self, state, input):
@@ -585,7 +586,9 @@ class NLS(System):
         .. math::
             \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
-        func = lambda x: self.state_transition(x,None, 0)
+        if self.tracedModel is None:
+            self.tracedModel = jit.trace(self.forwardfunc, tau)
+        func = lambda x: self.tracedModel(x)
         return jacobian(func, tau, **self.jacargs)
 
 

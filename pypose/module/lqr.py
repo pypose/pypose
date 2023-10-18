@@ -289,7 +289,7 @@ class LQR(nn.Module):
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
             associated quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
-        
+
         assert x_init.device == xu_target.device
         assert x_init.dtype == xu_target.dtype
         assert x_init.device == Q.device
@@ -315,7 +315,7 @@ class LQR(nn.Module):
         x, u, cost = self.lqr_forward(x_init, K, k, Q, p, u_lower, u_upper, du)
 
         return x, u, cost
-    
+
     def forward_(self, x_init, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
         r'''
         Performs LQR for the discrete system.
@@ -340,7 +340,7 @@ class LQR(nn.Module):
         '''
         t=timeit.default_timer()
         K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
-        print("backward time: ", timeit.default_timer()-t)  
+        print("backward time: ", timeit.default_timer()-t)
         x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
         return x, u, cost
 
@@ -365,7 +365,7 @@ class LQR(nn.Module):
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
         bt=torch.cat((self.x_traj,self.u_traj),-1)
         #t=timeit.default_timer()
-        F_all=self.system.F(bt).squeeze(-2).sum(2)
+        F_all=self.system.F(bt).sum(2)
         #print("F time: ", timeit.default_timer()-t)
         p = bmv(Q, xut) + p
         # t=timeit.default_timer()
