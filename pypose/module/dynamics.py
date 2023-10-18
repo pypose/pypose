@@ -558,27 +558,36 @@ class NLS(System):
         self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
         return self
 
-    @property
-    def A(self):
+    def A(self,state,input):
         r'''
         Linear/linearized system state matrix.
 
         .. math::
             \mathbf{A} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}} \right|_{\chi^*}
         '''
-        func = lambda x: self.state_transition(x, self._ref_input, self._ref_t)
-        return jacobian(func, self._ref_state, **self.jacargs)
+        func = lambda x: self.state_transition(x, input, 0)
+        return jacobian(func, state, **self.jacargs)
 
-    @property
-    def B(self):
+    def B(self,state,input):
         r'''
         Linear/linearized system input matrix.
 
         .. math::
             \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
-        func = lambda x: self.state_transition(self._ref_state, x, self._ref_t)
-        return jacobian(func, self._ref_input, **self.jacargs)
+        func = lambda x: self.state_transition(state, x, 0)
+        return jacobian(func, input, **self.jacargs)
+    
+    def F(self,tau):
+        r'''
+        Linear/linearized system input matrix.
+
+        .. math::
+            \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
+        '''
+        func = lambda x: self.state_transition(x,None, 0)
+        return jacobian(func, tau, **self.jacargs)
+
 
     @property
     def C(self):

@@ -1,9 +1,10 @@
 import torch
 from torch import nn
+from torch.autograd.functional import jacobian
 from .. import bmv, bvmv
 from torch.linalg import cholesky, vecdot
 import pypose.module.dynamics as dynamics
-
+import timeit
 
 class LQR(nn.Module):
     r'''
@@ -294,6 +295,8 @@ class LQR(nn.Module):
         assert x_init.device == Q.device
         assert x_init.dtype == Q.dtype
 
+        self.dargs = {'dtype': xu_target.dtype, 'device': xu_target.device}
+
         if Q.ndim == 3:
             Q = torch.tile(Q.unsqueeze(-3), (1, self.T, 1, 1))
 
@@ -301,9 +304,6 @@ class LQR(nn.Module):
             p = torch.tile(p.unsqueeze(-2), (1, self.T, 1))
 
         self.n_batch = x_init.shape[:-1]
-
-        
-        self.dargs = {'dtype': xu_target.dtype, 'device': xu_target.device}
 
         if p is None:
             p = torch.zeros(self.n_batch + (self.T, Q.size(-1)), **self.dargs)
@@ -338,7 +338,9 @@ class LQR(nn.Module):
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
             associated quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
+        t=timeit.default_timer()
         K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
+        print("backward time: ", timeit.default_timer()-t)  
         x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
         return x, u, cost
 
@@ -348,34 +350,47 @@ class LQR(nn.Module):
         nc = nsc - ns
 
         if u_traj is None:
-            self.u_traj = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
+            self.u_traj = torch.zeros((self.T, nc), **self.dargs)
         else:
             self.u_traj = u_traj
 
-        self.x_traj = x_init.unsqueeze(-2).repeat((1, self.T, 1))
-        for i in range(self.T-1):
-            self.x_traj[...,i+1,:], _ = self.system(self.x_traj[...,i,:].clone(),
-                                                    self.u_traj[...,i,:])
+        self.x_traj = x_init.repeat((self.T, 1))
+        # for i in range(self.T-1):
+        #     self.x_traj[...,i+1,:], _ = self.system(self.x_traj[...,i,:].clone(),
+        #                                             self.u_traj[...,i,:])
 
         K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
 
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
+        bt=torch.cat((self.x_traj,self.u_traj),-1)
+        #t=timeit.default_timer()
+        F_all=self.system.F(bt).squeeze(-2).sum(2)
+        #print("F time: ", timeit.default_timer()-t)
         p = bmv(Q, xut) + p
-
+        # t=timeit.default_timer()
+        # A = self.system.A(self.x_traj,self.u_traj).squeeze(-2).sum(2)
+        # print("A time: ", timeit.default_timer()-t)
+        # t=timeit.default_timer()
+        # B = self.system.B(self.x_traj,self.u_traj).squeeze(-2).sum(2)
+        # print("B time: ", timeit.default_timer()-t)
+        #F_all = torch.cat((A, B), dim=-1)
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
                 Qt = Q[...,t,:,:]
                 qt = p[...,t,:]
             else:
-                self.system.set_refpoint(state=self.x_traj[...,t,:],
-                                         input=self.u_traj[...,t,:],
-                                         t=torch.tensor(t*dt))
-                A = self.system.A.squeeze(-2)
-                B = self.system.B.squeeze(-2)
-                F = torch.cat((A, B), dim=-1)
+                # self.system.set_refpoint(state=self.x_traj[...,t,:],
+                #                          input=self.u_traj[...,t,:],
+                #                          t=torch.tensor(t*dt))
+                # func = lambda x: self.system.state_transition(self.x_traj[...,t,:], self.u_traj[...,t,:], 0)
+                # A = jacobian(func,self.x_traj[...,t,:],vectorize=True)
+                # A = self.system.A(self.x_traj[...,t,:],self.u_traj[...,t,:]).squeeze(-2)
+                # B = self.system.B(self.x_traj[...,t,:],self.u_traj[...,t,:]).squeeze(-2)
+                F = F_all[t]
                 Qt = Q[...,t,:,:] + F.mT @ V @ F
                 qt = p[...,t,:] + bmv(F.mT, v)
+
 
             Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
@@ -388,10 +403,10 @@ class LQR(nn.Module):
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
             v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
 
+
         return K, k
 
     def lqr_forward(self, x_init, K, k, Q, p, u_lower=None, u_upper=None, du=None):
-
         assert x_init.device == K.device == k.device
         assert x_init.dtype == K.dtype == k.dtype
         assert x_init.ndim == 2, "Shape not compatible."
@@ -412,5 +427,4 @@ class LQR(nn.Module):
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
             cost += 0.5 * bvmv(xut, Q[...,t,:,:], xut) + vecdot(xut, p[...,t,:])
-
         return x, u, cost
