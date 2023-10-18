@@ -4,6 +4,7 @@ import pypose as pp
 from torch import nn
 import numpy as np
 from pypose.optim import SAL
+from pypose.optim.scheduler import CnstOptSchduler
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -29,18 +30,24 @@ class TestOptim:
 
         input = None
         TensorNet = TensorModel(5).to(device)
-
+        # inner_opt = torch.optim.Adam(TensorNet.parameters(), lr=1e-2)
         inner_opt = torch.optim.SGD(TensorNet.parameters(), lr=1e-2, momentum=0.9)
-        inner_schd = torch.optim.lr_scheduler.StepLR(optimizer=inner_opt, step_size=20, gamma=0.5)
-        # scheduler = pp.optim.scheduler.StopOnPlateau(optimizer, steps=10, patience=3, decreasing=1e-3, verbose=True)
-        optimizer = SAL(model=TensorNet, inner_optimizer=inner_opt, inner_scheduler=inner_schd, inner_iter=400, penalty_safeguard=1e3)
+        inner_schd = torch.optim.lr_scheduler.StepLR(optimizer=inner_opt, step_size=20, \
+                                                     gamma=0.5, verbose=False)
+        optimizer = SAL(model=TensorNet, inner_optimizer=inner_opt, penalty_safeguard=1e3)
+        scheduler = CnstOptSchduler(optimizer, steps=30, inner_scheduler=inner_schd, inner_iter=400, \
+                                    object_decrease_tolerance=1e-6, violation_tolerance=1e-6, \
+                                    verbose=True)
 
-        for idx in range(20):
-            loss, lmd, = optimizer.step(input)
-            if optimizer.terminate:
-                break
-        print('-----------optimized result----------------')
-        print("Lambda*:", lmd)
+        # scheduler 
+        while scheduler.continual():
+            loss = optimizer.step(input)
+            scheduler.step(loss)
+        
+        # scheduler
+        # scheduler.optimize(input=input)
+
+        print("Lambda*:", optimizer.lagrangeMultiplier)
         print("x*:", TensorNet.pose)
 
 if __name__ == "__main__":

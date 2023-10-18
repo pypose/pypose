@@ -4,6 +4,7 @@ import pypose as pp
 from torch import nn
 import numpy as np
 from pypose.optim import SAL
+from pypose.optim.scheduler import CnstOptSchduler
 from torch import matmul as mult
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -120,20 +121,18 @@ class AlmOptimExample:
         input = None
 
         inner_optimizer = torch.optim.SGD(InnerNet.parameters(), lr=1e-2, momentum=0.9)
-        inner_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
+        inner_schd = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
         optimizer = SAL(model=InnerNet,
-                        inner_optimizer=inner_optimizer,
-                        inner_scheduler=inner_scheduler,
-                        object_decrease_tolerance=1e-7, inner_iter=300)
+                        inner_optimizer=inner_optimizer)
+        scheduler = CnstOptSchduler(optimizer, steps=120, inner_scheduler=inner_schd, inner_iter=400, \
+                                    object_decrease_tolerance=1e-6, violation_tolerance=1e-6, \
+                                    verbose=True)
+        
+        while scheduler.continual():
+            loss = optimizer.step(input)
+            scheduler.step(loss)
 
-        for idx in range(100):
-            loss, lmd, = optimizer.step(input)
-            if optimizer.terminate:
-                break
-        print('-----------optimized result----------------')
-        print('object f(x):', InnerNet.objective(input))
-        print('final violation:\n', torch.norm(InnerNet.constrain(input)))
-        print("Lambda*:\n", lmd)
+        print("Lambda*:\n", optimizer.lagrangeMultiplier)
         print('tau*:', InnerNet.x)
         solver = LQR_Solver()
         tau, mu = solver(A, B, C, T, x0)
@@ -174,16 +173,20 @@ class AlmOptimExample:
 
         posnet = PoseInvConstrained(1).to(device)
         inner_optimizer = torch.optim.SGD(posnet.parameters(), lr=1e-2, momentum=0.9)
-        inner_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
-        optimizer = SAL(model=posnet, inner_optimizer=inner_optimizer, inner_scheduler=inner_scheduler, inner_iter=400, penalty_safeguard=1e3)
+        inner_schd = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
+        # optimizer = SAL(model=posnet, inner_scheduler=inner_scheduler, inner_iter=400, penalty_safeguard=1e3)
+        optimizer = SAL(model=posnet, inner_optimizer=inner_optimizer, penalty_safeguard=1e3)
+        scheduler = CnstOptSchduler(optimizer, steps=30, inner_scheduler=inner_schd, inner_iter=400, \
+                                    object_decrease_tolerance=1e-6, violation_tolerance=1e-6, \
+                                    verbose=True)
+        
+        # scheduler 
+        while scheduler.continual():
+            loss = optimizer.step(input)
+            scheduler.step(loss)
 
-        for idx in range(20):
-            loss, lmd, = optimizer.step(input)
-            if optimizer.terminate:
-                break
-        print('-----------optimized result----------------')
         decimal_places = 4
-        print("Lambda:",lmd)
+        print("Lambda:",optimizer.lagrangeMultiplier)
         print('x axis:', np.around(posnet.pose.cpu().detach().numpy(), decimals=decimal_places))
 
         print('f(x):', posnet.objective(input))
@@ -191,5 +194,5 @@ class AlmOptimExample:
 
 if __name__ == "__main__":
     alm = AlmOptimExample()
-    alm.tensor_complex()
     alm.lietensor()
+    alm.tensor_complex()
