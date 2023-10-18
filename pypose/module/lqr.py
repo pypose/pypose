@@ -363,18 +363,13 @@ class LQR(nn.Module):
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
 
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
-        bt=torch.cat((self.x_traj,self.u_traj),-1)
+        tau_traj=torch.cat((self.x_traj,self.u_traj),-1)
         #t=timeit.default_timer()
-        F_all=self.system.F(bt).sum(2)
+        F_all=self.system.F(tau_traj).sum(2)
         #print("F time: ", timeit.default_timer()-t)
         p = bmv(Q, xut) + p
-        # t=timeit.default_timer()
         # A = self.system.A(self.x_traj,self.u_traj).squeeze(-2).sum(2)
-        # print("A time: ", timeit.default_timer()-t)
-        # t=timeit.default_timer()
         # B = self.system.B(self.x_traj,self.u_traj).squeeze(-2).sum(2)
-        # print("B time: ", timeit.default_timer()-t)
-        #F_all = torch.cat((A, B), dim=-1)
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
                 Qt = Q[...,t,:,:]
