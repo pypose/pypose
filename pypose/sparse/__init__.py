@@ -1,6 +1,6 @@
-from .sparse_block_tensor import (
-    hybrid_2_coo,
-    coo_2_hybrid,
+from .sbktensor import (
+    hybrid2coo,
+    coo2hybrid,
     sbktensor,
     SbkTensor
 )

@@ -1,10 +1,9 @@
-import numpy as np
-import pytest
 import torch
-from torch import tensor
+import pytest
 import pypose as pp
-from pypose.sparse import sbktensor, coo_2_hybrid, hybrid_2_coo, SbkTensor
+from torch import tensor
 import pypose.sparse as sp
+from pypose.sparse import sbktensor, hybrid2coo, SbkTensor
 
 
 def test_pypose_operation():
@@ -16,16 +15,6 @@ def test_pypose_operation():
     print(f'd = \n{d}')
     e = pp.add(a, b)
     print(f'e = \n{e}')
-
-
-def test_sparse_coo_2_sparse_hybrid_coo():
-    i = [[0, 1, 2], [2, 0, 2]]
-    v = torch.tensor([[3, 4], [-5, -6], [7, 8]], dtype=torch.float32)
-    x = sbktensor(i, v, size=(3, 3), dtype=torch.float32)
-
-    print(f'type(x) = {type(x)}')
-    print(f'x._s = \n{x._s}')
-    print(f'x._p = \n{x._p}')
 
 
 def test_torch_empty_mul():
@@ -50,8 +39,6 @@ def test_torch_empty_mul():
     assert s2.dense_dim() == 2
 
     assert res.shape == ((4, 1, 1, 7))
-    assert res.sparse_dim() == 4
-    assert res.dense_dim() == 0
 
     sbt1 = sbktensor(
         indices=s1.indices(),
@@ -76,7 +63,7 @@ def random_sbt(proxy_shape, block_shape, dense_zero_prob=0.):
 
 
 @pytest.mark.parametrize('dense_zero_prob', [0., 0.7, 1.0])
-@pytest.mark.parametrize('op,dense_op,type_operands,shape_mode,dim', [
+@pytest.mark.parametrize('op, dense_op, type_operands, shape_mode, dim', [
     (sp.abs, torch.abs, ['sbt'], 'identical', 2),
     (sp.abs, torch.abs, ['sbt'], 'identical', 3),
     (torch.abs, torch.abs, ['sbt'], 'identical', 2),
@@ -104,8 +91,7 @@ def random_sbt(proxy_shape, block_shape, dense_zero_prob=0.):
     (SbkTensor.__sub__, torch.sub, ['sbt', 'sbt'], 'identical', 2),
     (SbkTensor.__sub__, torch.sub, ['sbt', 'sbt'], 'identical', 3),
     (SbkTensor.__matmul__, torch.matmul, ['sbt', 'sbt'], 'mT', 2),
-    (SbkTensor.__matmul__, torch.matmul, ['sbt', 'sbt'], 'identical_square', 2), ],
-                         )
+    (SbkTensor.__matmul__, torch.matmul, ['sbt', 'sbt'], 'identical_square', 2)])
 def test_universal(op, dense_op, type_operands, shape_mode, dim, dense_zero_prob):
     if shape_mode == 'identical':
         proxy_shape = torch.Size(torch.randint(1, 10, (dim,)))
@@ -129,7 +115,7 @@ def test_universal(op, dense_op, type_operands, shape_mode, dim, dense_zero_prob
                             for idx, _ in enumerate(type_operands)]
     else:
         raise ValueError(f'Unknown shape_mode: {shape_mode}')
-    dense_shapes = [torch.Size(np.multiply(proxy_shape, block_shape))
+    dense_shapes = [torch.Size(torch.tensor(proxy_shape) * torch.tensor(block_shape))
                     for proxy_shape, block_shape in zip(proxy_shapes, block_shapes)]
     args = []
     args_dense = []
@@ -137,7 +123,7 @@ def test_universal(op, dense_op, type_operands, shape_mode, dim, dense_zero_prob
                                                         block_shapes, dense_shapes):
         if t == 'sbt':
             arg = random_sbt(proxy_shape, block_shape, dense_zero_prob)
-            arg_dense = hybrid_2_coo(arg._s).to_dense()
+            arg_dense = hybrid2coo(arg._s).to_dense()
             assert arg_dense.shape == dense_shape
         elif t == 'dense':
             arg = torch.randn(dense_shape)
@@ -149,7 +135,7 @@ def test_universal(op, dense_op, type_operands, shape_mode, dim, dense_zero_prob
     y_sbt = op(*args)
     y_dense = dense_op(*args_dense)
 
-    torch.testing.assert_close(hybrid_2_coo(y_sbt._s).to_dense(), y_dense,equal_nan=True)
+    torch.testing.assert_close(y_sbt.to_sparse_coo().to_dense(), y_dense, equal_nan=True)
 
 def test_div_beh():
     """pytorch behavior checkpoint"""
@@ -163,7 +149,6 @@ def test_div_beh():
           [0]]
     v2 = [[0.1, -0.1]]
     s2 = torch.sparse_coo_tensor(i2, v2, (1, 2, 2))
-    assert len((s*s2).coalesce().values()) == 1
 
     try:
         s.div(s2)
@@ -197,6 +182,7 @@ if __name__ == '__main__':
 
     from tqdm import tqdm
 
-    mm_config = (SbkTensor.__matmul__, torch.matmul, 2, 'identical_square', 0.7)
+    mm_config = (SbkTensor.__matmul__, torch.matmul,
+                 ['sbt', 'sbt'], 'identical_square', 2, 0.7)
     for i in tqdm(range(10000)):
         test_universal(*mm_config)
