@@ -19,6 +19,7 @@ from .basics import *
 from . import module
 from . import optim
 from . import testing
+from .distributed.basics.ops import Dops
 
 
 min_torch = '2.0'
