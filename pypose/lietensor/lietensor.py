@@ -176,6 +176,162 @@ class LieType:
         return cumprod_(X, dim)
 
 
+class SO2Type(LieType):
+    def __init__(self):
+        super().__init__(2, 2, 1)
+
+    def Log(self, X):
+        return
+
+    def Act(self, X, p):
+        return
+
+    def Mul(self, X, Y):
+        return
+
+    def Inv(self, X):
+        return
+
+    def Adj(self, X, a):
+        return
+
+    def AdjT(self, X, a):
+        return
+
+    def Jinvp(self, X, p):
+        return
+
+    @classmethod
+    def identity(cls, *size, **kwargs):
+        return
+
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
+        return
+
+    @classmethod
+    def add_(cls, input, other):
+        return
+
+    def matrix(self, input):
+        return
+
+    def rotation(self, input):
+        return
+
+    def identity_(self, X):
+        return
+
+    def Jr(self, X):
+        return
+
+class so2Type(LieType):
+    def __init__(self):
+        super().__init__(1, 2, 1)
+
+    def Exp(self, x):
+        return
+
+    def Mul(self, X, Y):
+        return
+
+    @classmethod
+    def identity(cls, *size, **kwargs):
+        return
+
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
+        return
+
+    def matrix(self, input):
+        return
+
+    def rotation(self, input):
+        return input.Exp().rotation()
+
+    def Jr(self, x):
+        return
+
+
+class SE2Type(LieType):
+    def __init__(self):
+        super().__init__(3, 3, 3)
+
+    def Log(self, X):
+        return
+
+    def Act(self, X, p):
+        return
+
+    def Mul(self, X, Y):
+        return
+
+    def Inv(self, X):
+        return
+
+    def rotation(self, input):
+        return
+
+    def translation(self, input):
+        return
+
+    def Adj(self, X, a):
+        return
+
+    def AdjT(self, X, a):
+        return
+
+    def Jinvp(self, X, p):
+        return
+
+    @classmethod
+    def identity(cls, *size, **kwargs):
+        return
+
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
+        return
+
+    @classmethod
+    def add_(cls, input, other):
+        return
+
+    def matrix(self, input):
+        return
+
+    def identity_(self, X):
+        return
+
+    def Jr(self, X):
+        return
+
+class se2Type(LieType):
+    def __init__(self):
+        super().__init__(3, 3, 3)
+
+    def Exp(self, x):
+        return
+
+    def Mul(self, X, Y):
+        return
+
+    @classmethod
+    def identity(cls, *size, **kwargs):
+        return
+
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
+        return
+
+    def matrix(self, input):
+        return
+
+    def rotation(self, input):
+        return input.Exp().rotation()
+
+    def translation(self, input):
+        return input.Exp().translation()
+
+    def Jr(self, x):
+        return
+
+
 class SO3Type(LieType):
     def __init__(self):
         super().__init__(4, 4, 3)
@@ -735,6 +891,9 @@ class rxso3Type(LieType):
         data = torch.cat([rotation, scale], dim=-1)
         return LieTensor(data, ltype=rxso3_type).requires_grad_(requires_grad)
 
+
+SO2Type, so2_type = SO2Type(), so2Type()
+SE2Type, se2_type = SE2Type(), se2Type()
 
 SO3_type, so3_type = SO3Type(), so3Type()
 SE3_type, se3_type = SE3Type(), se3Type()
