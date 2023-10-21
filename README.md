@@ -31,7 +31,7 @@ Deep learning has had remarkable success in robotic perception, but its data-cen
 - [`LevenbergMarquardt`](https://pypose.org/docs/main/generated/pypose.optim.LevenbergMarquardt/)
 - ......
 
-Want more features? [Create an issue here](https://github.com/pypose/pypose/issues) to requst new features.
+Want more features? [Create an issue here](https://github.com/pypose/pypose/issues) to request new features.
 
 ##### PyPose is highly efficient and supports parallel computing for Jacobian of Lie group and Lie algebra. See following comparison.
 
