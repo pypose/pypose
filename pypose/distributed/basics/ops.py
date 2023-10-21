@@ -1,6 +1,6 @@
 import torch
 import torch.distributed as dist
-from torch.distributed._tensor import DeviceMesh, Shard, Replicate, distribute_tensor, zeros
+from torch.distributed._tensor import DeviceMesh, Shard, Replicate, distribute_tensor
 
 
 class Dops:
@@ -8,11 +8,13 @@ class Dops:
     Performs basic distributed tensor operator
 
     Args:
-        world_size(:obj:'Int'): The world size of the global process group.
-        device_type(:obj:'Int'): the device type of devicemesh. Default: ``cpu``
+        rank(:obj:'int'): Rank for the default process group.
+        world_size(:obj:'int'): The world size of the global process group.
+        device_type(:obj:'str'): the device type of devicemesh. Default: ``cpu``
     '''
 
-    def __init__(self, world_size=4, device_type='cpu'):
+    def __init__(self, rank, world_size=4, device_type='cpu'):
+        self.rank = rank
         self.world_size = world_size
         self.device_type = device_type
 
@@ -41,19 +43,37 @@ class Dops:
                 >>> matmulAB(A,B).shape
                 tensor([3000,2000])
             '''
+
         assert A.shape[1] == B.shape[0], "The shape of the matrix of A and B is illegal"
         assert mesh_shape[0] * mesh_shape[1] == self.world_size, 'mesh_shape[0] * mesh_shape[1]' \
                                                                  ' must euqal to world_size'
         mesh = DeviceMesh(self.device_type, torch.arange(self.world_size).reshape(mesh_shape))
         if method == 'row':
+
+            if self.device_type == 'cuda':
+                torch.cuda.set_device(self.rank)
+
             dA = distribute_tensor(A, mesh, [Shard(1), Replicate()])
             dB = distribute_tensor(B, mesh, [Shard(0), Shard(1)])
             out_shape = [A.shape[0], int(B.shape[1] / 2)]
-            output = [torch.zeros(out_shape, dtype=torch.float32) for _ in range(mesh_shape[1])]
-            result = torch.matmul(dA.to_local(), dB.to_local()).to('cpu')
+            out_device = 'cpu' if self.device_type == 'cpu' else 'cuda:%d' % self.rank
+            output = [torch.zeros(out_shape, dtype=torch.float32, device=out_device) for _ in
+                      range(mesh_shape[1])]
+            result = torch.matmul(dA.to_local(), dB.to_local())
+            dist.barrier()
+
             dist.all_reduce(result, op=dist.ReduceOp.SUM, async_op=False,
                             group=mesh.get_dim_groups(0))
-            dist.all_gather(output, result, group=mesh.get_dim_groups(1))
+            if self.device_type == 'cpu':
+                dist.all_gather(output, result, group=mesh.get_dim_groups(1))
+
+            else:
+                # all_gather the result to cpu memory
+                group_cpu = dist.new_group(ranks=[0, 1], backend='gloo')
+                group_none = dist.new_group(ranks=[2, 3], backend='gloo')
+                result = result.to('cpu')
+                dist.all_gather(output, result, group=group_cpu)
+
             dist.barrier()
             return torch.cat(output, dim=1)
 
