@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
         # expert
         solver_exp = CartPole(dt, exp['len'], exp['m_cart'], exp['m_pole'], g)
-        mppi_expert = pp.MPPI(
+        mppi_expert = pp.module.MPPI(
         dynamics=solver_exp,
         running_cost=cost_fn,
         nx=4,
@@ -108,7 +108,7 @@ if __name__ == "__main__":
 
         #agent
         solver_agt = CartPole(dt, _len, exp['m_cart'], _m_pole, g)
-        mppi_agent = pp.MPPI(
+        mppi_agent = pp.module.MPPI(
         dynamics=solver_agt,
         running_cost=cost_fn,
         nx=4,
