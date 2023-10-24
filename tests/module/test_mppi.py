@@ -38,8 +38,6 @@ class TestMPPI:
         lambda_=0.01
         )
     u, xn= mppi.forward(x0)
-    print('u =', u)
-    print('x =', xn)
     x_ref=torch.tensor([[ 0.0000e+00,  0.0000e+00,  0.0000e+00],
             [-1.0977e-01,  0.0000e+00,  6.9991e-02],
             [-6.0990e-02,  3.4199e-03,  8.2744e-03],
