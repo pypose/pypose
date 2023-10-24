@@ -13,10 +13,6 @@ LieTensor
 
    :template: autosummary/base.rst
    SO3
-   so3
    SE3
-   se3
    Sim3
-   sim3
    RxSO3
-   rxso3
