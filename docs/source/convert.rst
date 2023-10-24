@@ -23,4 +23,3 @@ Convert
     cart2homo
     homo2cart
     point2pixel
-    pixel2point
