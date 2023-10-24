@@ -8,3 +8,4 @@ Distributed
 
    :template: autosummary/class-no-inherit.rst
    Dops
+   Dfactori

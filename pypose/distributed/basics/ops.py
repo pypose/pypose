@@ -20,30 +20,29 @@ class Dops:
 
     def matmulAB(self, A, B, mesh_shape, method='row'):
         r'''
-            Returns multiplication for tensor.
+        Returns multiplication for tensor.
 
-            Args:
-                A (:obj:`Tensor`): left input tensor.
-                B (:obj:`Tensor`): right input tensor.
-                mesh_shape(:obj:`tuple`): shape of device_mesh.
-                method(:obj:`str`): shard method of multiplication. Default: ``row``
+        Args:
+            A (:obj:`Tensor`): left input tensor.
+            B (:obj:`Tensor`): right input tensor.
+            mesh_shape(:obj:`tuple`): shape of device_mesh.
+            method(:obj:`str`): shard method of multiplication. Default: ``row``
 
-            Return:
-                :obj:`Tensor`: the result of multiplication of A, B.
+        Return:
+            :obj:`Tensor`: the result of multiplication of A, B.
 
-            Note:
-                Implementation is based on these papers
+        Note:
+            Implementation is based on these papers
 
-                * Cheng, Shenggan, et al. "ATP: Adaptive Tensor Parallelism for Foundation
-                  Models." arXiv preprint arXiv:2301.08658 (2023).
+            * Cheng, Shenggan, et al. "ATP: Adaptive Tensor Parallelism for Foundation
+              Models." arXiv preprint arXiv:2301.08658 (2023).
 
-            Example:
-                >>> A = torch.rand(3000,5000)
-                >>> B = torch.rand(5000,2000)
-                >>> matmulAB(A,B).shape
-                tensor([3000,2000])
-            '''
-
+        Example:
+            >>> A = torch.rand(3000,5000)
+            >>> B = torch.rand(5000,2000)
+            >>> matmulAB(A,B).shape
+            tensor([3000,2000])
+        '''
         assert A.shape[1] == B.shape[0], "The shape of the matrix of A and B is illegal"
         assert mesh_shape[0] * mesh_shape[1] == self.world_size, 'mesh_shape[0] * mesh_shape[1]' \
                                                                  ' must euqal to world_size'
