@@ -18,5 +18,5 @@ Modules
    module.IMUPreintegrator
    module.EPnP
    module.MPC
-   module.MPPI
    module.ICP
+   module.MPPI
