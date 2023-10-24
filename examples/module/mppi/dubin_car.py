@@ -86,7 +86,7 @@ if __name__ == '__main__':
     cost_fn = lambda x, u, t: (x[..., 0] - 10)**2 + (x[..., 1] - 10)**2 + (u[..., 0])**2
 
 
-    mppi = pp.MPPI(
+    mppi = pp.module.MPPI(
         dynamics=Simple2DNav(dt),
         running_cost=cost_fn,
         nx=3,
