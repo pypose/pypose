@@ -1,7 +1,7 @@
 import torch
 import pypose as pp
 import matplotlib.pyplot as plt
-
+import timeit
 dt = 1
 
 def getse3(xyzrpy):
@@ -125,10 +125,12 @@ def main():
     dynamics.set_reftrajectory(traj)
     LQR,Q, p = mpc_configs(dynamics, T = T)
 
-    x_init = pp.SE3(torch.tensor([0, -1, 0, 0, 0, 0,1], dtype=torch.float32, requires_grad=True)).unsqueeze(0)
+    x_init = pp.SE3(torch.tensor([0,0, 0, 0, 0, 0,1], dtype=torch.float32, requires_grad=True)).unsqueeze(0)
     tar=torch.zeros(Q.shape[1],14)
     tar[:,:7]=traj[0,1:,:]
+    time=timeit.default_timer()
     x, u, _ = LQR(x_init,tar,Q,p)
+    print("LQR time",timeit.default_timer()-time)
     # visualize_traj(x, traj)
     # x, u, _ = LQR(x[0,1:],tar,Q,p)
 
