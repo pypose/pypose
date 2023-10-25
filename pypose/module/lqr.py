@@ -305,6 +305,11 @@ class LQR(nn.Module):
 
         self.n_batch = x_init.shape[:-1]
 
+
+        #removeLater
+        self.n_batch=(1,)
+        #removeLater
+
         if p is None:
             p = torch.zeros(self.n_batch + (self.T, Q.size(-1)), **self.dargs)
 
@@ -327,7 +332,10 @@ class LQR(nn.Module):
         else:
             self.u_traj = u_traj
 
-        self.x_traj = x_init.repeat((self.T, 1))
+        if x_init.shape[0] == 1:
+            self.x_traj = x_init.repeat((self.T, 1))
+        else:
+            self.x_traj = x_init
 
         K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
@@ -335,7 +343,8 @@ class LQR(nn.Module):
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
         tau_traj=torch.cat((self.x_traj,self.u_traj),-1)
         F_all=self.system.F(tau_traj).sum(2)
-        p = bmv(Q, xut) + p
+
+        p =(bmv(Q.transpose(2,3), xut)+bmv(Q, xut))/2 + p
         # A = self.system.A(self.x_traj,self.u_traj).squeeze(-2).sum(2)
         # B = self.system.B(self.x_traj,self.u_traj).squeeze(-2).sum(2)
         for t in range(self.T-1, -1, -1):
@@ -376,11 +385,13 @@ class LQR(nn.Module):
 
         ns, nc = self.x_traj.size(-1), self.u_traj.size(-1)
 
+
+
         u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
         delta_u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
         cost = torch.zeros(self.n_batch, **self.dargs)
         x = torch.zeros(self.n_batch + (self.T+1, ns), **self.dargs)
-        xt = x[..., 0, :] = x_init
+        xt = x[..., 0, :] = x_init[0]
 
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]

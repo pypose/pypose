@@ -125,10 +125,12 @@ def main():
     dynamics.set_reftrajectory(traj)
     LQR,Q, p = mpc_configs(dynamics, T = T)
 
-    x_init = pp.SE3(torch.tensor([0, 0, 0, 0, 0, 0,1], dtype=torch.float32, requires_grad=True)).unsqueeze(0)
+    x_init = pp.SE3(torch.tensor([0, -1, 0, 0, 0, 0,1], dtype=torch.float32, requires_grad=True)).unsqueeze(0)
     tar=torch.zeros(Q.shape[1],14)
     tar[:,:7]=traj[0,1:,:]
-    x, u_mpc, _ = LQR(x_init,tar,Q,p)
+    x, u, _ = LQR(x_init,tar,Q,p)
+    # visualize_traj(x, traj)
+    # x, u, _ = LQR(x[0,1:],tar,Q,p)
 
     # x_traj = waypoints[:,0,:].unsqueeze(-2).repeat((1, T, 1))
     # dynamics.recover_dynamics()
@@ -138,3 +140,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+#prob 1: do not directly call forward to transition
+#prob 2: do not directly call forward to transition
