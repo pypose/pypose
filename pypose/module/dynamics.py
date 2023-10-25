@@ -12,10 +12,11 @@ class System(nn.Module):
     such as linear time invariant system :meth:`LTI`, Linear Time-Variant :meth:`LTV`,
     and a non-linear system :meth:`NLS`.
     '''
-    def __init__(self):
+    def __init__(self, xdim = None, udim = None, ydim = None):
         super().__init__()
         self.register_buffer('_t',torch.tensor(0, dtype=torch.int64))
         self.register_forward_hook(self.forward_hook)
+        self._xdim, self._udim, self._ydim = xdim, udim, ydim
 
     def forward_hook(self, module, inputs, outputs):
         r'''
@@ -84,7 +85,7 @@ class System(nn.Module):
         r'''
         Function to set the reference point for linearization.
 
-        Args: 
+        Args:
             state (:obj:`Tensor`): The reference state of the dynamical system. If ``None``,
                 the the most recent state is taken. Default: ``None``.
             input (:obj:`Tensor`): The reference input to the dynamical system. If ``None``,
@@ -100,6 +101,27 @@ class System(nn.Module):
             linearized system.
         '''
         return self
+
+    @property
+    def xdim(self):
+        r'''
+        dim of state
+        '''
+        return self._xdim
+
+    @property
+    def udim(self):
+        r'''
+        dim of input
+        '''
+        return self._udim
+
+    @property
+    def ydim(self):
+        r'''
+        dim of observation
+        '''
+        return self._ydim
 
     @property
     def systime(self):
@@ -118,7 +140,7 @@ class System(nn.Module):
 class LTI(System):
     r'''
     Discrete-time Linear Time-Invariant (LTI) system.
-    
+
     Args:
         A (:obj:`Tensor`): The state matrix of LTI system.
         B (:obj:`Tensor`): The input matrix of LTI system.
@@ -162,8 +184,8 @@ class LTI(System):
         >>> input = torch.randn(Bd, Id, device=device)
         >>> state, observation = lti(state, input)
         tensor([[[-8.5639,  0.0523, -0.2576]],
-                [[ 4.1013, -1.5452, -0.0233]]]), 
-        tensor([[[-3.5780, -2.2970, -2.9314]], 
+                [[ 4.1013, -1.5452, -0.0233]]]),
+        tensor([[[-3.5780, -2.2970, -2.9314]],
                 [[-0.4358,  1.7306,  2.7514]]]))
 
     Note:
@@ -173,7 +195,7 @@ class LTI(System):
         More practical examples can be found at `examples/module/dynamics
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
     '''
-    
+
     def __init__(self, A, B, C, D, c1=None, c2=None):
         super().__init__()
         self.register_buffer('_A', A)
@@ -188,7 +210,7 @@ class LTI(System):
         Perform one step advance for the LTI system.
 
         Args:
-            state (:obj:`Tensor`): The state (:math:`\mathbf{x}`) of the system 
+            state (:obj:`Tensor`): The state (:math:`\mathbf{x}`) of the system
             input (:obj:`Tensor`): The input (:math:`\mathbf{u}`) of the system.
 
         Returns:
@@ -204,7 +226,7 @@ class LTI(System):
             \mathbf{x}_{k+1} = \mathbf{A}\mathbf{x}_k + \mathbf{B}\mathbf{u}_k + \mathbf{c}_1
 
         Args:
-            state (:obj:`Tensor`): The state (:math:`\mathbf{x}`) of the system 
+            state (:obj:`Tensor`): The state (:math:`\mathbf{x}`) of the system
             input (:obj:`Tensor`): The input (:math:`\mathbf{u}`) of the system.
 
         Returns:
@@ -221,7 +243,7 @@ class LTI(System):
             \mathbf{y}_k = \mathbf{C}\mathbf{x}_k + \mathbf{D}\mathbf{u}_k + \mathbf{c}_2
 
         Args:
-            state (:obj:`Tensor`): The state (:math:`\mathbf{x}`) of the system 
+            state (:obj:`Tensor`): The state (:math:`\mathbf{x}`) of the system
             input (:obj:`Tensor`): The input (:math:`\mathbf{u}`) of the system.
 
         Returns:
@@ -244,7 +266,7 @@ class LTI(System):
     def C(self):
         r'''System output matrix.'''
         return self._C
- 
+
     @property
     def D(self):
         r'''System observation matrix.'''
@@ -265,7 +287,7 @@ class LTI(System):
 class LTV(LTI):
     r'''
     Discrete-time Linear Time-Variant (LTV) system.
-    
+
     Args:
         A (:obj:`Tensor`, optional): The stacked state matrix of LTI system. Default: ``None``
         B (:obj:`Tensor`, optional): The stacked input matrix of LTI system. Default: ``None``
@@ -308,28 +330,28 @@ class LTV(LTI):
         >>> D = torch.tile(torch.zeros(n_state, n_ctrl), (n_batch, T, 1, 1))
         >>> x = torch.randn(n_state)
         >>> u = torch.randn(T, n_ctrl)
-        ... 
+        ...
         >>> class MyLTV(pp.module.LTV):
         ...     def __init__(self, A, B, C, D, T):
         ...         super().__init__(A, B, C, D)
         ...         self.T = T
-        ... 
+        ...
         ...     @property
         ...     def A(self):
         ...         return self._A[...,self._t % self.T,:,:]
-        ... 
+        ...
         ...     @property
         ...     def B(self):
         ...         return self._B[...,self._t % self.T,:,:]
-        ... 
+        ...
         ...     @property
         ...     def C(self):
         ...         return self._C[...,self._t % self.T,:,:]
-        ... 
+        ...
         ...     @property
         ...     def D(self):
         ...         return self._D[...,self._t % self.T,:,:]
-        ... 
+        ...
         >>> ltv = MyLTV(A, B, C, D, T)
         >>> for t in range(T):
         ...     x, y = ltv(x, u[t])
@@ -340,28 +362,28 @@ class LTV(LTI):
         >>> n_sc = n_state + n_ctrl
         >>> x = torch.randn(n_state)
         >>> u = torch.randn(T, n_ctrl)
-        ... 
+        ...
         >>> class MyLTV(pp.module.LTV):
         ...     def __init__(self, A, B, C, D, T):
         ...         super().__init__(A, B, C, D)
         ...         self.T = T
-        ... 
+        ...
         ...     @property
         ...     def A(self):
         ...         return torch.eye(4, 4) * self._t.cos()
-        ... 
+        ...
         ...     @property
         ...     def B(self):
         ...         return torch.eye(4, 3) * self._t.sin()
-        ... 
+        ...
         ...     @property
         ...     def C(self):
         ...         return torch.eye(4, 4) * self._t.tan()
-        ... 
+        ...
         ...     @property
         ...     def D(self):
         ...         return torch.eye(4, 3)
-        ... 
+        ...
         >>> ltv = MyLTV()
         >>> for t in range(T):
         ...     x, y = ltv(x, u[t])
@@ -377,7 +399,7 @@ class LTV(LTI):
         r'''
         Function to set the reference point for linearization.
 
-        Args: 
+        Args:
             state (:obj:`Tensor`): The reference state of the dynamical system. If ``None``,
                 the the most recent state is taken. Default: ``None``.
             input (:obj:`Tensor`): The reference input to the dynamical system. If ``None``,
@@ -399,14 +421,14 @@ class LTV(LTI):
 class NLS(System):
     r'''
     Dynamics model for discrete-time non-linear system (NLS).
-    
+
     The state transision function :math:`\mathbf{f}` and observation function
     :math:`\mathbf{g}` are given by:
 
     .. math::
         \begin{aligned}
             \mathbf{x}_{k+1} &= \mathbf{f}(\mathbf{x}_k, \mathbf{u}_k, t_k), \\
-            \mathbf{y}_{k}   &= \mathbf{g}(\mathbf{x}_k, \mathbf{u}_k, t_k), 
+            \mathbf{y}_{k}   &= \mathbf{g}(\mathbf{x}_k, \mathbf{u}_k, t_k),
         \end{aligned}
 
     where :math:`k`, :math:`\mathbf{x}`, :math:`\mathbf{u}`, :math:`\mathbf{y}` are the time
@@ -433,11 +455,11 @@ class NLS(System):
 
         .. math::
             \begin{aligned}
-            \mathbf{f}(\mathbf{x}, \mathbf{u}, t^*) &\approx \mathbf{f}(\mathbf{x}^*, 
+            \mathbf{f}(\mathbf{x}, \mathbf{u}, t^*) &\approx \mathbf{f}(\mathbf{x}^*,
                 \mathbf{u}^*, t^*) +  \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}}
-                \right|_{\chi^*} \delta \mathbf{x} + \left. \frac{\partial \mathbf{f}} 
+                \right|_{\chi^*} \delta \mathbf{x} + \left. \frac{\partial \mathbf{f}}
                 {\partial \mathbf{u}} \right|_{\chi^*} \delta \mathbf{u} \\
-            &= \mathbf{f}(\mathbf{x}^*, \mathbf{u}^*, t^*) + \mathbf{A}(\mathbf{x} 
+            &= \mathbf{f}(\mathbf{x}^*, \mathbf{u}^*, t^*) + \mathbf{A}(\mathbf{x}
                 - \mathbf{x}^*) + \mathbf{B}(\mathbf{u}-\mathbf{u}^*) \\
             &= \mathbf{A}\mathbf{x} + \mathbf{B}\mathbf{u} + \mathbf{c}_1
             \end{aligned}
@@ -452,7 +474,7 @@ class NLS(System):
         theory. First, the linearization can be done for arbitrary point(s), not limited to
         the system's equilibrium point(s), and therefore the extra constant terms :math:`\mathbf{c}_1`
         and :math:`\mathbf{c}_2` are produced. Second, the linearized equations are represented
-        by the full states and inputs: :math:`\mathbf{x}` and :math:`\mathbf{u}`, rather than 
+        by the full states and inputs: :math:`\mathbf{x}` and :math:`\mathbf{u}`, rather than
         the perturbation format: :math:`\delta \mathbf{x}` and :math:`\delta \mathbf{u}`
         so that the model is consistent with, e.g., the LTI model and the iterative LQR
         solver. For more details go to :meth:`LTI`.
@@ -465,34 +487,34 @@ class NLS(System):
 
         >>> import math, torch
         >>> import pypose as pp
-        ... 
+        ...
         >>> class Floquet(pp.module.NLS):
         ...     def __init__(self):
         ...         super().__init__()
-        ... 
+        ...
         ...     def state_transition(self, state, input, t):
-        ... 
+        ...
         ...         cc = (2 * math.pi * t / 100).cos()
         ...         ss = (2 * math.pi * t / 100).sin()
-        ... 
+        ...
         ...         A = torch.tensor([[   1., cc/10],
         ...                           [cc/10,    1.]], device=t.device)
         ...         B = torch.tensor([[ss],
         ...                           [1.]], device=t.device)
-        ... 
+        ...
         ...         return pp.bmv(A, state) + pp.bmv(B, input)
-        ... 
+        ...
         ...     def observation(self, state, input, t):
         ...         return state + t
         ...
         >>> # Start from t = 8, and advance one step to t = 9.
         >>> step, current = 8, torch.tensor([1., 1.])
         >>> input = torch.tensor(2 * math.pi / 50 * step).sin()
-        ... 
+        ...
         >>> system = Floquet().reset(t = step)
         >>> next, observation = system(current, input)
         >>> system.set_refpoint()
-        ... 
+        ...
         >>> print(next)        # Next state
         >>> print(observation) # Observation
         >>> print(system.A)    # Linearized state matrix
@@ -536,7 +558,7 @@ class NLS(System):
         r'''
         Function to set the reference point for linearization.
 
-        Args: 
+        Args:
             state (:obj:`Tensor`): The reference state of the dynamical system. If ``None``,
                 the the most recent state is taken. Default: ``None``.
             input (:obj:`Tensor`): The reference input to the dynamical system. If ``None``,
@@ -590,7 +612,7 @@ class NLS(System):
         '''
         func = lambda x: self.observation(x, self._ref_input, self._ref_t)
         return jacobian(func, self._ref_state, **self.jacargs)
- 
+
     @property
     def D(self):
         r'''

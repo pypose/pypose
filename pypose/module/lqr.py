@@ -280,7 +280,7 @@ class LQR(nn.Module):
         assert self.Q.dtype == self.p.dtype, "Tensor data type not compatible."
         self.dargs = {'dtype': self.p.dtype, 'device': self.p.device}
 
-    def forward(self, x_init, dt=1, x_ref=None, u_traj=None, u_lower=None, u_upper=None, du=None):
+    def forward(self, x_init, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
         r'''
         Performs LQR for the discrete system.
 
@@ -302,11 +302,11 @@ class LQR(nn.Module):
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
             associated quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
-        K, k = self.lqr_backward(x_init, dt, x_ref, u_traj, u_lower, u_upper, du)
+        K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
         x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
         return x, u, cost
 
-    def lqr_backward(self, x_init, dt, x_ref=None, u_traj=None, u_lower=None, u_upper=None, du=None):
+    def lqr_backward(self, x_init, dt, u_traj=None, u_lower=None, u_upper=None, du=None):
 
         ns, nsc = x_init.size(-1), self.p.size(-1)
         nc = nsc - ns
@@ -318,6 +318,7 @@ class LQR(nn.Module):
 
         self.x_traj = x_init.unsqueeze(-2).repeat((1, self.T, 1))
         for i in range(self.T-1):
+            self.system.systime = torch.tensor(i, **self.dargs)
             self.x_traj[...,i+1,:], _ = self.system(self.x_traj[...,i,:].clone(),
                                                     self.u_traj[...,i,:])
 
@@ -328,18 +329,14 @@ class LQR(nn.Module):
 
         p = bmv(self.Q, xut) + self.p
 
-        if x_ref is not None:
-            tau_ref = torch.cat((x_ref, torch.zeros_like(self.u_traj)), dim=-1)
-            p -= bmv(self.Q, tau_ref) + bmv(self.Q.mT, tau_ref)/2
-
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
                 Qt = self.Q[...,t,:,:]
                 qt = p[...,t,:]
             else:
                 self.system.set_refpoint(state=self.x_traj[...,t,:],
-                                         input=self.u_traj[...,t,:],
-                                         t=torch.tensor(t*dt))
+                            input=self.u_traj[...,t,:],
+                            t=torch.tensor(t))
                 A = self.system.A.squeeze(-2)
                 B = self.system.B.squeeze(-2)
                 F = torch.cat((A, B), dim=-1)
@@ -373,6 +370,7 @@ class LQR(nn.Module):
         x = torch.zeros(self.n_batch + (self.T+1, ns), **self.dargs)
         xt = x[..., 0, :] = x_init
 
+        self.system.systime = torch.tensor(0, **self.dargs)
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]
             delta_xt = xt - self.x_traj[...,t,:]
