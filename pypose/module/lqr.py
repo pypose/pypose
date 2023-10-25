@@ -308,7 +308,7 @@ class LQR(nn.Module):
         if p is None:
             p = torch.zeros(self.n_batch + (self.T, Q.size(-1)), **self.dargs)
 
-        p_tar = -Q @ xu_target
+        p_tar = -bmv(Q,xu_target)
         p = p + p_tar
 
         K, k = self.lqr_backward(x_init, dt, Q, p, u_traj, u_lower, u_upper, du)
@@ -316,33 +316,6 @@ class LQR(nn.Module):
 
         return x, u, cost
 
-    def forward_(self, x_init, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
-        r'''
-        Performs LQR for the discrete system.
-
-        Args:
-            x_init (:obj:`Tensor`): The initial state of the system.
-            dt (:obj:`int`): The interval (:math:`\delta t`) between two time steps.
-                Default: `1`.
-            u_traj (:obj:`Tensor`, optinal): The current inputs of the system along a
-                trajectory. Default: ``None``.
-            u_lower (:obj:`Tensor`, optinal): The lower bounds on the controls.
-                Default: ``None``.
-            u_upper (:obj:`Tensor`, optinal): The upper bounds on the controls.
-                Default: ``None``.
-            du (:obj:`int`, optinal): The amount each component of the controls
-                is allowed to change in each LQR iteration. Default: ``None``.
-
-        Returns:
-            List of :obj:`Tensor`: A list of tensors including the solved state sequence
-            :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
-            associated quadratic costs :math:`\mathbf{c}` over the time horizon.
-        '''
-        t=timeit.default_timer()
-        K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
-        print("backward time: ", timeit.default_timer()-t)
-        x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
-        return x, u, cost
 
     def lqr_backward(self, x_init, dt, Q, p, u_traj=None, u_lower=None, u_upper=None, du=None):
 
@@ -355,18 +328,13 @@ class LQR(nn.Module):
             self.u_traj = u_traj
 
         self.x_traj = x_init.repeat((self.T, 1))
-        # for i in range(self.T-1):
-        #     self.x_traj[...,i+1,:], _ = self.system(self.x_traj[...,i,:].clone(),
-        #                                             self.u_traj[...,i,:])
 
         K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
 
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
         tau_traj=torch.cat((self.x_traj,self.u_traj),-1)
-        #t=timeit.default_timer()
         F_all=self.system.F(tau_traj).sum(2)
-        #print("F time: ", timeit.default_timer()-t)
         p = bmv(Q, xut) + p
         # A = self.system.A(self.x_traj,self.u_traj).squeeze(-2).sum(2)
         # B = self.system.B(self.x_traj,self.u_traj).squeeze(-2).sum(2)
@@ -419,7 +387,11 @@ class LQR(nn.Module):
             delta_xt = xt - self.x_traj[...,t,:]
             delta_u[..., t, :] = bmv(Kt, delta_xt) + kt
             u[...,t,:] = ut = delta_u[..., t, :] + self.u_traj[...,t,:]
-            xut = torch.cat((xt, ut), dim=-1)
-            x[...,t+1,:] = xt = self.system(xt, ut)[0]
+            if len(ut.shape)==1:
+                ut=ut.unsqueeze(0)
+            if len(xt.shape)==1:
+                xt=xt.unsqueeze(0)
+            xut = torch.cat((torch.tensor(xt), torch.tensor(ut)), dim=-1)
+            x[...,t+1,:] = xt = self.system(xut)[0]
             cost += 0.5 * bvmv(xut, Q[...,t,:,:], xut) + vecdot(xut, p[...,t,:])
         return x, u, cost
