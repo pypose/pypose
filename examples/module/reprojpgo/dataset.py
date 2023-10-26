@@ -118,7 +118,7 @@ def visualize(img1, img2, pts1, pts2, target, loss, step):
             [v1, reproj_v]
             , color=color_map(err)
         )
-    plt.title(f"Step: {step}, ReprojErr: {round(reproj_err.mean().item(), 3)},"
+    plt.title(f"Step: {step}, ReprojErr: {round(reproj_err.mean().item(), 3)}, "
               f"Residual: {round(loss.item(), 3)}")
     divider = make_axes_locatable(plt.gca())
     cax = divider.append_axes("right", size="5%", pad=0.05)

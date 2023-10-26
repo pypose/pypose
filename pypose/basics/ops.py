@@ -1,7 +1,7 @@
 import math, torch
 
 
-def pm(input, *, out=None):
+def pm(input):
     r'''
     Returns plus or minus (:math:`\pm`) states for tensor.
 
@@ -21,9 +21,7 @@ def pm(input, *, out=None):
         >>> pp.pm(torch.tensor([0.1, 0, -0.2], dtype=torch.float64))
         tensor([ 1.,  1., -1.], dtype=torch.float64)
     '''
-    out = torch.sign(input, out=None)
-    out[out==0] = 1
-    return out
+    return torch.sign(torch.sign(input) * 2 + 1)
 
 
 def cumops_(input, dim, ops):
