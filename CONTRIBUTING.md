@@ -5,14 +5,14 @@ Before you start coding for PyPose, it is important to inform the PyPose team of
 These contributions may include but are not limited to:
 
 1. If you notice a typographical error in PyPose's code or documentation, you can submit a Pull Request directly to fix it.
-    - If the changes you wish to make to PyPose involve significant modifications, it is recommended that you create an issue first. Within the issue, describe the error and information on how to reproduce the bug. Other developers will then review the issue and engage in discussion.
+    - If the changes you wish to make to PyPose involve significant modifications, it is recommended that you create an issue first. Within the issue, describe the error and provide information on how to reproduce the bug. Other developers will then review the issue and engage in discussion.
     - If you require additional information regarding a specific issue, please do not hesitate to request it, and we will gladly provide it to you.
 2. If you have an idea for a new feature in PyPose and wish to implement it, we recommend that you create an issue to post about your proposed feature. From there, we can discuss the design and implementation. Once we agree that the plan looks good, go ahead and implement it.
 
-Once you implement and test your feature or bug-fix, please submit a Pull Request.
+Once you implement and test your feature or bug fix, please submit a Pull Request.
 
 ## Workflow
-This document covers a step-by-step guide of contributing. It will tell you how to start from setting up the code repository and create a Pull Request step by step. This guide is modified from [OpenMMlab](https://github.com/open-mmlab/mmcv/blob/master/CONTRIBUTING.md)'s contribution guide.
+This document covers a step-by-step guide of contributing. It will tell you how to start by setting up the code repository and creating a Pull Request step by step. This guide is modified from [OpenMMlab](https://github.com/open-mmlab/mmcv/blob/master/CONTRIBUTING.md)'s contribution guide.
 
 ### 1. Fork and clone
 
@@ -26,7 +26,7 @@ git clone https://github.com/{your_github_id}/pypose.git
 # git clone git@github.com:{your_github_id}/pypose.git
 ```
 
-After that, you should add official repository as the upstream repository
+After that, you should add the official repository as the upstream repository
 
 ```bash
 git remote add upstream https://github.com/pypose/pypose.git
@@ -34,7 +34,7 @@ git remote add upstream https://github.com/pypose/pypose.git
 # git remote add upstream git@github.com:pypose/pypose.git
 ```
 
-Check whether remote repository has been added successfully by `git remote -v`. The output should be like this:
+Check whether the remote repository has been added successfully by `git remote -v`. The output should be like this:
 ```bash
 origin	https://github.com/{your_github_id}/pypose.git (fetch)
 origin	https://github.com/{your_github_id}/pypose.git (push)
@@ -58,7 +58,7 @@ After cloning a local copy of the repo, we should create a branch based on the m
 git checkout -b {your_github_id}/{pr_name}
 ```
 
-In subsequent development, if the main branch of the local repository is behind the main branch of "upstream", we need to pull the upstream for synchronization, and then execute the above command:
+In a subsequent development, if the main branch of the local repository is behind the main branch of "upstream", we need to pull the upstream for synchronization, and then execute the above command:
 
 ```shell
 git pull upstream main
@@ -76,7 +76,7 @@ git pull upstream main
 
 ### 4. Push the code to remote
 
-We could push the local commits to remote after passing through the check of unit test. You can associate the local branch with your remote branch by adding `-u` option.
+We could push the local commits to remote after passing through the check of the unit test. You can associate the local branch with your remote branch by adding `-u` option.
 
 ```shell
 git push -u origin {branch_name}
@@ -92,19 +92,19 @@ This will allow you to use the `git push` command to push code directly next tim
 
 **note**
 
-(a) The Pull Request description should contain the reason for the change, the content of the change, and the impact of the change, and be associated with the relevant Issue (see [documentation](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue))
+(a) The Pull Request description should contain the reason for the change, the content of the change, and the impact of the change and be associated with the relevant Issue (see [documentation](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue))
 
-(b) Check whether the Pull Request pass through the CI
+(b) Check whether the Pull Request passes through the CI
 
 <img width="909" alt="image" src="https://user-images.githubusercontent.com/8695500/222796987-3f612b21-21c9-4bb4-b8ff-4b1ddccf115d.png">
 
-CI will run unit test for the posted Pull Request in Linux environment. We can see the specific test information by clicking `Details` in the above image so that we can modify the code.
+CI will run the unit test for the posted Pull Request in the Linux environment. We can see the specific test information by clicking `Details` in the above image so that we can modify the code.
 
 (3) If the Pull Request passes the CI, then you can wait for the review from other developers. You'll modify the code based on the reviewer's comments, and repeat the steps [3](#3-commit-the-code-and-pass-the-unit-test)-[4](#4-push-the-code-to-remote) until all reviewers approve it. Then, we will merge it ASAP.
 
 ### 6. Resolve conflicts
 
-If your local branch conflicts with the latest main branch of "upstream", you'll need to resolove them. There are two ways to do this:
+If your local branch conflicts with the latest main branch of "upstream", you'll need to resolve them. There are two ways to do this:
 
 ```shell
 git fetch --all --prune
