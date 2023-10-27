@@ -87,21 +87,25 @@ pytest
 ```python
 >>> import torch, pypose as pp
 
->>> # A random so(3) LieTensor
+>>> # Create a random so(3) LieTensor with size 2x3x3 and enable gradient tracking
 >>> r = pp.randn_so3(2, requires_grad=True)
     so3Type LieTensor:
     tensor([[ 0.1606,  0.0232, -1.5516],
             [-0.0807, -0.7184, -0.1102]], requires_grad=True)
 
+    # Compute the matrix exponential of the so(3) LieTensor to get an SO(3) LieTensor
 >>> R = r.Exp() # Equivalent to: R = pp.Exp(r)
     SO3Type LieTensor:
     tensor([[ 0.0724,  0.0104, -0.6995,  0.7109],
             [-0.0395, -0.3513, -0.0539,  0.9339]], grad_fn=<AliasBackward0>)
 
+    # Generate a random 3D point using torch.randn
+    # and rotate it using the SO(3) LieTensor R
 >>> p = R @ torch.randn(3) # Rotate random point
     tensor([[ 0.8045, -0.8555,  0.5260],
             [ 0.3502,  0.8337,  0.9154]], grad_fn=<ViewBackward0>)
 
+    # Compute the sum of the elements in p and backward propagate the gradients
 >>> p.sum().backward()     # Compute gradient
 >>> r.grad                 # Print gradient
     tensor([[-0.7920, -0.9510,  1.7110],
@@ -117,28 +121,36 @@ pytest
 >>> from pypose.optim.strategy import Constant
 >>> from pypose.optim.scheduler import StopOnPlateau
 
+    # Define a custom neural network class InvNet
 >>> class InvNet(nn.Module):
 
         def __init__(self, *dim):
             super().__init__()
+            # Initialize the pose parameter with a random SE(3) tensor
             init = pp.randn_SE3(*dim)
             self.pose = pp.Parameter(init)
 
         def forward(self, input):
+            # Calculate the error as the logarithm of the pose transformation
             error = (self.pose @ input).Log()
             return error.tensor()
+    # Specify the device (GPU in this case)
+    >>> device = torch.device("cuda")
+    # Generate a random SE(3) tensor for input data on the specified device
+    >>> input = pp.randn_SE3(2, 2, device=device)
+    # Create an instance of the InvNet class and move it to the specified device
+    >>> invnet = InvNet(2, 2).to(device)
+    # Define a Constant damping strategy for the LM optimizer
+    >>> strategy = Constant(damping=1e-4)
+    # Create an LM optimizer with the InvNet and the damping strategy
+    >>> optimizer = LM(invnet, strategy=strategy)
+    # Create a StopOnPlateau scheduler to control the optimization process
+    >>> scheduler = StopOnPlateau(optimizer, steps=10, patience=3, decreasing=1e-3, verbose=True)
 
->>> device = torch.device("cuda")
->>> input = pp.randn_SE3(2, 2, device=device)
->>> invnet = InvNet(2, 2).to(device)
->>> strategy = Constant(damping=1e-4)
->>> optimizer = LM(invnet, strategy=strategy)
->>> scheduler = StopOnPlateau(optimizer, steps=10, patience=3, decreasing=1e-3, verbose=True)
-
->>> # 1st option, full optimization
+>>> # 1st option, full optimization using the scheduler
 >>> scheduler.optimize(input=input)
 
->>> # 2nd option, step optimization
+>>> # 2nd option, step optimization with the scheduler
 >>> while scheduler.continual():
         loss = optimizer.step(input)
         scheduler.step(loss)
