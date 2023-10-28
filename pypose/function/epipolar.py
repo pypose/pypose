@@ -18,16 +18,18 @@ def normalizePoints(coordinates:torch.Tensor):
 
     """
     assert coordinates.shape[1] == 3, "the coordinates has to be the homogeneous!"
-
+    
+    # keep data at same device
+    device = coordinates.device
     if coordinates.type() != 'torch.FloatTensor':
-        coordinates = coordinates.type(torch.FloatTensor)  
+        coordinates = coordinates.type(torch.FloatTensor).to(device)  
 
     mean = torch.mean(coordinates, dim = 0)
     scale = 1.4142135623730950488 / (torch.linalg.norm(coordinates - mean, dim = 1).mean() + 1e-8)
 
     transform = torch.tensor([scale,     0.0, - scale * mean [0],
                                 0.0,   scale, - scale * mean [1],
-                                0.0,     0.0, 1.0 ]).view(3,3)
+                                0.0,     0.0, 1.0 ]).view(3,3).to(device)  
 
     normP = transform @ coordinates.T
     return normP.T, transform
@@ -50,7 +52,7 @@ def trangulatePoints(coordinates1,coordinates2,intrinsic1,intrinsic2,R,t):
     Example:
 
     """
-    M = torch.cat([intrinsic1,torch.zeros(3,1)],dim =-1)
+    M = torch.cat([intrinsic1,torch.zeros_like(intrinsic1[..., :1])],dim =-1)
     Proj = intrinsic2 @ torch.cat([R,t],dim =-1)
 
     # consturct the A and b matrices
@@ -172,11 +174,14 @@ def findEssentialMat(coordinates1,coordinates2,intrinsic,method = 'none',iterati
     """
     assert coordinates1.shape == coordinates2.shape, "Point sets has to be the same shape!"
     assert coordinates1.shape[1] == 2, "the coordinates shape has to be (N, 2)!"
+    
+    # keep data at same device
+    device = coordinates1.device
     # transfer to homogeneous coordinates
     if coordinates1.type() != 'torch.FloatTensor':
-        coordinates1 = coordinates1.type(torch.FloatTensor) 
+        coordinates1 = coordinates1.type(torch.FloatTensor).to(device)
     if coordinates2.type() != 'torch.FloatTensor':
-        coordinates2 = coordinates2.type(torch.FloatTensor) 
+        coordinates2 = coordinates2.type(torch.FloatTensor).to(device)
 
     PH1 = pp.cart2homo(coordinates1)
     PH2 = pp.cart2homo(coordinates2)
@@ -205,9 +210,12 @@ def decomposeEssentialMat(E):
     Example:
 
     """
+    # keep data at same device
+    device = E.device
+
     W = torch.tensor([0.0, -1.0, 0.0,
                       1.0,  0.0, 0.0, 
-                      0.0,  0.0, 1.0]).view(3,3)
+                      0.0,  0.0, 1.0]).view(3,3).to(device)
     U,S,VT = torch.linalg.svd(E)
     t = U[:,-1].view(-1,1)
     R1 = U @ W @ VT
