@@ -317,8 +317,9 @@ class LQR(nn.Module):
             self.u_traj = u_traj
 
         self.x_traj = x_init.unsqueeze(-2).repeat((1, self.T, 1))
+
+        self.system.systime = torch.tensor(0)
         for i in range(self.T-1):
-            self.system.systime = torch.tensor(i, **self.dargs)
             self.x_traj[...,i+1,:], _ = self.system(self.x_traj[...,i,:].clone(),
                                                     self.u_traj[...,i,:])
 
@@ -336,7 +337,7 @@ class LQR(nn.Module):
             else:
                 self.system.set_refpoint(state=self.x_traj[...,t,:],
                             input=self.u_traj[...,t,:],
-                            t=torch.tensor(t))
+                            t=t)
                 A = self.system.A.squeeze(-2)
                 B = self.system.B.squeeze(-2)
                 F = torch.cat((A, B), dim=-1)
@@ -370,12 +371,12 @@ class LQR(nn.Module):
         x = torch.zeros(self.n_batch + (self.T+1, ns), **self.dargs)
         xt = x[..., 0, :] = x_init
 
-        self.system.systime = torch.tensor(0, **self.dargs)
+        self.system.systime = 0
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]
             delta_xt = xt - self.x_traj[...,t,:]
-            delta_u[..., t, :] = bmv(Kt, delta_xt) + kt
-            u[...,t,:] = ut = delta_u[..., t, :] + self.u_traj[...,t,:]
+            delta_u[...,t,:] = bmv(Kt, delta_xt) + kt
+            u[...,t,:] = ut = delta_u[...,t,:] + self.u_traj[...,t,:]
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
             cost += 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + vecdot(xut, self.p[...,t,:])
