@@ -502,7 +502,7 @@ def mat2RxSO3(mat, check=True, rtol=1e-5, atol=1e-5):
     shape = mat.shape
     rot = mat[..., :3, :3]
 
-    s = torch.pow(torch.det(mat), 1/3).unsqueeze(-1)
+    s = torch.pow(torch.det(rot), 1/3).unsqueeze(-1)
     if torch.allclose(s,  torch.zeros(shape[:-2], dtype=mat.dtype, device=mat.device), rtol=rtol, atol=atol):
         raise ValueError("Rotation matrix not full rank.")
 
