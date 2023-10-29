@@ -34,7 +34,7 @@ def normalizePoints(coordinates:torch.Tensor):
     normP = transform @ coordinates.T
     return normP.T, transform
 
-def trangulatePoints(coordinates1,coordinates2,intrinsic1,intrinsic2,R,t):
+def triangulatePoints(coordinates1,coordinates2,intrinsic1,intrinsic2,R,t):
     r"""
     Convert 2D corresponding coordinates to 3D points.
     
@@ -69,7 +69,7 @@ def trangulatePoints(coordinates1,coordinates2,intrinsic1,intrinsic2,R,t):
 
     return points3D.squeeze()
 
-def eight_pts_alg(coordinates1,coordinates2):
+def eightPointsAlg(coordinates1,coordinates2):
     r"""
     A minimum of eight corresponding points from two images 
     to obtain an initial estimate of the essential or fundamental matrix. 
@@ -133,8 +133,9 @@ def ransac(coordinates1,coordinates2,iterations = 1000, threshold = 1):
         num = torch.randint(0,5,(1,))
         sample = torch.randint(0,len(coordinates1),(8 + num,)) 
         # run 8 points algorithm
-        F = eight_pts_alg(coordinates1[sample],coordinates2[sample])
-
+        F = eightPointsAlg(coordinates1[sample],coordinates2[sample])
+        
+        #caculating the distance (error) between the corroseponding point and epipolarline
         err = computeError(coordinates1,coordinates2,F)
         mask = torch.argwhere(err < threshold)
 
@@ -144,7 +145,7 @@ def ransac(coordinates1,coordinates2,iterations = 1000, threshold = 1):
             MaxNumOfIns = len(mask)
             Maskbest = mask
             # refine the F with all inliers
-            F = eight_pts_alg(coordinates1[mask[:,0]],coordinates2[mask[:,0]])
+            F = eightPointsAlg(coordinates1[mask[:,0]],coordinates2[mask[:,0]])
             Fbest = F
     return Fbest, Maskbest
 
@@ -157,7 +158,7 @@ def findEssentialMat(coordinates1,coordinates2,intrinsic,method = 'none',iterati
         coordinates2 (``torch.Tensor``): Image coordinates with the shape (N, 2).
         intrinsic (``torch.Tensor``): The intrinsic matrix with the shape (3, 3).
         method (``str``, optional): The method to calculate the fundamental matrix.
-                              ``'none'``: No method is applied.
+                              ``'none'``: No method is applied. This method will compute the E or F with all points in the corresponding points set.
                               ``'RANSAC'``: RANSAC method is applied.
 
         iterations (``int``, optional): The maximum number of iterations in RANSAC method.
@@ -166,23 +167,31 @@ def findEssentialMat(coordinates1,coordinates2,intrinsic,method = 'none',iterati
     
     Returns:
         E (``torch.Tensor``): Essential matrix with the shape (3, 3).
-        mask (``torch.Tensor``): For RANSAC, it will return the index of the inliers in the corresponding points set.
+        mask (``torch.Tensor``): For 'RANSAC', it will return the index of the inliers in the corresponding points set.
                                  The shape is (..., 1)
+                                 For 'none', no mask will be returned.
     
     Example:
+        use the 'RANSAC' to compute E:
 
+        >> E, mask= findEssentialMat(coordinates1,coordinates2,intrinsic,method='RANSAC', iterations = 1000, threshold = 0.5)
+
+        use all points in the corresponding points set to compute E:
+
+        >> E = findEssentialMat(coordinates1,coordinates2,intrinsic)
+        
     """
     assert coordinates1.shape == coordinates2.shape, "Point sets has to be the same shape!"
     assert coordinates1.shape[1] == 2, "the coordinates shape has to be (N, 2)!"
     
-    # keep data at same device
+    # transfer to float and keep data at same device
     device = coordinates1.device
-    # transfer to homogeneous coordinates
     if coordinates1.type() != 'torch.FloatTensor':
         coordinates1 = coordinates1.type(torch.FloatTensor).to(device)
     if coordinates2.type() != 'torch.FloatTensor':
         coordinates2 = coordinates2.type(torch.FloatTensor).to(device)
 
+    # transfer to homogeneous coordinates
     PH1 = pp.cart2homo(coordinates1)
     PH2 = pp.cart2homo(coordinates2)
 
@@ -191,7 +200,7 @@ def findEssentialMat(coordinates1,coordinates2,intrinsic,method = 'none',iterati
         E =  intrinsic.T @ F @ intrinsic
         return E, mask
     else:
-        F = eight_pts_alg(PH1,PH2)
+        F = eightPointsAlg(PH1,PH2)
         E =  intrinsic.T @ F @ intrinsic
         return E
 
@@ -251,10 +260,10 @@ def recoverPose(E,coordinates1,coordinates2,intrinsic):
     """
 
     R1,R2,t = decomposeEssentialMat(E)
-    p3d1 = trangulatePoints(coordinates1,coordinates2,intrinsic,intrinsic,R= R1, t= t)
-    p3d2 = trangulatePoints(coordinates1,coordinates2,intrinsic,intrinsic,R= R1, t= -t)
-    p3d3 = trangulatePoints(coordinates1,coordinates2,intrinsic,intrinsic,R= R2, t= t)
-    p3d4 = trangulatePoints(coordinates1,coordinates2,intrinsic,intrinsic,R= R2, t= -t)
+    p3d1 = triangulatePoints(coordinates1,coordinates2,intrinsic,intrinsic,R= R1, t= t)
+    p3d2 = triangulatePoints(coordinates1,coordinates2,intrinsic,intrinsic,R= R1, t= -t)
+    p3d3 = triangulatePoints(coordinates1,coordinates2,intrinsic,intrinsic,R= R2, t= t)
+    p3d4 = triangulatePoints(coordinates1,coordinates2,intrinsic,intrinsic,R= R2, t= -t)
 
     # select the combination with the most positive numbers
     mask1 = torch.argwhere(p3d1[:,-1] > 0)
