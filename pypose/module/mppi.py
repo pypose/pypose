@@ -1,6 +1,6 @@
 import torch
 import functools
-import numpy as np
+#import numpy as np
 from torch.distributions.multivariate_normal import MultivariateNormal
 
 def _ensure_non_zero(cost, beta, factor):
@@ -8,7 +8,7 @@ def _ensure_non_zero(cost, beta, factor):
 
 
 def is_tensor_like(x):
-    return torch.is_tensor(x) or type(x) is np.ndarray
+    return torch.is_tensor(x) #or type(x) is np.ndarray
 
 
 def squeeze_n(v, n_squeeze):
