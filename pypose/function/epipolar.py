@@ -1,7 +1,7 @@
 import torch
 import pypose as pp
 
-def normalizePoints(coordinates:torch.Tensor):
+def normalize_points(coordinates:torch.Tensor):
     r"""  
     Calculate the normalized transformation of each coordinate set. After the transformation, 
     the centroid of each coordinate set is located at the coordinate origin, 
@@ -10,7 +10,7 @@ def normalizePoints(coordinates:torch.Tensor):
         coordinates (``torch.Tensor``): Homogeneous coordinates with the shape (N,3).
 
     Returns:
-        normP (``torch.Tensor``): normalized coordinates with the shape (N,3).
+        norm_pts (``torch.Tensor``): normalized coordinates with the shape (N,3).
         transform (``torch.Tensor``): transformation matrix with the shape (3,3).
     
     Example:
@@ -31,10 +31,10 @@ def normalizePoints(coordinates:torch.Tensor):
                                 0.0,   scale, - scale * mean [1],
                                 0.0,     0.0, 1.0 ]).view(3,3).to(device)  
 
-    normP = transform @ coordinates.T
-    return normP.T, transform
+    norm_pts = transform @ coordinates.T
+    return norm_pts.T, transform
 
-def triangulatePoints(coordinates1,coordinates2,intrinsic1,intrinsic2,R,t):
+def triangulate_points(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intrinsic1,intrinsic2,R,t):
     r"""
     Convert 2D corresponding coordinates to 3D points.
     
@@ -69,7 +69,7 @@ def triangulatePoints(coordinates1,coordinates2,intrinsic1,intrinsic2,R,t):
 
     return points3D.squeeze()
 
-def eightPointsAlg(coordinates1,coordinates2):
+def eight_pts_alg(coordinates1:torch.Tensor,coordinates2:torch.Tensor):
     r"""
     A minimum of eight corresponding points from two images 
     to obtain an initial estimate of the essential or fundamental matrix. 
@@ -87,8 +87,8 @@ def eightPointsAlg(coordinates1,coordinates2):
     assert coordinates1.shape == coordinates2.shape, "Point sets has to be the same shape!"
     assert len(coordinates1) > 7, "The number of point pairs must be greater than 7!"
 
-    PH1, Norm_matrix1 = normalizePoints(coordinates1)
-    PH2, Norm_matrix2 = normalizePoints(coordinates2)
+    PH1, norm_matrix1 = normalize_points(coordinates1)
+    PH2, norm_matrix2 = normalize_points(coordinates2)
 
     x1,y1 = PH1[:,0].view(-1,1),PH1[:,1].view(-1,1)
     x2,y2 = PH2[:,0].view(-1,1),PH2[:,1].view(-1,1)
@@ -102,14 +102,14 @@ def eightPointsAlg(coordinates1,coordinates2):
     S[-1] = 0.0
     M_new = U @ torch.diag_embed(S) @ VT
 
-    F = Norm_matrix2.T @ M_new @ Norm_matrix1
+    F = norm_matrix2.T @ M_new @ norm_matrix1
 
     # Make the value of the last row and column is one.
     if abs(F[2,2]) > 0.0:
         F = F/F[-1,-1]
     return F
 
-def ransac(coordinates1,coordinates2,iterations = 1000, threshold = 1):
+def ransac(coordinates1:torch.Tensor,coordinates2:torch.Tensor,iterations = 1000, threshold = 1):
     r""" 
     The algorithm identifies inliers and outliers. It also caculates the essential or fundamental matrix with the inliers.
    
@@ -121,35 +121,35 @@ def ransac(coordinates1,coordinates2,iterations = 1000, threshold = 1):
     
     Returns:
         Fbest (``torch.Tensor``): Essential or fundamental matrix with the most inliers. The shape is (3, 3).
-        Maskbest (``torch.Tensor``): The index of the inliers in the corresponding points set. The shape is (..., 1).
+        mask_inliers (``torch.Tensor``): The index of the inliers in the corresponding points set. The shape is (..., 1).
 
     Example:
 
     """
-    MaxNumOfIns = 8
+    max_num_of_inliers = 8
     
     for i in range(iterations):
         # randomly choose 8-12 samples
         num = torch.randint(0,5,(1,))
         sample = torch.randint(0,len(coordinates1),(8 + num,)) 
         # run 8 points algorithm
-        F = eightPointsAlg(coordinates1[sample],coordinates2[sample])
+        F = eight_pts_alg(coordinates1[sample],coordinates2[sample])
         
         #caculating the distance (error) between the corroseponding point and epipolarline
-        err = computeError(coordinates1,coordinates2,F)
+        err = compute_error(coordinates1,coordinates2,F)
         mask = torch.argwhere(err < threshold)
 
         # err = np.sum( coordinates2 @ F * coordinates1,axis= 1)
         # mask = np.argwhere(abs(err)<threshold) 
-        if len(mask) > MaxNumOfIns:
-            MaxNumOfIns = len(mask)
-            Maskbest = mask
+        if len(mask) > max_num_of_inliers:
+            max_num_of_inliers = len(mask)
+            mask_inliers = mask
             # refine the F with all inliers
-            F = eightPointsAlg(coordinates1[mask[:,0]],coordinates2[mask[:,0]])
+            F = eight_pts_alg(coordinates1[mask[:,0]],coordinates2[mask[:,0]])
             Fbest = F
-    return Fbest, Maskbest
+    return Fbest, mask_inliers
 
-def findEssentialMat(coordinates1,coordinates2,intrinsic,method = 'none',iterations =10000, threshold = 0.5):
+def find_essential_mat(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intrinsic,method = 'none',iterations =10000, threshold = 0.5):
     r""" 
     Comupte the essential matrix.
 
@@ -174,11 +174,11 @@ def findEssentialMat(coordinates1,coordinates2,intrinsic,method = 'none',iterati
     Example:
         use the 'RANSAC' to compute E:
 
-        >> E, mask= findEssentialMat(coordinates1,coordinates2,intrinsic,method='RANSAC', iterations = 1000, threshold = 0.5)
+        >>> E, mask= find_essential_mat(coordinates1,coordinates2,intrinsic,method='RANSAC', iterations = 1000, threshold = 0.5)
 
         use all points in the corresponding points set to compute E:
 
-        >> E = findEssentialMat(coordinates1,coordinates2,intrinsic)
+        >>> E = find_essential_mat(coordinates1,coordinates2,intrinsic)
         
     """
     assert coordinates1.shape == coordinates2.shape, "Point sets has to be the same shape!"
@@ -204,7 +204,7 @@ def findEssentialMat(coordinates1,coordinates2,intrinsic,method = 'none',iterati
         E =  intrinsic.T @ F @ intrinsic
         return E
 
-def decomposeEssentialMat(E):
+def decompose_essential_mat(E):
     r""" 
     Decompose the essential matrix into possible rotation and translation matrices.
    
@@ -239,7 +239,7 @@ def decomposeEssentialMat(E):
 
     return R1,R2,t
 
-def recoverPose(E,coordinates1,coordinates2,intrinsic):
+def recover_pose(E,coordinates1:torch.Tensor,coordinates2:torch.Tensor,intrinsic):
     r"""
     Decompose the essential matrix into 4 possible poses,[R1,t],[R1,-t],[R2,t],[R2,-t].
     Return the rotation and translation matrices in which the triangulated points are in front of both cameras.
@@ -259,11 +259,11 @@ def recoverPose(E,coordinates1,coordinates2,intrinsic):
 
     """
 
-    R1,R2,t = decomposeEssentialMat(E)
-    p3d1 = triangulatePoints(coordinates1,coordinates2,intrinsic,intrinsic,R= R1, t= t)
-    p3d2 = triangulatePoints(coordinates1,coordinates2,intrinsic,intrinsic,R= R1, t= -t)
-    p3d3 = triangulatePoints(coordinates1,coordinates2,intrinsic,intrinsic,R= R2, t= t)
-    p3d4 = triangulatePoints(coordinates1,coordinates2,intrinsic,intrinsic,R= R2, t= -t)
+    R1,R2,t = decompose_essential_mat(E)
+    p3d1 = triangulate_points(coordinates1,coordinates2,intrinsic,intrinsic,R= R1, t= t)
+    p3d2 = triangulate_points(coordinates1,coordinates2,intrinsic,intrinsic,R= R1, t= -t)
+    p3d3 = triangulate_points(coordinates1,coordinates2,intrinsic,intrinsic,R= R2, t= t)
+    p3d4 = triangulate_points(coordinates1,coordinates2,intrinsic,intrinsic,R= R2, t= -t)
 
     # select the combination with the most positive numbers
     mask1 = torch.argwhere(p3d1[:,-1] > 0)
@@ -279,7 +279,7 @@ def recoverPose(E,coordinates1,coordinates2,intrinsic):
         return R2, t, mask3 
     return R2, -t, mask4
     
-def computeError(coordinates1, coordinates2, F):
+def compute_error(coordinates1:torch.Tensor, coordinates2:torch.Tensor, F):
     r"""
     Finding the epipolar line and caculating the distance (error) between 
     the corroseponding point and epipolarline.
