@@ -365,7 +365,7 @@ def svdstf(source: torch.Tensor, target: torch.Tensor,
 
     # eq. 43
     M = torch.eye(m).expand_as(U).clone()
-    M[...,-1,-1] = torch.det(U @ V)
+    M[...,-1,-1] = torch.sign(torch.det(U @ V))
 
     # eq. 42
     if with_scale:
