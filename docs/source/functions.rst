@@ -17,8 +17,12 @@ Functions
     bvv
     bmv
     bvmv
+    compute_error
+    decompose_essential_mat
     pm
     Exp
+    eight_pts_alg
+    find_essential_mat
     Log
     Inv
     Retr
@@ -27,6 +31,7 @@ Functions
     AdjT
     Jinvp
     Jr
+    normalize_points
     randn_so3
     randn_SO3
     randn_se3
@@ -36,6 +41,7 @@ Functions
     randn_rxso3
     randn_RxSO3
     randn_like
+    ransac
     identity_so3
     identity_SO3
     identity_se3
@@ -52,7 +58,9 @@ Functions
     cumops
     cumops_
     reprojerr
+    recover_pose
     knn
     svdtf
     chspline
     bspline
+    triangulate_points
