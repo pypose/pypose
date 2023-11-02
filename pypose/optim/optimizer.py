@@ -46,7 +46,10 @@ class RobustModel(nn.Module):
             weight_diag = []
             for w, r in zip(weight, R):
                 ni = r.numel() * w.shape[-1] / w.numel()
-                weight_diag += [w] * int(ni)
+                w = w.view(*w.shape, 1, 1) if r.shape[-1] == 1 else w
+                ws = w.view(-1, w.shape[-2], w.shape[-1]).split(1, 0)
+                ws = [wsi.squeeze(0) for wsi in ws]
+                weight_diag += ws * int(ni)
             weight_diag = torch.block_diag(*weight_diag)
         R = [r.reshape(-1) for r in R]
         J = torch.cat(J) if isinstance(J, (tuple, list)) else J
@@ -148,6 +151,10 @@ class GaussNewton(_Optimizer):
         weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
             the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
             the length must be equal to the number of residuals.
+            The corresponding residual and weight should be
+            `broadcastable <https://pytorch.org/docs/stable/notes/broadcasting.html#broadcasting-semantics>`_.
+            For example, if the shape of a residual is ``B*M*N*R``, the shape of its weight can
+            be ``R*R``, ``N*R*R``, ``M*N*R*R`` or ``B*M*N*R*R``.
             Use this only when all inputs shared the same weight matrices. This is
             ignored when weight is given when calling :meth:`.step` or :meth:`.optimize` method.
             Default: ``None``.
@@ -346,6 +353,10 @@ class LevenbergMarquardt(_Optimizer):
         weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
             the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
             the length must be equal to the number of residuals.
+            The corresponding residual and weight should be
+            `broadcastable <https://pytorch.org/docs/stable/notes/broadcasting.html#broadcasting-semantics>`_.
+            For example, if the shape of a residual is ``B*M*N*R``, the shape of its weight can
+            be ``R*R``, ``N*R*R``, ``M*N*R*R`` or ``B*M*N*R*R``.
             Use this only when all inputs shared the same weight matrices. This is
             ignored when weight is given when calling :meth:`.step` or :meth:`.optimize` method.
             Default: ``None``.

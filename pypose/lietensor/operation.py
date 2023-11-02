@@ -211,9 +211,9 @@ def SE3_Adj(X):
 
 
 def SE3_Matrix(X):
-    T = torch.eye(4, device=X.device, dtype=X.dtype, requires_grad=False).repeat(X.shape[:-1]+(1, 1))
-    T[..., :3, :3] = SO3_Matrix(X[..., 3:])
-    T[..., :3, 3] = X[..., :3]
+    T = torch.cat([SO3_Matrix(X[..., 3:]), X[..., :3, None]], dim=-1)
+    E = torch.tensor([0, 0, 0, 1], dtype=T.dtype, device=T.device)
+    T = torch.cat([T, E.repeat(X.shape[:-1]+(1, 1))], dim=-2)
     return T
 
 
@@ -470,7 +470,7 @@ class sim3_Exp(torch.autograd.Function):
 
 
 class SO3_Act(torch.autograd.Function):
-
+    generate_vmap_rule = True
     @staticmethod
     def forward(X, p):
         Xv, Xw = X[..., :3], X[..., 3:]
@@ -498,7 +498,7 @@ class SO3_Act(torch.autograd.Function):
 
 
 class SE3_Act(torch.autograd.Function):
-
+    generate_vmap_rule = True
     @staticmethod
     def forward(X, p):
         out = X[..., :3] + SO3_Act.apply(X[..., 3:], p)

@@ -31,7 +31,7 @@ Deep learning has had remarkable success in robotic perception, but its data-cen
 - [`LevenbergMarquardt`](https://pypose.org/docs/main/generated/pypose.optim.LevenbergMarquardt/)
 - ......
 
-Want more features? [Create an issue here](https://github.com/pypose/pypose/issues) to requst new features.
+Want more features? [Create an issue here](https://github.com/pypose/pypose/issues) to request new features.
 
 ##### PyPose is highly efficient and supports parallel computing for Jacobian of Lie group and Lie algebra. See following comparison.
 
@@ -54,7 +54,7 @@ pip install pypose
 
 1. Requirement:
 
-On Ubuntu, MasOS, or Windows, install [PyTorch](https://pytorch.org/), then run:
+On Ubuntu, macOS, or Windows, install [PyTorch](https://pytorch.org/), then run:
 
 ```bash
 pip install -r requirements/runtime.txt
@@ -154,9 +154,20 @@ If you use PyPose, please cite the paper below. You may also [download it here](
 
 ```bibtex
 @inproceedings{wang2023pypose,
-  title     = {{PyPose}: A Library for Robot Learning with Physics-based Optimization},
-  author    = {Wang, Chen and Gao, Dasong and Xu, Kuan and Geng, Junyi and Hu, Yaoyu and Qiu, Yuheng and Li, Bowen and Yang, Fan and Moon, Brady and Pandey, Abhinav and Aryan and Xu, Jiahe and Wu, Tianhao and He, Haonan and Huang, Daning and Ren, Zhongqiang and Zhao, Shibo and Fu, Taimeng and Reddy, Pranay and Lin, Xiao and Wang, Wenshan and Shi, Jingnan and Talak, Rajat and Cao, Kun and Du, Yi and Wang, Han and Yu, Huai and Wang, Shanzhao and Chen, Siyu and Kashyap, Ananth  and Bandaru, Rohan and Dantu, Karthik and Wu, Jiajun and Xie, Lihua and Carlone, Luca and Hutter, Marco and Scherer, Sebastian},
+  title = {{PyPose}: A Library for Robot Learning with Physics-based Optimization},
+  author = {Wang, Chen and Gao, Dasong and Xu, Kuan and Geng, Junyi and Hu, Yaoyu and Qiu, Yuheng and Li, Bowen and Yang, Fan and Moon, Brady and Pandey, Abhinav and Aryan and Xu, Jiahe and Wu, Tianhao and He, Haonan and Huang, Daning and Ren, Zhongqiang and Zhao, Shibo and Fu, Taimeng and Reddy, Pranay and Lin, Xiao and Wang, Wenshan and Shi, Jingnan and Talak, Rajat and Cao, Kun and Du, Yi and Wang, Han and Yu, Huai and Wang, Shanzhao and Chen, Siyu and Kashyap, Ananth  and Bandaru, Rohan and Dantu, Karthik and Wu, Jiajun and Xie, Lihua and Carlone, Luca and Hutter, Marco and Scherer, Sebastian},
   booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-  year      = {2023}
+  year = {2023}
+}
+```
+
+More papers describing PyPose:
+
+```bibtex
+@inproceedings{zhan2023pypose,
+  title = {{PyPose} v0.6: The Imperative Programming Interface for Robotics},
+  author = {Zitong Zhan and Xiangfu Li and Qihang Li and Haonan He and Abhinav Pandey and Haitao Xiao and Yangmengfei Xu and Xiangyu Chen and Kuan Xu and Kun Cao and Zhipeng Zhao and Zihan Wang and Huan Xu and Zihang Fang and Yutian Chen and Wentao Wang and Xu Fang and Yi Du and Tianhao Wu and Xiao Lin and Yuheng Qiu and Fan Yang and Jingnan Shi and Shaoshu Su and Yiren Lu and Taimeng Fu and Karthik Dantu and Jiajun Wu and Lihua Xie and Marco Hutter and Luca Carlone and Sebastian Scherer and Daning Huang and Yaoyu Hu and Junyi Geng and Chen Wang},
+  year = {2023},
+  booktitle = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) Workshop},
 }
 ```
