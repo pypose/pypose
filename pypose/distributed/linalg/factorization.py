@@ -119,7 +119,7 @@ class Dfactori:
         self.rank = rank
         self.world_size = world_size
         self.device_type = device_type
-
+    # def calu(self):
     def tslu(self,local_input, max_step):
         s = 0
 
@@ -184,6 +184,7 @@ class Dfactori:
         '''
 
         if method == 'tslu':
+
             rank = dist.get_rank()
             max_step = int(np.log2(self.world_size))
             dx = distribute_tensor(input, device_mesh, [Shard(0)])
@@ -223,4 +224,7 @@ class Dfactori:
                     else:
                         L_result = torch.matmul(L_result, block_diag(dic_L[key]))
                 result = torch.matmul(L_result, U_)
-                return result
+                return L_result, U_
+
+            else:
+                return None,None

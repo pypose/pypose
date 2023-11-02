@@ -10,8 +10,9 @@ def test_lu(rank, world_size, device_type):
     A = torch.rand(1000, 500)
     dfactori = pp.Dfactori(rank,world_size, device_type)
     device_mesh = DeviceMesh(device_type, torch.arange(world_size))
-    dresult = dfactori.factorization(A, device_mesh,'tslu')
+    L, U = dfactori.factorization(A, device_mesh, 'tslu')
     if rank == 0:
+        dresult = torch.matmul(L, U)
         print('input_shape:', dresult.shape, 'error:', torch.sum(dresult- A))
 
 
