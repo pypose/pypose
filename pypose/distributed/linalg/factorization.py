@@ -119,7 +119,120 @@ class Dfactori:
         self.rank = rank
         self.world_size = world_size
         self.device_type = device_type
-    # def calu(self):
+
+    def calu(self, input, DeviceMesh):
+        #right looking
+        #only test pass world_size == 4, wait for update
+        rank = dist.get_rank()
+        mesh_array = np.arange(self.world_size).reshape(2, 2)
+        mesh = DeviceMesh("cpu", mesh_array, mesh_dim_names=['dp', 'tp'])
+        ndim = 8
+        gather_dim = int(ndim / 2)
+        dx = distribute_tensor(input, mesh, [Shard(0), Shard(1)])
+        dl = distribute_tensor(torch.zeros_like(input), mesh, [Shard(0), Shard(1)])
+        du = distribute_tensor(torch.zeros_like(input), mesh, [Shard(0), Shard(1)])
+        dist.barrier()
+        for step in range(mesh_array.ndim):
+
+            row_grp, col_grp, null_grp = None, None, None
+            local_data = dx.to_local()
+            list_l = [torch.zeros_like(local_data) for _ in range(step + 1)]
+            list_u = [torch.zeros_like(local_data) for _ in range(step + 1)]
+
+            if step == 0:
+                row_ranks, col_ranks, null_ranks = get_panel_group(mesh_array, step, method=0)
+
+            else:
+                row_ranks, col_ranks, null_ranks = get_panel_group(mesh_array, step, method=1)
+            dist.barrier()
+
+            if step != 0:
+
+                null_grp = dist.new_group(null_ranks, timeout=timedelta(seconds=5))
+                group_ranks = list(set(row_ranks + col_ranks))
+                gather_grp = dist.new_group(group_ranks)
+                if rank in group_ranks:
+                    list_l = funcol.all_gather_tensor(dl.to_local(), gather_dim=0,
+                                                      group=gather_grp).reshape(len(group_ranks),
+                                                                                gather_dim,
+                                                                                gather_dim) * 1
+                    list_u = funcol.all_gather_tensor(du.to_local(), gather_dim=0,
+                                                      group=gather_grp).reshape(len(group_ranks),
+                                                                                gather_dim,
+                                                                                gather_dim) * 1
+
+                if rank == mesh_array[step, step]:
+                    print(f'{rank},{col_ranks},{row_ranks},{group_ranks}')
+                    l_index = find_index(group_ranks, row_ranks)
+                    u_index = find_index(group_ranks, col_ranks)
+                    list_l = list_l[l_index]
+                    list_u = list_u[u_index]
+
+                    print(list_l.shape, list_u.shape)
+                    local_data = update_diagblock(local_data, list_l, list_u)
+
+            dist.barrier()  # right-looked 通信字典创建
+            row_ranks, col_ranks, null_ranks = get_panel_group(mesh_array, step, method=0)
+            row_ranks_cp, col_ranks_cp = row_ranks, col_ranks
+
+            if len(row_ranks_cp) != 0:
+                row_ranks_cp += [step]
+                col_ranks_cp += [step]
+
+            dist.barrier()
+
+            p, l, u = torch.linalg.lu(local_data)
+            l = p @ l
+            l = l.contiguous()
+            u = u.contiguous()
+
+            if len(row_ranks_cp) != 0:
+                row_grp = dist.new_group(row_ranks_cp)
+                col_grp = dist.new_group(col_ranks_cp)
+
+                if len(null_ranks) != 0:
+                    null_grp = dist.new_group(null_ranks)
+
+            if rank == step and rank == 0:
+                dl._local_tensor = l
+                du._local_tensor = u
+                if step == mesh_array.ndim - 1:  # 如果是最后一个块,则计算完lu分解返回
+                    break
+                print(f'src {rank},broadcast row{row_ranks_cp}, broadcast col {col_ranks_cp}')
+                dist.broadcast(l, step, group=row_grp)
+                dist.broadcast(u, step, group=col_grp)
+            elif rank == mesh_array[step, step]:
+
+                dl._local_tensor = l
+                du._local_tensor = u
+                if step == mesh_array.ndim - 1:  # 如果是最后一个块,则计算完lu分解返回
+                    break
+            else:
+
+                if step == mesh_array.ndim - 1:  # 如果是最后一个块,则计算完lu分解返回
+                    break
+
+                if rank in row_ranks:
+
+                    dist.broadcast(l, step, group=row_grp)
+                    du._local_tensor = update_row_panel(l, dx.to_local()).contiguous()
+                    print(f'u:{du.to_local()}')
+                elif rank in col_ranks:
+
+                    dist.broadcast(u, step, group=col_grp)
+                    dl._local_tensor = update_row_panel(u, dx.to_local()).contiguous()
+                    print(f'l:{dl.to_local()}')
+
+            del row_grp, col_grp, null_grp
+            dist.barrier()
+        # row_l = funcol.all_gather_tensor(dl.to_local(), gather_dim=1, group=(mesh, 1)) * 1  #allgather L block and u block
+        # row_u = funcol.all_gather_tensor(du.to_local(), gather_dim=1, group=(mesh, 1)) * 1
+        # l = funcol.all_gather_tensor(row_l, gather_dim=0, group=(mesh, 0)) * 1
+        # u = funcol.all_gather_tensor(row_u, gather_dim=0, group=(mesh, 0)) * 1
+        dist.barrier()
+        if rank == 0:
+            print('need block matmul')
+
     def tslu(self,local_input, max_step):
         s = 0
 
@@ -158,7 +271,7 @@ class Dfactori:
         return list_L, U, list_s
     def calu(self):
         return
-    def factorization(self, input, device_mesh, method=tslu):
+    def factorization(self, input, device_mesh, method='tslu'):
         r'''
         Returns multiplication for tensor.
 
@@ -192,7 +305,6 @@ class Dfactori:
             L, U, s = self.tslu(dx.to_local(), max_step)
             L = {self.rank: L}
             if rank == 0:
-                print('u_shape', U.shape)
                 U_ = U
             l_list = [None for i in range(self.world_size)]
             l_obj = {}
@@ -228,3 +340,6 @@ class Dfactori:
 
             else:
                 return None,None
+
+        elif method == 'calu':
+            self.calu(input, device_mesh)
