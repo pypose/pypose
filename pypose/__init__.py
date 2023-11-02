@@ -19,7 +19,8 @@ from .basics import *
 from . import module
 from . import optim
 from . import testing
-
+from .distributed.basics.ops import Dops
+from .distributed.linalg.factorization import Dfactori
 
 min_torch = '2.0'
 assert version.parse(min_torch) <= version.parse(torch.__version__), \

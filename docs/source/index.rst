@@ -11,6 +11,7 @@ PyPose Documentation
    func
    functions
    convert
+   distributed
    modules
    optim
    utils
