@@ -2,29 +2,28 @@ import torch
 import pypose as pp
 import matplotlib.pyplot as plt
 
-dt = 1
+def getse3(xyzrpy):
+    xyz = xyzrpy[..., :3]
+    rpy = xyzrpy[..., 3:]
+    q = pp.euler2SO3(rpy).tensor()
+    return pp.SE3(torch.cat([xyz, q], dim=-1)).Log()
 
-class Bicycle(pp.module.NLS):
+class anySE3(pp.module.NLS):
     def __init__(self, dt=None):
         super().__init__()
         self.ref_traj = None
         self.dt = dt
 
-    def origin_state_transition(self, state, input, t=None):
-        v, w = input[..., 0:1], input[..., 1:2]
-        zeros = torch.zeros_like(v, dtype=torch.float32, requires_grad=True)
-        # xyzrpy = torch.cat((v, zeros, zeros, zeros, zeros, w), dim=-1) * dt
-        xyzrpy = torch.cat((v*(w*self.dt).cos(), v*(w*self.dt).sin(), zeros, zeros, zeros, w), dim=-1)*self.dt
-        rt = getSE3(xyzrpy)
-        return  rt*state
-
     def state_transition(self, state, input, t):
         if self.ref_traj is None:
-            return self.origin_state_transition(state, input, t)
+            return state.Retr(pp.se3(input))
         else:
             ref_SE3 = self.ref_traj[...,t,:]
             next_ref_SE3 = self.ref_traj[...,t+1,:]
-            return next_ref_SE3.Inv()*self.origin_state_transition(ref_SE3*state, input, t)
+            next_SE3 = (pp.se3(input)).Exp()*(ref_SE3*state)
+            return next_ref_SE3.Inv()*next_SE3
+            # next_SE3 = (ref_SE3@state).Retr(pp.se3(input))
+            # return next_ref_SE3.Inv()@next_SE3
 
     def observation(self, state, input, t=None):
         return state
@@ -66,12 +65,6 @@ def visualize_traj(traj, ref_traj):
     # ax.legend()
     # plt.show()
 
-def getSE3(xyzrpy):
-    xyz = xyzrpy[..., :3]
-    rpy = xyzrpy[..., 3:]
-    q = pp.euler2SO3(rpy).tensor()
-    return pp.SE3(torch.cat([xyz, q], dim=-1))
-
 def waypoints_configs():
     r = 6
 
@@ -97,46 +90,37 @@ def waypoints_configs():
                             [r/sqrt2-r, -r/sqrt2, 0, 0, 0, thetas[15]],
                             [0, 0, 0, 0, 0, thetas[0]]]], requires_grad=True)
 
-    return getSE3(xyzrpy)
+    return getse3(xyzrpy).Exp()
 
 def mpc_configs(dynamics, T):
     n_batch = 1
-    n_state, n_ctrl = 7, 2
+    n_state, n_ctrl = 7, 6
     Q = torch.tile(torch.eye(n_state + n_ctrl), (n_batch, T, 1, 1))
-    Q[..., n_state:, n_state:] *= 1
+    Q[..., n_state:, n_state:] *= 1e-1
     p = torch.tile(torch.zeros(n_state + n_ctrl), (n_batch, T, 1))
 
     stepper = pp.utils.ReduceToBason(steps=1, verbose=False)
     MPC = pp.module.MPC(dynamics, Q, p, T, stepper=stepper)
     return MPC
 
-def evaluate_traj(traj, ref_traj):
-    traj, ref_traj = pp.SE3(traj), pp.SE3(ref_traj)
-    print("ref_traj shape is", ref_traj.shape)
-    print("traj shape is", traj.shape)
-    error = ref_traj.Inv()*traj
-    print("The error is\n", error)
-
 def main():
     T = 90
-    dynamics = Bicycle(dt=dt)
+    dt = 1
+    dynamics = anySE3(dt=dt)
     waypoints = waypoints_configs()
     traj = pp.bspline(waypoints, interval=0.2, extrapolate=True)
-    # print(traj.shape)
+    print("traj shape is", traj.shape)
     dynamics.set_reftrajectory(traj)
     MPC = mpc_configs(dynamics, T = T)
 
-    x_init = traj[...,0,:]
+    x_init = pp.SE3(torch.tensor([[0, 0, 0, 0, 0, 0, 1]], dtype=torch.float32, requires_grad=True))
     _, u_mpc, _ = MPC(dt, x_init)
-    # print(u_mpc)
 
-    x_traj = x_init.unsqueeze(-2).repeat((1, T+1, 1))
+    x_traj = waypoints[:,0,:].unsqueeze(-2).repeat((1, T, 1))
     dynamics.recover_dynamics()
-
-    for i in range(T):
+    for i in range(T-1):
         x_traj[...,i+1,:], _ = dynamics(x_traj[...,i,:].clone(), u_mpc[...,i,:])
 
-    # evaluate_traj(x_traj, traj)
     visualize_traj(x_traj, traj)
 
 if __name__ == "__main__":
