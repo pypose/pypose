@@ -1,6 +1,6 @@
 __all__ = ['groups']
 from .lietensor import LieTensor, Parameter
-from .lietensor import SO3_type, so3_type, SE3_type, se3_type
+from .lietensor import SO3_type, so3_type, SE3_type, se3_type, SE3Type
 from .lietensor import Sim3_type, sim3_type, RxSO3_type, rxso3_type
 from .utils import randn_like, randn_SE3, randn_SO3, randn_so3, randn_se3
 from .utils import randn_Sim3, randn_sim3, randn_RxSO3, randn_rxso3
