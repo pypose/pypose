@@ -280,6 +280,9 @@ class LQR(nn.Module):
         assert self.Q.dtype == self.p.dtype, "Tensor data type not compatible."
         self.dargs = {'dtype': self.p.dtype, 'device': self.p.device}
 
+    def reconfig(self, Q, p, T):
+        self.Q, self.p, self.T = Q, p, T
+
     def forward(self, x_init, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
         r'''
         Performs LQR for the discrete system.
@@ -338,8 +341,11 @@ class LQR(nn.Module):
                 self.system.set_refpoint(state=self.x_traj[...,t,:],
                             input=self.u_traj[...,t,:],
                             t=t)
-                A = self.system.A.squeeze(-2)
-                B = self.system.B.squeeze(-2)
+                A = self.system.A
+                B = self.system.B
+                if A.ndim == 4:
+                    A = torch.stack([A[i, :, i, :] for i in range(A.shape[0])])
+                    B = torch.stack([B[i, :, i, :] for i in range(B.shape[0])])
                 F = torch.cat((A, B), dim=-1)
                 Qt = self.Q[...,t,:,:] + F.mT @ V @ F
                 qt = p[...,t,:] + bmv(F.mT, v)

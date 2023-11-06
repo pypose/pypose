@@ -12,11 +12,13 @@ class Bicycle(pp.module.NLS):
 
     def origin_state_transition(self, state, input, t=None):
         v, w = input[..., 0:1], input[..., 1:2]
-        zeros = torch.zeros_like(v, dtype=torch.float32, requires_grad=True)
-        # xyzrpy = torch.cat((v, zeros, zeros, zeros, zeros, w), dim=-1) * dt
-        xyzrpy = torch.cat((v*(w*self.dt).cos(), v*(w*self.dt).sin(), zeros, zeros, zeros, w), dim=-1)*self.dt
+        zeros = torch.zeros_like(v.repeat(1,4), dtype=torch.float32, requires_grad=True)
+        xyzrpy = torch.cat((v, zeros, w), dim=-1)*self.dt
+        # zeros = torch.zeros_like(v.repeat(1,3), dtype=torch.float32, requires_grad=True)
+        # xyzrpy = torch.cat((v*(w*self.dt).cos(), v*(w*self.dt).sin(), zeros, w), dim=-1)*self.dt
         rt = getSE3(xyzrpy)
-        return  rt*state
+        print(t)
+        return state*rt
 
     def state_transition(self, state, input, t):
         if self.ref_traj is None:
@@ -35,7 +37,7 @@ class Bicycle(pp.module.NLS):
     def recover_dynamics(self):
         self.ref_traj = None
 
-def visualize_traj(traj, ref_traj):
+def visualize_traj_and_input(traj, ref_traj, u_mpc):
     traj, ref_traj = pp.SE3(traj), pp.SE3(ref_traj)
     x = traj.translation()[...,0].squeeze().detach().numpy()
     y = traj.translation()[...,1].squeeze().detach().numpy()
@@ -43,28 +45,27 @@ def visualize_traj(traj, ref_traj):
     x_ref = ref_traj.translation()[...,0].squeeze().detach().numpy()
     y_ref = ref_traj.translation()[...,1].squeeze().detach().numpy()
     z_ref = ref_traj.translation()[...,2].squeeze().detach().numpy()
+    u_mpc = u_mpc.squeeze().detach().numpy()
 
-    plt.figure()
-    plt.axes().set_aspect('equal')
-    plt.plot(x, y, 'o-', label='trajectory', alpha = 0.8)
-    plt.plot(x_ref, y_ref, 'o-', label='reference trajectory', alpha = 0.1)
-    plt.xlabel('x')
-    plt.ylabel('y')
-    plt.title('Bicycle trajectory')
-    plt.legend()
+    fig, axs = plt.subplots(2, 1, figsize=(10, 10))
+
+    axs[0].set_aspect('equal')
+    axs[0].plot(x, y, 'o-', label='trajectory', alpha=0.8)
+    axs[0].plot(x_ref, y_ref, 'o-', label='reference trajectory', alpha=0.1)
+    axs[0].set_xlabel('x')
+    axs[0].set_ylabel('y')
+    axs[0].set_title('Bicycle trajectory')
+    axs[0].legend()
+
+    axs[1].plot(u_mpc[:,0], label='v')
+    axs[1].plot(u_mpc[:,1], label='w')
+    axs[1].set_xlabel('time')
+    axs[1].set_ylabel('input')
+    axs[1].set_title('Bicycle input')
+    axs[1].legend()
+
+    plt.tight_layout()
     plt.show()
-
-    ## Plot in 3D
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection='3d')
-    # ax.plot(x, y, z, 'o-', label='trajectory', alpha = 0.8)
-    # ax.plot(x_ref, y_ref, z_ref, 'o-', label='reference trajectory', alpha = 0.1)
-    # ax.set_xlabel('x')
-    # ax.set_ylabel('y')
-    # ax.set_zlabel('z')
-    # ax.set_title('Bicycle trajectory')
-    # ax.legend()
-    # plt.show()
 
 def getSE3(xyzrpy):
     xyz = xyzrpy[..., :3]
@@ -112,32 +113,44 @@ def mpc_configs(dynamics, T):
 
 def evaluate_traj(traj, ref_traj):
     traj, ref_traj = pp.SE3(traj), pp.SE3(ref_traj)
-    print("ref_traj shape is", ref_traj.shape)
-    print("traj shape is", traj.shape)
     error = ref_traj.Inv()*traj
     print("The error is\n", error)
+
+def test_dynamic():
+    dynamics = Bicycle(dt=dt)
+    waypoints = waypoints_configs()
+    traj = pp.bspline(waypoints, interval=0.2, extrapolate=True)
+
+    x_init = traj[...,0,:]
+    x_traj = x_init.unsqueeze(-2).repeat((1, 6, 1))
+    u = torch.tensor([[1, 0.5]]).repeat((5, 1))
+    for i in range(5):
+        x_traj[...,i+1,:], _ = dynamics(x_traj[...,i,:].clone(), u[i].unsqueeze(0))
+
+    visualize_traj_and_input(x_traj, traj, u)
 
 def main():
     T = 90
     dynamics = Bicycle(dt=dt)
     waypoints = waypoints_configs()
     traj = pp.bspline(waypoints, interval=0.2, extrapolate=True)
-    # print(traj.shape)
+
     dynamics.set_reftrajectory(traj)
     MPC = mpc_configs(dynamics, T = T)
 
     x_init = traj[...,0,:]
+    print(x_init.euler())
     _, u_mpc, _ = MPC(dt, x_init)
-    # print(u_mpc)
 
     x_traj = x_init.unsqueeze(-2).repeat((1, T+1, 1))
     dynamics.recover_dynamics()
 
+    dynamics.systime = torch.tensor(0)
     for i in range(T):
         x_traj[...,i+1,:], _ = dynamics(x_traj[...,i,:].clone(), u_mpc[...,i,:])
 
-    # evaluate_traj(x_traj, traj)
-    visualize_traj(x_traj, traj)
+    visualize_traj_and_input(x_traj, traj, u_mpc)
 
 if __name__ == "__main__":
     main()
+    # test_dynamic()

@@ -20,7 +20,7 @@ class anySE3(pp.module.NLS):
         else:
             ref_SE3 = self.ref_traj[...,t,:]
             next_ref_SE3 = self.ref_traj[...,t+1,:]
-            next_SE3 = (pp.se3(input)).Exp()*(ref_SE3*state)
+            next_SE3 = (ref_SE3*state).Retr(pp.se3(input))
             return next_ref_SE3.Inv()*next_SE3
             # next_SE3 = (ref_SE3@state).Retr(pp.se3(input))
             # return next_ref_SE3.Inv()@next_SE3
