@@ -134,14 +134,14 @@ def triangulate_points(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
 
     return points3D.squeeze()
 
-def eight_pts_alg(coordinates1:torch.Tensor,coordinates2:torch.Tensor):
+def eight_pts_alg(data:torch.Tensor):
     r"""
     A minimum of eight corresponding points from two images 
     to obtain an initial estimate of the essential or fundamental matrix. 
 
     Args:
-        coordinates1 (``torch.Tensor``): Homogeneous coordinates with the shape (N, 3).
-        coordinates2 (``torch.Tensor``): Homogeneous coordinates with the shape (N, 3).
+        data (``torch.Tensor``): Concatenated two sets of Homogeneous coordinate,so the shape is (N, 6).
+        
     
     Returns:
         (``F: torch.Tensor``):
@@ -157,15 +157,17 @@ def eight_pts_alg(coordinates1:torch.Tensor,coordinates2:torch.Tensor):
         ...                      [356.0312, 187.2891],[191.6719, 476.9531],[381.6484, 213.8477],[ 91.6328,  92.5391],[ 62.7266, 200.2344],[396.4111, 226.1543]])   
         >>> pts1 = pp.cart2homo(pts1)
         >>> pts2 = pp.cart2homo(pts2)
-        >>> F = eight_pts_alg(pts1,pts2)
+        >>> data = torch.cat((pts1,pts2),1)
+        >>> F = eight_pts_alg(data)
         >>> F
         tensor([[ 4.6117e-07, -9.0610e-05,  2.7522e-02],
                 [ 9.4227e-05,  3.9505e-06, -8.7046e-02],
                 [-2.9752e-02,  8.4636e-02,  1.0000e+00]])
     """
-    assert coordinates1.shape == coordinates2.shape, "Point sets has to be the same shape!"
-    assert len(coordinates1) > 7, "The number of point pairs must be greater than 7!"
-
+    assert data.shape[1] == 6, "The shape must be (N, 6)!"
+    assert len(data) > 7, "The number of point pairs must be greater than 7!"
+    coordinates1 = data[:,:3]
+    coordinates2 = data[:,3:]
     norm_pts1, transfer_matrix1 = normalize_points(coordinates1)
     norm_pts2, transfer_matrix2 = normalize_points(coordinates2)
 
@@ -188,7 +190,7 @@ def eight_pts_alg(coordinates1:torch.Tensor,coordinates2:torch.Tensor):
         F = F/F[-1,-1]
     return F
 
-def ransac(coordinates1:torch.Tensor,coordinates2:torch.Tensor,iterations = 1000, threshold = 1):
+def ransac(data:torch.Tensor,fit_model,check_model,iterations = 1000,num_of_select = 8, threshold = 1):
     r""" 
     The algorithm identifies inliers and outliers. It also caculates the essential or fundamental matrix with the inliers.
    
@@ -214,34 +216,52 @@ def ransac(coordinates1:torch.Tensor,coordinates2:torch.Tensor,iterations = 1000
         ...                      [356.0312, 187.2891],[191.6719, 476.9531],[381.6484, 213.8477],[ 91.6328,  92.5391],[ 62.7266, 200.2344],[396.4111, 226.1543]])   
         >>> pts1 = pp.cart2homo(pts1)
         >>> pts2 = pp.cart2homo(pts2)
-        >>> F, mask = ransac(pts1, pts2, iterations = 1000, threshold = 0.5))
+        >>> data = torch.cat((pts1,pts2),1)
+        >>> fit_model = eight_pts_alg
+        >>> check_model = compute_error
+        >>> num_of_select = 8
+        >>> F, mask = ransac(data,fit_model,check_model,iterations = 1000,num_of_select = 8 ,threshold = 0.5)
         >>> F
         tensor([[ 4.6117e-07, -9.0610e-05,  2.7522e-02],
                 [ 9.4227e-05,  3.9505e-06, -8.7046e-02],
                 [-2.9752e-02,  8.4636e-02,  1.0000e+00]])
     """
-    max_num_of_inliers = 8
+    max_num_of_inliers = 0
+    least_err = torch.inf
     
     for i in range(iterations):
-        # randomly choose 8-12 samples
-        num = torch.randint(0,5,(1,))
-        sample = torch.randint(0,len(coordinates1),(8 + num,)) 
-        # run 8 points algorithm
-        F = eight_pts_alg(coordinates1[sample],coordinates2[sample])
+        # randomly choose ‘num_of_select’ samples
+        samples = torch.randint(0,len(data),(num_of_select,)) 
+        # avoid selecting a sample multiple times
+        if len(torch.unique(samples))!= num_of_select:
+            continue
+        # run fit model
+        M = fit_model(data[samples])
         
-        #caculating the distance (error) between the corroseponding point and epipolarline
-        err = compute_error(coordinates1,coordinates2,F)
-        mask = torch.argwhere(err < threshold)
+        # check the data with M, get the err and mask for inliers
+        err, mask = check_model(data,M,threshold)
 
-        # err = np.sum( coordinates2 @ F * coordinates1,axis= 1)
-        # mask = np.argwhere(abs(err)<threshold) 
         if len(mask) > max_num_of_inliers:
+
             max_num_of_inliers = len(mask)
             mask_inliers = mask
-            # refine the F with all inliers
-            F = eight_pts_alg(coordinates1[mask[:,0]],coordinates2[mask[:,0]])
-            Fbest = F
-    return Fbest, mask_inliers
+            
+            # refine the M with all inliers
+            M = fit_model(data[mask[:,0]])
+            Mbest = M
+        
+        # if get the same number of inliers, choose the one has less error
+        if len(mask) == max_num_of_inliers:
+            # refine the M with all inliers
+            M = fit_model(data[mask[:,0]])
+            err, _ = check_model(data[mask[:,0]], M, threshold)
+            if err < least_err:
+                least_err = err
+                max_num_of_inliers = len(mask)
+                mask_inliers = mask
+                Mbest = M
+   
+    return Mbest, mask_inliers
 
 def find_essential_mat(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intrinsic,method = 'none',iterations =10000, threshold = 0.5):
     r""" 
@@ -311,11 +331,16 @@ def find_essential_mat(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
     PH2 = pp.cart2homo(coordinates2)
 
     if method == 'RANSAC':
-        F, mask = ransac(PH1,PH2,iterations,threshold)
+        fit_model = eight_pts_alg
+        check_model = compute_error
+        data = torch.cat((PH1,PH2),1)
+        num_of_select = 8
+        F, mask = ransac(data,fit_model,check_model,iterations,num_of_select,threshold)
         E =  intrinsic.T @ F @ intrinsic
         return E, mask
     else:
-        F = eight_pts_alg(PH1,PH2)
+        data = torch.cat((PH1,PH2),1)
+        F = eight_pts_alg(data)
         E =  intrinsic.T @ F @ intrinsic
         return E
 
@@ -433,20 +458,21 @@ def recover_pose(E,coordinates1:torch.Tensor,coordinates2:torch.Tensor,intrinsic
     if len(mask3) == maxnum:
         return R2, t, mask3 
     return R2, -t, mask4
-    
-def compute_error(coordinates1:torch.Tensor, coordinates2:torch.Tensor, F):
+
+def compute_error(data:torch.Tensor, F, threshold):
     r"""
     Finding the epipolar line and caculating the distance (error) between 
     the corroseponding point and epipolarline.
     
     Args:
-        coordinates1 (``torch.Tensor``): Homogeneous coordinates with the shape (N, 3).
-        coordinates2 (``torch.Tensor``): Homogeneous coordinates with the shape (N, 3).
+        data (``torch.Tensor``): Concatenated two sets of Homogeneous coordinate,so the shape is (N, 6).
         F (``torch.Tensor``): The fundamental matrix with the shape (3, 3).
-    
+        threshold (``float``): The maximum tolerable distance from the corresponding points to the epipolarlines.
+        
     Returns:
-        (``err: torch.Tensor``):
-        ``err``: The distance (error) between the corroseponding points and epipolarlines. The shape is (N, 1).
+        (``err: torch.Tensor``, mask: torch.Tensor``):
+        ``err``: The distance (error) between the corroseponding points and epipolarlines. The shape is (N, 1). But the return will be the mean of the error.
+        ``mask``: The index of the inliers in the corresponding points set. The shape is (..., 1).
 
     Example:
         >>> pts1 = torch.tensor([[ 40, 368],[ 63, 224], [ 85, 447], [108, 151], [ 77, 319], [411, 371],[335, 183],[ 42, 151],[144, 440],
@@ -458,17 +484,19 @@ def compute_error(coordinates1:torch.Tensor, coordinates2:torch.Tensor, F):
         ...                      [356.0312, 187.2891],[191.6719, 476.9531],[381.6484, 213.8477],[ 91.6328,  92.5391],[ 62.7266, 200.2344],[396.4111, 226.1543]])   
         >>> pts1 = pp.cart2homo(pts1)
         >>> pts2 = pp.cart2homo(pts2)
-        >>> F = eight_pts_alg(pts1,pts2)
-        >>> err = compute_error(pts1,pts2,F)
+        >>> data = torch.cat((pts1,pts2),1)
+        >>> F = eight_pts_alg(data)
+        >>> err, mask = compute_error(data,F, 0.5)
         >>> err
-        tensor([0.0041, 0.0015, 0.0006, 0.0020, 0.0008, 0.0150, 0.0014, 0.0005, 0.0009,
-                0.0031, 0.0008, 0.0007, 0.0020, 0.0015, 0.0004, 0.0020, 0.0024, 0.0012,
-                0.0014, 0.0026, 0.0017, 0.0019, 0.0003, 0.0038])
+        tensor(0.0022)
+        >>> mask
+        tensor([[ 0],[ 1],[ 2],[ 3],[ 4],[ 5],[ 6],[ 7],[ 8],[ 9],[10],[11],[12],[13],[14],[15],[16],[17],[18],[19],[20],[21],[22],[23]])
 
     """
-    assert coordinates1.type() == 'torch.FloatTensor', "the type of coordinates1 has to be FloatTensor!"
-    assert coordinates2.type() == 'torch.FloatTensor', "the type of coordinates2 has to be FloatTensor!"
+    assert data.type() == 'torch.FloatTensor', "the type of coordinates1 has to be FloatTensor!"
 
+    coordinates1 = data[:,:3]
+    coordinates2 = data[:,3:]
     left_epi_lines =  coordinates1 @ F.T  # N*3
     right_epi_lines = coordinates2 @ F    # N*3
 
@@ -479,5 +507,6 @@ def compute_error(coordinates1:torch.Tensor, coordinates2:torch.Tensor, F):
     right_err = right_d**2 / (right_epi_lines[:,0]**2 + right_epi_lines[:,1]**2)
 
     err = torch.maximum(left_err,right_err)
+    mask = torch.argwhere(err <= threshold)
 
-    return torch.sqrt(err)
+    return torch.sqrt(err).mean(), mask
