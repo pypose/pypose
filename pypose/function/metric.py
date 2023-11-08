@@ -1,27 +1,86 @@
 import warnings
 from typing import Optional, Union, \
-                   List, Tuple
+                   List, Tuple, \
+                   TypedDict, Literal
+from dataclasses import dataclass
 
 import torch
 from .geometry import svdstf
-from ..lietensor import mat2SO3
-from ..lietensor import SE3, Sim3
+from ..lietensor import mat2SO3, SE3, Sim3
+from ..lietensor.lietensor import SE3Type, Sim3Type
+
+PoseRelaType = Literal[ 'translation', 'rotation', 'full',
+                        'rotation_angle_rad', 'rotation_angle_deg',
+                        'rotation_euler_angle_rad', 'rotation_euler_angle_deg']
+
+class APEConfig(TypedDict):
+    pose_relation: PoseRelaType
+    max_diff: float
+    offset_2: float
+    align: bool
+    correct_scale: bool
+    n_to_align: int
+    align_origin: bool
+
+def create_ape_config(pose_relation:PoseRelaType = "translation",
+                      max_diff: float = 0.01, offset_2: float = 0.0,
+                      align: bool = True, correct_scale:bool = True,
+                      n_to_align: int = -1, align_origin: bool = False) -> APEConfig:
+    return APEConfig(
+        pose_relation = pose_relation, max_diff = max_diff, offset_2 = offset_2,
+        align = align, correct_scale = correct_scale, n_to_align = n_to_align,
+        align_origin = align_origin)
+
+
+RelaType = Literal['translation', 'frame']
+class RPEConfig(TypedDict):
+    pose_relation: PoseRelaType
+    relation_type: RelaType
+    delta: float
+    max_diff: float
+    offset_2: float
+    align: bool
+    correct_scale: bool
+    n_to_align: int
+    align_origin: bool
+
+def create_rpe_config(pose_relation:PoseRelaType = "translation",
+                      relation_type: RelaType = "frame", delta: float = 0.0,
+                      max_diff: float = 0.01, offset_2: float = 0.0,
+                      align: bool = True, correct_scale:bool = True,
+                      n_to_align: int = -1, align_origin: bool = False) -> RPEConfig:
+    return RPEConfig(
+        pose_relation = pose_relation, relation_type = relation_type,
+        delta = delta, max_diff = max_diff, offset_2 = offset_2,
+        align = align, correct_scale = correct_scale, n_to_align=n_to_align,
+        align_origin = align_origin)
+
 
 class StampedSE3(object):
-    """
-    a representation with temporal information
-    and poses
-    """
     def __init__(self,
-                poses_SE3: SE3 = None,
+                poses_SE3: SE3Type = None,
                 timestamps: Optional[torch.Tensor] = None,
                 dtype: Optional[torch.dtype] = torch.float64):
+        r"""
+        Class for represent the trajectory with timestamps
+
+        Args:
+            poses_SE3: The trajectory poses. Must be SE3
+                    e.g. pypose.SE3(torch.rand(10, 7))
+            timestamps: The timestamps of the trajectory.
+                        Must have same length with poses.
+                    e.g torch.tensor(...) or None
+            dtype: The data type for poses to calculate (default: torch.float64)
+                    e.g. torch.float64
+
+        Returns:
+            None
+
+        Error:
+            1. ValueError: The poses have shape problem
+            2. ValueError: The timestamps have shape problem
         """
-        :param timestamps: optional nx1 list of timestamps give in np.array in seconds
-        :param poses_SE3: optional nx7 list of poses (SE3 objects)
-        :param dtype: if no special set, the result will be calculated as the pose is
-        """
-        assert (poses_SE3 is not None), {"The pose must be not empty"}
+        assert (poses_SE3 is not None), {"The pose must be not None"}
         assert (poses_SE3.numel() != 0),  {"The pose must be not empty"}
         assert len(poses_SE3.lshape) == 1, {"Only one trajectory estimation is support,\
                 The shape of the trajectory must be 2"}
@@ -35,18 +94,18 @@ class StampedSE3(object):
             self.timestamps = torch.arange(poses_SE3.lshape[0], dtype=torch.float64,
                                            device=poses_SE3.device)
         else:
-            self.timestamps = torch.tensor(timestamps, dtype=torch.float64,
-                                           device=poses_SE3.device)
+            self.timestamps = timestamps.type(torch.float64).to(poses_SE3.device)
 
         # check timestamps
         assert len(self.timestamps.shape) == 1, {"The timestamp should be one array"}
         assert self.timestamps.shape[0] == self.poses.lshape[0], \
             {"timestamps and poses must have same length"}
-        assert torch.sort(self.timestamps) == self.timestamps, \
+        assert torch.all(torch.sort(self.timestamps)[0] == self.timestamps), \
             {"timestamps must be accending"}
 
     def __getitem__(self, index) -> 'StampedSE3':
-        return StampedSE3(self.timestamps[index], self.pose[index], self.poses.dtype)
+        return StampedSE3(self.poses[index], self.timestamps[index],
+                          self.poses.dtype)
 
     def reduce_to_ids(
             self, ids: Union[List[int], torch.Tensor]) -> None:
@@ -78,13 +137,13 @@ class StampedSE3(object):
                             self.timestamps <= end_timestamp)
         self.reduce_to_ids(ids)
 
-    def align(self, trans: Union[SE3, Sim3]):
-        if isinstance(trans, SE3):
+    def align(self, trans: Union[SE3Type, Sim3Type]):
+        if isinstance(trans.ltype, SE3Type):
             self.poses = trans @ self.poses
 
-        elif isinstance(trans, Sim3):
-            ones = torch.ones_like(self.pose.data[..., 0:1])
-            poses_sim = Sim3(torch.cat((self.poses, ones), dim=-1))
+        elif isinstance(trans.ltype, Sim3Type):
+            ones = torch.ones_like(self.poses.data[..., 0:1])
+            poses_sim = Sim3(torch.cat((self.poses.data, ones), dim=-1))
             traned_pose = trans @ poses_sim
             self.poses = SE3(traned_pose.data[..., 0:7])
 
@@ -111,7 +170,7 @@ class StampedSE3(object):
         return self.poses.shape[0]
 
     @property
-    def first_pose(self) -> SE3:
+    def first_pose(self) -> SE3Type:
         return self.poses[0]
 
     @property
@@ -126,17 +185,24 @@ MatchingIndices = Tuple[List[int], List[int]]
 def matching_time_indices(stamps_1: torch.Tensor, stamps_2: torch.Tensor,
                           max_diff: float = 0.01,
                           offset_2: float = 0.0) -> MatchingIndices:
-    """
+    r"""
     Searches for the best matching timestamps of two lists of timestamps
-    and returns the list indices of the best matches.
-    :param stamps_1: short vector of timestamps.
-    :param stamps_2: long vector of timestamps.
-    :param max_diff: max. allowed absolute time difference
-    :param offset_2: optional time offset to be applied to stamps_2
-    :return: 2 lists of the matching timestamp indices (stamps_1, stamps_2)
+
+    Args:
+        stamps_1: first list of timestamps
+        stamps_2: second list of timestamps
+        max_diff: max. allowed absolute time difference for associating
+        offset_2: the align offset for the second timestamps
+
+    Returns:
+        matching_indices_1: indices of timestamps_1 that match with timestamps_1
+        matching_indices_2: indices of timestamps_2 that match with timestamps_2
+
+    Error:
+        None
     """
     stamps_2 += offset_2
-    diff_mat = (stamps_1[None] - stamps_2[..., None]).abs()
+    diff_mat = (stamps_1[..., None] - stamps_2[None]).abs()
     indices_1 = torch.arange(len(stamps_1), device=stamps_1.device)
     value, indices_2 = diff_mat.min(dim=-1)
 
@@ -145,21 +211,27 @@ def matching_time_indices(stamps_1: torch.Tensor, stamps_2: torch.Tensor,
 
     return matching_indices_1, matching_indices_2
 
-
+AssocTraj = Tuple[StampedSE3, StampedSE3]
 def associate_trajectories(
         traj_1: StampedSE3, traj_2: StampedSE3,
         max_diff: float = 0.01, offset_2: float = 0.0,
         first_name: str = "first trajectory",
-        snd_name: str = "second trajectory"):
-    """
-    Synchronizes two trajectories by matching their timestamps.
-    :param traj_1: trajectory.PoseTrajectory3D object of first trajectory
-    :param traj_2: trajectory.PoseTrajectory3D object of second trajectory
-    :param max_diff: max. allowed absolute time difference for associating
-    :param offset_2: optional time offset of second trajectory
-    :param first_name: name of first trajectory for verbose logging
-    :param snd_name: name of second trajectory for verbose/debug logging
-    :return: traj_1, traj_2 (synchronized)
+        snd_name: str = "second trajectory") -> AssocTraj:
+    r"""
+    Associates two trajectories by matching their timestamps
+
+    Args:
+        stamps_1: first list of timestamps
+        stamps_2: second list of timestamps
+        max_diff: max. allowed absolute time difference for associating
+        offset_2: the align offset for the second timestamps
+
+    Returns:
+        matching_indices_1: indices of timestamps_1 that match with timestamps_1
+        matching_indices_2: indices of timestamps_2 that match with timestamps_2
+
+    Error:
+        None
     """
     snd_longer = len(traj_2.timestamps) > len(traj_1.timestamps)
     traj_long = traj_2 if snd_longer else traj_1
@@ -177,10 +249,9 @@ def associate_trajectories(
     traj_1 = traj_short if snd_longer else traj_long
     traj_2 = traj_long if snd_longer else traj_short
 
-    assert len(matching_indices_short) != len(matching_indices_long), \
+    assert len(matching_indices_short) == len(matching_indices_long), \
         {r"matching_time_indices returned unequal number of indices"}
-
-    assert num_matches == 0, \
+    assert num_matches != 0, \
         {f"found no matching timestamps between {first_name}"
             "and {snd_name} with max. time "
             "diff {max_diff} (s) and time offset {offset_2} (s)"}
@@ -192,24 +263,19 @@ def associate_trajectories(
                        May be not be enough for aligned and not accurate results.",
                       category=Warning, stacklevel=2)
 
-
-    print("Found {} of max. {} possible matching timestamps between \n"
-        "{} and {} with max time diff.: {} (s) "
-        "and time offset: {} (s).".format(num_matches, max_pairs, first_name,
-                                          snd_name, max_diff, offset_2))
+    print(f"Found {num_matches} of max. {max_pairs} possible matching."
+        f"timestamps between {first_name} and {snd_name} with max time"
+        f"diff.: {max_diff} (s) and time offset: {offset_2} (s).")
 
     return traj_1, traj_2
 
-def process_data(self, traj_est: SE3, traj_ref: SE3,
+def process_data(traj_est: SE3Type, traj_ref: SE3Type,
                 pose_type: str = 'translation') -> None:
         # As evo
         if pose_type == 'translation':
             E = traj_est.translation() - traj_ref.translation()
         else:
             E = (traj_est.Inv() @ traj_ref.poses).matrix()
-
-        print("Compared {} absolute pose pairs.".format(self.E.shape[0]))
-        print("Calculating error for {} pose relation...".format((pose_type)))
 
         if pose_type == 'translation':
             return torch.linalg.norm(E, dim=-1)
@@ -258,32 +324,32 @@ def get_result(error) -> dict:
     return result_dict
 
 def compute_ATE(traj_est: StampedSE3, traj_ref: StampedSE3,
-                pose_relation: str = "translation",
-                #This part is for sync
-                max_diff: float = 0.01, offset_2: float = 0.0,
-                #This part is for align
-                align: bool = False, correct_scale: bool = False,
-                n_to_align: int = -1, align_origin: bool = False,
-                ref_name: str = "reference", est_name: str = "estimate"):
+                ate_config: APEConfig,
+                est_name: str = "estimate", ref_name: str = "reference"):
+    r"""
+    Computes the Absolute Trajectory Error (ATE) between two trajectories
 
+    """
     traj_est, traj_ref = associate_trajectories(traj_est, traj_ref,
-                            max_diff, offset_2, est_name, ref_name)
+                            ate_config['max_diff'], ate_config['offset_2'],
+                            est_name, ref_name)
 
-    if align:
-        if n_to_align == -1:
+    if ate_config['align']:
+        if ate_config['n_to_align'] == -1:
             trans_mat = svdstf(traj_est.translation(),
-                            traj_ref.translation(),
-                            correct_scale)
+                               traj_ref.translation(),
+                               ate_config['correct_scale'])
         else:
-            trans_mat = svdstf(traj_est.translation()[:n_to_align],
-                            traj_ref.translation()[:n_to_align],
-                            correct_scale)
-    if align_origin:
-        trans_mat[...,:7] = (traj_ref.first_pose @ traj_ref.first_pose.Inv()).data
+            trans_mat = svdstf(traj_est.translation()[:ate_config['n_to_align']],
+                            traj_ref.translation()[:ate_config['n_to_align']],
+                            ate_config['correct_scale'])
+
+    if ate_config['align_origin']:
+        trans_mat[...,:7] = (traj_ref.first_pose @ traj_est.first_pose.Inv()).data
 
     traj_est.align(trans_mat)
 
-    error = process_data(traj_est, traj_ref, pose_relation)
+    error = process_data(traj_est, traj_ref, ate_config['pose_relation'])
     result = get_result(error)
 
     return result
