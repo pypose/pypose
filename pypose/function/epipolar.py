@@ -44,8 +44,7 @@ def normalize_points(coordinates:torch.Tensor):
     
     # keep data at same device
     device = coordinates.device
-    if coordinates.type() != 'torch.FloatTensor':
-        coordinates = coordinates.type(torch.FloatTensor).to(device)  
+    coordinates = coordinates.type(torch.FloatTensor).to(device)  
 
     mean = torch.mean(coordinates, dim = 0)
     scale = 1.4142135623730950488 / (torch.linalg.norm(coordinates - mean, dim = 1).mean() + 1e-8)
@@ -321,10 +320,9 @@ def find_essential_mat(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
     
     # transfer to float and keep data at same device
     device = coordinates1.device
-    if coordinates1.type() != 'torch.FloatTensor':
-        coordinates1 = coordinates1.type(torch.FloatTensor).to(device)
-    if coordinates2.type() != 'torch.FloatTensor':
-        coordinates2 = coordinates2.type(torch.FloatTensor).to(device)
+    
+    coordinates1 = coordinates1.type(torch.FloatTensor).to(device)
+    coordinates2 = coordinates2.type(torch.FloatTensor).to(device)
 
     # transfer to homogeneous coordinates
     PH1 = pp.cart2homo(coordinates1)
@@ -493,7 +491,6 @@ def compute_error(data:torch.Tensor, F, threshold):
         tensor([[ 0],[ 1],[ 2],[ 3],[ 4],[ 5],[ 6],[ 7],[ 8],[ 9],[10],[11],[12],[13],[14],[15],[16],[17],[18],[19],[20],[21],[22],[23]])
 
     """
-    assert data.type() == 'torch.FloatTensor', "the type of coordinates1 has to be FloatTensor!"
 
     coordinates1 = data[:,:3]
     coordinates2 = data[:,3:]
