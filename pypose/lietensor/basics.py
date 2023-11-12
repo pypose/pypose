@@ -3,9 +3,8 @@ import torch
 '''
 This basics file includes functions needed to implement LieTensor.
 '''
-
-def vec2skew(input:torch.Tensor) -> torch.Tensor:
-    r"""
+def vec2skew(input: torch.Tensor) -> torch.Tensor:
+    """
     Convert batched vectors to skew matrices.
 
     Args:
@@ -18,27 +17,20 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
         Input: :obj:`(*, 3)`
 
         Output: :obj:`(*, 3, 3)`
-
-    .. math::
-        {\displaystyle \mathbf{y}_i={\begin{bmatrix}\,\,
-        0&\!-x_{i,3}&\,\,\,x_{i,2}\\\,\,\,x_{i,3}&0&\!-x_{i,1}
-        \\\!-x_{i,2}&\,\,x_{i,1}&\,\,0\end{bmatrix}}}
-
-    Note:
-        The last dimension of the input tensor has to be 3.
-
-    Example:
-        >>> pp.vec2skew(torch.randn(1,3))
-        tensor([[[ 0.0000, -2.2059, -1.2761],
-                [ 2.2059,  0.0000,  0.2929],
-                [ 1.2761, -0.2929,  0.0000]]])
     """
-    v = input.tensor() if hasattr(input, 'ltype') else input
-    assert v.shape[-1] == 3, "Last dim should be 3"
-    O = torch.zeros(v.shape[:-1], device=v.device, dtype=v.dtype, requires_grad=v.requires_grad)
-    return torch.stack([torch.stack([        O, -v[...,2],  v[...,1]], dim=-1),
-                        torch.stack([ v[...,2],         O, -v[...,0]], dim=-1),
-                        torch.stack([-v[...,1],  v[...,0],         O], dim=-1)], dim=-2)
+    assert input.shape[-1] == 3, "Last dim should be 3"
+
+    # Extract components of the input vector
+    x, y, z = input.unbind(dim=-1)
+
+    # Build the skew-symmetric matrix directly without moving to "cuda"
+    skew_matrix = torch.stack([
+        torch.zeros_like(x), -z, y,
+        z, torch.zeros_like(x), -x,
+        -y, x, torch.zeros_like(x)
+    ], dim=-1).view(*input.shape[:-1], 3, 3)
+
+    return skew_matrix
 
 
 def add_(input, other, alpha=1):

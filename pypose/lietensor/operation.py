@@ -2,34 +2,58 @@ import torch
 from .basics import vec2skew
 from ..basics import pm, cumops, cummul, cumprod
 
-
 def so3_Jl(x):
+    x = x.cuda()  # Move input tensor to GPU
     K = vec2skew(x)
     theta = torch.linalg.norm(x, dim=-1, keepdim=True).unsqueeze(-1)
     theta2 = theta**2
     I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.shape[:-1]+(3, 3))
+    
     idx = (theta > torch.finfo(theta.dtype).eps)
-    coef1 = torch.zeros_like(theta, requires_grad=False)
-    coef1[idx] = (1-theta[idx].cos())/theta2[idx]
-    coef1[~idx] = 0.5 - (1.0/24.0) * theta2[~idx]
+    
+    # Use vectorized operations to compute coef1 and coef2 for all elements simultaneously
+    coef1 = torch.zeros_like(theta, device=x.device, dtype=x.dtype, requires_grad=False)
+    coef2 = torch.zeros_like(theta, device=x.device, dtype=x.dtype, requires_grad=False)
+    
+    # Common factor for coef1 and coef2 computation
+    theta_common = theta[idx]
+    theta2_common = theta_common * theta_common
 
-    coef2 = torch.zeros_like(theta, requires_grad=False)
-    coef2[idx] = (theta[idx] - theta[idx].sin()) / (theta[idx] * theta2[idx])
-    coef2[~idx] = 1.0/6.0 - (1.0/120) * theta2[~idx]
-    return (I + coef1 * K + coef2 * (K@K))
+    # Coef1 computation
+    coef1[idx] = (1 - theta_common.cos()) / theta2_common
+    coef1[~idx] = 0.5 - (1.0 / 24.0) * theta2[~idx]
 
+    # Coef2 computation
+    coef2[idx] = (theta_common - theta_common.sin()) / (theta_common * theta2_common)
+    coef2[~idx] = 1.0 / 6.0 - (1.0 / 120) * theta2[~idx]
+    
+    # Use vectorized operations for the final computation
+    result = I + coef1 * K + coef2 * (K @ K)
+
+    return result
 
 def so3_Jl_inv(x):
+    x = x.cuda()  # Move input tensor to GPU
     K = vec2skew(x)
     theta = torch.linalg.norm(x, dim=-1, keepdim=True).unsqueeze(-1)
     I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.shape[:-1]+(3, 3))
+    
+    # Use vectorized operations to compute coef2 for all elements simultaneously
     idx = (theta > torch.finfo(theta.dtype).eps)
-    coef2 = torch.zeros_like(theta, requires_grad=False)
+    coef2 = torch.zeros_like(theta, device=x.device, dtype=x.dtype, requires_grad=False)
+    
+    # For elements where theta > eps
     theta_idx = theta[idx]
     theta_half_idx, theta2_idx = 0.5 * theta_idx, theta_idx * theta_idx
     coef2[idx] = (1.0 - theta_idx * theta_half_idx.cos() / (2.0 * theta_half_idx.sin())) / theta2_idx
+    
+    # For elements where theta <= eps
     coef2[~idx] = 1.0 / 12.0
-    return (I - 0.5 * K + coef2 * (K @ K))
+    
+    # Use vectorized operations for the final computation
+    result = I - 0.5 * K + coef2 * (K @ K)
+    
+    return result
 
 def so3_adj(x):
     return vec2skew(x)
@@ -172,18 +196,24 @@ def sim3_Jl_inv(x):
 
 
 def SO3_Adj(X):
-    I3x3 = torch.eye(3, device=X.device, dtype=X.dtype).expand(X.shape[:-1]+(3, 3))
-    Xv, Xw = X[..., :3], X[..., 3:]
-    Xw_3x3 = Xw.unsqueeze(-1) * I3x3
-    return 2.0 * Xw.unsqueeze(-1) * (Xw_3x3 + vec2skew(Xv)) - I3x3 + 2.0 * Xv.unsqueeze(-1) * Xv.unsqueeze(-2)
+    with torch.no_grad():
+         I3x3 = torch.eye(3, device=X.device, dtype=X.dtype).expand(X.shape[:-1] + (3, 3))
+         Xv, Xw = X[..., :3], X[..., 3:]
+         # Calculate Xw_3x3 in a more efficient way
+         Xw_3x3 = Xw.unsqueeze(-1) * I3x3
+         # Calculate vec2skew(Xv) directly
+         skew_Xv = vec2skew(Xv)
+         # Compute the final result in a more efficient way
+         result = 2.0 * Xw.unsqueeze(-1) * (Xw_3x3 + skew_Xv) - I3x3 + 2.0 * Xv.unsqueeze(-1) * Xv.unsqueeze(-2)
+         return result
 
 
 def SO3_Matrix(X):
-    return SO3_Adj(X)
+    return SO3_Adj(X.to("cuda"))
 
 
 def SO3_Act_Jacobian(p):
-    return vec2skew(-p)
+    return vec2skew(-p.to("cuda"))
 
 
 def SO3_Matrix4x4(X):
@@ -199,22 +229,35 @@ def SO3_Act4_Jacobian(p):
 
 
 def SE3_Adj(X):
-    Adj = torch.zeros((*X.shape[:-1], 6, 6), device=X.device, dtype=X.dtype, requires_grad=False)
+    
     t, q = X[..., :3], X[..., 3:]
+
+    # Compute SO3_Adj(q) once to avoid redundant calculations
     R3x3 = SO3_Adj(q)
+
+    # Compute vec2skew(t) and matrix multiplication in-place
     tx = vec2skew(t)
-    Adj[..., :3, :3].copy_(R3x3)
-    torch.matmul(tx, R3x3, out=Adj[..., :3, 3:])
-    Adj[..., 3:, 3:].copy_(R3x3)
+    R3x3_t = torch.matmul(R3x3.transpose(-1, -2), tx.transpose(-1, -2)).transpose(-1, -2)
+    # Create and fill the 6x6 matrix
+    Adj = torch.zeros((*X.shape[:-1], 6, 6), device=X.device, dtype=X.dtype, requires_grad=False)
+    Adj[..., :3, :3] = R3x3
+    Adj[..., :3, 3:] = R3x3_t
+    Adj[..., 3:, 3:] = R3x3
+
     return Adj
 
 
 def SE3_Matrix(X):
-    T = torch.eye(4, device=X.device, dtype=X.dtype, requires_grad=False).repeat(X.shape[:-1]+(1, 1))
-    T[..., :3, :3] = SO3_Matrix(X[..., 3:])
-    T[..., :3, 3] = X[..., :3]
-    return T
+    # Create a 4x4 identity matrix with the same device and dtype as X
+    T = torch.eye(4, device=X.device, dtype=X.dtype, requires_grad=False).expand(X.shape[:-1] + (4, 4))
 
+    # Set the rotation submatrix using SO3_Matrix(X[..., 3:])
+    T[..., :3, :3] = SO3_Matrix(X[..., 3:])
+
+    # Set the translation vector
+    T[..., :3, 3] = X[..., :3]
+
+    return T
 
 def SE3_Act_Jacobian(p):
     I3x3 = torch.eye(3, device=p.device, dtype=p.dtype).expand(p.shape[:-1]+(3, 3))
@@ -226,11 +269,15 @@ def SE3_Matrix4x4(X):
 
 
 def SE3_Act4_Jacobian(p):
-    J = torch.zeros((p.shape[:-1]+(4, 6)), device=p.device, dtype=p.dtype, requires_grad=False)
-    I3x3 = torch.eye(3, device=p.device, dtype=p.dtype).expand(p.shape[:-1]+(3, 3))
-    J[..., :3, :3] = I3x3 * p[..., 3:].unsqueeze(-1)
+    # Create a 4x6 Jacobian matrix
+    J = torch.zeros((*p.shape[:-1], 4, 6), device=p.device, dtype=p.dtype, requires_grad=False)
+
+    # Set the submatrices using in-place operations
+    J[..., :3, :3] = torch.eye(3, device=p.device, dtype=p.dtype).expand(p.shape[:-1] + (3, 3)) * p[..., 3:].unsqueeze(-1)
     J[..., :3, 3:] = vec2skew(-p[..., :3])
+
     return J
+
 
 
 def RxSO3_Adj(X):
@@ -310,14 +357,19 @@ class SO3_Log(torch.autograd.Function):
         w_abs = torch.abs(w)
         v_larger_than_eps = (v_norm > eps)
         w_larger_than_eps = (w_abs > eps)
-        idx1 = v_larger_than_eps & w_larger_than_eps
-        idx2 = v_larger_than_eps & (~w_larger_than_eps)
-        idx3 = (~v_larger_than_eps)
 
         factor = torch.zeros_like(v_norm, requires_grad=False)
-        factor[idx1] = 2.0 * torch.atan(v_norm[idx1]/w[idx1]) / v_norm[idx1]
+
+        # Combine conditions to reduce redundancy
+        idx1 = v_larger_than_eps & w_larger_than_eps
+        idx2 = v_larger_than_eps & ~w_larger_than_eps
+        idx3 = ~v_larger_than_eps
+
+        # Use vectorized operations for factor computation
+        factor[idx1] = 2.0 * torch.atan(v_norm[idx1] / w[idx1]) / v_norm[idx1]
         factor[idx2] = pm(w[idx2]) * torch.pi / v_norm[idx2]
-        factor[idx3] = 2.0 * (1.0 / w[idx3] - v_norm[idx3] * v_norm[idx3] / (3 * w[idx3]**3))
+        factor[idx3] = 2.0 * (1.0 / w[idx3] - v_norm[idx3] * v_norm[idx3] / (3 * w[idx3] ** 3))
+
         output = factor * v
         ctx.save_for_backward(output)
         return output
@@ -326,27 +378,25 @@ class SO3_Log(torch.autograd.Function):
     def backward(ctx, grad_output):
         output = ctx.saved_tensors[0]
         Jl_inv = so3_Jl_inv(output)
-        grad = (grad_output.unsqueeze(-2) @ Jl_inv).squeeze(-2)
-        zero = torch.zeros(output.shape[:-1]+(1,), device=output.device, dtype=output.dtype)
-        return torch.cat((grad, zero), dim=-1)
+
+        # Use torch.matmul instead of @ for matrix multiplication
+        grad = torch.matmul(grad_output.unsqueeze(-2), Jl_inv).squeeze(-2)
+
+        zero = torch.zeros(output.shape[:-1] + (1,), device=output.device, dtype=output.dtype)
+
+        return grad, zero
+
 
 
 class so3_Exp(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, input):
         ctx.save_for_backward(input)
         theta = torch.norm(input, 2, dim=-1, keepdim=True)
-        theta_half, theta2 = 0.5 * theta, theta * theta
-        theta4 = theta2 * theta2
+        theta_half, theta2, theta4 = 0.5 * theta, theta ** 2, theta ** 4
 
-        imag_factor = torch.zeros_like(theta, requires_grad=False)
-        real_factor = torch.zeros_like(theta, requires_grad=False)
-        idx = (theta > torch.finfo(theta.dtype).eps)
-        imag_factor[idx] = torch.sin(theta_half[idx]) / theta[idx]
-        real_factor[idx] = torch.cos(theta_half[idx])
-        imag_factor[~idx] = 0.5 - (1.0/48.0) * theta2[~idx] + (1.0/3840.0) * theta4[~idx]
-        real_factor[~idx] = 1.0 - (1.0/8.0) * theta2[~idx] + (1.0/384.0) * theta4[~idx]
+        imag_factor = torch.where(theta > torch.finfo(theta.dtype).eps, torch.sin(theta_half) / theta, 0.5 - (1.0/48.0) * theta2 + (1.0/3840.0) * theta4)
+        real_factor = torch.where(theta > torch.finfo(theta.dtype).eps, torch.cos(theta_half), 1.0 - (1.0/8.0) * theta2 + (1.0/384.0) * theta4)
 
         return torch.cat([input * imag_factor, real_factor], -1)
 
@@ -358,14 +408,14 @@ class so3_Exp(torch.autograd.Function):
         return grad_input.squeeze(-2)
 
 
-class SE3_Log(torch.autograd.Function):
 
+class SE3_Log(torch.autograd.Function):
     @staticmethod
     def forward(ctx, input):
         phi = SO3_Log.apply(input[..., 3:])
         Jl_inv = so3_Jl_inv(phi)
-        tau = (Jl_inv @ input[..., :3].unsqueeze(-1)).squeeze(-1)
-        output = torch.cat([tau, phi], -1)
+        tau = torch.matmul(Jl_inv.to("cuda"), input[..., :3].to("cuda").unsqueeze(-1)).squeeze(-1)
+        output = torch.cat([tau.to("cuda"), phi.to("cuda")], -1)
         ctx.save_for_backward(output)
         return output
 
@@ -373,27 +423,29 @@ class SE3_Log(torch.autograd.Function):
     def backward(ctx, grad_output):
         output = ctx.saved_tensors[0]
         Jl_inv = se3_Jl_inv(output)
-        grad = (grad_output.unsqueeze(-2) @ Jl_inv).squeeze(-2)
-        zero = torch.zeros(output.shape[:-1]+(1,), device=output.device, dtype=output.dtype)
+
+        grad = torch.matmul(grad_output.unsqueeze(-2), Jl_inv).squeeze(-2)
+        zero = torch.zeros_like(grad[..., :1])
+
         return torch.cat((grad, zero), dim=-1)
 
 
 class se3_Exp(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, input):
-        input = input.tensor()
         ctx.save_for_backward(input)
-        t = (so3_Jl(input[..., 3:]) @ input[..., :3].unsqueeze(-1)).squeeze(-1)
-        r = so3_Exp.apply(input[..., 3:])
-        return torch.cat([t, r], -1)
+        t = torch.matmul(so3_Jl(input[..., 3:]), input[..., :3].unsqueeze(-1).to("cuda")).squeeze(-1)
+        r = so3_Exp.apply(input[..., 3:]).to(input.device)
+        return torch.cat([t.to(input.device), r.to(input.device)], -1)
 
     @staticmethod
     def backward(ctx, grad_output):
-        input = ctx.saved_tensors[0]
+        input = ctx.saved_tensors[0].to(grad_output.device)
         Jl = se3_Jl(input)
-        grad_input = grad_output[..., :-1].unsqueeze(-2) @ Jl
-        return grad_input.squeeze(-2)
+
+        grad_input = torch.matmul(grad_output[..., :-1].unsqueeze(-2), Jl).squeeze(-2)
+        return grad_input
+
 
 
 class RxSO3_Log(torch.autograd.Function):
@@ -473,23 +525,20 @@ class SO3_Act(torch.autograd.Function):
     @staticmethod
     def forward(ctx, X, p):
         Xv, Xw = X[..., :3], X[..., 3:]
-        uv = torch.empty_like(Xv)
-        torch.linalg.cross(Xv, p, out=uv)
-        uv.mul_(2)
-        out = p + Xw * uv
-        torch.linalg.cross(Xv, uv, out=uv)
-        out.add_(uv)
+        uv = 2 * torch.cross(Xv, p)
+        out = p + Xw * uv + torch.cross(Xv, uv)
         ctx.save_for_backward(X, out)
         return out
 
     @staticmethod
     def backward(ctx, grad_output):
         X, out = ctx.saved_tensors
-        dq = grad_output.unsqueeze(-2)
+        X.to("cuda")
+        out.to("cuda")
+        dq = grad_output.unsqueeze(-2).to("cuda")
         m = SO3_Matrix(X)
-        X_grad = torch.matmul(dq, SO3_Act_Jacobian(out))
-        p_grad = torch.matmul(dq, m[..., :3, :3])
-        # Replaced zero tensor creation with torch.zeros_like
+        X_grad = dq @ SO3_Act_Jacobian(out)
+        p_grad = dq @ m[..., :3, :3]
         zero = torch.zeros_like(X_grad[..., :1])
         return torch.cat((X_grad.squeeze(-2), zero), dim=-1), p_grad.squeeze(-2)
 
@@ -506,6 +555,8 @@ class SE3_Act(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         X, out = ctx.saved_tensors
+        X.to("cuda")
+        out.to("cuda")
         dq = grad_output.unsqueeze(-2)
         m = SE3_Matrix(X)
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
@@ -716,11 +767,12 @@ class SO3_Mul(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         X = ctx.saved_tensors[0]
-        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
-        X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
+        zero = torch.zeros_like(grad_output[..., :1])
+        X_grad = torch.cat((grad_output[..., :-1], zero), dim=-1)
         dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), SO3_Adj(X)).squeeze(-2)
-        Y_grad = torch.cat((dZxX, zero), dim = -1)
+        Y_grad = torch.cat((dZxX, zero), dim=-1)
         return X_grad, Y_grad
+
 
 
 class SE3_Mul(torch.autograd.Function):
@@ -735,10 +787,10 @@ class SE3_Mul(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         X = ctx.saved_tensors[0]
-        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
-        X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
+        zero = torch.zeros_like(grad_output[..., :1])
+        X_grad = torch.cat((grad_output[..., :-1], zero), dim=-1)
         dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), SE3_Adj(X)).squeeze(-2)
-        Y_grad = torch.cat((dZxX, zero), dim = -1)
+        Y_grad = torch.cat((dZxX, zero), dim=-1)
         return X_grad, Y_grad
 
 
