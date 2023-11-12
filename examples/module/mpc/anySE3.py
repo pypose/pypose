@@ -16,12 +16,13 @@ class anySE3(pp.module.NLS):
 
     def state_transition(self, state, input, t):
         if self.ref_traj is None:
-            return state.Retr(pp.se3(input))
+            return state*pp.se3(input).Exp()
+            # return state.Retr(pp.se3(input))
         else:
             ref_SE3 = self.ref_traj[...,t,:]
             next_ref_SE3 = self.ref_traj[...,t+1,:]
-            next_SE3 = (ref_SE3*state).Retr(pp.se3(input))
-            # next_SE3 = (ref_SE3*state)*pp.se3(input).Exp()
+            # next_SE3 = (ref_SE3*state).Retr(pp.se3(input))
+            next_SE3 = (ref_SE3*state)*pp.se3(input).Exp()
             return next_ref_SE3.Inv()*next_SE3
             # next_SE3 = (ref_SE3@state).Retr(pp.se3(input))
             # return next_ref_SE3.Inv()@next_SE3
@@ -67,7 +68,7 @@ def visualize_traj(traj, ref_traj):
     # plt.show()
 
 def waypoints_configs():
-    r = 6
+    r = 3
 
     sqrt2 = 2**0.5
     thetas = torch.tensor([torch.pi/2, torch.pi/4, 0, -torch.pi/4, -torch.pi/2, -torch.pi*3/4, -torch.pi, torch.pi*3/4, torch.pi/2,
@@ -100,24 +101,26 @@ def mpc_configs(dynamics, T):
     Q[..., n_state:, n_state:] *= 1e-1
     p = torch.tile(torch.zeros(n_state + n_ctrl), (n_batch, T, 1))
 
-    stepper = pp.utils.ReduceToBason(steps=1, verbose=False)
+    stepper = pp.utils.ReduceToBason(steps=3, verbose=False)
     MPC = pp.module.MPC(dynamics, Q, p, T, stepper=stepper)
     return MPC
 
 def main():
-    T = 90
+    T = 10
+    init_idx = 35
+
     dt = 1
     dynamics = anySE3(dt=dt)
     waypoints = waypoints_configs()
     traj = pp.bspline(waypoints, interval=0.2, extrapolate=True)
-    print("traj shape is", traj.shape)
-    dynamics.set_reftrajectory(traj)
+    dynamics.set_reftrajectory(traj[...,init_idx:,:])
     MPC = mpc_configs(dynamics, T = T)
 
-    x_init = pp.SE3(torch.tensor([[0, 0, 0, 0, 0, 0, 1]], dtype=torch.float32, requires_grad=True))
-    _, u_mpc, _ = MPC(dt, x_init)
+    x_init = traj[...,init_idx,:]
+    x_error = pp.SE3(torch.tensor([[0, 0, 0, 0, 0, 0, 1]], dtype=torch.float32, requires_grad=True))
+    _, u_mpc, _ = MPC(dt, x_error)
 
-    x_traj = waypoints[:,0,:].unsqueeze(-2).repeat((1, T, 1))
+    x_traj = x_init.unsqueeze(-2).repeat((1, T, 1))
     dynamics.recover_dynamics()
     for i in range(T-1):
         x_traj[...,i+1,:], _ = dynamics(x_traj[...,i,:].clone(), u_mpc[...,i,:])

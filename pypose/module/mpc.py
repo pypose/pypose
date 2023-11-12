@@ -233,9 +233,9 @@ class MPC(nn.Module):
                 x, u, cost = self.lqr(x_init, dt, u_traj=u)
                 self.stepper.step(cost)
 
-        return x, u, cost
+        # return x, u, cost
 
-        #         if best['cost'] == None or cost < best['cost']:
-        #             best = {'x': x, 'u': u, 'cost': cost}
+                if best['cost'] == None or cost < best['cost']:
+                    best = {'x': x, 'u': u, 'cost': cost}
 
-        # return self.lqr(x_init, dt, u_traj=best['u'])
+        return self.lqr(x_init, dt, u_traj=best['u'])
