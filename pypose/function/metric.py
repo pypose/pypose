@@ -6,13 +6,12 @@ from dataclasses import dataclass
 
 import torch
 from .geometry import svdstf
-from ..lietensor import mat2SO3, SE3, Sim3
+from ..lietensor import mat2SO3, SE3, Sim3, identity_Sim3
 from ..lietensor.lietensor import SE3Type, Sim3Type
 
-PoseRelaType = Literal[ 'translation', 'rotation', 'full',
-                        'rotation_angle_rad', 'rotation_angle_deg',
-                        'rotation_euler_angle_rad', 'rotation_euler_angle_deg']
-
+PoseRelaType = Literal['translation', 'rotation', 'full',
+                       'rotation_angle_rad', 'rotation_angle_deg',
+                       'rotation_euler_angle_rad', 'rotation_euler_angle_deg']
 class APEConfig(TypedDict):
     pose_relation: PoseRelaType
     max_diff: float
@@ -31,12 +30,12 @@ def create_ape_config(pose_relation:PoseRelaType = "translation",
         align = align, correct_scale = correct_scale, n_to_align = n_to_align,
         align_origin = align_origin)
 
-
 RelaType = Literal['translation', 'frame']
 class RPEConfig(TypedDict):
     pose_relation: PoseRelaType
     relation_type: RelaType
     delta: float
+    match_all: bool
     max_diff: float
     offset_2: float
     align: bool
@@ -55,7 +54,6 @@ def create_rpe_config(pose_relation:PoseRelaType = "translation",
         align = align, correct_scale = correct_scale, n_to_align=n_to_align,
         align_origin = align_origin)
 
-
 class StampedSE3(object):
     def __init__(self,
                 poses_SE3: SE3Type = None,
@@ -71,7 +69,7 @@ class StampedSE3(object):
                         Must have same length with poses.
                     e.g torch.tensor(...) or None
             dtype: The data type for poses to calculate (default: torch.float64)
-                    e.g. torch.float64
+                   The recommended type is torch.float64 or higher
 
         Returns:
             None
@@ -84,9 +82,6 @@ class StampedSE3(object):
         assert (poses_SE3.numel() != 0),  {"The pose must be not empty"}
         assert len(poses_SE3.lshape) == 1, {"Only one trajectory estimation is support,\
                 The shape of the trajectory must be 2"}
-
-        # change the type of the calculation precise for the pose
-        # the recommended type is float64 or higher
         self.poses = poses_SE3.to(dtype)
 
         if timestamps is None:
@@ -96,7 +91,6 @@ class StampedSE3(object):
         else:
             self.timestamps = timestamps.type(torch.float64).to(poses_SE3.device)
 
-        # check timestamps
         assert len(self.timestamps.shape) == 1, {"The timestamp should be one array"}
         assert self.timestamps.shape[0] == self.poses.lshape[0], \
             {"timestamps and poses must have same length"}
@@ -117,13 +111,6 @@ class StampedSE3(object):
     def reduce_to_time_range(self,
                              start_timestamp: Optional[float] = None,
                              end_timestamp: Optional[float] = None):
-        r"""
-        Removes elements with timestamps outside of the specified time range.
-        :param start_timestamp: any data with lower timestamp is removed
-                                if None: current start timestamp
-        :param end_timestamp: any data with larger timestamp is removed
-                              if None: current end timestamp
-        """
         assert self.num_poses, {"trajectory is empty"}
         assert start_timestamp > end_timestamp, \
             {f"start_timestamp is greater than end_timestamp, \
@@ -154,7 +141,8 @@ class StampedSE3(object):
         return self.poses.rotation()
 
     def Inv(self) -> 'StampedSE3':
-        return StampedSE3(self.poses.Inv())
+        return StampedSE3(self.timestamps, self.poses.Inv(),
+                          self.poses.type)
 
     def type(self, dtype=torch.float64) -> None:
         self.poses = self.poses.to(dtype)
@@ -197,9 +185,6 @@ def matching_time_indices(stamps_1: torch.Tensor, stamps_2: torch.Tensor,
     Returns:
         matching_indices_1: indices of timestamps_1 that match with timestamps_1
         matching_indices_2: indices of timestamps_2 that match with timestamps_2
-
-    Error:
-        None
     """
     stamps_2 += offset_2
     diff_mat = (stamps_1[..., None] - stamps_2[None]).abs()
@@ -215,23 +200,36 @@ AssocTraj = Tuple[StampedSE3, StampedSE3]
 def associate_trajectories(
         traj_1: StampedSE3, traj_2: StampedSE3,
         max_diff: float = 0.01, offset_2: float = 0.0,
+        threshold: float = 0.3,
         first_name: str = "first trajectory",
         snd_name: str = "second trajectory") -> AssocTraj:
     r"""
     Associates two trajectories by matching their timestamps
 
     Args:
-        stamps_1: first list of timestamps
-        stamps_2: second list of timestamps
-        max_diff: max. allowed absolute time difference for associating
-        offset_2: the align offset for the second timestamps
+        stamps_1:
+            first list of timestamps
+        stamps_2:
+            second list of timestamps
+        threshold:
+            the threshold of the matching timestamps for aligning
+        max_diff:
+            max allowed absolute time difference for associating
+        offset_2:
+            the align offset for the second timestamps
+        threshold:
+            The threshold for the matching warning
+        first_name:
+            The name of the first trajectory
+        second_name:
+            The name of the second trajectory
 
     Returns:
         matching_indices_1: indices of timestamps_1 that match with timestamps_1
         matching_indices_2: indices of timestamps_2 that match with timestamps_2
 
-    Error:
-        None
+    Warning:
+        The matched stamps are under the threshold
     """
     snd_longer = len(traj_2.timestamps) > len(traj_1.timestamps)
     traj_long = traj_2 if snd_longer else traj_1
@@ -256,60 +254,76 @@ def associate_trajectories(
             "and {snd_name} with max. time "
             "diff {max_diff} (s) and time offset {offset_2} (s)"}
 
-    if num_matches < 0.3 * max_pairs:
+    if num_matches < threshold * max_pairs:
         warnings.warn("Alert !!!!!!!!!!!!!!!!!!!!!!! \
                        The estimated trajectory has not enough \
                        timestamps within the GT timestamps. \
                        May be not be enough for aligned and not accurate results.",
                       category=Warning, stacklevel=2)
 
-    print(f"Found {num_matches} of max. {max_pairs} possible matching."
-        f"timestamps between {first_name} and {snd_name} with max time"
-        f"diff.: {max_diff} (s) and time offset: {offset_2} (s).")
+    print(f"Found {num_matches} of maxiumn {max_pairs} possible matching."
+          f"timestamps between {first_name} and {snd_name} with max time"
+          f"diff: {max_diff} (s) and time offset: {offset_2} (s).")
 
     return traj_1, traj_2
 
 def process_data(traj_est: SE3Type, traj_ref: SE3Type,
-                pose_type: str = 'translation') -> None:
-        # As evo
-        if pose_type == 'translation':
-            E = traj_est.translation() - traj_ref.translation()
-        else:
-            E = (traj_est.Inv() @ traj_ref.poses).matrix()
+                pose_type: PoseRelaType = 'translation') -> None:
+    r'''
+    To get the error of the pose based on the pose type
 
-        if pose_type == 'translation':
-            return torch.linalg.norm(E, dim=-1)
-        elif pose_type == 'rotation':
-            return torch.linalg.norm((E[:,:3,:3] -
-                   torch.eye(3, device=E.device,
-                   dtype=E.dtype).expand_as(E[:,:3,:3])), dim=(-2, -1))
+    Args:
+        traj_est:
+            The estimated trajectory
+        traj_ref:
+            The reference trajectory
+        pose_type:
+            The type of the pose error
 
-        elif pose_type == 'full':
-            return torch.linalg.norm((E - torch.eye(4, device=E.device,
-                    dtype=E.dtype).expand_as(E)), dim=(-2, -1))
+    Returns:
+        error: The all error of the pose
 
-        # Rodrigues formula
-        elif pose_type == 'rotation_angle_rad':
-            return torch.acos((torch.diagonal(E[:,:3,:3], offset=0,
-                                dim1=-2, dim2=-1).sum(dim=-1) - 1) / 2).abs()
+    Error:
+        ValueError: The pose_type is not supported
 
-        elif pose_type == 'rotation_angle_deg':
-            error = torch.acos((torch.diagonal(E[:,:3,:3], offset=0,
-                                dim1=-2, dim2=-1).sum(dim=-1) - 1) / 2).abs()
-            return torch.rad2deg(error)
+        Only PoseRelaType = Literal[ 'translation', 'rotation', 'full',
+                'rotation_angle_rad', 'rotation_angle_deg',
+                'rotation_euler_angle_rad', 'rotation_euler_angle_deg']
+    '''
+    if pose_type == 'translation':
+        E = traj_est.translation() - traj_ref.translation()
+    else:
+        E = (traj_est.Inv() @ traj_ref.poses).matrix()
 
-        # euler angle
-        elif pose_type == 'rotation_euler_angle_rad':
-            return mat2SO3(E[:,:3,:3]).euler().norm(dim=-1)
+    if pose_type == 'translation':
+        return torch.linalg.norm(E, dim=-1)
+    elif pose_type == 'rotation':
+        return torch.linalg.norm((E[:,:3,:3] -
+                torch.eye(3, device=E.device,
+                dtype=E.dtype).expand_as(E[:,:3,:3])), dim=(-2, -1))
+    elif pose_type == 'full':
+        return torch.linalg.norm((E - torch.eye(4, device=E.device,
+                dtype=E.dtype).expand_as(E)), dim=(-2, -1))
 
-        elif pose_type == 'rotation_euler_angle_deg':
-            error = (mat2SO3(E[:,:3,:3]).euler()).norm(dim=-1)
-            return torch.rad2deg(error)
-        else:
-            raise ValueError("unsupported pose_relation, \
-                             Only support (translation, rotation, full, \
-                             rotation_angle_rad, rotation_angle_deg, \
-                             rotation_euler_angle_rad, rotation_euler_angle_deg)")
+    # Rodrigues formula
+    elif pose_type == 'rotation_angle_rad':
+        return torch.acos((torch.diagonal(E[:,:3,:3], offset=0,
+                            dim1=-2, dim2=-1).sum(dim=-1) - 1) / 2).abs()
+
+    elif pose_type == 'rotation_angle_deg':
+        error = torch.acos((torch.diagonal(E[:,:3,:3], offset=0,
+                            dim1=-2, dim2=-1).sum(dim=-1) - 1) / 2).abs()
+        return torch.rad2deg(error)
+
+    # euler angle
+    elif pose_type == 'rotation_euler_angle_rad':
+        return mat2SO3(E[:,:3,:3]).euler().norm(dim=-1)
+
+    elif pose_type == 'rotation_euler_angle_deg':
+        error = (mat2SO3(E[:,:3,:3]).euler()).norm(dim=-1)
+        return torch.rad2deg(error)
+    else:
+        raise ValueError(f"Unknown pose type: {pose_type}")
 
 def get_result(error) -> dict:
     result_dict ={}
@@ -320,36 +334,102 @@ def get_result(error) -> dict:
     result_dict['std']    = torch.std(error.abs()).item()
     result_dict['rmse']   = torch.sqrt(torch.mean(torch.pow(error, 2))).item()
     result_dict['sse']    = torch.sum(torch.pow(error, 2)).item()
-
     return result_dict
 
-def compute_ATE(traj_est: StampedSE3, traj_ref: StampedSE3,
-                ate_config: APEConfig,
+def compute_APE(traj_est: StampedSE3, traj_ref: StampedSE3,
+                ape_config: APEConfig, match_thresh: float = 0.3,
                 est_name: str = "estimate", ref_name: str = "reference"):
-    r"""
-    Computes the Absolute Trajectory Error (ATE) between two trajectories
+    r'''
+    Computes the Absolute Pose Error (RPE) between two trajectories
 
-    """
+    Args:
+        traj_est:
+            The estimated trajectory
+        traj_ref:
+            The reference trajectory
+        match_thresh:
+            The threshold for the matching pair.
+            i.e. If the matching pairs are under the threshold,
+                 the warning will given.
+        ape_config:
+            The config for APE alignment
+        est_name:
+            The estimated trajectory name
+        ref_name:
+            The reference trajectory name
+
+    Returns:
+        error: The statics error of the trajectory
+    '''
     traj_est, traj_ref = associate_trajectories(traj_est, traj_ref,
-                            ate_config['max_diff'], ate_config['offset_2'],
-                            est_name, ref_name)
+                            ape_config['max_diff'], ape_config['offset_2'],
+                            match_thresh, est_name, ref_name)
 
-    if ate_config['align']:
-        if ate_config['n_to_align'] == -1:
-            trans_mat = svdstf(traj_est.translation(),
-                               traj_ref.translation(),
-                               ate_config['correct_scale'])
-        else:
-            trans_mat = svdstf(traj_est.translation()[:ate_config['n_to_align']],
-                            traj_ref.translation()[:ate_config['n_to_align']],
-                            ate_config['correct_scale'])
+    trans_mat = identity_Sim3(1, dtype=traj_est.dtype,
+                              device=traj_est.device)
+    if ape_config['align']:
+        n_to_align = traj_est.num_poses if ape_config['n_to_align'] == -1 \
+                    else ape_config['n_to_align']
+        trans_mat = svdstf(traj_est.translation()[:,:n_to_align],
+                           traj_ref.translation()[:,:n_to_align],
+                           ape_config['correct_scale'])
 
-    if ate_config['align_origin']:
+    if ape_config['align_origin']:
+        trans_mat[..., :7] = (traj_ref.first_pose @ traj_est.first_pose.Inv()).data
+
+    traj_est.align(trans_mat)
+
+    error = process_data(traj_est, traj_ref, ape_config['pose_relation'])
+    result = get_result(error)
+
+    return result
+
+
+def compute_RPE(traj_est: StampedSE3, traj_ref: StampedSE3,
+                rpe_config: RPEConfig, match_thresh: float = 0.3,
+                est_name: str = "estimate", ref_name: str = "reference"):
+
+    r'''
+    Computes the Relative Pose Error (RPE) between two trajectories
+
+    Args:
+        traj_est:
+            The estimated trajectory
+        traj_ref:
+            The reference trajectory
+        match_thresh:
+            The threshold for the matching pair.
+            i.e. If the matching pairs are under the threshold,
+                 the warning will given.
+        ape_config:
+            The config for APE alignment
+        est_name:
+            The estimated trajectory name
+        ref_name:
+            The reference trajectory name
+
+    Returns:
+        error: The statics error of the trajectory
+    '''
+    traj_est, traj_ref = associate_trajectories(traj_est, traj_ref,
+                         rpe_config['max_diff'], rpe_config['offset_2'],
+                         match_thresh, est_name, ref_name)
+
+    trans_mat = identity_Sim3(1, dtype=traj_est.dtype,
+                              device=traj_est.device)
+    if rpe_config['align']:
+        n_to_align = traj_est.num_poses if rpe_config['n_to_align'] == -1 \
+                    else rpe_config['n_to_align']
+        trans_mat = svdstf(traj_est.translation()[:,:n_to_align],
+                           traj_ref.translation()[:,:n_to_align],
+                           rpe_config['correct_scale'])
+
+    if rpe_config['align_origin']:
         trans_mat[...,:7] = (traj_ref.first_pose @ traj_est.first_pose.Inv()).data
 
     traj_est.align(trans_mat)
 
-    error = process_data(traj_est, traj_ref, ate_config['pose_relation'])
+    error = process_data(traj_est, traj_ref, rpe_config['pose_relation'])
     result = get_result(error)
 
     return result
