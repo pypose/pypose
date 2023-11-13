@@ -35,7 +35,8 @@ class RPEConfig(TypedDict):
     pose_relation: PoseRelaType
     relation_type: RelaType
     delta: float
-    match_all: bool
+    tol: float
+    all_pairs: bool
     max_diff: float
     offset_2: float
     align: bool
@@ -385,6 +386,7 @@ def compute_APE(traj_est: StampedSE3, traj_ref: StampedSE3,
     return result
 
 
+
 def compute_RPE(traj_est: StampedSE3, traj_ref: StampedSE3,
                 rpe_config: RPEConfig, match_thresh: float = 0.3,
                 est_name: str = "estimate", ref_name: str = "reference"):
@@ -411,6 +413,57 @@ def compute_RPE(traj_est: StampedSE3, traj_ref: StampedSE3,
     Returns:
         error: The statics error of the trajectory
     '''
+
+    IdPairs = Tuple[List[int], List[int]]
+    def get_frame_pairs(traj: StampedSE3, delta: float,
+                        all_pairs: bool)-> IdPairs:
+        traj_len = traj.num_poses
+        delta = int(delta)
+        assert delta >= 1, "delta must >= 1"
+        if all_pairs:
+            ids_1 = torch.arange(traj_len,
+                                device=traj.device,
+                                dtype=torch.long)
+            ids_2 = ids_1 + delta
+            id_pairs = (ids_1[ids_2<traj_len].tolist(),
+                        ids_2[ids_2<traj_len].tolist())
+        else:
+            ids = torch.arange(0, traj_len, delta,
+                                device=traj.device,
+                                dtype=torch.long)
+            id_pairs = (ids[:-1].tolist(), ids[1:].tolist())
+
+        return id_pairs
+
+    def get_distance_pairs(traj: StampedSE3, delta: float,
+                           all_pairs: bool, tol: float = 0.0)-> IdPairs:
+        poses = traj.poses
+        if all_pairs:
+            idx_0, idx_1 = [], []
+            acc_dis = traj.distance
+            for i in range(traj.num_poses - 1):
+                offset = i + 1
+                distance_from_i = acc_dis[offset:] - acc_dis[i]
+                value, index = torch.min(torch.abs(distance_from_i - delta), dim=0)
+                if value > tol:
+                    continue
+                idx_0.append(i)
+                idx_1.append((index + offset).item())
+                id_pairs = (idx_0, idx_1)
+        else:
+            idx = []
+            previous_pose = poses[0]
+            acc_path = 0.0
+            for i, current_pose in enumerate(poses):
+                acc_path += torch.linalg.norm(previous_pose.translation() -
+                                                current_pose.translation(), dim=-1)
+                previous_pose = current_pose
+                if acc_path >= delta:
+                    idx.append(i)
+            id_pairs = (idx[:-1], idx[1:])
+
+        return id_pairs
+
     traj_est, traj_ref = associate_trajectories(traj_est, traj_ref,
                          rpe_config['max_diff'], rpe_config['offset_2'],
                          match_thresh, est_name, ref_name)
@@ -429,7 +482,21 @@ def compute_RPE(traj_est: StampedSE3, traj_ref: StampedSE3,
 
     traj_est.align(trans_mat)
 
-    error = process_data(traj_est, traj_ref, rpe_config['pose_relation'])
+    if rpe_config['relation_type'] == 'frame':
+        sour_id, tar_id = \
+            get_frame_pairs(traj_ref, delta = int(rpe_config['delta']),
+                            all_pairs = rpe_config['all_pairs'])
+    elif rpe_config['relation_type'] == 'translation':
+        sour_id, tar_id = \
+            get_distance_pairs(traj_ref, delta=rpe_config['delta'],
+                            all_pairs=rpe_config['all_pairs'], tol= rpe_config['tol'])
+
+
+    traj_est_rela = traj_est.Inv()[sour_id] @ traj_est[tar_id]
+    traj_ref_rela = traj_ref.Inv()[sour_id] @ traj_est[tar_id]
+
+    error = process_data(traj_est_rela,
+                         traj_ref_rela, rpe_config['pose_relation'])
     result = get_result(error)
 
     return result
