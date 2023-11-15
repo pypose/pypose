@@ -3,7 +3,8 @@ from .basics import vec2skew
 from ..basics import pm, cumops, cummul, cumprod
 
 def so3_Jl(x):
-    x = x.cuda()  # Move input tensor to GPU
+  # Move input tensor to GPU
+    x.to(x.device)
     K = vec2skew(x)
     theta = torch.linalg.norm(x, dim=-1, keepdim=True).unsqueeze(-1)
     theta2 = theta**2
@@ -33,7 +34,7 @@ def so3_Jl(x):
     return result
 
 def so3_Jl_inv(x):
-    x = x.cuda()  # Move input tensor to GPU
+    x = x.to(x.device)  # Move input tensor to GPU
     K = vec2skew(x)
     theta = torch.linalg.norm(x, dim=-1, keepdim=True).unsqueeze(-1)
     I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.shape[:-1]+(3, 3))
@@ -213,7 +214,7 @@ def SO3_Matrix(X):
 
 
 def SO3_Act_Jacobian(p):
-    return vec2skew(-p.to("cuda"))
+    return vec2skew(-p.to(p.device))
 
 
 def SO3_Matrix4x4(X):
@@ -414,8 +415,8 @@ class SE3_Log(torch.autograd.Function):
     def forward(ctx, input):
         phi = SO3_Log.apply(input[..., 3:])
         Jl_inv = so3_Jl_inv(phi)
-        tau = torch.matmul(Jl_inv.to("cuda"), input[..., :3].to("cuda").unsqueeze(-1)).squeeze(-1)
-        output = torch.cat([tau.to("cuda"), phi.to("cuda")], -1)
+        tau = torch.matmul(Jl_inv.to(input.device), input[..., :3].to(input.device).unsqueeze(-1)).squeeze(-1)
+        output = torch.cat([tau.to(input.device), phi.to(input.device)], -1)
         ctx.save_for_backward(output)
         return output
 
@@ -434,7 +435,7 @@ class se3_Exp(torch.autograd.Function):
     @staticmethod
     def forward(ctx, input):
         ctx.save_for_backward(input)
-        t = torch.matmul(so3_Jl(input[..., 3:]), input[..., :3].unsqueeze(-1).to("cuda")).squeeze(-1)
+        t = torch.matmul(so3_Jl(input[..., 3:]), input[..., :3].unsqueeze(-1).to(input.device)).squeeze(-1)
         r = so3_Exp.apply(input[..., 3:]).to(input.device)
         return torch.cat([t.to(input.device), r.to(input.device)], -1)
 
@@ -533,14 +534,15 @@ class SO3_Act(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         X, out = ctx.saved_tensors
-        X.to("cuda")
-        out.to("cuda")
+        X=X.to(X.device)
+        out=out.to(X.device)
         dq = grad_output.unsqueeze(-2)
-        dq.to("cuda")
+        dq=dq.to(X.device)
         m = SO3_Matrix(X)
+        m=m.to(X.device)
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
-        X_grad = dq @ SO3_Act_Jacobian(out)
-        p_grad = dq @ m[..., :3, :3]
+        X_grad = dq @ SO3_Act_Jacobian(out).to(X.device)
+        p_grad = dq @ m[..., :3, :3].to(X.device)
         return torch.cat((X_grad.squeeze(-2), zero), dim = -1), p_grad.squeeze(-2)
 
 
@@ -558,8 +560,8 @@ class SE3_Act(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         X, out = ctx.saved_tensors
-        X.to("cuda")
-        out.to("cuda")
+        X.to(X.device)
+        out.to(X.device)
         dq = grad_output.unsqueeze(-2)
         m = SE3_Matrix(X)
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
