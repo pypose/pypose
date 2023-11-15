@@ -209,7 +209,7 @@ def SO3_Adj(X):
 
 
 def SO3_Matrix(X):
-    return SO3_Adj(X.to("cuda"))
+    return SO3_Adj(X.to(X.device))
 
 
 def SO3_Act_Jacobian(p):
@@ -535,12 +535,15 @@ class SO3_Act(torch.autograd.Function):
         X, out = ctx.saved_tensors
         X.to("cuda")
         out.to("cuda")
-        dq = grad_output.unsqueeze(-2).to("cuda")
+        dq = grad_output.unsqueeze(-2)
+        dq.to("cuda")
         m = SO3_Matrix(X)
+        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
         X_grad = dq @ SO3_Act_Jacobian(out)
         p_grad = dq @ m[..., :3, :3]
-        zero = torch.zeros_like(X_grad[..., :1])
-        return torch.cat((X_grad.squeeze(-2), zero), dim=-1), p_grad.squeeze(-2)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), p_grad.squeeze(-2)
+
+
 
 
 
