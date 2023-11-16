@@ -82,7 +82,6 @@ def visualize_traj_and_input(traj, ref_traj, u_mpc):
 
 def waypoints_configs():
     r = 3
-
     sqrt2 = 2**0.5
     thetas = torch.tensor([torch.pi/2, torch.pi/4, 0, -torch.pi/4, -torch.pi/2, -torch.pi*3/4, -torch.pi, torch.pi*3/4, torch.pi/2,
                         torch.pi*3/4, torch.pi, -torch.pi*3/4, -torch.pi/2, -torch.pi/4, 0, torch.pi/4, torch.pi/2])
@@ -111,16 +110,38 @@ def mpc_configs(dynamics, T):
     n_batch = 1
     n_state, n_ctrl = 6, 2
     Q = torch.tile(torch.eye(n_state + n_ctrl), (n_batch, T, 1, 1))
-    Q[..., n_state:, n_state:] *= 0.1
+    Q[..., n_state:, n_state:] *= 1
     p = torch.tile(torch.zeros(n_state + n_ctrl), (n_batch, T, 1))
 
-    stepper = pp.utils.ReduceToBason(steps=3, verbose=False)
+    stepper = pp.utils.ReduceToBason(steps=30, verbose=False)
     MPC = pp.module.MPC(dynamics, Q, p, T, stepper=stepper)
     return MPC
 
+def traj_analysis(traj, ref_traj):
+    T = traj.shape[-2]-1
+    traj, ref_traj = pp.se3(traj).Exp(), pp.SE3(ref_traj)
+    error_traj = (ref_traj.Inv()*traj).Log()
+
+    flags = error_traj.norm(dim=-1) > 1
+    for t in range(T):
+        if flags[...,t]:
+            print("The error index is: ", t)
+            break
+
+    check_idx = 34
+    print("the current traj is", traj[...,check_idx,:])
+    print("the current ref_traj is", ref_traj[...,check_idx,:])
+    print("the current error_traj is", error_traj[...,check_idx,:])
+    print("\n")
+
+    print("the next traj is", traj[...,check_idx+1,:])
+    print("the next ref_traj is", ref_traj[...,check_idx+1,:])
+    print("the next error_traj is", error_traj[...,check_idx+1,:])
+    print("\n")
+
 def main():
     dt = 1
-    T = 20
+    T = 40
     init_idx = 30
     dynamics = Bicycle(dt=dt)
     MPC = mpc_configs(dynamics, T = T)
@@ -130,7 +151,7 @@ def main():
     dynamics.set_reftrajectory(traj[...,init_idx:,:])
 
     x_init = traj[...,init_idx,:].Log()
-    x_rela = pp.SE3(torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]], requires_grad=True)).Log()
+    x_rela = (traj[...,init_idx,:].Inv()*x_init.Exp()).Log()
     _, u_mpc, _ = MPC(dt, x_rela)
 
     x_traj = x_init.unsqueeze(-2).repeat((1, T+1, 1))
@@ -140,6 +161,7 @@ def main():
     for i in range(T):
         x_traj[...,i+1,:], _ = dynamics(x_traj[...,i,:].clone(), u_mpc[...,i,:])
 
+    traj_analysis(x_traj, traj[...,init_idx:init_idx+T+1,:])
     visualize_traj_and_input(x_traj, traj, u_mpc)
 
 if __name__ == "__main__":
