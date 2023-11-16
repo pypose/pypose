@@ -332,17 +332,17 @@ class LQR(nn.Module):
         else:
             self.u_traj = u_traj
 
-        if x_init.shape[0] == 1:
-            self.x_traj = x_init.repeat((self.T, 1))
-        else:
-            self.x_traj = x_init
+
+        self.x_traj = x_init
 
         K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
 
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
         tau_traj=torch.cat((self.x_traj,self.u_traj),-1)
-        F_all=self.system.F(tau_traj).sum(2)
+        F_all=self.system.F(tau_traj)
+
+        F_all=F_all.squeeze(3).sum(3)
 
         p =(bmv(Q.transpose(2,3), xut)+bmv(Q, xut))/2 + p
         # A = self.system.A(self.x_traj,self.u_traj).squeeze(-2).sum(2)
@@ -359,7 +359,7 @@ class LQR(nn.Module):
                 # A = jacobian(func,self.x_traj[...,t,:],vectorize=True)
                 # A = self.system.A(self.x_traj[...,t,:],self.u_traj[...,t,:]).squeeze(-2)
                 # B = self.system.B(self.x_traj[...,t,:],self.u_traj[...,t,:]).squeeze(-2)
-                F = F_all[t]
+                F = F_all[...,t,:,:]
                 Qt = Q[...,t,:,:] + F.mT @ V @ F
                 qt = p[...,t,:] + bmv(F.mT, v)
 
@@ -381,7 +381,7 @@ class LQR(nn.Module):
     def lqr_forward(self, x_init, K, k, Q, p, u_lower=None, u_upper=None, du=None):
         assert x_init.device == K.device == k.device
         assert x_init.dtype == K.dtype == k.dtype
-        assert x_init.ndim == 2, "Shape not compatible."
+        #assert x_init.ndim == 2, "Shape not compatible."
 
         ns, nc = self.x_traj.size(-1), self.u_traj.size(-1)
 
@@ -390,8 +390,9 @@ class LQR(nn.Module):
         u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
         delta_u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
         cost = torch.zeros(self.n_batch, **self.dargs)
+        costs=[]
         x = torch.zeros(self.n_batch + (self.T+1, ns), **self.dargs)
-        xt = x[..., 0, :] = x_init[0]
+        xt = x[..., 0, :] = x_init[...,0,:]
 
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]
@@ -402,7 +403,8 @@ class LQR(nn.Module):
                 ut=ut.unsqueeze(0)
             if len(xt.shape)==1:
                 xt=xt.unsqueeze(0)
-            xut = torch.cat((torch.tensor(xt), torch.tensor(ut)), dim=-1)
-            x[...,t+1,:] = xt = self.system(xut)[0]
-            cost += 0.5 * bvmv(xut, Q[...,t,:,:], xut) + vecdot(xut, p[...,t,:])
+            xut = torch.cat((torch.tensor(xt), torch.tensor(ut)), dim=-1)[None]
+            x[...,t+1,:] = xt = self.system(xut)[...,0,:]
+            cost += (0.5 * bvmv(xut, Q[...,t,:,:], xut) + vecdot(xut, p[...,t,:])).sum(1)
+            costs.append(cost)
         return x, u, cost
