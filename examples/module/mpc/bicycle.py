@@ -142,7 +142,7 @@ def traj_analysis(traj, ref_traj):
 def main():
     dt = 1
     T = 40
-    init_idx = 30
+    init_idx = 0
     dynamics = Bicycle(dt=dt)
     MPC = mpc_configs(dynamics, T = T)
 
