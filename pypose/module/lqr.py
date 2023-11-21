@@ -300,6 +300,8 @@ class LQR(nn.Module):
         if Q.ndim == 3:
             Q = torch.tile(Q.unsqueeze(-3), (1, self.T, 1, 1))
 
+        f_x_init=x_init.clone()
+
         if x_init.ndim == 2:
             x_init = torch.tile(x_init[:,None,:], (1, self.T, 1))
 
@@ -320,7 +322,7 @@ class LQR(nn.Module):
         p = p + p_tar
 
         K, k = self.lqr_backward(x_init, dt, Q, p, u_traj, u_lower, u_upper, du)
-        x, u, cost = self.lqr_forward(x_init, K, k, Q, p, u_lower, u_upper, du)
+        x, u, cost = self.lqr_forward(f_x_init, K, k, Q, p, u_lower, u_upper, du)
 
         return x, u, cost
 
@@ -346,7 +348,7 @@ class LQR(nn.Module):
 
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
         #tau_traj=torch.cat((self.x_traj,self.u_traj),-1)
-        F_all=dynamics.systemMat(self.system,self.x_traj,self.u_traj)
+        F_all=dynamics.systemMat(self.system,self.x_traj,self.u_traj,torch.arange(self.T))
 
         #F_all=F_all.squeeze(3).sum(3)
 
@@ -387,30 +389,26 @@ class LQR(nn.Module):
     def lqr_forward(self, x_init, K, k, Q, p, u_lower=None, u_upper=None, du=None):
         assert x_init.device == K.device == k.device
         assert x_init.dtype == K.dtype == k.dtype
-        #assert x_init.ndim == 2, "Shape not compatible."
+        assert x_init.ndim == 2, "Shape not compatible."
 
         ns, nc = self.x_traj.size(-1), self.u_traj.size(-1)
-
-
 
         u = torch.zeros((self.n_batch,self.T, nc), **self.dargs)
         delta_u = torch.zeros((self.n_batch,self.T, nc), **self.dargs)
         cost = torch.zeros(self.n_batch, **self.dargs)
-        costs=[]
         x = torch.zeros((self.n_batch,self.T+1, ns), **self.dargs)
-        xt = x[..., 0, :] = x_init[...,0,:]
+        xt = x[..., 0, :] = x_init
+
+        if isinstance(self.system, dynamics.LTV):
+            self.system.reset()
 
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]
             delta_xt = xt - self.x_traj[...,t,:]
             delta_u[..., t, :] = bmv(Kt, delta_xt) + kt
             u[...,t,:] = ut = delta_u[..., t, :] + self.u_traj[...,t,:]
-            if len(ut.shape)==1:
-                ut=ut.unsqueeze(0)
-            if len(xt.shape)==1:
-                xt=xt.unsqueeze(0)
-            xut = torch.cat((torch.tensor(xt), torch.tensor(ut)), dim=-1)[None]
-            x[...,t+1,:] = xt = self.system.state_transition(xt,ut)
-            cost += (0.5 * bvmv(xut, Q[...,t,:,:], xut) + vecdot(xut, p[...,t,:])).sum(1)
-            costs.append(cost)
+            xut = torch.cat((xt, ut), dim=-1)
+            x[...,t+1,:] = xt = self.system(xt, ut)[0]
+            cost += 0.5 * bvmv(xut, Q[...,t,:,:], xut) + vecdot(xut, p[...,t,:])
+
         return x, u, cost

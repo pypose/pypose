@@ -642,5 +642,7 @@ def systemMat(system, state, input, t=None):
     n_batch=state.shape[0]
     T=state.shape[1]
     tau=torch.cat((state,input),-1)
+    if isinstance(system, LTV):
+        return torch.cat((system._A[...,t,:,:],system._B[...,t,:,:]),-1)[:,t].repeat(1,T,1,1)
     if isinstance(system, LTI):
         return torch.cat((system.A,system.B),-1)[:,None].repeat(1,T,1,1)
