@@ -7,7 +7,7 @@ from torch.optim import Optimizer
 from .solver import PINV, Cholesky
 from torch.linalg import cholesky_ex
 from .corrector import FastTriggs
-
+from .. import SbkTensor, sparse_coo_diagonal, sparse_coo_diagonal_add_, sparse_coo_diagonal_clamp_, hybrid2coo
 
 class Trivial(torch.nn.Module):
     r"""
@@ -35,7 +35,10 @@ class RobustModel(nn.Module):
 
     def flatten_row_jacobian(self, J, params_values):
         if isinstance(J, (tuple, list)):
-            J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params_values)], 1)
+            if isinstance(J[0], SbkTensor):
+                J = torch.cat([hybrid2coo(j) for j in J], 1)
+            else:
+                J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params_values)], 1)
         return J
 
     def normalize_RWJ(self, R, weight, J):
@@ -505,9 +508,15 @@ class LevenbergMarquardt(_Optimizer):
                                     else self.model.loss(input, target)
             J_T = J.T @ weight if weight is not None else J.T
             A, self.reject_count = J_T @ J, 0
-            A.diagonal().clamp_(pg['min'], pg['max'])
+            if A.is_sparse:
+                sparse_coo_diagonal_clamp_(A, pg['min'], pg['max'])
+            else:
+                A.diagonal().clamp_(pg['min'], pg['max'])
             while self.last <= self.loss:
-                A.diagonal().add_(A.diagonal() * pg['damping'])
+                if A.is_sparse:
+                    sparse_coo_diagonal_add_(A, sparse_coo_diagonal(A) * pg['damping'])
+                else:
+                    A.diagonal().add_(A.diagonal() * pg['damping'])
                 try:
                     D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
                 except Exception as e:
