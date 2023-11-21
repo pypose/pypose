@@ -300,15 +300,18 @@ class LQR(nn.Module):
         if Q.ndim == 3:
             Q = torch.tile(Q.unsqueeze(-3), (1, self.T, 1, 1))
 
+        if x_init.ndim == 2:
+            x_init = torch.tile(x_init[:,None,:], (1, self.T, 1))
+
         if p.ndim == 2:
             p = torch.tile(p.unsqueeze(-2), (1, self.T, 1))
 
-        self.n_batch = x_init.shape[:-1]
+        self.n_batch = x_init.shape[0]
+
+        if xu_target.ndim == 1:
+            xu_target = torch.tile(xu_target[None,None], (self.n_batch,self.T, 1))
 
 
-        #removeLater
-        self.n_batch=(1,)
-        #removeLater
 
         if p is None:
             p = torch.zeros(self.n_batch + (self.T, Q.size(-1)), **self.dargs)
@@ -328,21 +331,21 @@ class LQR(nn.Module):
         nc = nsc - ns
 
         if u_traj is None:
-            self.u_traj = torch.zeros((self.T, nc), **self.dargs)
+            self.u_traj = torch.zeros((self.n_batch,self.T, nc), **self.dargs)
         else:
             self.u_traj = u_traj
 
 
         self.x_traj = x_init
 
-        K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
-        k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
+        K = torch.zeros((self.n_batch,self.T, nc, ns), **self.dargs)
+        k = torch.zeros((self.n_batch,self.T, nc), **self.dargs)
 
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
-        tau_traj=torch.cat((self.x_traj,self.u_traj),-1)
-        F_all=self.system.F(tau_traj)
+        #tau_traj=torch.cat((self.x_traj,self.u_traj),-1)
+        F_all=dynamics.systemMat(self.system,self.x_traj,self.u_traj)
 
-        F_all=F_all.squeeze(3).sum(3)
+        #F_all=F_all.squeeze(3).sum(3)
 
         p =(bmv(Q.transpose(2,3), xut)+bmv(Q, xut))/2 + p
         # A = self.system.A(self.x_traj,self.u_traj).squeeze(-2).sum(2)
@@ -387,11 +390,11 @@ class LQR(nn.Module):
 
 
 
-        u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
-        delta_u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
+        u = torch.zeros((self.n_batch,self.T, nc), **self.dargs)
+        delta_u = torch.zeros((self.n_batch,self.T, nc), **self.dargs)
         cost = torch.zeros(self.n_batch, **self.dargs)
         costs=[]
-        x = torch.zeros(self.n_batch + (self.T+1, ns), **self.dargs)
+        x = torch.zeros((self.n_batch,self.T+1, ns), **self.dargs)
         xt = x[..., 0, :] = x_init[...,0,:]
 
         for t in range(self.T):
@@ -404,7 +407,7 @@ class LQR(nn.Module):
             if len(xt.shape)==1:
                 xt=xt.unsqueeze(0)
             xut = torch.cat((torch.tensor(xt), torch.tensor(ut)), dim=-1)[None]
-            x[...,t+1,:] = xt = self.system(xut)[...,0,:]
+            x[...,t+1,:] = xt = self.system.state_transition(xt,ut)
             cost += (0.5 * bvmv(xut, Q[...,t,:,:], xut) + vecdot(xut, p[...,t,:])).sum(1)
             costs.append(cost)
         return x, u, cost
