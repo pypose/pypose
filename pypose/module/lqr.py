@@ -347,26 +347,16 @@ class LQR(nn.Module):
         k = torch.zeros((self.n_batch,self.T, nc), **self.dargs)
 
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
-        #tau_traj=torch.cat((self.x_traj,self.u_traj),-1)
         F_all=dynamics.systemMat(self.system,self.x_traj,self.u_traj,torch.arange(self.T))
 
-        #F_all=F_all.squeeze(3).sum(3)
-
         p =(bmv(Q.transpose(2,3), xut)+bmv(Q, xut))/2 + p
-        # A = self.system.A(self.x_traj,self.u_traj).squeeze(-2).sum(2)
-        # B = self.system.B(self.x_traj,self.u_traj).squeeze(-2).sum(2)
+
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
                 Qt = Q[...,t,:,:]
                 qt = p[...,t,:]
             else:
-                # self.system.set_refpoint(state=self.x_traj[...,t,:],
-                #                          input=self.u_traj[...,t,:],
-                #                          t=torch.tensor(t*dt))
-                # func = lambda x: self.system.state_transition(self.x_traj[...,t,:], self.u_traj[...,t,:], 0)
-                # A = jacobian(func,self.x_traj[...,t,:],vectorize=True)
-                # A = self.system.A(self.x_traj[...,t,:],self.u_traj[...,t,:]).squeeze(-2)
-                # B = self.system.B(self.x_traj[...,t,:],self.u_traj[...,t,:]).squeeze(-2)
+
                 F = F_all[...,t,:,:]
                 Qt = Q[...,t,:,:] + F.mT @ V @ F
                 qt = p[...,t,:] + bmv(F.mT, v)
