@@ -338,7 +338,7 @@ class LQR(nn.Module):
         self.x_traj = x_init
 
         for i in range(self.T-1):
-            self.x_traj[...,i+1,:], _ = self.system.state_transition(self.x_traj[...,i,:].clone(),
+            self.x_traj[...,i+1,:], _ = self.system(self.x_traj[...,i,:].clone(),
                                                     self.u_traj[...,i,:])
 
         K = torch.zeros((self.n_batch,self.T, nc, ns), **self.dargs)
