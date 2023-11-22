@@ -10,7 +10,7 @@ class Bicycle(pp.module.NLS):
         self.ref_traj = None
         self.dt = dt
 
-    def origin_state_transition(self, state, input, t=None):
+    def origin_state_transition(self, state, input, t):
         state=pp.se3(state)
         v, w = input[..., 0:1], input[..., 1:2]
         zeros = torch.zeros_like(v.repeat(1,1,4), requires_grad=True)
@@ -18,7 +18,7 @@ class Bicycle(pp.module.NLS):
         rt = getSE3(xyzrpy)
         return (state.Exp()*rt).Log()
 
-    def error_state_transition(self, error_state, input, t=None):
+    def error_state_transition(self, error_state, input, t):
         error_state=pp.se3(error_state)
         T=input.shape[1]
         v, w = input[..., 0:1], input[..., 1:2]
@@ -26,17 +26,16 @@ class Bicycle(pp.module.NLS):
         xyzrpy = torch.cat((v, zeros, w), dim=-1)*self.dt
         rt = getSE3(xyzrpy)
 
-        ref_SE3 = self.ref_traj[...,:20,:]#❓❓❓
-        next_ref_SE3 = self.ref_traj[...,1:21,:]#❓❓❓
+        ref_SE3 = self.ref_traj[...,t,:]#❓❓❓
+        next_ref_SE3 = self.ref_traj[...,t+1,:]#❓❓❓
 
         return (next_ref_SE3.Inv()*ref_SE3*error_state.Exp()*rt).Log()
 
-    def state_transition(self, tau):
-        state,input=tau[...,:,:6], tau[...,:,6:]
+    def state_transition(self, state,input, t):
         if input.shape[1]==1:
-            return self.origin_state_transition(state, input)
+            return self.origin_state_transition(state, input,t)
         else:
-            return self.error_state_transition(state, input)
+            return self.error_state_transition(state, input,t)
 
     def observation(self, state, input, t=None):
         return state
@@ -133,7 +132,7 @@ def main():
     traj = pp.bspline(waypoints, interval=0.2, extrapolate=True)
     dynamics.set_reftrajectory(traj[...,init_idx:,:])
 
-    u_init =torch.tensor([[0,0]])[:,None,:].repeat(1,T,1)
+    u_init =torch.tensor([[0.0,0.0]])[:,None,:].repeat(1,T,1)
     x_init = torch.tensor(traj[...,init_idx,:].Log())
     x_rela = pp.SE3(torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]], requires_grad=True)).Log()
     xu_targ = torch.zeros(1,T,8)

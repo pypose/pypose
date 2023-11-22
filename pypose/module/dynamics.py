@@ -183,7 +183,7 @@ class LTI(System):
         self.register_buffer('_c1', c1)
         self.register_buffer('_c2', c2)
 
-    def forward(self, state, input):
+    def forward(self, state, input,_):
         r'''
         Perform one step advance for the LTI system.
 
@@ -515,7 +515,7 @@ class NLS(System):
         self.tracedModel = None
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
 
-    def forward(self,state,input):
+    def forward(self,state,input,T):
         r'''
         Defines the computation performed at every call that advances the system by one time step.
 
@@ -529,7 +529,7 @@ class NLS(System):
             To introduce noise in a model, redefine this method via
             subclassing. See example in ``examples/module/ekf/tank_robot.py``.
         '''
-        state = self.state_transition(state,input)
+        state = self.state_transition(state,input,T)
         return state
 
     def set_refpoint(self, state=None, input=None, t=None):
@@ -578,7 +578,7 @@ class NLS(System):
         func = lambda x: self.state_transition(state, x, 0)
         return jacobian(func, input, **self.jacargs)
 
-    def tau_transition(self,tau,n_s):
+    def tau_transition(self,tau,n_s,t):
         r'''
         Linear/linearized system input matrix.
 
@@ -586,7 +586,7 @@ class NLS(System):
             \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
         state,input=tau[...,:,:n_s], tau[...,:,n_s:]
-        return self.state_transition(state,input)
+        return self.state_transition(state,input,t)
 
 
     @property
@@ -648,6 +648,6 @@ def systemMat(system, state, input, t=None):
     if isinstance(system, NLS):
         n_s=state.shape[-1]
         tau=torch.cat((state,input),-1)
-        func = lambda x: system.tau_transition(x,n_s)
+        func = lambda x: system.tau_transition(x,n_s,t)
         F=jacobian(func, tau, **system.jacargs)
         return F.sum(3).sum(3)
