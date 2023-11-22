@@ -1,5 +1,5 @@
 import torch, pypose as pp
-
+import timeit
 
 
 class TestLQR:
@@ -74,7 +74,9 @@ class TestLQR:
                                [-1.05, -1.36,  0.43,  0.80]], device=device)
 
         lti = pp.module.LTI(A, B, C, D, c1, c2).to(device)
+        t=timeit.default_timer()
         LQR = pp.module.LQR(lti, T).to(device)
+        print(timeit.default_timer()-t)
         target=torch.zeros_like(p[0,0])
         x, u, cost = LQR(x_init,target,Q, p)
 
@@ -151,7 +153,10 @@ class TestLQR:
         ltv = MyLTV(A, B, C, D).to(device)
         lqr = pp.module.LQR(ltv,T).to(device)
         target = torch.zeros_like(p[0])
+
+        t=timeit.default_timer()
         x, u, cost = lqr(x_init,target,Q, p)
+        print(timeit.default_timer()-t)
 
         torch.testing.assert_close(x_ref, x, atol=1e-5, rtol=1e-3)
         torch.testing.assert_close(u_ref, u, atol=1e-5, rtol=1e-3)
@@ -159,6 +164,6 @@ class TestLQR:
 
 if __name__ == '__main__':
     test = TestLQR()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda")
     test.test_lqr_linear(device)
     test.test_lqr_ltv(device)

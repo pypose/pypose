@@ -77,7 +77,9 @@ class TestMPC:
         stepper = pp.utils.ReduceToBason(steps=10, verbose=False)
         MPC = pp.module.MPC(cartPoleSolver,T, stepper=stepper).to(device)
         target=torch.zeros_like(p[0,0])
+        t=timeit.default_timer()
         x, u, cost = MPC(dt, x_init,target, Q, p, u_init=current_u)
+        print(timeit.default_timer()-t)
 
         torch.testing.assert_close(x_ref, x, atol=1e-5, rtol=1e-3)
         torch.testing.assert_close(u_ref, u, atol=1e-5, rtol=1e-3)
@@ -85,8 +87,6 @@ class TestMPC:
 
 if __name__ == '__main__':
     test = TestMPC()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
 
-    t=timeit.default_timer()
     test.test_ilqr_cartpole(device)
-    print(timeit.default_timer()-t)
