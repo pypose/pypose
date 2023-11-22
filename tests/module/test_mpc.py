@@ -34,8 +34,10 @@ class TestMPC:
                 self.totalMass = self.cartmass + self.polemass
 
             def state_transition(self, state, input, t=None):
-                x, xDot, theta, thetaDot = state.squeeze()
-                force = input.squeeze()
+                xDot=state[...,1:2]
+                theta=state[...,2:3]
+                thetaDot=state[...,3:4]
+                force = input[..., 0:1]
                 costheta = torch.cos(theta)
                 sintheta = torch.sin(theta)
 
@@ -43,8 +45,8 @@ class TestMPC:
                 thetaAcc = (self.gravity * sintheta - costheta * temp) / \
                     (self.length * (4 / 3 - self.polemass * costheta**2 / self.totalMass))
                 xAcc = temp - self.poleml * thetaAcc * costheta / self.totalMass
-                _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
-                return (state.squeeze() + torch.mul(_dstate, self.tau)).unsqueeze(0)
+                _dstate = torch.cat((xDot, xAcc, thetaDot, thetaAcc),-1)
+                return state.squeeze() + torch.mul(_dstate, self.tau)
 
             def observation(self, state, input, t=None):
                 return state

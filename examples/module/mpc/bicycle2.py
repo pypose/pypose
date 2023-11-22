@@ -134,7 +134,7 @@ def main():
     dynamics.set_reftrajectory(traj[...,init_idx:,:])
 
     u_init =torch.tensor([[0,0]])[:,None,:].repeat(1,T,1)
-    x_init = torch.tensor(traj[...,init_idx,:].Log())[:,None,:].repeat(1,T,1)
+    x_init = torch.tensor(traj[...,init_idx,:].Log())
     x_rela = pp.SE3(torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]], requires_grad=True)).Log()
     xu_targ = torch.zeros(1,T,8)
     x, u_mpc, c = LQR(x_init,xu_targ,Q,p,u_traj=u_init)#,x_rela)

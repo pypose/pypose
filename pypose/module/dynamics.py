@@ -44,7 +44,7 @@ class System(nn.Module):
         self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
         state = self.state_transition(self.state, self.input)
         obs = self.observation(self.state, self.input)
-        return state, obs
+        return state
 
     def state_transition(self, state, input, t=None):
         r'''
@@ -210,8 +210,9 @@ class LTI(System):
         Returns:
             ``Tensor``: The state the system in next time step.
         '''
-        z = bmv(self.A, state) + bmv(self.B, input)
-        return z if self.c1 is None else z + self.c1
+        z = bmv(self.A, state.squeeze(1)) + bmv(self.B, input.squeeze(1))
+        z = z.unsqueeze(1)
+        return z if self.c1 is None else z + self.c1.unsqueeze(1)
 
     def observation(self, state, input):
         r'''
@@ -514,7 +515,7 @@ class NLS(System):
         self.tracedModel = None
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
 
-    def forward(self,tau):
+    def forward(self,state,input):
         r'''
         Defines the computation performed at every call that advances the system by one time step.
 
@@ -528,9 +529,7 @@ class NLS(System):
             To introduce noise in a model, redefine this method via
             subclassing. See example in ``examples/module/ekf/tank_robot.py``.
         '''
-        #self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
-        state = self.state_transition(tau)
-        #obs = self.observation(self.state, self.input, self.systime)
+        state = self.state_transition(state,input)
         return state
 
     def set_refpoint(self, state=None, input=None, t=None):
@@ -579,15 +578,15 @@ class NLS(System):
         func = lambda x: self.state_transition(state, x, 0)
         return jacobian(func, input, **self.jacargs)
 
-    def F(self,tau):
+    def tau_transition(self,tau,n_s):
         r'''
         Linear/linearized system input matrix.
 
         .. math::
             \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
-        func = lambda x: self.state_transition(x)
-        return jacobian(func, tau, **self.jacargs)
+        state,input=tau[...,:,:n_s], tau[...,:,n_s:]
+        return self.state_transition(state,input)
 
 
     @property
@@ -646,3 +645,9 @@ def systemMat(system, state, input, t=None):
         return torch.cat((system._A[...,t,:,:],system._B[...,t,:,:]),-1)[:,t].repeat(1,T,1,1)
     if isinstance(system, LTI):
         return torch.cat((system.A,system.B),-1)[:,None].repeat(1,T,1,1)
+    if isinstance(system, NLS):
+        n_s=state.shape[-1]
+        tau=torch.cat((state,input),-1)
+        func = lambda x: system.tau_transition(x,n_s)
+        F=jacobian(func, tau, **system.jacargs)
+        return F.sum(3).sum(3)
