@@ -1,5 +1,5 @@
 import torch, pypose as pp
-
+import timeit
 
 class TestMPC:
 
@@ -86,4 +86,7 @@ class TestMPC:
 if __name__ == '__main__':
     test = TestMPC()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    t=timeit.default_timer()
     test.test_ilqr_cartpole(device)
+    print(timeit.default_timer()-t)
