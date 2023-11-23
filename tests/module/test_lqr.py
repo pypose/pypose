@@ -74,11 +74,11 @@ class TestLQR:
                                [-1.05, -1.36,  0.43,  0.80]], device=device)
 
         lti = pp.module.LTI(A, B, C, D, c1, c2).to(device)
-        t=timeit.default_timer()
         LQR = pp.module.LQR(lti, T).to(device)
-        print(timeit.default_timer()-t)
         target=torch.zeros_like(p[0,0])
+        t=timeit.default_timer()
         x, u, cost = LQR(x_init,target,Q, p)
+        print(timeit.default_timer()-t)
 
         torch.testing.assert_close(x_ref, x, rtol=1e-5, atol=1e-3)
         torch.testing.assert_close(u_ref, u, atol=1e-5, rtol=1e-3)

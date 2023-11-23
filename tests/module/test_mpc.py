@@ -87,6 +87,6 @@ class TestMPC:
 
 if __name__ == '__main__':
     test = TestMPC()
-    device = torch.device("cpu")
+    device = torch.device("cuda")
 
     test.test_ilqr_cartpole(device)
