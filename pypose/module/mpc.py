@@ -228,9 +228,11 @@ class MPC(nn.Module):
         best = {'x': x, 'u': u, 'cost': None}
 
         self.stepper.reset()
+        needInit=True
         with torch.no_grad():
             while self.stepper.continual():
-                x, u, cost = self.lqr(x_init,  xu_target, Q, p, dt, u)
+                x, u, cost = self.lqr(x_init,  xu_target, Q, p, dt, u, needInit=needInit)
+                needInit=False
                 self.stepper.step(cost)
 
                 if best['cost'] == None or cost < best['cost']:

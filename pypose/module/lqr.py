@@ -267,7 +267,7 @@ class LQR(nn.Module):
         self.x_traj = None
         self.u_traj = None
 
-    def forward(self, x_init, xu_target, Q, p=None, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
+    def forward(self, x_init, xu_target, Q, p=None, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None, needInit=True):
         r'''
         Performs LQR for the discrete system.
 
@@ -321,13 +321,13 @@ class LQR(nn.Module):
         p_tar = -bmv(Q,xu_target)
         p = p + p_tar
 
-        K, k = self.lqr_backward(x_init, dt, Q, p, u_traj, u_lower, u_upper, du)
+        K, k = self.lqr_backward(x_init, dt, Q, p, u_traj, u_lower, u_upper, du, needInit)
         x, u, cost = self.lqr_forward(f_x_init, K, k, Q, p, u_lower, u_upper, du)
 
         return x, u, cost
 
 
-    def lqr_backward(self, x_init, dt, Q, p, u_traj=None, u_lower=None, u_upper=None, du=None):
+    def lqr_backward(self, x_init, dt, Q, p, u_traj=None, u_lower=None, u_upper=None, du=None, needInit=True):
 
         ns, nsc = x_init.size(-1), p.size(-1)
         nc = nsc - ns
@@ -339,9 +339,12 @@ class LQR(nn.Module):
 
         self.x_traj = x_init
 
-        for i in range(self.T-1):
-            self.x_traj[...,i+1:i+2,:] = self.system(self.x_traj[...,i:i+1,:].clone(),
-                                                    self.u_traj[...,i:i+1,:], torch.arange(self.T))
+        if needInit:
+            for i in range(self.T-1):
+                self.x_traj[...,i+1:i+2,:] = self.system(self.x_traj[...,i:i+1,:].clone(),
+                                                        self.u_traj[...,i:i+1,:], torch.arange(self.T))
+        else:
+            self.x_traj = self.x_traj[:,:self.T,:]
 
         K = torch.zeros((self.n_batch,self.T, nc, ns), **self.dargs)
         k = torch.zeros((self.n_batch,self.T, nc), **self.dargs)
