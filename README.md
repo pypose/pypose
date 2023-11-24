@@ -54,7 +54,7 @@ pip install pypose
 
 1. Requirement:
 
-On Ubuntu, MasOS, or Windows, install [PyTorch](https://pytorch.org/), then run:
+On Ubuntu, macOS, or Windows, install [PyTorch](https://pytorch.org/), then run:
 
 ```bash
 pip install -r requirements/runtime.txt
