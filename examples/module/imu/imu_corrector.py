@@ -23,7 +23,7 @@ class IMUIntegrator(nn.Module):
             acc = data['acc'], rot = rot)
 
 class IMUCorrector(nn.Module):
-    def __init__(self, size_list= [6, 64, 128, 128, 128, 6]):
+    def __init__(self, size_list= [6, 128, 128, 128, 6]):
         super().__init__()
         layers = []
         self.size_list = size_list
@@ -39,8 +39,8 @@ class IMUCorrector(nn.Module):
         B, F = feature.shape[:2]
 
         output = self.net(feature.reshape(B*F,6)).reshape(B, F, 6)
-        corrected_acc = output[...,:3] + data["acc"]
-        corrected_gyro = output[...,3:] + data["gyro"]
+        corrected_acc = output[...,:3] * 0.1 + data["acc"]
+        corrected_gyro = output[...,3:] * 0.1 + data["gyro"]
         if self.eval:
             rot = None
         else:
@@ -55,7 +55,7 @@ def get_loss(state, data):
     pos_loss = torch.nn.functional.mse_loss(state['pos'], data['gt_pos'], reduction='mean')
     rot_loss = (data['gt_rot'] * state['rot'].Inv()).Log().norm(dim=-1).mean()
 
-    loss = pos_loss + rot_loss * 1e2
+    loss = pos_loss + rot_loss * 5e2
     return loss, {'pos_loss': pos_loss, 'rot_loss': rot_loss}
 
 
@@ -158,7 +158,7 @@ if __name__ == '__main__':
     integrator = IMUIntegrator().to(args.device)
 
     optimizer = torch.optim.Adam(network.parameters(), lr = 5e-5)  # to use with ViTs
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor = 0.1, patience = 10)# default setup
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor = 0.1, patience = 15)# default setup
 
     best_loss = torch.inf
     para_stae_dict = None

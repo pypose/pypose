@@ -90,3 +90,5 @@ Note: change `DATAROOT` to the folder you select.
         --datadrive DATADRIVE [DATADRIVE ...]
                                 data sequences
         --load_ckpt
+
+![imu-correction-result](./IMUcorrector.png)
