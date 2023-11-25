@@ -50,6 +50,19 @@ class IMUCorrector(nn.Module):
             acc = corrected_acc, rot = rot)
 
 
+def plot_trajectory(poses, poses_gt, poses_corrected, save = False):
+    plt.figure(figsize=(5, 5))
+    ax = plt.axes()
+    ax.plot(poses[:,0], poses[:,1], 'b')
+    ax.plot(poses_corrected[:,0], poses_corrected[:,1], 'g')
+    ax.plot(poses_gt[:,0], poses_gt[:,1], 'r')
+    plt.title("PyPose IMU Integrator")
+    plt.legend(["Integration", "Corrected", "Ground Truth"])
+
+    if save:
+        plt.savefig("imu_corrector.png")
+    plt.show()
+
 
 def get_loss(state, data):
     pos_loss = torch.nn.functional.mse_loss(state['pos'], data['gt_pos'], reduction='mean')
@@ -180,12 +193,4 @@ if __name__ == '__main__':
     poses_corrected, poses_gt = evaluate(network, init, evaluate_loader, device = args.device)
     poses, _ = evaluate(integrator, init, evaluate_loader, device = args.device)
 
-    plt.figure(figsize=(5, 5))
-    ax = plt.axes()
-    ax.plot(poses[:,0], poses[:,1], 'b')
-    ax.plot(poses_corrected[:,0], poses_corrected[:,1], 'g')
-    ax.plot(poses_gt[:,0], poses_gt[:,1], 'r')
-    plt.title("PyPose IMU Integrator")
-    plt.legend(["Integration", "Corrected", "Ground Truth"])
-
-    plt.show()
+    plot_trajectory(poses, poses_gt, poses_corrected, save = True)
