@@ -174,21 +174,22 @@ if __name__ == '__main__':
     best_loss = torch.inf
     para_stae_dict = None
     for epoch_i in range(args.max_epoches):
-        train_loss = train(network, train_loader, epoch_i, optimizer, device = args.device)
+        train_loss = train(network, train_loader, epoch_i, optimizer, device=args.device)
         test_loss = test(network, test_loader, device = args.device)
         reference_loss = test(integrator, train_loader, device = args.device)
         scheduler.step(test_loss)
         if best_loss > test_loss:
             best_loss = test_loss
             para_stae_dict = network.state_dict()
-        print("train loss: %f test loss: %f reference loss: %f "%(train_loss, test_loss, reference_loss))
+        print("train loss: %f test loss: %f reference loss: %f"
+                %(train_loss, test_loss, reference_loss))
 
     print("evaluating...")
 
     init = evaluate_dataset.get_init_value()
     network = IMUCorrector().to(args.device)
     network.load_state_dict(para_stae_dict)
-    poses_corrected, poses_gt = evaluate(network, init, evaluate_loader, device = args.device)
+    poses_corrected, poses_gt = evaluate(network, init, evaluate_loader, device=args.device)
     poses, _ = evaluate(integrator, init, evaluate_loader, device = args.device)
 
     plot_trajectory(poses, poses_gt, poses_corrected, save = True)
