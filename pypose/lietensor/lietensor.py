@@ -1228,7 +1228,9 @@ def retain_ltype():
     TO_BE_WRAPPED = {
         torch.autograd.forward_ad.make_dual,
         torch._functorch.eager_transforms._wrap_tensor_for_grad,
+        torch._functorch.vmap._add_batch_dim,
     }
+    torch._functorch.vmap._add_batch_dim.__module__ = 'torch._functorch.vmap'
 
     def wrap_function(func):
         def wrapper(*args, **kwargs):
