@@ -91,4 +91,5 @@ Note: change `DATAROOT` to the folder you select.
                                 data sequences
         --load_ckpt
 
-![imu-correction-result](./IMUcorrector.png)
+![IMUcorrector](https://github.com/pypose/pypose/assets/22726519/fab23d94-58ce-4948-98f0-c4d5e66e6080)
+

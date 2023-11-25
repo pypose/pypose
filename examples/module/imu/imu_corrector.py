@@ -149,7 +149,6 @@ if __name__ == '__main__':
     parser.add_argument("--dataname", type=str, default='2011_09_26', help="dataset name")
     parser.add_argument("--datadrive", nargs='+', type=str, default=["0022"],
                         help="data sequences")
-    parser.add_argument('--load_ckpt', default=False, action="store_true")
     args = parser.parse_args(); print(args)
 
     train_dataset = KITTI_IMU(args.dataroot, args.dataname, args.datadrive[0],
@@ -166,12 +165,11 @@ if __name__ == '__main__':
     evaluate_loader = Data.DataLoader(dataset=evaluate_dataset, batch_size=1,
                                       collate_fn=imu_collate, shuffle=False)
 
-    ## optimizer
     network = IMUCorrector().to(args.device)
     integrator = IMUIntegrator().to(args.device)
 
-    optimizer = torch.optim.Adam(network.parameters(), lr = 5e-5)  # to use with ViTs
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor = 0.1, patience = 15)# default setup
+    optimizer = torch.optim.Adam(network.parameters(), lr = 5e-5)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor = 0.1, patience = 15)
 
     best_loss = torch.inf
     para_stae_dict = None
