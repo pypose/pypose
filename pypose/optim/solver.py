@@ -254,6 +254,8 @@ class Krylov(nn.Module):
         self.forward_time = 0 # non-accumulative
         self.matvec_time = 0 # non-accumulative across forward passes
         forward_start = time.time()
+        A = A.to_sparse_csr()
+        A = A.to(torch.float64)
         assert(A.shape[0] == A.shape[1])
 
         b = b.squeeze()
@@ -303,4 +305,5 @@ class Krylov(nn.Module):
         forward_end = time.time()
         self.forward_time += forward_end - forward_start
         if self.debug: print(f'matvec percentage: {100 * self.matvec_time / self.forward_time:.2f}%')
+        x = x.to(torch.float32)
         return x #, torch.stack(res_hist)

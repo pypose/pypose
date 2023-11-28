@@ -520,7 +520,6 @@ class LevenbergMarquardt(_Optimizer):
             J_T = J.T @ weight if weight is not None else J.T
             A, self.reject_count = J_T @ J, 0
             if self.sparse:
-                A = A.to(torch.float64)
                 sparse_coo_diagonal_clamp_(A, pg['min'], pg['max'])
             else:
                 A = A.to_dense()
@@ -534,7 +533,7 @@ class LevenbergMarquardt(_Optimizer):
                     solver_start = time.time()
                     D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
                     D = D.unsqueeze(-1)
-                    D = D.to(torch.float32)
+                    #D = D.to(torch.float32)
                     solver_end = time.time()
                     self.solver_time += solver_end - solver_start
                 except Exception as e:
