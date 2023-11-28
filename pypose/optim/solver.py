@@ -296,6 +296,7 @@ class Krylov(nn.Module):
             norm_r = torch.linalg.norm(r)
             if torch.any(torch.isnan(norm_r)):
                 # if we have NaN r norm then we likely aren't converging, return early
+                print('NaN norm_r, returning early')
                 return x
 
             res_hist.append(norm_r)
