@@ -1,7 +1,7 @@
 import torch, warnings
 from torch import Tensor, nn
 from torch.linalg import pinv, lstsq, cholesky_ex
-
+import time
 
 class PINV(nn.Module):
     r'''The batched linear solver with pseudo inversion.
@@ -216,6 +216,8 @@ class Krylov(nn.Module):
         super().__init__()
         self.rtol = rtol
         self.iterations = iterations
+        self.forward_time = 0
+        self.matvec_time = 0
 
     def forward(self, A, b, x=None, M=None):
         '''
@@ -248,7 +250,9 @@ class Krylov(nn.Module):
         res_hist : list of torch.Tensor
         Norm of the residual at each iteration, including before the first iteration.
         '''
-
+        self.forward_time = 0 # non-accumulative
+        self.matvec_time = 0 # non-accumulative across forward passes
+        forward_start = time.time()
         assert(A.shape[0] == A.shape[1])
 
         b = b.squeeze()
@@ -271,7 +275,10 @@ class Krylov(nn.Module):
         res_hist = [norm_r]
 
         while norm_r / norm_b > self.rtol:
+            matvec_start = time.time()
             Ap = A@p # Ap.shape = [120993, 1]
+            matvec_end = time.time()
+            self.matvec_time += matvec_end - matvec_start
             rz = torch.linalg.vecdot(r, z) # rz.shape = 1
             alpha = rz/torch.linalg.vecdot(Ap, p) # p.shape = [120993, 1]
             x = x + alpha * p # x.shape = [120993, 1]
@@ -283,11 +290,13 @@ class Krylov(nn.Module):
             norm_r = torch.linalg.norm(r)
             if torch.any(torch.isnan(norm_r)):
                 # if we have NaN r norm then we likely aren't converging, return early
-                return x, torch.stack(res_hist)
+                return x
 
             res_hist.append(norm_r)
             it += 1
             if self.iterations is not None and it >= self.iterations:
                 break
-
+        forward_end = time.time()
+        self.forward_time += forward_end - forward_start
+        print(f'matvec percentage: {100 * self.matvec_time / self.forward_time:.2f}%')
         return x #, torch.stack(res_hist)

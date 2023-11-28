@@ -8,6 +8,7 @@ from .solver import PINV, Cholesky
 from torch.linalg import cholesky_ex
 from .corrector import FastTriggs
 from .. import SbkTensor, sparse_coo_diagonal, sparse_coo_diagonal_add_, sparse_coo_diagonal_clamp_, hybrid2coo
+import time
 
 class Trivial(torch.nn.Module):
     r"""
@@ -423,6 +424,8 @@ class LevenbergMarquardt(_Optimizer):
         self.corrector = [c if c is not None else Trivial() for c in self.corrector]
         self.model = RobustModel(model, kernel)
         self.sparse = sparse
+        self.solver_time = 0
+        self.step_time = 0
 
 
     @torch.no_grad()
@@ -493,6 +496,8 @@ class LevenbergMarquardt(_Optimizer):
             `examples/module/pgo
             <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.
         '''
+        self.step_time = 0 # non-acculumative
+        step_start = time.time()
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
             R = list(self.model(input, target))
@@ -514,21 +519,24 @@ class LevenbergMarquardt(_Optimizer):
                                     else self.model.loss(input, target)
             J_T = J.T @ weight if weight is not None else J.T
             A, self.reject_count = J_T @ J, 0
-            A = A.to(torch.float64)
-            # A = A.to_dense()
-            if A.is_sparse:
+            if self.sparse:
+                A = A.to(torch.float64)
                 sparse_coo_diagonal_clamp_(A, pg['min'], pg['max'])
             else:
+                A = A.to_dense()
                 A.diagonal().clamp_(pg['min'], pg['max'])
             while self.last <= self.loss:
-                if A.is_sparse:
+                if self.sparse:
                     sparse_coo_diagonal_add_(A, sparse_coo_diagonal(A) * pg['damping'])
                 else:
                     A.diagonal().add_(A.diagonal() * pg['damping'])
                 try:
+                    solver_start = time.time()
                     D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
                     D = D.unsqueeze(-1)
                     D = D.to(torch.float32)
+                    solver_end = time.time()
+                    self.solver_time += solver_end - solver_start
                 except Exception as e:
                     print(e, "\nLinear solver failed. Breaking optimization step...")
                     break
@@ -538,6 +546,12 @@ class LevenbergMarquardt(_Optimizer):
                 if self.last < self.loss and self.reject_count < self.reject: # reject step
                     self.update_parameter(params = pg['params'], step = -D)
                     self.loss, self.reject_count = self.last, self.reject_count + 1
+                    print(f'reject step {self.reject_count}')
                 else:
+                    print(f'accept step after {self.reject_count} retries')
                     break
+        step_end = time.time()
+        self.step_time += step_end - step_start
+        print(f'solver time percentage: {100 * self.solver_time / self.step_time:.2f}%')
+        self.solver_time = 0 # reset solver time only after accept step
         return self.loss
