@@ -3,7 +3,7 @@ from .. import hasnan
 from functools import partial
 from torch.autograd.functional import jacobian
 from torch.func import jacrev, jacfwd, functional_call
-
+import pypose as pp
 
 def modjac(model, input=None, create_graph=False, strict=False, vectorize=False, \
                     strategy='reverse-mode', flatten=False):
@@ -155,8 +155,47 @@ def modjac(model, input=None, create_graph=False, strict=False, vectorize=False,
 def modjacrev(model, input, argnums=0, *, has_aux=False):
     params = dict(model.named_parameters())
     func = partial(functional_call, model)
-    return jacrev(func, argnums=argnums, has_aux=has_aux)(params, input)
+    return pp.func.jacrev(func, argnums=argnums, has_aux=has_aux)(params, input)[0]['model.pose']
 
+# def construct_sbt(jac_from_vmap, num_cameras, camera_index):
+#     n = camera_index.shape[0] # num 2D points
+#     i = torch.stack([torch.arange(n), camera_index])
+#     v = jac_from_vmap[:, None, :] # adjust dimension to accomodate for sbt constructor
+#     return pp.sbktensor(i, v, size=(n, num_cameras), dtype=torch.float32)
+
+def construct_sbt(jac_from_vmap, num, index):
+    n = index.shape[0] # num 2D points
+    i = torch.stack([torch.arange(n).to(index.device), index])
+    v = jac_from_vmap[:, None, :] # adjust dimension to accomodate for sbt constructor
+    return pp.sbktensor(i, v, size=(n, num), device=index.device, dtype=torch.float32)
+
+def construct_sbt_points_3d(jac_from_vmap, num, index):
+    n = index.shape[0] # num 2D points
+    i = torch.stack([torch.arange(n).to(index.device), index])
+    v = jac_from_vmap
+    return pp.sbktensor(i, v, size=(n, num), device=index.device, dtype=torch.float32)
+
+def modjacrev_vmap(model, input, argnums=0, *, has_aux=False):
+    params = dict(model.named_parameters())
+    func = partial(functional_call, model)
+    images_num = params['model.pose'].shape[0]
+    points_3d_num = params['model.points_3d'].shape[0]
+    params['model.pose'] = params['model.pose'][input[-2]]
+    params['model.points_3d'] = params['model.points_3d'][input[-1], None]
+    jac_dict = torch.vmap(jacrev(func, argnums=argnums, has_aux=has_aux))(params, input)
+    jac_pose = jac_dict[0]['model.pose']
+    jac_points_3d = jac_dict[0]['model.points_3d']
+    return [construct_sbt(jac_pose, images_num, input[-2]),
+            construct_sbt_points_3d(jac_points_3d, points_3d_num, input[-1])]
+
+def modjacrev_vmap_pose_only(model, input, argnums=0, *, has_aux=False):
+    params = dict(model.named_parameters())
+    func = partial(functional_call, model)
+    images_num = params['model.pose'].shape[0]
+    params['model.pose'] = params['model.pose'][input[-1]]
+    jac_dict = torch.vmap(jacrev(func, argnums=argnums, has_aux=has_aux))(params, input)
+    jac_pose = jac_dict[0]['model.pose']
+    return construct_sbt(jac_pose, images_num, input[-1])
 
 def modjacfwd(model, input, argnums=0, *, has_aux=False):
     params = dict(model.named_parameters())

@@ -70,7 +70,7 @@ def hybrid2coo(hybrid):
     proxyshape = hybrid.shape[:dim] # proxy shape.
     blknum = hybrid.indices().shape[-1]
     blknumel = 0 if blknum == 0 else hybrid.values().numel() // blknum
-    offset = unravel_index(torch.arange(blknumel), blkshape) # in-block offset
+    offset = unravel_index(torch.arange(blknumel).to(hybrid.device), blkshape) # in-block offset
     # indices shape (dim, blknum, blknumel)
     indices = hybrid.indices().unsqueeze(-1).expand(-1, -1, blknumel)
     # scale the block indices by a factor of block shape
