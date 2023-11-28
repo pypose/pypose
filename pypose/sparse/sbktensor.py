@@ -70,7 +70,7 @@ def hybrid2coo(hybrid):
     proxyshape = hybrid.shape[:dim] # proxy shape.
     blknum = hybrid.indices().shape[-1]
     blknumel = 0 if blknum == 0 else hybrid.values().numel() // blknum
-    offset = unravel_index(torch.arange(blknumel), blkshape) # in-block offset
+    offset = unravel_index(torch.arange(blknumel).to(hybrid.device), blkshape) # in-block offset
     # indices shape (dim, blknum, blknumel)
     indices = hybrid.indices().unsqueeze(-1).expand(-1, -1, blknumel)
     # scale the block indices by a factor of block shape
@@ -532,3 +532,19 @@ def sbktensor(indices, values, size=None, dtype=None, device=None, requires_grad
         requires_grad=False).coalesce()
 
     return x
+
+def sparse_coo_diagonal(t: torch.Tensor):
+    indices = t.indices()
+    diag_indices = indices[0] == indices[1]
+    return t.values()[diag_indices]
+
+def sparse_coo_diagonal_clamp_(t: torch.Tensor, min_value, max_value):
+    indices = t.indices()
+    diag_indices = indices[0] == indices[1]
+    t.values()[diag_indices] = t.values()[diag_indices].clamp_(min_value, max_value)
+
+
+def sparse_coo_diagonal_add_(t: torch.Tensor, other: torch.Tensor):
+    indices = t.indices()
+    diag_indices = indices[0] == indices[1]
+    t.values()[diag_indices] = t.values()[diag_indices].add_(other)

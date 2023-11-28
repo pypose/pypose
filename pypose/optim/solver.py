@@ -16,7 +16,7 @@ class PINV(nn.Module):
 
     .. math::
         \bm{x}_i = \mathrm{pinv}(\mathbf{A}_i) \mathbf{b}_i,
-        
+
     where :math:`\mathrm{pinv}()` is the `pseudo inversion
     <https://en.wikipedia.org/wiki/Moore-Penrose_inverse>`_ function.
 
@@ -77,7 +77,7 @@ class LSTSQ(nn.Module):
 
     .. math::
         \bm{x}_i = \mathrm{lstsq}(\mathbf{A}_i, \mathbf{b}_i),
-        
+
     where :math:`\mathrm{lstsq}()` computes a solution to the least squares problem
     of a system of linear equations. More details go to `torch.linalg.lstsq
     <https://pytorch.org/docs/stable/generated/torch.linalg.lstsq.html>`_.
@@ -210,3 +210,84 @@ class Cholesky(nn.Module):
         assert not torch.any(torch.isnan(L)), \
             'Cholesky decomposition failed. Check your matrix (may not be positive-definite)'
         return b.cholesky_solve(L, upper=self.upper)
+
+class Krylov(nn.Module):
+    def __init__(self, rtol=1e-6, iterations=None):
+        super().__init__()
+        self.rtol = rtol
+        self.iterations = iterations
+
+    def forward(self, A, b, x=None, M=None):
+        '''
+        Solves the matrix equation
+
+        Ax = b
+
+        for symmetric positive definite (SPD) A, using the method of
+        conjugate gradients (Saad 2003)
+
+        Parameters
+        ----------
+        A : numml.sparse.SparseCSRTensor or numml.sparse.LinearOperator
+        System matrix
+        b : torch.Tensor
+        Right-hand-side vector
+        x : torch.Tensor
+        Initial guess to the solution.  If not given, will default to zero.
+        M : numml.sparse.SparseCSRTensor or numml.sparse.LinearOperator
+        Preconditioner, if it exists.  If not given this will behave like the identity.
+        This should also be SPD.
+        rtol : float
+        Relative tolerance for stopping condition.  Will terminate the algorithm when
+        ||b - Ax|| / ||b|| <= rtol
+
+        Returns
+        -------
+        x_sol : torch.Tensor
+        Approximate solution to the matrix equation.
+        res_hist : list of torch.Tensor
+        Norm of the residual at each iteration, including before the first iteration.
+        '''
+
+        assert(A.shape[0] == A.shape[1])
+
+        b = b.squeeze()
+        b = b.to(torch.float64)
+        r = None
+        if x is None:
+            x = torch.zeros(A.shape[1], device=b.device)
+            r = b.clone()
+        else:
+            r = b - A @ x
+
+        if M is None:
+            M = A.clone()
+
+        z = M @ r
+        p = z.clone()
+        norm_b = torch.linalg.norm(b)
+        it = 0
+        norm_r = torch.linalg.norm(r)
+        res_hist = [norm_r]
+
+        while norm_r / norm_b > self.rtol:
+            Ap = A@p # Ap.shape = [120993, 1]
+            rz = torch.linalg.vecdot(r, z) # rz.shape = 1
+            alpha = rz/torch.linalg.vecdot(Ap, p) # p.shape = [120993, 1]
+            x = x + alpha * p # x.shape = [120993, 1]
+            r = r - alpha * Ap # r.shape = [120993, 1]
+            z = M@r # z.shape = [120993, 1]
+            beta = torch.linalg.vecdot(r, z) / rz #
+            p = z + beta * p
+
+            norm_r = torch.linalg.norm(r)
+            if torch.any(torch.isnan(norm_r)):
+                # if we have NaN r norm then we likely aren't converging, return early
+                return x, torch.stack(res_hist)
+
+            res_hist.append(norm_r)
+            it += 1
+            if self.iterations is not None and it >= self.iterations:
+                break
+
+        return x #, torch.stack(res_hist)

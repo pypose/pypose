@@ -1,13 +1,13 @@
 import torch
 from .. import bmv
 from torch import nn, finfo
-from .functional import modjac
+from .functional import modjac, modjacrev, modjacrev_vmap, modjacrev_vmap_pose_only
 from .strategy import TrustRegion
 from torch.optim import Optimizer
 from .solver import PINV, Cholesky
 from torch.linalg import cholesky_ex
 from .corrector import FastTriggs
-
+from .. import SbkTensor, sparse_coo_diagonal, sparse_coo_diagonal_add_, sparse_coo_diagonal_clamp_, hybrid2coo
 
 class Trivial(torch.nn.Module):
     r"""
@@ -35,7 +35,10 @@ class RobustModel(nn.Module):
 
     def flatten_row_jacobian(self, J, params_values):
         if isinstance(J, (tuple, list)):
-            J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params_values)], 1)
+            if isinstance(J[0], SbkTensor):
+                J = torch.cat([hybrid2coo(j._s) for j in J], 1)
+            else:
+                J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params_values)], 1)
         return J
 
     def normalize_RWJ(self, R, weight, J):
@@ -55,7 +58,7 @@ class RobustModel(nn.Module):
         J = torch.cat(J) if isinstance(J, (tuple, list)) else J
         return torch.cat(R), weight_diag, J
 
-    def forward(self, input, target):
+    def forward(self, input, target=None):
         output = self.model_forward(input)
         return self.residuals(output, target)
 
@@ -400,7 +403,7 @@ class LevenbergMarquardt(_Optimizer):
         structural information, although computing Jacobian vector is faster.**
     '''
     def __init__(self, model, solver=None, strategy=None, kernel=None, corrector=None, \
-                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True):
+                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True, sparse=True):
         assert min > 0, ValueError("min value has to be positive: {}".format(min))
         assert max > 0, ValueError("max value has to be positive: {}".format(max))
         self.strategy = TrustRegion() if strategy is None else strategy
@@ -419,6 +422,7 @@ class LevenbergMarquardt(_Optimizer):
         self.corrector = [self.corrector] if not isinstance(self.corrector, (tuple, list)) else self.corrector
         self.corrector = [c if c is not None else Trivial() for c in self.corrector]
         self.model = RobustModel(model, kernel)
+        self.sparse = sparse
 
 
     @torch.no_grad()
@@ -492,7 +496,12 @@ class LevenbergMarquardt(_Optimizer):
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
             R = list(self.model(input, target))
-            J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
+            # J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
+            if self.sparse:
+                J = [modjacrev_vmap(self.model, input)]
+                # J = [[modjacrev_vmap_pose_only(self.model, input)]]
+            else:
+                J = [[modjacrev(self.model, input)]]
             params = dict(self.model.named_parameters())
             params_values = tuple(params.values())
             J = [self.model.flatten_row_jacobian(Jr, params_values) for Jr in J]
@@ -505,11 +514,21 @@ class LevenbergMarquardt(_Optimizer):
                                     else self.model.loss(input, target)
             J_T = J.T @ weight if weight is not None else J.T
             A, self.reject_count = J_T @ J, 0
-            A.diagonal().clamp_(pg['min'], pg['max'])
+            A = A.to(torch.float64)
+            # A = A.to_dense()
+            if A.is_sparse:
+                sparse_coo_diagonal_clamp_(A, pg['min'], pg['max'])
+            else:
+                A.diagonal().clamp_(pg['min'], pg['max'])
             while self.last <= self.loss:
-                A.diagonal().add_(A.diagonal() * pg['damping'])
+                if A.is_sparse:
+                    sparse_coo_diagonal_add_(A, sparse_coo_diagonal(A) * pg['damping'])
+                else:
+                    A.diagonal().add_(A.diagonal() * pg['damping'])
                 try:
                     D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
+                    D = D.unsqueeze(-1)
+                    D = D.to(torch.float32)
                 except Exception as e:
                     print(e, "\nLinear solver failed. Breaking optimization step...")
                     break
