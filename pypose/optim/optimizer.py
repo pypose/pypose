@@ -404,7 +404,7 @@ class LevenbergMarquardt(_Optimizer):
         structural information, although computing Jacobian vector is faster.**
     '''
     def __init__(self, model, solver=None, strategy=None, kernel=None, corrector=None, \
-                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True, sparse=True):
+                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True, sparse=True, debug=False):
         assert min > 0, ValueError("min value has to be positive: {}".format(min))
         assert max > 0, ValueError("max value has to be positive: {}".format(max))
         self.strategy = TrustRegion() if strategy is None else strategy
@@ -426,6 +426,7 @@ class LevenbergMarquardt(_Optimizer):
         self.sparse = sparse
         self.solver_time = 0
         self.step_time = 0
+        self.debug = debug
 
 
     @torch.no_grad()
@@ -496,7 +497,6 @@ class LevenbergMarquardt(_Optimizer):
             `examples/module/pgo
             <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.
         '''
-        self.step_time = 0 # non-acculumative
         step_start = time.time()
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
@@ -546,12 +546,13 @@ class LevenbergMarquardt(_Optimizer):
                 if self.last < self.loss and self.reject_count < self.reject: # reject step
                     self.update_parameter(params = pg['params'], step = -D)
                     self.loss, self.reject_count = self.last, self.reject_count + 1
-                    print(f'reject step {self.reject_count}')
+                    if self.debug: print(f'reject step {self.reject_count}')
                 else:
-                    print(f'accept step after {self.reject_count} retries')
+                    if self.debug: print(f'accept step after {self.reject_count} retries')
                     break
         step_end = time.time()
         self.step_time += step_end - step_start
-        print(f'solver time percentage: {100 * self.solver_time / self.step_time:.2f}%')
+        if self.debug: print(f'step time percentage: {100 * self.solver_time / self.step_time:.2f}%')
         self.solver_time = 0 # reset solver time only after accept step
+        self.step_time = 0
         return self.loss

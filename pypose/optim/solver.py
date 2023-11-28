@@ -212,12 +212,13 @@ class Cholesky(nn.Module):
         return b.cholesky_solve(L, upper=self.upper)
 
 class Krylov(nn.Module):
-    def __init__(self, rtol=1e-6, iterations=None):
+    def __init__(self, rtol=1e-6, iterations=None, debug=False):
         super().__init__()
         self.rtol = rtol
         self.iterations = iterations
         self.forward_time = 0
         self.matvec_time = 0
+        self.debug = debug
 
     def forward(self, A, b, x=None, M=None):
         '''
@@ -283,7 +284,10 @@ class Krylov(nn.Module):
             alpha = rz/torch.linalg.vecdot(Ap, p) # p.shape = [120993, 1]
             x = x + alpha * p # x.shape = [120993, 1]
             r = r - alpha * Ap # r.shape = [120993, 1]
+            matvec_start = time.time()
             z = M@r # z.shape = [120993, 1]
+            matvec_end = time.time()
+            self.matvec_time += matvec_end - matvec_start
             beta = torch.linalg.vecdot(r, z) / rz #
             p = z + beta * p
 
@@ -298,5 +302,5 @@ class Krylov(nn.Module):
                 break
         forward_end = time.time()
         self.forward_time += forward_end - forward_start
-        print(f'matvec percentage: {100 * self.matvec_time / self.forward_time:.2f}%')
+        if self.debug: print(f'matvec percentage: {100 * self.matvec_time / self.forward_time:.2f}%')
         return x #, torch.stack(res_hist)
