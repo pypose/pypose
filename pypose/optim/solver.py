@@ -306,5 +306,4 @@ class Krylov(nn.Module):
         forward_end = time.time()
         self.forward_time += forward_end - forward_start
         if self.debug: print(f'matvec percentage: {100 * self.matvec_time / self.forward_time:.2f}%')
-        x = x.to(torch.float32)
         return x #, torch.stack(res_hist)

@@ -404,7 +404,7 @@ class LevenbergMarquardt(_Optimizer):
         structural information, although computing Jacobian vector is faster.**
     '''
     def __init__(self, model, solver=None, strategy=None, kernel=None, corrector=None, \
-                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True, sparse=True, debug=False):
+                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True, sparse=True, debug=False, dense_A=False):
         assert min > 0, ValueError("min value has to be positive: {}".format(min))
         assert max > 0, ValueError("max value has to be positive: {}".format(max))
         self.strategy = TrustRegion() if strategy is None else strategy
@@ -427,6 +427,8 @@ class LevenbergMarquardt(_Optimizer):
         self.solver_time = 0
         self.step_time = 0
         self.debug = debug
+        self.prev_D = None
+        self.dense_A = dense_A
 
 
     @torch.no_grad()
@@ -519,21 +521,26 @@ class LevenbergMarquardt(_Optimizer):
                                     else self.model.loss(input, target)
             J_T = J.T @ weight if weight is not None else J.T
             A, self.reject_count = J_T @ J, 0
-            if self.sparse:
+            if self.dense_A:
+                A = A.to_dense()
+            if A.is_sparse:
                 sparse_coo_diagonal_clamp_(A, pg['min'], pg['max'])
             else:
-                A = A.to_dense()
                 A.diagonal().clamp_(pg['min'], pg['max'])
             while self.last <= self.loss:
-                if self.sparse:
+                if A.is_sparse:
                     sparse_coo_diagonal_add_(A, sparse_coo_diagonal(A) * pg['damping'])
                 else:
                     A.diagonal().add_(A.diagonal() * pg['damping'])
                 try:
                     solver_start = time.time()
-                    D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
-                    D = D.unsqueeze(-1)
-                    #D = D.to(torch.float32)
+                    if not self.dense_A:
+                        D = self.solver(A = A, b = -J_T @ R.view(-1, 1), x = self.prev_D)
+                        self.prev_D = D
+                        D = D.unsqueeze(-1)
+                        D = D.to(torch.float32)
+                    else:
+                        D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
                     solver_end = time.time()
                     self.solver_time += solver_end - solver_start
                 except Exception as e:
@@ -545,6 +552,7 @@ class LevenbergMarquardt(_Optimizer):
                 if self.last < self.loss and self.reject_count < self.reject: # reject step
                     self.update_parameter(params = pg['params'], step = -D)
                     self.loss, self.reject_count = self.last, self.reject_count + 1
+                    self.prev_D = None # reset prev_D after reject step
                     if self.debug: print(f'reject step {self.reject_count}')
                 else:
                     if self.debug: print(f'accept step after {self.reject_count} retries')
