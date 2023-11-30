@@ -129,7 +129,6 @@ def add(input, other, alpha=1):
     '''
     return input.add(other, alpha)
 
-
 @torch.jit.script
 def bsr_bsc_matmul(bsr:torch.Tensor, bsc:torch.Tensor):
     assert bsr.shape[-1] == bsc.shape[-2]
@@ -189,8 +188,13 @@ def bsr_bsc_matmul(bsr:torch.Tensor, bsc:torch.Tensor):
                                    size=(sparse_m, sparse_p, dense_m, dense_p)).coalesce()
 
 
-def matmul(input, other):
-    if isinstance(input, torch.Tensor) and other.layout == torch.sparse_bsr:
+from torch.library import Library, impl
+sparse_lib = Library('aten', 'IMPL')
+
+# @impl(sparse_lib, 'mm', 'Sparse')
+@impl(sparse_lib, 'mm', 'SparseCsrCPU')
+def mm(input, other):
+    if isinstance(input, torch.Tensor) and input.layout == torch.sparse_bsr:
         if isinstance(other, torch.Tensor) and other.layout == torch.sparse_bsc:
             return bsr_bsc_matmul(input, other)
     elif isinstance(input, torch.Tensor) and input.layout == torch.sparse_bsc:
@@ -398,3 +402,23 @@ def mul(input, other):
             LieTensor([ 0.5740,  1.3197, -0.2752,  0.6819, -0.5389,  0.4634,  0.1727, 1.1172])
     '''
     return input * other
+
+if __name__ == '__main__':
+    with torch.no_grad():
+        crow_indices = torch.tensor([0, 2, 4])
+        col_indices = torch.tensor([0, 1, 0, 1])
+        values = torch.tensor([1, 2, 3, 4])
+        csr = torch.sparse_csr_tensor(crow_indices, col_indices, values, dtype=torch.float64)
+        csr
+        csr.to_dense()
+
+        crow_indices = torch.tensor([0, 2, 4])
+        col_indices = torch.tensor([0, 1, 0, 1])
+        values = torch.tensor([[[0, 1, 2], [6, 7, 8]],
+                            [[3, 4, 5], [9, 10, 11]],
+                            [[12, 13, 14], [18, 19, 20]],
+                            [[15, 16, 17], [21, 22, 23]]])
+        bsr = torch.sparse_bsr_tensor(crow_indices, col_indices, values, dtype=torch.float64)
+        def func(a, b):
+            return a @ b
+        print(func(bsr, bsr.mT))
