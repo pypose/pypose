@@ -9,6 +9,7 @@ from torch.linalg import cholesky_ex
 from .corrector import FastTriggs
 from .. import SbkTensor, sparse_coo_diagonal, sparse_coo_diagonal_add_, sparse_coo_diagonal_clamp_, hybrid2coo
 import time
+import scipy.sparse as sp
 
 class Trivial(torch.nn.Module):
     r"""
@@ -404,7 +405,8 @@ class LevenbergMarquardt(_Optimizer):
         structural information, although computing Jacobian vector is faster.**
     '''
     def __init__(self, model, solver=None, strategy=None, kernel=None, corrector=None, \
-                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True, sparse=True, debug=False, dense_A=False):
+                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True, sparse=True, \
+                        debug=False, dense_A=False, scipy=False):
         assert min > 0, ValueError("min value has to be positive: {}".format(min))
         assert max > 0, ValueError("max value has to be positive: {}".format(max))
         self.strategy = TrustRegion() if strategy is None else strategy
@@ -429,6 +431,9 @@ class LevenbergMarquardt(_Optimizer):
         self.debug = debug
         self.prev_D = None
         self.dense_A = dense_A
+        self.scipy = scipy
+        if self.scipy:
+            self.solver = sp.linalg.cg
 
 
     @torch.no_grad()
@@ -534,7 +539,15 @@ class LevenbergMarquardt(_Optimizer):
                     A.diagonal().add_(A.diagonal() * pg['damping'])
                 try:
                     solver_start = time.time()
-                    if not self.dense_A:
+                    if self.scipy:
+                        A = A.coalesce()
+                        A_indices = A.indices()
+                        A_scipy = sp.coo_matrix((A.values().numpy(), (A_indices[0].numpy(), A_indices[1].numpy())))
+                        D_scipy = self.solver(A_scipy, (-J_T @ R.view(-1, 1)).numpy(), x0 = self.prev_D, tol=1e-2)[0]
+                        self.prev_D = D_scipy
+                        D = torch.from_numpy(D_scipy).to(torch.float32)
+                        D = D.unsqueeze(-1)
+                    elif not self.dense_A:
                         D = self.solver(A = A, b = -J_T @ R.view(-1, 1), x = self.prev_D)
                         self.prev_D = D
                         D = D.unsqueeze(-1)
