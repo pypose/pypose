@@ -183,9 +183,20 @@ def bsr_bsc_matmul(bsr:torch.Tensor, bsc:torch.Tensor):
     reduced.scatter_add_(0, index.unsqueeze(-1).unsqueeze(-1).expand_as(prod), prod)
     result_indices = torch.tensor(result_indices, dtype=idx_dtype, device=bsr.device)
     result_indices = result_indices.view(-1, 2).T
-    return torch.sparse_coo_tensor(indices=result_indices,
-                                   values=reduced,
-                                   size=(sparse_m, sparse_p, dense_m, dense_p)).coalesce()
+    # return torch.sparse_coo_tensor(indices=result_indices,
+    #                                values=reduced,
+    #                                size=(sparse_m, sparse_p, dense_m, dense_p)).coalesce()
+    # use fake coo
+    dummy_val = torch.zeros(result_indices.shape[-1], dtype=prod.dtype, device=prod.device)
+    dummy = torch.sparse_coo_tensor(indices=result_indices,
+                                    values=dummy_val,
+                                    size=(sparse_m, sparse_p)).coalesce()
+    dummy_csr = dummy.to_sparse_csr()
+    return torch.sparse_bsr_tensor(dummy_csr.crow_indices(),
+                                   dummy_csr.col_indices(),
+                                   reduced,
+                                   size=(m, p), dtype=reduced.dtype)
+
 
 
 from torch.library import Library, impl
@@ -419,6 +430,31 @@ if __name__ == '__main__':
                             [[12, 13, 14], [18, 19, 20]],
                             [[15, 16, 17], [21, 22, 23]]])
         bsr = torch.sparse_bsr_tensor(crow_indices, col_indices, values, dtype=torch.float64)
-        def func(a, b):
-            return a @ b
-        print(func(bsr, bsr.mT))
+        spmm_res = (bsr @ bsr.mT).to_dense()
+        mm_res = bsr.to_dense() @ bsr.mT.to_dense()
+        # torch.testing.assert_close(spmm_res, mm_res)
+
+    # benchmark
+    import time
+    start = time.time()
+    for _ in range(1000):
+        spmm_res = (bsr @ bsr.mT)
+    end = time.time()
+    print(end - start)
+
+device = 'cpu'
+import time
+bsr = bsr.to(device)
+dense = bsr.to_dense()
+_ = bsr_bsc_matmul(bsr, bsr.mT)
+start = time.time()
+for i in range(1000):
+    res = bsr_bsc_matmul(bsr, bsr.mT)
+end = time.time()
+print("sparse time in seconds: ", end - start)
+
+start = time.time()
+for i in range(1000):
+    res = torch.matmul(dense, dense.transpose(-2, -1))
+end = time.time()
+print("dense time in seconds: ", end - start)
