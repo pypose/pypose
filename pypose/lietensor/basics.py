@@ -178,11 +178,11 @@ def bsr_bsc_matmul(bsr:torch.Tensor, bsc:torch.Tensor):
     source = torch.tensor(source, dtype=idx_dtype, device=bsr.device).view(-1, 2)
     index = torch.tensor(index, dtype=idx_dtype, device=bsr.device)
     prod = torch.bmm(csr_values[source[:, 0]], csc_values[source[:, 1]])
-    reduced = torch.zeros((result_step, dense_m, dense_p),
-                          dtype=prod.dtype, device=prod.device)
+    values_shape = (result_step, dense_m, dense_p)
+    reduced = torch.zeros(values_shape, dtype=prod.dtype, device=prod.device)
     reduced.scatter_add_(0, index.unsqueeze(-1).unsqueeze(-1).expand_as(prod), prod)
-    result_indices = torch.tensor(result_indices, dtype=idx_dtype, device=bsr.device)\
-        .view(-1, 2).T
+    result_indices = torch.tensor(result_indices, dtype=idx_dtype, device=bsr.device)
+    result_indices = result_indices.view(-1, 2).T
     return torch.sparse_coo_tensor(indices=result_indices,
                                    values=reduced,
                                    size=(sparse_m, sparse_p, dense_m, dense_p)).coalesce()
