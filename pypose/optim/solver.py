@@ -1,5 +1,8 @@
 import torch, warnings
+from typing import Optional
 from torch import Tensor, nn
+from functools import partial
+from ..function.linalg import bmv
 from torch.linalg import pinv, lstsq, cholesky_ex
 
 
@@ -16,7 +19,7 @@ class PINV(nn.Module):
 
     .. math::
         \bm{x}_i = \mathrm{pinv}(\mathbf{A}_i) \mathbf{b}_i,
-        
+
     where :math:`\mathrm{pinv}()` is the `pseudo inversion
     <https://en.wikipedia.org/wiki/Moore-Penrose_inverse>`_ function.
 
@@ -77,7 +80,7 @@ class LSTSQ(nn.Module):
 
     .. math::
         \bm{x}_i = \mathrm{lstsq}(\mathbf{A}_i, \mathbf{b}_i),
-        
+
     where :math:`\mathrm{lstsq}()` computes a solution to the least squares problem
     of a system of linear equations. More details go to `torch.linalg.lstsq
     <https://pytorch.org/docs/stable/generated/torch.linalg.lstsq.html>`_.
@@ -210,3 +213,65 @@ class Cholesky(nn.Module):
         assert not torch.any(torch.isnan(L)), \
             'Cholesky decomposition failed. Check your matrix (may not be positive-definite)'
         return b.cholesky_solve(L, upper=self.upper)
+
+
+class CG(nn.Module):
+    def __init__(self, maxiter=None, tol=1e-5):
+        super().__init__()
+        self.maxiter, self.tol = maxiter, tol
+
+    def forward(self, A: Tensor, b: Tensor, x: Optional[Tensor]=None,
+                M: Optional[Tensor]=None) -> Tensor:
+        '''
+        Args:
+            A (Tensor): the input batched tensor.
+            b (Tensor): the batched tensor on the right hand side.
+
+        Return:
+            Tensor: the solved batched tensor.
+        '''
+        b = b.ravel()
+        if x is None:
+            x = torch.zeros_like(b)
+        bnrm2 = torch.linalg.norm(b)
+        if bnrm2 == 0:
+            return b
+        atol = self.tol * bnrm2
+        n = b.shape[-1]
+
+        if self.maxiter is None:
+            maxiter = n*10
+        else:
+            maxiter = self.maxiter
+
+        matvec = partial(bmv, A)
+        dotprod = torch.linalg.vecdot
+        psolve = partial(bmv, M) if M is not None else lambda x: x
+        r = b - matvec(x) if x.any() else b.clone()
+
+        # Dummy value to initialize var, silences warnings
+        rho_prev, p = None, None
+
+        for iteration in range(maxiter):
+            if torch.linalg.norm(r) < atol:
+                return x
+
+            z = psolve(r)
+            rho_cur = dotprod(r, z)
+            if iteration > 0:
+                beta = rho_cur / rho_prev
+                p *= beta
+                p += z
+            else:  # First spin
+                p = torch.empty_like(r)
+                p[:] = z[:]
+
+            q = matvec(p)
+            alpha = rho_cur / dotprod(p, q)
+            x += alpha*p
+            r -= alpha*q
+            rho_prev = rho_cur
+
+        else:  # for loop exhausted
+            # Return incomplete progress
+            return x
