@@ -1,5 +1,8 @@
 import torch, warnings
+from typing import Optional
 from torch import Tensor, nn
+from functools import partial
+from ..function.linalg import bmv
 from torch.linalg import pinv, lstsq, cholesky_ex
 import time
 
@@ -211,99 +214,64 @@ class Cholesky(nn.Module):
             'Cholesky decomposition failed. Check your matrix (may not be positive-definite)'
         return b.cholesky_solve(L, upper=self.upper)
 
-class Krylov(nn.Module):
-    def __init__(self, rtol=1e-6, iterations=None, debug=False):
+
+class CG(nn.Module):
+    def __init__(self, maxiter=None, tol=1e-5):
         super().__init__()
-        self.rtol = rtol
-        self.iterations = iterations
-        self.forward_time = 0
-        self.matvec_time = 0
-        self.debug = debug
+        self.maxiter, self.tol = maxiter, tol
 
-    def forward(self, A, b, x=None, M=None):
+    def forward(self, A: Tensor, b: Tensor, x: Optional[Tensor]=None,
+                M: Optional[Tensor]=None) -> Tensor:
         '''
-        Solves the matrix equation
+        Args:
+            A (Tensor): the input batched tensor.
+            b (Tensor): the batched tensor on the right hand side.
 
-        Ax = b
-
-        for symmetric positive definite (SPD) A, using the method of
-        conjugate gradients (Saad 2003)
-
-        Parameters
-        ----------
-        A : numml.sparse.SparseCSRTensor or numml.sparse.LinearOperator
-        System matrix
-        b : torch.Tensor
-        Right-hand-side vector
-        x : torch.Tensor
-        Initial guess to the solution.  If not given, will default to zero.
-        M : numml.sparse.SparseCSRTensor or numml.sparse.LinearOperator
-        Preconditioner, if it exists.  If not given this will behave like the identity.
-        This should also be SPD.
-        rtol : float
-        Relative tolerance for stopping condition.  Will terminate the algorithm when
-        ||b - Ax|| / ||b|| <= rtol
-
-        Returns
-        -------
-        x_sol : torch.Tensor
-        Approximate solution to the matrix equation.
-        res_hist : list of torch.Tensor
-        Norm of the residual at each iteration, including before the first iteration.
+        Return:
+            Tensor: the solved batched tensor.
         '''
-        self.forward_time = 0 # non-accumulative
-        self.matvec_time = 0 # non-accumulative across forward passes
-        forward_start = time.time()
-        A = A.to_sparse_csr()
-        A = A.to(torch.float64)
-        assert(A.shape[0] == A.shape[1])
-
-        b = b.squeeze()
-        b = b.to(torch.float64)
-        r = None
+        b = b.ravel()
         if x is None:
-            x = torch.zeros(A.shape[1], device=b.device)
-            r = b.clone()
+            x = torch.zeros_like(b)
+        bnrm2 = torch.linalg.norm(b)
+        if bnrm2 == 0:
+            return b
+        atol = self.tol * bnrm2
+        n = b.shape[-1]
+
+        if self.maxiter is None:
+            maxiter = n*10
         else:
-            r = b - A @ x
+            maxiter = self.maxiter
 
-        if M is None:
-            M = A.clone()
+        matvec = partial(bmv, A)
+        dotprod = torch.linalg.vecdot
+        psolve = partial(bmv, M) if M is not None else lambda x: x
+        r = b - matvec(x) if x.any() else b.clone()
 
-        z = M @ r
-        p = z.clone()
-        norm_b = torch.linalg.norm(b)
-        it = 0
-        norm_r = torch.linalg.norm(r)
-        res_hist = [norm_r]
+        # Dummy value to initialize var, silences warnings
+        rho_prev, p = None, None
 
-        while norm_r / norm_b > self.rtol:
-            matvec_start = time.time()
-            Ap = A@p # Ap.shape = [120993, 1]
-            matvec_end = time.time()
-            self.matvec_time += matvec_end - matvec_start
-            rz = torch.linalg.vecdot(r, z) # rz.shape = 1
-            alpha = rz/torch.linalg.vecdot(Ap, p) # p.shape = [120993, 1]
-            x = x + alpha * p # x.shape = [120993, 1]
-            r = r - alpha * Ap # r.shape = [120993, 1]
-            matvec_start = time.time()
-            z = M@r # z.shape = [120993, 1]
-            matvec_end = time.time()
-            self.matvec_time += matvec_end - matvec_start
-            beta = torch.linalg.vecdot(r, z) / rz #
-            p = z + beta * p
-
-            norm_r = torch.linalg.norm(r)
-            if torch.any(torch.isnan(norm_r)):
-                # if we have NaN r norm then we likely aren't converging, return early
-                print('NaN norm_r, returning early')
+        for iteration in range(maxiter):
+            if torch.linalg.norm(r) < atol:
                 return x
 
-            res_hist.append(norm_r)
-            it += 1
-            if self.iterations is not None and it >= self.iterations:
-                break
-        forward_end = time.time()
-        self.forward_time += forward_end - forward_start
-        if self.debug: print(f'matvec percentage: {100 * self.matvec_time / self.forward_time:.2f}%')
-        return x #, torch.stack(res_hist)
+            z = psolve(r)
+            rho_cur = dotprod(r, z)
+            if iteration > 0:
+                beta = rho_cur / rho_prev
+                p *= beta
+                p += z
+            else:  # First spin
+                p = torch.empty_like(r)
+                p[:] = z[:]
+
+            q = matvec(p)
+            alpha = rho_cur / dotprod(p, q)
+            x += alpha*p
+            r -= alpha*q
+            rho_prev = rho_cur
+
+        else:  # for loop exhausted
+            # Return incomplete progress
+            return x
