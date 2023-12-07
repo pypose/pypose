@@ -21,12 +21,17 @@ def test_cg_fixed():
     cg = CG()
     torch.testing.assert_close(x, cg(A, b), atol=1e-5, rtol=1e-4)
 
-def test_cf_batch():
+def test_cg_batch():
     cg = CG()
     A_batch = torch.stack([A, A])
     b_batch = torch.stack([b, b])
     x_batch = torch.stack([x, x])
     torch.testing.assert_close(x_batch, cg(A_batch, b_batch), atol=1e-5, rtol=1e-4)
+
+def test_cg_csr():
+    cg = CG()
+    A_csr = A.to_sparse_csr()
+    torch.testing.assert_close(x, cg(A_csr, b), atol=1e-5, rtol=1e-4)
 
 if __name__ == '__main__':
     # for dev purpose, will not be executed in CI
