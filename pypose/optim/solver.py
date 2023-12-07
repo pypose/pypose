@@ -3,7 +3,7 @@ from typing import Optional
 from torch import Tensor, nn
 from functools import partial
 from ..function.linalg import bmv
-from torch.linalg import pinv, lstsq, cholesky_ex
+from torch.linalg import pinv, lstsq, cholesky_ex, vecdot
 
 
 class PINV(nn.Module):
@@ -233,6 +233,7 @@ class CG(nn.Module):
     sparse matrices, the batched computation may introduce additional overhead.
 
     Examples:
+        >>> # dense example
         >>> import pypose.optim.solver as ppos
         >>> A = torch.tensor([[0.1802967, 0.3151198, 0.4548111, 0.3860016, 0.2870615],
                               [0.3151198, 1.4575327, 1.5533425, 1.0540756, 1.0795838],
@@ -244,7 +245,6 @@ class CG(nn.Module):
                               [ 0.73612658],
                               [ 0.51501254],
                               [-0.26689271]])
-        >>> A = A.to_sparse_csr() # optional, used to demonstrate the sparse matrix support
         >>> solver = ppos.CG()
         >>> x = solver(A, b)
         tensor([[246.4098],
@@ -252,6 +252,21 @@ class CG(nn.Module):
                 [-56.9239],
                 [-161.7914],
                 [137.2683]])
+
+        >>> # sparse csr example
+        >>> import pypose.optim.solver as ppos
+        >>> crow_indices = torch.tensor([0, 2, 4])
+        >>> col_indices = torch.tensor([0, 1, 0, 1])
+        >>> values = torch.tensor([1, 2, 3, 4], dtype=torch.float)
+        >>> A = torch.sparse_csr_tensor(crow_indices, col_indices, values)
+        >>> A.to_dense()  # visualize
+        tensor([[1., 2.],
+                [3., 4.]])
+        >>> b = torch.tensor([[1.], [2.]])
+        >>> solver = ppos.CG()
+        >>> x = solver(A, b)
+        tensor([-4.4052e-05,  5.0003e-01])
+
     '''
     def __init__(self, maxiter=None, tol=1e-5):
         super().__init__()
@@ -290,31 +305,24 @@ class CG(nn.Module):
             maxiter = n*10
         else:
             maxiter = self.maxiter
-
-        matvec = partial(bmv, A)
-        dotprod = torch.linalg.vecdot
-        psolve = partial(bmv, M) if M is not None else lambda x: x
-        r = b - matvec(x) if x.any() else b.clone()
-
-        # Dummy value to initialize var, silences warnings
+        r = b - bmv(A, x) if x.any() else b.clone()
         rho_prev, p = None, None
 
         for iteration in range(maxiter):
             if (torch.linalg.norm(r, dim=-1) < atol).all():
                 return x
 
-            z = psolve(r)
-            rho_cur = dotprod(r, z)
+            z = bmv(M, r) if M is not None else r
+            rho_cur = vecdot(r, z)
             if iteration > 0:
                 beta = rho_cur / rho_prev
-                p *= beta.unsqueeze(-1)
-                p += z
+                p =  p * beta.unsqueeze(-1) + z
             else:  # First spin
                 p = torch.empty_like(r)
                 p[:] = z[:]
 
-            q = matvec(p)
-            alpha = rho_cur / dotprod(p, q)
+            q = bmv(A, p)
+            alpha = rho_cur / vecdot(p, q)
             x += alpha.unsqueeze(-1)*p
             r -= alpha.unsqueeze(-1)*q
             rho_prev = rho_cur
