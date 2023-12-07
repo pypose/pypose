@@ -216,16 +216,20 @@ class Cholesky(nn.Module):
 
 
 class CG(nn.Module):
-    r'''The non-batched linear solver with conjugate gradient method.
+    r'''The batched linear solver with conjugate gradient method.
 
     .. math::
-        \mathbf{A} \bm{x} = \mathbf{b},
+        \mathbf{A}_i \bm{x}_i = \mathbf{b}_i,
 
-    where :math:`\mathbf{A} \in \mathbb{C}^{N \times N}` and :math:`\bm{b} \in
-    \mathbb{C}^{N \times 1}` are the linear equation.
+    where :math:`\mathbf{A}_i \in \mathbb{C}^{M \times N}` and :math:`\bm{b}_i \in
+    \mathbb{C}^{M \times 1}` are the :math:`i`-th item of batched linear equations.
+
     This function is a 1:1 replica of `scipy.sparse.linalg.cg <https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.linalg.cg.html>`_.
     The solution is consistent with the scipy version up to numerical precision.
     Variable names are kept the same as the scipy version for easy reference.
+    We recommend using only non-batched or batch size 1 input for this solver, as
+    the batched version was not appeared in the original scipy version. When handling
+    sparse matrices, the batched computation may introduce additional overhead.
     '''
     def __init__(self, maxiter=None, tol=1e-5):
         super().__init__()
