@@ -224,8 +224,8 @@ class CG(nn.Module):
     where :math:`\mathbf{A}_i \in \mathbb{C}^{M \times N}` and :math:`\bm{b}_i \in
     \mathbb{C}^{M \times 1}` are the :math:`i`-th item of batched linear equations.
 
-    This function is a 1:1 replica of `scipy.sparse.linalg.cg <https://docs.scipy.org/doc\
-        /scipy/reference/generated/scipy.sparse.linalg.cg.html>`_.
+    This function is a 1:1 replica of `scipy.sparse.linalg.cg <https://docs.scipy.org/doc
+    /scipy/reference/generated/scipy.sparse.linalg.cg.html>`_.
     The solution is consistent with the scipy version up to numerical precision.
     Variable names are kept the same as the scipy version for easy reference.
     We recommend using only non-batched or batch size 1 input for this solver, as
