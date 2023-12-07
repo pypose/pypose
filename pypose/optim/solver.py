@@ -224,12 +224,34 @@ class CG(nn.Module):
     where :math:`\mathbf{A}_i \in \mathbb{C}^{M \times N}` and :math:`\bm{b}_i \in
     \mathbb{C}^{M \times 1}` are the :math:`i`-th item of batched linear equations.
 
-    This function is a 1:1 replica of `scipy.sparse.linalg.cg <https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.linalg.cg.html>`_.
+    This function is a 1:1 replica of `scipy.sparse.linalg.cg <https://docs.scipy.org/doc\
+        /scipy/reference/generated/scipy.sparse.linalg.cg.html>`_.
     The solution is consistent with the scipy version up to numerical precision.
     Variable names are kept the same as the scipy version for easy reference.
     We recommend using only non-batched or batch size 1 input for this solver, as
     the batched version was not appeared in the original scipy version. When handling
     sparse matrices, the batched computation may introduce additional overhead.
+
+    Examples:
+        >>> import pypose.optim.solver as ppos
+        >>> A = torch.tensor([[0.1802967, 0.3151198, 0.4548111, 0.3860016, 0.2870615],
+                              [0.3151198, 1.4575327, 1.5533425, 1.0540756, 1.0795838],
+                              [0.4548111, 1.5533425, 2.3674474, 1.1222278, 1.2365348],
+                              [0.3860016, 1.0540756, 1.1222278, 1.3748058, 1.2223261],
+                              [0.2870615, 1.0795838, 1.2365348, 1.2223261, 1.2577004]])
+        >>> b = torch.tensor([[ 2.64306851],
+                              [-0.03593633],
+                              [ 0.73612658],
+                              [ 0.51501254],
+                              [-0.26689271]])
+        >>> A = A.to_sparse_csr() # optional, used to demonstrate the sparse matrix support
+        >>> solver = ppos.CG()
+        >>> x = solver(A, b)
+        tensor([[246.4098],
+                [ 22.6997],
+                [-56.9239],
+                [-161.7914],
+                [137.2683]])
     '''
     def __init__(self, maxiter=None, tol=1e-5):
         super().__init__()
