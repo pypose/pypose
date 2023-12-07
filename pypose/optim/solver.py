@@ -236,10 +236,13 @@ class CG(nn.Module):
         '''
         Args:
             A (Tensor): the input tensor. It is assumed to be a symmetric
-            positive-definite matrix. Layout is allowed to be COO, CSR, BSR, or dense.
+                positive-definite matrix. Layout is allowed to be COO, CSR, BSR, or dense.
             b (Tensor): the tensor on the right hand side. Layout could be sparse or dense
                 but is only allowed to be a type that is compatible with the layout of A.
                 In other words, `A @ b` operation must be supported by the layout of A.
+            x (Tensor, optional): the initial guess for the solution. Default: ``None``.
+            M (Tensor, optional): the preconditioner for A. Layout is allowed to be COO,
+                CSR, BSR, or dense. Default: ``None``.
 
         Return:
             Tensor: the solved tensor. Layout is the same as the layout of b.
