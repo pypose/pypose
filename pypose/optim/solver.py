@@ -235,11 +235,14 @@ class CG(nn.Module):
                 M: Optional[Tensor]=None) -> Tensor:
         '''
         Args:
-            A (Tensor): the input batched tensor.
-            b (Tensor): the batched tensor on the right hand side.
+            A (Tensor): the input tensor. It is assumed to be a symmetric
+            positive-definite matrix. Layout is allowed to be COO, CSR, BSR, or dense.
+            b (Tensor): the tensor on the right hand side. Layout could be sparse or dense
+                but is only allowed to be a type that is compatible with the layout of A.
+                In other words, `A @ b` operation must be supported by the layout of A.
 
         Return:
-            Tensor: the solved batched tensor.
+            Tensor: the solved tensor. Layout is the same as the layout of b.
         '''
         b = b.ravel()
         if x is None:
