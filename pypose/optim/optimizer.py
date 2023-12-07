@@ -10,6 +10,7 @@ from .corrector import FastTriggs
 from .. import SbkTensor, sparse_coo_diagonal, sparse_coo_diagonal_add_, sparse_coo_diagonal_clamp_, hybrid2coo
 import time
 import scipy.sparse as sp
+import scipy.sparse.linalg
 
 class Trivial(torch.nn.Module):
     r"""
@@ -548,7 +549,7 @@ class LevenbergMarquardt(_Optimizer):
                         D = torch.from_numpy(D_scipy).to(torch.float32)
                         D = D.unsqueeze(-1)
                     elif not self.dense_A:
-                        D = self.solver(A = A, b = -J_T @ R.view(-1, 1), x = self.prev_D)
+                        D = self.solver(A = A.to_sparse_csr(), b = -J_T @ R.view(-1, 1), x = self.prev_D)
                         self.prev_D = D
                         D = D.unsqueeze(-1)
                         D = D.to(torch.float32)
