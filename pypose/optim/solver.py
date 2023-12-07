@@ -247,11 +247,15 @@ class CG(nn.Module):
         Return:
             Tensor: the solved tensor. Layout is the same as the layout of b.
         '''
-        b = b.ravel()
+        if A.ndim == b.ndim:
+            b = b.squeeze(-1)
+        else:
+            assert A.ndim == b.ndim + 1, \
+                'The number of dimensions of A and b must differ by 1'
         if x is None:
             x = torch.zeros_like(b)
-        bnrm2 = torch.linalg.norm(b)
-        if bnrm2 == 0:
+        bnrm2 = torch.linalg.norm(b, dim=-1)
+        if (bnrm2 == 0).all():
             return b
         atol = self.tol * bnrm2
         n = b.shape[-1]
@@ -270,14 +274,14 @@ class CG(nn.Module):
         rho_prev, p = None, None
 
         for iteration in range(maxiter):
-            if torch.linalg.norm(r) < atol:
+            if (torch.linalg.norm(r, dim=-1) < atol).all():
                 return x
 
             z = psolve(r)
             rho_cur = dotprod(r, z)
             if iteration > 0:
                 beta = rho_cur / rho_prev
-                p *= beta
+                p *= beta.unsqueeze(-1)
                 p += z
             else:  # First spin
                 p = torch.empty_like(r)
@@ -285,8 +289,8 @@ class CG(nn.Module):
 
             q = matvec(p)
             alpha = rho_cur / dotprod(p, q)
-            x += alpha*p
-            r -= alpha*q
+            x += alpha.unsqueeze(-1)*p
+            r -= alpha.unsqueeze(-1)*q
             rho_prev = rho_cur
 
         else:  # for loop exhausted
