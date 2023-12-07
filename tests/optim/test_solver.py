@@ -7,11 +7,11 @@ import torch
 from pypose.optim.solver import CG
 
 from tqdm import tqdm
-for _ in tqdm(range(1000)):
+for _ in tqdm(range(100)):
     import scipy
     import numpy as np
     # example linear solver
-    A = scipy.sparse.random(1000, 1000, density=0.01)
+    A = scipy.sparse.random(1000, 1000, density=0.1)
     A = A @ A.T
     b = np.random.randn(1000, 1)
     x_gt, info = scipy.sparse.linalg.cg(A, b)
