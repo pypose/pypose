@@ -302,7 +302,7 @@ class CG(nn.Module):
         n = b.shape[-1]
 
         if self.maxiter is None:
-            maxiter = n*10
+            maxiter = n * 10
         else:
             maxiter = self.maxiter
         r = b - bmv(A, x) if x.any() else b.clone()
@@ -316,7 +316,7 @@ class CG(nn.Module):
             rho_cur = vecdot(r, z)
             if iteration > 0:
                 beta = rho_cur / rho_prev
-                p =  p * beta.unsqueeze(-1) + z
+                p = p * beta.unsqueeze(-1) + z
             else:  # First spin
                 p = torch.empty_like(r)
                 p[:] = z[:]
@@ -327,6 +327,4 @@ class CG(nn.Module):
             r -= alpha.unsqueeze(-1)*q
             rho_prev = rho_cur
 
-        else:  # for loop exhausted
-            # Return incomplete progress
-            return x
+        return x
