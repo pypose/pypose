@@ -327,4 +327,7 @@ class CG(nn.Module):
             r -= alpha.unsqueeze(-1)*q
             rho_prev = rho_cur
 
+        assert not torch.any(torch.isnan(x)), \
+            'Conjugate Gradient Solver Failed. Check your matrix (may not be Symmetric Positive Definite)'
+
         return x
