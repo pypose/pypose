@@ -356,3 +356,27 @@ def svdtf(source, target):
     t = ctntarget.mT - R @ ctnsource.mT
     T = torch.cat((R, t), dim=-1)
     return mat2SE3(T, check=False)
+
+
+def ror(points, nbp=16, radius=0.05 ):
+    r'''
+    Removes points that have few neighbors in a given sphere around them.
+
+    Args:
+        points (``torch.Tensor``):  the input point cloud. The last dimension D of the
+            point cloud should be greater than 3, and the coordinates of the point should
+            be the first three numbers. The shape has to be (..., N, D).
+        nbp (``int``, optional): the minimum amount of points that the sphere should
+            contain.
+            Default: ``16``.
+        radius (``float``, optional): the radius of the sphere that will be used for
+            counting the neighbors.
+            Default: ``0.05``.
+
+    Returns:
+        ``outlier``: The outlier points. The shape is (..., N1, D).
+        ``filtered``: The filtered points. The shape is (..., N2, D).
+
+    Example:
+        To Be Complete
+    '''
