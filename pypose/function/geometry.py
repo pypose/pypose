@@ -358,17 +358,18 @@ def svdtf(source, target):
     return mat2SE3(T, check=False)
 
 
-def ror(points, nbp=16, radius=0.05 ):
+def ror(points, nbr=16, radius=0.05):
     r'''
-    Removes points that have few neighbors in a given sphere around them.
+    Removes point cloud outliers by checking if they have fewer neighbors (nbr) than the
+    set limit within a certain radius.
 
     Args:
-        points (``torch.Tensor``):  the input point cloud. The last dimension D of the
-            point cloud should be greater than 3, and the coordinates of the point should
-            be the first three numbers, and the rest could be any other infomation, such
-            as intensity, RGB channel, etc. The shape has to be (..., N, D).
-        nbp (``int``, optional): the minimum amount of points that the sphere should
-            contain.
+        points (``torch.Tensor``): the input point cloud. It is essential that the last
+            dimension (D) exceeds 3, with the point's coordinates occupying the initial
+            three values. Subsequent values may contain additional information like
+            intensity, RGB channels, etc. The shape has to be (..., N, D).
+        nbr (``int``, optional): the minimum amount of neighbors within the certain
+            radius.
             Default: ``16``.
         radius (``float``, optional): the radius of the sphere that will be used for
             counting the neighbors.
@@ -376,7 +377,7 @@ def ror(points, nbp=16, radius=0.05 ):
 
     Returns:
         ``mask``: The mask of the input pointcloud, where the filtered value is True and
-        the outlier is False. The shape is (..., N1).
+        the outlier is False. The shape is (..., N).
 
     Example:
         >>> import torch, pypose as pp
@@ -386,15 +387,15 @@ def ror(points, nbp=16, radius=0.05 ):
         ...                        [0., 1., 1.],
         ...                        [10., 1., 1.],
         ...                        [10., 1., 10.]])
-        >>> pp.ror(points, nbp=2, radius=5)
+        >>> pp.ror(points, nbr=2, radius=5)
         tensor([ True,  True,  True,  True, False, False])
-        >>> pp.ror(points, nbp=2, radius=12)
+        >>> pp.ror(points, nbr=2, radius=12)
         tensor([ True,  True,  True,  True,  True, False])
     '''
     assert points.size(-1) >= 3, {
-        "The dimension of the points should be greater than 3."}
+        "The last dimension of the pointcloud should exceed 3."}
     diff = points[..., :3].unsqueeze(-2) - points[..., :3].unsqueeze(-3)
     dist = torch.linalg.norm(diff, dim=-1)
-    nbr = torch.sum(dist < radius, dim=-1) - 1
-    mask = nbr >= nbp
+    count = torch.sum(dist < radius, dim=-1) - 1
+    mask = count >= nbr
     return mask
