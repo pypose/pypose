@@ -544,12 +544,13 @@ class LevenbergMarquardt(_Optimizer):
                         A = A.coalesce()
                         A_indices = A.indices()
                         A_scipy = sp.coo_matrix((A.values().numpy(), (A_indices[0].numpy(), A_indices[1].numpy())))
-                        D_scipy = self.solver(A_scipy, (-J_T @ R.view(-1, 1)).numpy(), x0 = self.prev_D, tol=1e-2)[0]
+                        D_scipy = self.solver(A_scipy, (-J_T @ R.view(-1, 1)).numpy(), x0 = self.prev_D, tol=1e-2, maxiter=10000)[0]
                         self.prev_D = D_scipy
                         D = torch.from_numpy(D_scipy).to(torch.float32)
                         D = D.unsqueeze(-1)
                     elif not self.dense_A:
-                        D = self.solver(A = A.to_sparse_csr(), b = -J_T @ R.view(-1, 1), x = self.prev_D)
+                        D = self.solver(A = A.to_sparse_csr().to(dtype=torch.float64), b = (-J_T @ R.view(-1, 1)).to(dtype=torch.float64), x = self.prev_D)
+                        #D = self.solver(A = A.to_sparse_csr(), b = (-J_T @ R.view(-1, 1)), x = self.prev_D)
                         self.prev_D = D
                         D = D.unsqueeze(-1)
                         D = D.to(torch.float32)
@@ -559,6 +560,7 @@ class LevenbergMarquardt(_Optimizer):
                     self.solver_time += solver_end - solver_start
                 except Exception as e:
                     print(e, "\nLinear solver failed. Breaking optimization step...")
+                    raise e
                     break
                 self.update_parameter(pg['params'], D)
                 self.loss = self.model.loss(input, target)

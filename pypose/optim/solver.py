@@ -232,7 +232,7 @@ class CG(nn.Module):
         '''
         b = b.ravel()
         if x is None:
-            x = torch.zeros_like(b)
+            x = torch.zeros_like(b).to(dtype=b.dtype)
         bnrm2 = torch.linalg.norm(b)
         if bnrm2 == 0:
             return b
@@ -271,7 +271,7 @@ class CG(nn.Module):
             x += alpha*p
             r -= alpha*q
             rho_prev = rho_cur
-
-        else:  # for loop exhausted
-            # Return incomplete progress
-            return x
+            if torch.isnan(x).any():
+                raise RuntimeError('CG failed to converge')
+        
+        return x

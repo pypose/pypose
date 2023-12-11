@@ -183,18 +183,18 @@ def modjacrev_vmap(model, input, argnums=0, *, has_aux=False):
     cameras_num = params['model.pose'].shape[0]
     points_3d_num = params['model.points_3d'].shape[0]
     params['model.pose'] = params['model.pose'][input[-2]]
-    params['model.intrinsics'] = params['model.intrinsics'][input[-2]]
-    params['model.distortions'] = params['model.distortions'][input[-2]]
     params['model.points_3d'] = params['model.points_3d'][input[-1], None]
+    #params['model.intrinsics'] = params['model.intrinsics'][input[-2]]
+    #params['model.distortions'] = params['model.distortions'][input[-2]]
     jac_dict = torch.vmap(jacrev(func, argnums=argnums, has_aux=has_aux))(params, input)
     jac_pose = jac_dict[0]['model.pose']
     jac_points_3d = jac_dict[0]['model.points_3d']
-    jac_intrinsics = jac_dict[0]['model.intrinsics']
-    jac_distortions = jac_dict[0]['model.distortions']
+    #jac_intrinsics = jac_dict[0]['model.intrinsics']
+    #jac_distortions = jac_dict[0]['model.distortions']
     return [construct_sbt(jac_pose, cameras_num, input[-2]),
-            construct_sbt_points_3d(jac_points_3d, points_3d_num, input[-1]),
-            construct_sbt(jac_intrinsics, cameras_num, input[-2]),
-            construct_sbt(jac_distortions, cameras_num, input[-2])]
+            construct_sbt_points_3d(jac_points_3d, points_3d_num, input[-1])]
+            #construct_sbt(jac_intrinsics, cameras_num, input[-2]),
+            #construct_sbt(jac_distortions, cameras_num, input[-2])]
 
 def modjacrev_vmap_pose_only(model, input, argnums=0, *, has_aux=False):
     params = dict(model.named_parameters())
