@@ -73,8 +73,9 @@ class TestMPC:
 
         cartPoleSolver = CartPole(dt, len, m_cart, m_pole, g).to(device)
         stepper = pp.utils.ReduceToBason(steps=10, verbose=False)
-        MPC = pp.module.MPC(cartPoleSolver, Q, p, T, stepper=stepper).to(device)
-        x, u, cost = MPC(dt, x_init, u_init=current_u)
+        MPC = pp.module.MPC(cartPoleSolver,T, stepper=stepper).to(device)
+        target=torch.zeros_like(p[0,0])
+        x, u, cost = MPC(dt, x_init,target, Q, p, u_init=current_u)
 
         torch.testing.assert_close(x_ref, x, atol=1e-5, rtol=1e-3)
         torch.testing.assert_close(u_ref, u, atol=1e-5, rtol=1e-3)
