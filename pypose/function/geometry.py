@@ -375,8 +375,7 @@ def ror(points, nbp=16, radius=0.05 ):
             Default: ``0.05``.
 
     Returns:
-        ``outlier``: The outlier points. The shape is (..., N1, D).
-        ``filtered``: The filtered points. The shape is (..., N2, D).
+        ``mask``: The mask of the filtered value. The shape is (..., N1).
 
     Example:
         >>> import torch, pypose as pp
@@ -387,18 +386,9 @@ def ror(points, nbp=16, radius=0.05 ):
         ...                        [10., 1., 1.],
         ...                        [10., 1., 10.]])
         >>> pp.ror(points, nbp=2, radius=5)
-        (tensor([[0., 0., 0.],
-                [1., 0., 0.],
-                [0., 1., 0.],
-                [0., 1., 1.]]), tensor([[10.,  1.,  1.],
-                [10.,  1., 10.]]))
+        tensor([ True,  True,  True,  True, False, False])
         >>> pp.ror(points, nbp=2, radius=12)
-        (tensor([[ 0.,  0.,  0.],
-                [ 1.,  0.,  0.],
-                [ 0.,  1.,  0.],
-                [ 0.,  1.,  1.],
-                [10.,  1.,  1.]]), tensor([[10.,  1., 10.]]))
-
+        tensor([ True,  True,  True,  True,  True, False])
     '''
     assert points.size(-1) >= 3, {
         "The dimension of the points should be greater than 3."}
@@ -406,6 +396,4 @@ def ror(points, nbp=16, radius=0.05 ):
     dist = torch.linalg.norm(diff, dim=-1)
     nbr = torch.sum(dist < radius, dim=-1) - 1
     mask = nbr >= nbp
-    filtered = points[mask]
-    outlier = points[~mask]
-    return filtered, outlier
+    return mask
