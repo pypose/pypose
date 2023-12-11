@@ -402,7 +402,7 @@ def ror(points, nbp=16, radius=0.05 ):
     '''
     assert points.size(-1) >= 3, {
         "The dimension of the points should be greater than 3."}
-    diff = points.unsqueeze(-2) - points.unsqueeze(-3)
+    diff = points[..., :3].unsqueeze(-2) - points[..., :3].unsqueeze(-3)
     dist = torch.linalg.norm(diff, dim=-1)
     nbr = torch.sum(dist < radius, dim=-1) - 1
     mask = nbr >= nbp
