@@ -380,16 +380,10 @@ def ror(points, nbp=16, radius=0.05 ):
     Example:
         To Be Complete
     '''
-    outlier = []
-    filtered = []
-    for i in range(points.shape[0]):
-        neighbor = []
-        for j in range(points.shape[0]):
-            if i!=j:
-                if radius >= torch.linalg.norm(points[i]-points[j]):
-                    neighbor.append(points[j])
-        if len(neighbor)<nbp:
-            outlier.append(points[i])
-        else:
-            filtered.append(points[i])
-    return outlier,filtered
+    diff = points.unsqueeze(-2) - points.unsqueeze(-3)
+    dist = torch.linalg.norm(diff, dim=-1)
+    nbr = torch.sum(dist < radius, dim=-1)
+    mask = nbr >= nbp
+    filtered = points[mask]
+    outlier = points[~mask]
+    return filtered, outlier

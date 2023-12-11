@@ -56,3 +56,4 @@ Functions
     svdtf
     chspline
     bspline
+    ror
