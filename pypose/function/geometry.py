@@ -375,7 +375,8 @@ def ror(points, nbp=16, radius=0.05 ):
             Default: ``0.05``.
 
     Returns:
-        ``mask``: The mask of the filtered value. The shape is (..., N1).
+        ``mask``: The mask of the input pointcloud, where the filtered value is True and
+        the outlier is False. The shape is (..., N1).
 
     Example:
         >>> import torch, pypose as pp
