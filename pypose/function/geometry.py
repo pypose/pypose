@@ -365,7 +365,8 @@ def ror(points, nbp=16, radius=0.05 ):
     Args:
         points (``torch.Tensor``):  the input point cloud. The last dimension D of the
             point cloud should be greater than 3, and the coordinates of the point should
-            be the first three numbers. The shape has to be (..., N, D).
+            be the first three numbers, and the rest could be any other infomation, such
+            as intensity, RGB channel, etc. The shape has to be (..., N, D).
         nbp (``int``, optional): the minimum amount of points that the sphere should
             contain.
             Default: ``16``.
@@ -378,11 +379,32 @@ def ror(points, nbp=16, radius=0.05 ):
         ``filtered``: The filtered points. The shape is (..., N2, D).
 
     Example:
-        To Be Complete
+        >>> import torch, pypose as pp
+        >>> points = torch.tensor([[0., 0., 0.],
+        ...                        [1., 0., 0.],
+        ...                        [0., 1., 0.],
+        ...                        [0., 1., 1.],
+        ...                        [10., 1., 1.],
+        ...                        [10., 1., 10.]])
+        >>> pp.ror(points, nbp=2, radius=5)
+        (tensor([[0., 0., 0.],
+                [1., 0., 0.],
+                [0., 1., 0.],
+                [0., 1., 1.]]), tensor([[10.,  1.,  1.],
+                [10.,  1., 10.]]))
+        >>> pp.ror(points, nbp=2, radius=12)
+        (tensor([[ 0.,  0.,  0.],
+                [ 1.,  0.,  0.],
+                [ 0.,  1.,  0.],
+                [ 0.,  1.,  1.],
+                [10.,  1.,  1.]]), tensor([[10.,  1., 10.]]))
+
     '''
+    assert points.size(-1) >= 3, {
+        "The dimension of the points should be greater than 3."}
     diff = points.unsqueeze(-2) - points.unsqueeze(-3)
     dist = torch.linalg.norm(diff, dim=-1)
-    nbr = torch.sum(dist < radius, dim=-1)
+    nbr = torch.sum(dist < radius, dim=-1) - 1
     mask = nbr >= nbp
     filtered = points[mask]
     outlier = points[~mask]
