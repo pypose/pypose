@@ -311,8 +311,7 @@ def knn(ref, nbr, k=1, ord=2, dim=-1, largest=False, sorted=True):
     dist = torch.linalg.norm(diff, dim=dim, ord=ord)
     return dist.topk(k, dim=dim, largest=largest, sorted=sorted)
 
-def svdstf(source: torch.Tensor, target: torch.Tensor,
-           with_scale: bool=True): #-> pypose.Sim3:
+def svdstf(source: torch.Tensor, target: torch.Tensor, with_scale: bool=True):
     r'''
     Computes the affine transformation ( :math:`Sim(3)` ) between two sets of associated
     point clouds (source and target) using Umeyama alignment.
