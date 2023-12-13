@@ -164,7 +164,9 @@ def bsr_bsc_matmul(bsr:torch.Tensor, bsc:torch.Tensor):
             nz: bool = False
             k2 = int(ccol_indices[j].item())
             for k1 in range(int(crow_indices[i].item()), int(crow_indices[i+1].item())):
-                while row_indices[k2] < col_indices[k1] and k2 < ccol_indices[j+1]:
+                if k2 == ccol_indices[j+1]:
+                    break
+                while row_indices[k2] < col_indices[k1] and k2 < ccol_indices[j+1] - 1:
                     k2 += 1
                 if row_indices[k2] == col_indices[k1]:
                     index.append(result_step)

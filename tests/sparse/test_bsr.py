@@ -71,3 +71,13 @@ def test_universal(op, dense_op, type_operands, shape_mode, dim, dense_zero_prob
     y_dense = dense_op(*args_dense)
 
     torch.testing.assert_close(y_sbt.to_sparse_coo().to_dense(), y_dense, equal_nan=True)
+
+
+if __name__ == '__main__':
+    for i in range(1000):
+        test_universal(torch.matmul, torch.matmul, ['bsr', 'bsc'], 'mT', 2, 0.7)
+        test_universal(torch.matmul, torch.matmul, ['bsr', 'bsc'], 'identical_square', 2, 0.7)
+        test_universal(torch.matmul, torch.matmul, ['bsr', 'bsc'], 'mT', 2, 0.0)
+        test_universal(torch.matmul, torch.matmul, ['bsr', 'bsc'], 'identical_square', 2, 0.0)
+        test_universal(torch.matmul, torch.matmul, ['bsr', 'bsc'], 'mT', 2, 1.0)
+        test_universal(torch.matmul, torch.matmul, ['bsr', 'bsc'], 'identical_square', 2, 1.0)
