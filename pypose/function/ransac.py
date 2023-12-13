@@ -1,5 +1,4 @@
 import torch
-import pypose as pp
 from torch import nn
 
 class RANSAC(nn.Module):

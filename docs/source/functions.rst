@@ -41,7 +41,6 @@ Functions
     randn_rxso3
     randn_RxSO3
     randn_like
-    ransac
     identity_so3
     identity_SO3
     identity_se3

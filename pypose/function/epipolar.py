@@ -1,5 +1,4 @@
 import torch
-import pypose as pp
 from ransac import RANSAC
 
 def normalize_points(coordinates:torch.Tensor):
@@ -55,9 +54,6 @@ def normalize_points(coordinates:torch.Tensor):
     scale, mean_x, mean_y = scale.view(-1,1), mean_x.view(-1,1), mean_y.view(-1,1)
     zeros, ones = torch.zeros_like(scale), torch.ones_like(scale)
 
-    # transform = torch.tensor([scale,     0.0, - scale * mean [0],
-    #                             0.0,   scale, - scale * mean [1],
-    #                             0.0,     0.0, 1.0 ]).view(3,3).to(device)  
     transform = torch.cat((scale, zeros, - scale * mean_x,
                         zeros, scale, - scale * mean_y,
                         zeros, zeros, ones), dim = -1).view(-1,3,3)
@@ -158,11 +154,6 @@ def triangulate_points(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
     AT = A.transpose(-2,-1)                          # (..., N, 3, 4)
     b  = - torch.cat([row1_3,row2_3,row3_3,row4_3], dim = -2)  # (..., N, 4, 1)
 
-
-    #A = torch.cat([row1[:,:3],row2[:,:3],row3[:,:3],row4[:,:3]],dim =-1).view(-1,4,3)     # (N, 4, 3)
-    #AT = torch.cat([row1[:,:3].reshape(-1,1),row2[:,:3].reshape(-1,1),row3[:,:3].reshape(-1,1),row4[:,:3].reshape(-1,1)],dim =-1).view(-1,3,4)     # (N, 3, 4)
-    #b = - torch.cat([row1[:,3].reshape(-1,1),row2[:,3].reshape(-1,1),row3[:,3].reshape(-1,1),row4[:,3].reshape(-1,1)],dim =-1).view(-1,4,1)        # (N, 4, 1)
-    
     points3D = torch.linalg.inv(AT @ A) @ AT @ b     # (..., N, 3, 1)
 
     return points3D.squeeze()
@@ -304,8 +295,9 @@ def find_essential_mat(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
     coordinates2 = coordinates2.type(torch.FloatTensor).to(device)
 
     # transfer to homogeneous coordinates
-    PH1 = pp.cart2homo(coordinates1)
-    PH2 = pp.cart2homo(coordinates2)
+    ones = torch.ones_like(coordinates1[..., :1])
+    PH1 = torch.cat([coordinates1, ones], dim = -1)
+    PH2 = torch.cat([coordinates2, ones], dim = -1)
 
     def fit_model(data,samples):
         coordinates1 = data['coordinates_1'][samples[:,:]]
