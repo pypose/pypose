@@ -3,6 +3,7 @@ import torch
 import importlib
 import pypose as pp
 from torch import nn
+from torch import vmap
 from contextlib import contextmanager
 from typing import Collection, Callable
 from torch.utils._pytree import tree_map
@@ -11,6 +12,26 @@ from torch.func import functional_call, jacfwd, jacrev
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+@contextmanager
+def check_fn_equal(TO_BE_CHECKED: Collection[Callable]):
+    # assert func1 and func2 are equal according to memory reference, module name,
+    # function name, and bytecode
+    def assert_fn_equal(func1, func2):
+        assert func1 == func2 \
+        and type(func1) == type(func2) \
+        and func1.__module__  == func2.__module__ \
+        and func1.__name__  == func2.__name__ \
+        and 'builtin_function_or_method' in str(type(func1)) \
+        or func1.__code__.co_code == func2.__code__.co_code
+    try:
+        yield
+    finally:
+        # make sure functions has been restored
+        for func1 in TO_BE_CHECKED:
+            module, name = func1.__module__, func1.__name__
+            module = importlib.import_module(module)
+            func2 = getattr(module, name)
+            assert_fn_equal(func1, func2)
 
 class TestJacobian:
 
@@ -142,25 +163,6 @@ class TestJacobian:
         def func(pose, points):
             return pose @ points
 
-        @contextmanager
-        def check_fn_equal(TO_BE_CHECKED: Collection[Callable]):
-            # assert func1 and func2 are equal according to memory reference, module name,
-            # function name, and bytecode
-            def assert_fn_equal(func1, func2):
-                assert func1 == func2 \
-                and func1.__module__  == func2.__module__ \
-                and func1.__name__  == func2.__name__ \
-                and func1.__code__.co_code == func2.__code__.co_code
-            try:
-                yield
-            finally:
-                # make sure functions has been restored
-                for func1 in TO_BE_CHECKED:
-                    module, name = func1.__module__, func1.__name__
-                    module = importlib.import_module(module)
-                    func2 = getattr(module, name)
-                    assert_fn_equal(func1, func2)
-
         # save functions to be checked
         TO_BE_CHECKED = {
             torch.autograd.forward_ad.make_dual,
@@ -178,6 +180,32 @@ class TestJacobian:
             jac_func = pp.func.jacrev(func)
             jac = jac_func(pose, points)
             assert not pp.hasnan(jac)
+
+    def test_lietensor_vmap(self):
+        pose = pp.randn_SE3(5).to(device)
+        points = torch.randn(5, 3).to(device)
+
+        def func(pose, points):
+            return pose @ points
+
+        # save functions to be checked
+        TO_BE_CHECKED = {
+            torch._functorch.vmap._add_batch_dim,
+        }
+
+        with check_fn_equal(TO_BE_CHECKED):
+            with pp.retain_ltype():
+                vmap_func = vmap(func)
+                res = vmap_func(pose, points)
+                assert not pp.hasnan(res)
+
+        # without context manager, assume exception
+        try:
+            vmap_func = vmap(func)
+            res = vmap_func(pose, points)
+            raise AssertionError('should not reach here')
+        except RuntimeError as e:
+            assert 'Expected size' in str(e)
 
 if __name__ == '__main__':
     test = TestJacobian()
