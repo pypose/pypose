@@ -3,16 +3,43 @@ import torch
 from torch.library import Library, impl
 sparse_lib = Library('aten', 'IMPL')
 
-# @impl(sparse_lib, 'mm', 'Sparse')
 @impl(sparse_lib, 'mm', 'SparseCsrCPU')
-def mm(input, other):
-    if isinstance(input, torch.Tensor) and input.layout == torch.sparse_bsr:
-        if isinstance(other, torch.Tensor) and other.layout == torch.sparse_bsc:
-            return bsr_bsc_matmul(input, other)
-    elif isinstance(input, torch.Tensor) and input.layout == torch.sparse_bsc:
-        if isinstance(other, torch.Tensor) and other.layout == torch.sparse_bsr:
-            return bsr_bsc_matmul(other.mT, input.mT).mT
-    return input.matmul(other)
+def mm(mat1, mat2):
+    if isinstance(mat1, torch.Tensor) and mat1.layout == torch.sparse_bsr:
+        if isinstance(mat2, torch.Tensor) and mat2.layout == torch.sparse_bsc:
+            return bsr_bsc_matmul(mat1, mat2)
+    elif isinstance(mat1, torch.Tensor) and mat1.layout == torch.sparse_bsc:
+        if isinstance(mat2, torch.Tensor) and mat2.layout == torch.sparse_bsr:
+            raise NotImplemented
+    #https://github.com/pytorch/pytorch/blob/3fa3ed4923c19a2b8d2da69e994169b4c8ac5fe3/
+    #aten/src/ATen/native/sparse/SparseCsrTensorMath.cpp#L789
+    if mat1.is_sparse_csr() and mat2.is_sparse_csr():
+        return torch.addmm(
+            torch.zeros([mat1.size(0), mat2.size(1)], dtype=mat2.dtype, device=mat2.device, layout=mat2.layout),
+            mat1,
+            mat2,
+            0.0,
+            1.0)
+    if (mat1.layout() == torch.sparse_csc or mat1.layout() == torch.sparse_csr) and\
+        (mat2.layout() == torch.sparse_csc or mat2.layout() == torch.sparse_csr):
+        return _sparse_csr_mm(mat1.to_sparse_csr(), mat2.to_sparse_csr())
+    if mat1.layout() == torch.sparse_csc and mat2.layout() == torch.strided:
+        return _sparse_csr_mm(mat1.to_sparse_csr(), mat2)
+    if mat2.layout() == torch.strided:
+        return torch.addmm(
+            torch.zeros([mat1.size(0), mat2.size(1)], dtype=mat1.dtype, device=mat1.device,
+            layout=mat2.layout),
+            mat1,
+            mat2,
+            0.0,
+            1.0)
+    return torch.addmm(
+        torch.zeros([mat1.size(0), mat2.size(1)], dtype=mat1.dtype, device=mat1.device,
+        layout=mat1.layout),
+        mat1,
+        mat2,
+        0.0,
+        1.0)
 
 @torch.jit.script
 def bsr_bsc_matmul(bsr:torch.Tensor, bsc:torch.Tensor):
