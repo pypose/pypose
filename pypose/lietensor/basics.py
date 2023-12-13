@@ -442,19 +442,19 @@ if __name__ == '__main__':
     end = time.time()
     print(end - start)
 
-device = 'cpu'
-import time
-bsr = bsr.to(device)
-dense = bsr.to_dense()
-_ = bsr_bsc_matmul(bsr, bsr.mT)
-start = time.time()
-for i in range(1000):
-    res = bsr_bsc_matmul(bsr, bsr.mT)
-end = time.time()
-print("sparse time in seconds: ", end - start)
+    device = 'cpu'
+    import time
+    bsr = bsr.to(device)
+    dense = bsr.to_dense()
+    _ = bsr_bsc_matmul(bsr, bsr.mT)
+    start = time.time()
+    for i in range(1000):
+        res = bsr_bsc_matmul(bsr, bsr.mT)
+    end = time.time()
+    print("sparse time in seconds: ", end - start)
 
-start = time.time()
-for i in range(1000):
-    res = torch.matmul(dense, dense.transpose(-2, -1))
-end = time.time()
-print("dense time in seconds: ", end - start)
+    start = time.time()
+    for i in range(1000):
+        res = torch.matmul(dense, dense.transpose(-2, -1))
+    end = time.time()
+    print("dense time in seconds: ", end - start)
