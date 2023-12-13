@@ -14,6 +14,7 @@ from .lietensor import tensor, translation, rotation, scale, matrix, euler
 from .lietensor import mat2SO3, mat2SE3, mat2Sim3, mat2RxSO3, from_matrix, matrix, euler2SO3, vec2skew
 from .function import *
 from .basics import *
+from .sparse import *
 from . import module
 from . import optim
 
