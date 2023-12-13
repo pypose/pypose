@@ -70,9 +70,6 @@ def bsr_bsc_matmul(bsr:torch.Tensor, bsc:torch.Tensor):
     reduced.scatter_add_(0, index.unsqueeze(-1).unsqueeze(-1).expand_as(prod), prod)
     coo_indices = torch.tensor(coo_indices, dtype=idx_dtype, device=bsr.device)
     coo_indices = coo_indices.view(-1, 2).T
-    # return torch.sparse_coo_tensor(indices=result_indices,
-    #                                values=reduced,
-    #                                size=(sparse_m, sparse_p, dense_m, dense_p)).coalesce()
     # use fake coo
     dummy_val = torch.zeros(coo_indices.shape[-1], dtype=prod.dtype, device=prod.device)
     dummy = torch.sparse_coo_tensor(indices=coo_indices,
