@@ -70,7 +70,11 @@ class TestBSR:
             assert arg_dense.shape == dense_shape
             args.append(arg)
             args_dense.append(arg_dense)
-        y_sbt = op(*args)
+        y_sparse = op(*args)
         y_dense = dense_op(*args_dense)
 
-        torch.testing.assert_close(y_sbt.to_dense(), y_dense, equal_nan=True)
+        torch.testing.assert_close(y_sparse.to_dense(), y_dense, equal_nan=True)
+
+
+if __name__ == '__main__':
+    TestBSR.test_universal(None, torch.matmul, torch.matmul, ['bsr', 'bsc'], 'identical_square', 2, 0.7)
