@@ -1,13 +1,13 @@
 import math, torch
 
 
-def pm(input, *, out=None):
+def pm(input):
     r'''
     Returns plus or minus (:math:`\pm`) states for tensor.
 
     Args:
         input (:obj:`Tensor`): the input tensor.
-    
+
     Return:
         :obj:`Tensor`: the output tensor contains only :math:`-1` or :math:`+1`.
 
@@ -21,9 +21,7 @@ def pm(input, *, out=None):
         >>> pp.pm(torch.tensor([0.1, 0, -0.2], dtype=torch.float64))
         tensor([ 1.,  1., -1.], dtype=torch.float64)
     '''
-    out = torch.sign(input, out=None)
-    out[out==0] = 1
-    return out
+    return torch.sign(torch.sign(input) * 2 + 1)
 
 
 def cumops_(input, dim, ops):
@@ -103,7 +101,7 @@ def cummul(input, dim, left = True):
 
     .. math::
         y_i = x_1 * x_2 * \cdots * x_i,
-        
+
     where :math:`x_i,~y_i` are the :math:`i`-th LieType item along the :obj:`dim`
     dimension of input and output, respectively.
 
@@ -122,7 +120,7 @@ def cummul(input, dim, left = True):
           :math:`N` is the LieTensor size along the :obj:`dim` dimension.
 
     Example:
-    
+
         * Left multiplication with :math:`\text{input} \in` :obj:`SE3`
 
         >>> input = pp.randn_SE3(2)
@@ -141,7 +139,7 @@ def cummul(input, dim, left = True):
     """
     if left:
         return cumops(input, dim, lambda a, b : a * b)
-    else: 
+    else:
         return cumops(input, dim, lambda a, b : b * a)
 
 
@@ -152,7 +150,7 @@ def cumprod(input, dim, left = True):
 
     .. math::
         y_i = x_i ~\times~ x_{i-1} ~\times~ \cdots ~\times~ x_1,
-    
+
     * Right product:
 
     .. math::
