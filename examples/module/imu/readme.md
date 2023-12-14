@@ -90,3 +90,6 @@ Note: change `DATAROOT` to the folder you select.
         --datadrive DATADRIVE [DATADRIVE ...]
                                 data sequences
         --load_ckpt
+
+![IMUcorrector](https://github.com/pypose/pypose/assets/22726519/fab23d94-58ce-4948-98f0-c4d5e66e6080)
+
