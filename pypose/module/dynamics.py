@@ -658,6 +658,6 @@ def systemMat(system, state, input, t=None):
         #return F.sum(3).sum(3)
 
         batched_jacrev_func = torch.vmap(jacrev(func), in_dims=1)
-        F=batched_jacrev_func(tau).transpose(0,1).squeeze(1,2,3,4,5)
+        F=batched_jacrev_func(tau).transpose(0,1).squeeze(2,4)
 
         return F

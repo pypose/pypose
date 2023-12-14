@@ -359,11 +359,9 @@ class LQR(nn.Module):
                 Qt = Q[...,t,:,:]
                 qt = p[...,t,:]
             else:
-
                 F = F_all[...,t,:,:]
                 Qt = Q[...,t,:,:] + F.mT @ V @ F
                 qt = p[...,t,:] + bmv(F.mT, v)
-
 
             Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
