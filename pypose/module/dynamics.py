@@ -3,6 +3,7 @@ from .. import bmv
 from torch import nn
 from torch.autograd.functional import jacobian
 import torch.jit as jit
+from ..func.jac import jacrev
 
 class System(nn.Module):
     r'''
@@ -585,6 +586,8 @@ class NLS(System):
         .. math::
             \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
         '''
+        while tau.dim()<3:
+            tau=tau.unsqueeze(0)
         state,input=tau[...,:,:n_s], tau[...,:,n_s:]
         return self.state_transition(state,input,t)
 
@@ -648,6 +651,13 @@ def systemMat(system, state, input, t=None):
     if isinstance(system, NLS):
         n_s=state.shape[-1]
         tau=torch.cat((state,input),-1)
+
         func = lambda x: system.tau_transition(x,n_s,t)
-        F=jacobian(func, tau, **system.jacargs)
-        return F.sum(3).sum(3)
+
+        #F=jacobian(func, tau, **system.jacargs)
+        #return F.sum(3).sum(3)
+
+        batched_jacrev_func = torch.vmap(jacrev(func), in_dims=1)
+        F=batched_jacrev_func(tau).transpose(0,1).squeeze(1,2,3,4,5)
+
+        return F
