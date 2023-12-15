@@ -1,9 +1,9 @@
 from typing import List
+import warnings
 import torch
 from torch.library import Library, impl
-sparse_lib = Library('aten', 'IMPL')
 
-@impl(sparse_lib, 'mm', 'SparseCsrCPU')
+
 def _sparse_csr_mm(mat1, mat2):
     if isinstance(mat1, torch.Tensor) and mat1.layout == torch.sparse_bsr:
         if isinstance(mat2, torch.Tensor) and mat2.layout == torch.sparse_bsc:
@@ -108,3 +108,9 @@ def bsr_bsc_matmul(bsr:torch.Tensor, bsc:torch.Tensor):
                                    dummy_csr.col_indices(),
                                    reduced,
                                    size=(m, p), dtype=reduced.dtype)
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    sparse_lib = Library('aten', 'IMPL')
+    sparse_lib.impl('mm', _sparse_csr_mm, 'SparseCsrCPU')
+    sparse_lib.impl('mm', _sparse_csr_mm, 'SparseCsrCUDA')
