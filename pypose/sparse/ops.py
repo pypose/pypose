@@ -3,6 +3,31 @@ import warnings
 import torch
 from torch.library import Library, impl
 
+def _bsr_diag(input, offset = 0):
+    crow_indices = input.crow_indices() # b + 1 dimensional
+    col_indices = input.col_indices() # b + 1 dimensional
+    bsr_values = input.values() # 1 + 2 dimensional
+    m, n = input.shape[-2], input.shape[-1]
+    dense_m, dense_n = (bsr_values.shape[-2],
+                                 bsr_values.shape[-1])
+    sparse_m, sparse_n = m // dense_m, n // dense_n
+
+    #simple case(block is square and offset is 0)
+    if dense_m == dense_n and offset == 0:
+        dummy_val = torch.zeros(bsr_values.shape[0])
+        dummy = torch.sparse_csr_tensor(crow_indices=crow_indices,
+                                        col_indices=col_indices,
+                                        values=dummy_val)
+        dummy_coo = dummy.to_sparse_coo().coalesce()
+
+        indices = dummy_coo.indices()
+        diag_indices = indices[0] == indices[1]
+        values = bsr_values[diag_indices]
+
+        batched_diagonal = torch.vmap(torch.diagonal)
+        batched_result = batched_diagonal(values)
+        result_dense = torch.flatten(batched_result)
+        return result_dense
 
 def _sparse_csr_mm(mat1, mat2):
     if isinstance(mat1, torch.Tensor) and mat1.layout == torch.sparse_bsr:
