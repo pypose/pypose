@@ -56,3 +56,5 @@ Functions
     svdtf
     chspline
     bspline
+    geodesic_loss
+    pose_loss
