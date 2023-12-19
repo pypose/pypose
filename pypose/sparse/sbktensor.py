@@ -166,17 +166,24 @@ class SbkOps(object):
         self.func_name = func_name
 
     def storage_pre(self, func, types, args=(), kwargs={}):
-        return args, args
+        '''Separate the Storange and Proxy tensor.
+
+        Returns:
+            s_array (list): A list of Storage tensors. Could be Hybrid tensors.
+            p_array (list): A list of Proxy tensors.
+        '''
+        s_array = [arg._s if isinstance(arg, SbkTensor) else arg for arg in args]
+        p_array = [arg._p if isinstance(arg, SbkTensor) else arg for arg in args]
+        return s_array, p_array
 
     def storage_op(self, func, stripped_types, s_args=(), kwargs={}):
         return torch.Tensor.__torch_function__(func, stripped_types, s_args, kwargs)
 
     def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
-        '''The operation on the Proxy tensor.
+        '''Opertion on the Proxy tensor is identity by default.
 
         Returns:
-            tuple?
-
+            torch.Tensor: The Proxy tensor.
         '''
         return p_args
 
@@ -214,21 +221,9 @@ class HybridOps(SbkOps):
             reduction operation.
     '''
 
-    def __init__(self, func_name, proxy_reduction=None, clone=False):
+    def __init__(self, func_name, proxy_reduction=None):
         super().__init__(func_name=func_name)
         self.proxy_reduction = proxy_reduction
-        self.clone = clone
-
-    def storage_pre(self, func, types, args=(), kwargs={}):
-        '''Separate the Storange and Proxy tensor.
-
-        Returns:
-            s_array (list): A list of Storage tensors. Could be Hybrid tensors.
-            p_array (list): A list of Proxy tensors.
-        '''
-        s_array = [arg._s if isinstance(arg, SbkTensor) else arg for arg in args]
-        p_array = [arg._p if isinstance(arg, SbkTensor) else arg for arg in args]
-        return s_array, p_array
 
     def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
         '''Apply operation on the Proxy tensor, according to the proxy_reduction.
@@ -251,8 +246,31 @@ class HybridOps(SbkOps):
             p = torch.mul(*p_args)
         else:
             raise ValueError('Unknown proxy reduction: {}'.format(self.proxy_reduction))
-        if self.clone:
-            return p.detach().clone()
+        return p
+
+
+class UnaryOps(SbkOps):
+    '''Unary operations on SbkTensor.
+
+    Args:
+        func_name (str): The name of the operation.
+
+    '''
+    def proxy_op(self, func, stripped_types, p_args=(), kwargs={}):
+        '''Apply operation on the Proxy tensor, according to the proxy_reduction.
+
+        Returns:
+            p (torch.Tensor): The Proxy tensor.
+
+        Note:
+            Assume that the operation does not need to even touch the proxy tensor.
+            For most of such operations, the proxy Tensor is the only sparse Tensor in
+            the list of arguments.
+        '''
+        # Find the first sparse Tensor in operands.
+        func = lambda op: isinstance(op, torch.Tensor) and op.is_sparse
+        p = next(filter(func, p_args), None)
+        p = p.clone()
         return p
 
 
@@ -378,20 +396,20 @@ registry.add_op( '__get__', SbkGetOp )
 registry.add_op( 'matmul', CooOps )
 
 # ========== elementwise functions ==========
-registry.add_op('abs', HybridOps, proxy_reduction=None, clone=True)
 registry.add_op('add', HybridOps, proxy_reduction='add')
-registry.add_op('asin', HybridOps, proxy_reduction=None, clone=True)
-registry.add_op('atan', HybridOps, proxy_reduction=None, clone=True)
-registry.add_op('ceil', HybridOps, proxy_reduction=None, clone=True)
-registry.add_op('floor', HybridOps, proxy_reduction=None, clone=True)
-registry.add_op('round', HybridOps, proxy_reduction=None, clone=True)
-registry.add_op('sin', HybridOps, proxy_reduction=None, clone=True)
-registry.add_op('sinh', HybridOps, proxy_reduction=None, clone=True)
-registry.add_op('sqrt', HybridOps, proxy_reduction=None, clone=True)
-registry.add_op('square', HybridOps, proxy_reduction=None, clone=True)
 registry.add_op('sub', HybridOps, proxy_reduction='add')
-registry.add_op('tan', HybridOps, proxy_reduction=None, clone=True)
-registry.add_op('tanh', HybridOps, proxy_reduction=None, clone=True)
+registry.add_op('abs', UnaryOps)
+registry.add_op('asin', UnaryOps)
+registry.add_op('atan', UnaryOps)
+registry.add_op('ceil', UnaryOps)
+registry.add_op('floor', UnaryOps)
+registry.add_op('round', UnaryOps)
+registry.add_op('sin', UnaryOps)
+registry.add_op('sinh', UnaryOps)
+registry.add_op('sqrt', UnaryOps)
+registry.add_op('square', UnaryOps)
+registry.add_op('tan', UnaryOps)
+registry.add_op('tanh', UnaryOps)
 
 
 class SbkTensor(torch.Tensor):
@@ -436,7 +454,7 @@ class SbkTensor(torch.Tensor):
                 sbk._p = proxy
                 outputs_final.append(sbk)
             else:
-               # noop for the case of not a tensor nor a SbkTensor
+                # noop for the case of not a tensor nor a SbkTensor
                 outputs_final.append(storage)
 
         if flag_list:
