@@ -35,6 +35,7 @@ class TestBSR:
     @pytest.mark.parametrize('op, dense_op, layouts, shape_mode, dim', [
         (torch.matmul, torch.matmul, ['bsr', 'bsc'], 'mT', 2),
         (torch.matmul, torch.matmul, ['bsr', 'bsc'], 'identical_square', 2),
+        (torch.diag, torch.diag, ['bsr'], 'identical_square', 2),
         ])
     def test_universal(self, op, dense_op, layouts, shape_mode, dim, dense_zero_prob):
         if shape_mode == 'identical':
