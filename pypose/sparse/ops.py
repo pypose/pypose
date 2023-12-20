@@ -16,13 +16,13 @@ def _bsr_diag(input, offset: int=0):
 
     #simple case(block is square and offset is 0)
     if dense_m == dense_n and offset == 0:
-        dummy_val = torch.zeros(bsr_values.shape[0])
-        dummy = torch.sparse_csr_tensor(crow_indices=crow_indices,
-                                        col_indices=col_indices,
+        dummy_val = torch.zeros(bsr_values.shape[0], device='cpu')
+        dummy = torch.sparse_csr_tensor(crow_indices=crow_indices.to('cpu'),
+                                        col_indices=col_indices.to('cpu'),
                                         values=dummy_val)
         dummy_coo = dummy.to_sparse(layout=torch.sparse_coo).coalesce()
 
-        indices = dummy_coo.indices()
+        indices = dummy_coo.indices().to(input.device)
         diag_indices = indices[0] == indices[1]
         values = bsr_values[diag_indices]
         n_diag_blocks = sparse_m if sparse_m < sparse_n else sparse_n
