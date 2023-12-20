@@ -38,7 +38,10 @@ class RobustModel(nn.Module):
 
     def flatten_row_jacobian(self, J, params_values):
         if isinstance(J, (tuple, list)):
-            if isinstance(J[0], SbkTensor):
+            if len(J) == 1:
+                return J[0]
+            if isinstance(J[0], SbkTensor) or \
+                (isinstance(J[0], torch.Tensor) and J[0].layout == torch.sparse_bsc):
                 J = torch.cat([hybrid2coo(j._s) for j in J], 1)
             else:
                 J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params_values)], 1)
@@ -521,11 +524,13 @@ class LevenbergMarquardt(_Optimizer):
             for i in range(len(R)):
                 R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
                     else self.corrector[i](R = R[i], J = J[i])
+            if isinstance(J, (tuple, list)) and len(J) == 1 and isinstance(J[0], torch.Tensor):
+                J = J[0]
             R, weight, J = self.model.normalize_RWJ(R, weight, J)
 
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target)
-            J_T = J.T @ weight if weight is not None else J.T
+            J_T = J.mT @ weight if weight is not None else J.mT
             A, self.reject_count = J_T @ J, 0
             if self.dense_A:
                 A = A.to_dense()
@@ -549,7 +554,7 @@ class LevenbergMarquardt(_Optimizer):
                         D = torch.from_numpy(D_scipy).to(torch.float32)
                         D = D.unsqueeze(-1)
                     elif not self.dense_A:
-                        D = self.solver(A = A.to_sparse_csr().to(dtype=torch.float64), b = (-J_T @ R.view(-1, 1)).to(dtype=torch.float64), x = self.prev_D)
+                        D = self.solver(A = A.to(dtype=torch.float64), b = (-J_T @ R.view(-1, 1)).to(dtype=torch.float64), x = self.prev_D)
                         #D = self.solver(A = A.to_sparse_csr(), b = (-J_T @ R.view(-1, 1)), x = self.prev_D)
                         self.prev_D = D
                         D = D.unsqueeze(-1)
