@@ -124,16 +124,17 @@ def bsr_bsc_matmul(bsr:torch.Tensor, bsc:torch.Tensor):
     values_shape = (result_step, dense_m, dense_p)
     reduced = torch.zeros(values_shape, dtype=prod.dtype, device=prod.device)
     reduced.scatter_add_(0, index.unsqueeze(-1).unsqueeze(-1).expand_as(prod), prod)
-    coo_indices = torch.tensor(coo_indices, dtype=idx_dtype, device=bsr.device)
+    # Indices should be prepared on CPU, IN ANY CASE
+    coo_indices = torch.tensor(coo_indices, dtype=idx_dtype, device='cpu')
     coo_indices = coo_indices.view(-1, 2).T
     # use fake coo
-    dummy_val = torch.zeros(coo_indices.shape[-1], dtype=prod.dtype, device=prod.device)
+    dummy_val = torch.zeros(coo_indices.shape[-1], dtype=prod.dtype, device='cpu')
     dummy = torch.sparse_coo_tensor(indices=coo_indices,
                                     values=dummy_val,
                                     size=(sparse_m, sparse_p)).coalesce()
     dummy_csr = dummy.to_sparse_csr()
-    return torch.sparse_bsr_tensor(dummy_csr.crow_indices(),
-                                   dummy_csr.col_indices(),
+    return torch.sparse_bsr_tensor(dummy_csr.crow_indices().to(bsr.device),
+                                   dummy_csr.col_indices().to(bsr.device),
                                    reduced,
                                    size=(m, p), dtype=reduced.dtype)
 
