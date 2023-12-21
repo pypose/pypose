@@ -3,6 +3,7 @@ from torch import nn
 from torch.autograd.functional import jacobian
 from .. import bmv, bvmv
 from torch.linalg import cholesky, vecdot
+from .dynamics import system_mat
 import pypose.module.dynamics as dynamics
 import timeit
 
@@ -267,7 +268,8 @@ class LQR(nn.Module):
         self.x_traj = None
         self.u_traj = None
 
-    def forward(self, x_init, xu_target, Q, p=None, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None, needInit=True):
+
+    def forward(self, x_init, xu_target, Q, p=None, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
         r'''
         Performs LQR for the discrete system.
 
@@ -313,21 +315,19 @@ class LQR(nn.Module):
         if xu_target.ndim == 1:
             xu_target = torch.tile(xu_target[None,None], (self.n_batch,self.T, 1))
 
-
-
         if p is None:
             p = torch.zeros(self.n_batch + (self.T, Q.size(-1)), **self.dargs)
 
         p_tar = -bmv(Q,xu_target)
         p = p + p_tar
 
-        K, k = self.lqr_backward(x_init, dt, Q, p, u_traj, u_lower, u_upper, du, needInit)
+        K, k = self.lqr_backward(x_init, dt, Q, p, u_traj, u_lower, u_upper, du)
         x, u, cost = self.lqr_forward(f_x_init, K, k, Q, p, u_lower, u_upper, du)
 
         return x, u, cost
 
 
-    def lqr_backward(self, x_init, dt, Q, p, u_traj=None, u_lower=None, u_upper=None, du=None, needInit=True):
+    def lqr_backward(self, x_init, dt, Q, p, u_traj=None, u_lower=None, u_upper=None, du=None):
 
         ns, nsc = x_init.size(-1), p.size(-1)
         nc = nsc - ns
@@ -339,29 +339,24 @@ class LQR(nn.Module):
 
         self.x_traj = x_init
 
-        if needInit:
-            for i in range(self.T-1):
-                self.x_traj[...,i+1:i+2,:] = self.system(self.x_traj[...,i:i+1,:].clone(),
-                                                        self.u_traj[...,i:i+1,:], torch.arange(self.T))
-        else:
-            self.x_traj = self.x_traj[:,:self.T,:]
+        self.x_traj = self.x_traj[:,:self.T,:]
 
         K = torch.zeros((self.n_batch,self.T, nc, ns), **self.dargs)
         k = torch.zeros((self.n_batch,self.T, nc), **self.dargs)
 
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
-        F_all=dynamics.systemMat(self.system,self.x_traj,self.u_traj,torch.arange(self.T))
+        F = dynamics.system_mat(self.system,self.x_traj,self.u_traj,torch.arange(self.T))
 
-        p =(bmv(Q.transpose(2,3), xut)+bmv(Q, xut))/2 + p
+        p = (bmv(Q.transpose(2,3), xut)+bmv(Q, xut))/2 + p
 
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
                 Qt = Q[...,t,:,:]
                 qt = p[...,t,:]
             else:
-                F = F_all[...,t,:,:]
-                Qt = Q[...,t,:,:] + F.mT @ V @ F
-                qt = p[...,t,:] + bmv(F.mT, v)
+                Ft = F[...,t,:,:]
+                Qt = Q[...,t,:,:] + Ft.mT @ V @ Ft
+                qt = p[...,t,:] + bmv(Ft.mT, v)
 
             Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
@@ -374,8 +369,8 @@ class LQR(nn.Module):
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
             v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
 
-
         return K, k
+
 
     def lqr_forward(self, x_init, K, k, Q, p, u_lower=None, u_upper=None, du=None):
         assert x_init.device == K.device == k.device

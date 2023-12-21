@@ -640,24 +640,44 @@ class NLS(System):
         return self._ref_g - bmv(self.C, self._ref_state) - bmv(self.D, self._ref_input)
 
 
-def systemMat(system, state, input, t=None):
-    n_batch=state.shape[0]
-    T=state.shape[1]
-    tau=torch.cat((state,input),-1)
+def system_mat(system, state, input_, t=None):
+    n_batch = state.shape[0]
+    T = state.shape[1]
+    tau = torch.cat((state, input_), -1)
+
     if isinstance(system, LTV):
-        return torch.cat((system._A[...,t,:,:],system._B[...,t,:,:]),-1)[:,t].repeat(1,T,1,1)
+        A_B_cat = torch.cat((system._A[..., t, :, :], system._B[..., t, :, :]), -1)
+        return A_B_cat[:, t].repeat(1, T, 1, 1)
+
     if isinstance(system, LTI):
-        return torch.cat((system.A,system.B),-1)[:,None].repeat(1,T,1,1)
+        A_B_cat = torch.cat((system.A, system.B), -1)
+        return A_B_cat[:, None].repeat(1, T, 1, 1)
+
     if isinstance(system, NLS):
-        n_s=state.shape[-1]
-        tau=torch.cat((state,input),-1)
+        n_s = state.shape[-1]
+        tau = torch.cat((state, input_), -1)
+        trans_func = lambda x: system.tau_transition(x, n_s, t)
+        batched_jacrev_func = torch.vmap(jacrev(trans_func), in_dims=1)
+        return batched_jacrev_func(tau).transpose(0, 1).squeeze(2, 4)
 
-        func = lambda x: system.tau_transition(x,n_s,t)
+def format_vec(vec,T):
+    if vec.ndim == 1:
+        vec = vec.unsqueeze(0)
 
-        #F=jacobian(func, tau, **system.jacargs)
-        #return F.sum(3).sum(3)
+    if vec.ndim == 2:
+        vec = vec.unsqueeze(0)
 
-        batched_jacrev_func = torch.vmap(jacrev(func), in_dims=1)
-        F=batched_jacrev_func(tau).transpose(0,1).squeeze(2,4)
+    if vec.shape[1] == 1:
+        vec = vec.repeat(1, T, 1)
 
-        return F
+    return vec
+
+def system_run(system,T,x_traj,u_traj):
+    x_traj = format_vec(x_traj, T)
+    u_traj = format_vec(u_traj, T)
+
+    for i in range(T-1):
+        x_traj[...,i+1:i+2,:] = system(x_traj[...,i:i+1,:].clone(),
+                                                u_traj[...,i:i+1,:], torch.arange(T))
+
+    return x_traj

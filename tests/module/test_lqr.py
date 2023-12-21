@@ -77,6 +77,8 @@ class TestLQR:
         LQR = pp.module.LQR(lti, T).to(device)
         target=torch.zeros_like(p[0,0])
         t=timeit.default_timer()
+
+        #x_init=pp.module.dynamics.system_run(lti, T, x_init, torch.zeros_like(p))
         x, u, cost = LQR(x_init,target,Q, p)
         print(timeit.default_timer()-t)
 
@@ -165,5 +167,5 @@ class TestLQR:
 if __name__ == '__main__':
     test = TestLQR()
     device = torch.device("cuda")
-    test.test_lqr_linear(device)
+    #test.test_lqr_linear(device)
     test.test_lqr_ltv(device)
