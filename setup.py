@@ -9,6 +9,7 @@ if sys.version_info < (3, 6, 0):
 
 
 from setuptools import setup, find_packages
+from torch.utils import cpp_extension
 
 def find_version(file_path: str) -> str:
     version_file = open(file_path).read()
@@ -89,4 +90,6 @@ if __name__ == '__main__':
             'Programming Language :: Python :: 3.10',
             'Programming Language :: Python :: 3.11',
         ],
+        ext_modules=[cpp_extension.CppExtension('sparse_op_cpp', ['sparse_op_cpp.cpp'])],
+        cmdclass={'build_ext': cpp_extension.BuildExtension}
     )
