@@ -1,9 +1,11 @@
 import copy
 import torch
+import pytest
 import importlib
 import pypose as pp
 from torch import nn
 from torch import vmap
+from torch.nn import Identity
 from contextlib import contextmanager
 from typing import Collection, Callable
 from torch.utils._pytree import tree_map
@@ -11,6 +13,7 @@ from torch.autograd.functional import jacobian
 from torch.func import functional_call, jacfwd, jacrev
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+identity = Identity()
 
 @contextmanager
 def check_fn_equal(TO_BE_CHECKED: Collection[Callable]):
@@ -155,13 +158,17 @@ class TestJacobian:
             raise AssertionError('should not reach here')
         except RuntimeError as e:
             assert 'shapes cannot be multiplied' in str(e)
-
-    def test_lietensor_jacrev(self):
-        pose = pp.randn_SE3(1).to(device)
+    @pytest.mark.parametrize('input, op', [
+        (pp.randn_SE3(1), identity),
+        (pp.randn_SE3(1), pp.Inv),
+        # (pp.randn_se3(1), pp.Exp),
+    ])
+    def test_lietensor_jacrev(self, input, op):
+        pose = input.to(device)
         points = torch.randn(1, 3).to(device)
 
         def func(pose, points):
-            return pose @ points
+            return op(pose) @ points
 
         # save functions to be checked
         TO_BE_CHECKED = {
@@ -180,14 +187,6 @@ class TestJacobian:
             jac_func = pp.func.jacrev(func)
             jac = jac_func(pose, points)
             assert not pp.hasnan(jac)
-
-        # test inv
-        def func(pose, points):
-            return pose.Inv() @ points
-        pose = pp.randn_SE3(1)
-        points = torch.randn(1, 3)
-        jacobian = pp.func.jacrev(func)(pose, points)
-        assert not pp.hasnan(jacobian)
 
     def test_lietensor_vmap(self):
         pose = pp.randn_SE3(5).to(device)
