@@ -784,11 +784,18 @@ class Sim3_Mul(torch.autograd.Function):
 
 
 class SO3_Inv(torch.autograd.Function):
+    generate_vmap_rule = True
     @staticmethod
-    def forward(ctx, X):
+    def forward(X):
         Y = torch.cat((-X[..., :3], X[..., 3:]), -1)
-        ctx.save_for_backward(Y)
         return Y
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -799,13 +806,20 @@ class SO3_Inv(torch.autograd.Function):
 
 
 class SE3_Inv(torch.autograd.Function):
+    generate_vmap_rule = True
     @staticmethod
-    def forward(ctx, X):
+    def forward(X):
         q_inv = SO3_Inv.apply(X[..., 3:])
         t_inv = -SO3_Act.apply(q_inv, X[..., :3])
         Y = torch.cat((t_inv, q_inv), dim = -1)
-        ctx.save_for_backward(Y)
         return Y
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -816,13 +830,20 @@ class SE3_Inv(torch.autograd.Function):
 
 
 class RxSO3_Inv(torch.autograd.Function):
+    generate_vmap_rule = True
     @staticmethod
-    def forward(ctx, X):
+    def forward(X):
         q_inv = SO3_Inv.apply(X[..., :4])
         s_inv = 1.0 / X[..., 4:]
         Y = torch.cat((q_inv, s_inv), dim = -1)
-        ctx.save_for_backward(Y)
         return Y
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -833,13 +854,20 @@ class RxSO3_Inv(torch.autograd.Function):
 
 
 class Sim3_Inv(torch.autograd.Function):
+    generate_vmap_rule = True
     @staticmethod
-    def forward(ctx, X):
+    def forward(X):
         qs_inv = RxSO3_Inv.apply(X[..., 3:])
         t_inv = -RxSO3_Act.apply(qs_inv, X[..., :3])
         Y = torch.cat((t_inv, qs_inv), dim = -1)
-        ctx.save_for_backward(Y)
         return Y
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
