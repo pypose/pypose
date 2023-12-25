@@ -181,6 +181,14 @@ class TestJacobian:
             jac = jac_func(pose, points)
             assert not pp.hasnan(jac)
 
+        # test inv
+        def func(pose, points):
+            return pose.Inv() @ points
+        pose = pp.randn_SE3(1)
+        points = torch.randn(1, 3)
+        jacobian = pp.func.jacrev(func)(pose, points)
+        assert not pp.hasnan(jacobian)
+
     def test_lietensor_vmap(self):
         pose = pp.randn_SE3(5).to(device)
         points = torch.randn(5, 3).to(device)
