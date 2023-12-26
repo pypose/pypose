@@ -161,7 +161,9 @@ class TestJacobian:
     @pytest.mark.parametrize('input, op', [
         (pp.randn_SE3(1), identity),
         (pp.randn_SE3(1), pp.Inv),
-        # (pp.randn_se3(1), pp.Exp),
+        (pp.randn_SO3(1), pp.Inv),
+        (pp.randn_se3(1), pp.Exp),
+        (pp.randn_so3(1), pp.Exp),
     ])
     def test_lietensor_jacrev(self, input, op):
         pose = input.to(device)
