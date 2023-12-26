@@ -6,6 +6,7 @@ import pypose as pp
 from torch import nn
 from torch import vmap
 from torch.nn import Identity
+from functools import partial
 from contextlib import contextmanager
 from typing import Collection, Callable
 from torch.utils._pytree import tree_map
@@ -204,14 +205,23 @@ class TestJacobian:
             assert not pp.hasnan(jac)
 
     @pytest.mark.parametrize('input, op', [
-        (pp.randn_SE3(5), identity),
+        (pp.randn_SE3(5), pp.Inv),
+        (pp.randn_SO3(5), pp.Inv),
+        (pp.randn_Sim3(5), pp.Inv),
+        (pp.randn_RxSO3(5), pp.Inv),
+        (pp.randn_se3(5), pp.Inv),
+        (pp.randn_so3(5), pp.Inv),
+        (pp.randn_sim3(5), pp.Inv),
+        (pp.randn_rxso3(5), pp.Inv),
+        (pp.randn_SE3(5), partial(pp.Act, p=torch.randn(5, 3))),
+        (pp.randn_SO3(5), partial(pp.Act, p=torch.randn(5, 3))),
+        # all log/exp functions are not yet supported
     ])
     def test_lietensor_vmap(self, input, op):
         pose = input.to(device)
-        points = torch.randn(5, 3).to(device)
 
-        def func(pose, points):
-            return op(pose) @ points
+        def func(pose):
+            return op(pose)
 
         # save functions to be checked
         TO_BE_CHECKED = {
@@ -221,16 +231,16 @@ class TestJacobian:
         with check_fn_equal(TO_BE_CHECKED):
             with pp.retain_ltype():
                 vmap_func = vmap(func)
-                res = vmap_func(pose, points)
+                res = vmap_func(pose)
                 assert not pp.hasnan(res)
 
         # without context manager, assume exception
         try:
             vmap_func = vmap(func)
-            res = vmap_func(pose, points)
-            raise AssertionError('should not reach here')
-        except RuntimeError as e:
-            assert 'Expected size' in str(e)
+            res = vmap_func(pose)
+            self.fail('should not reach here')
+        except Exception as e:
+            assert 'Expected size' in str(e) or 'Invalid LieTensor Type.' in str(e)
 
 if __name__ == '__main__':
     test = TestJacobian()
