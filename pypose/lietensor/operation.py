@@ -303,7 +303,7 @@ def Sim3_Act4_Jacobian(p):
 
 class SO3_Log(torch.autograd.Function):
     generate_vmap_rule = True
-    
+
     @staticmethod
     def forward(input):
         eps = torch.finfo(input.dtype).eps
@@ -856,11 +856,16 @@ class SE3_Mul(torch.autograd.Function):
     generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, Y):
-        ctx.save_for_backward(X)
+    def forward(X, Y):
         t = X[..., :3] + SO3_Act.apply(X[..., 3:], Y[..., :3])
         q = SO3_Mul.apply(X[..., 3:], Y[..., 3:])
         return torch.cat((t, q), -1)
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, Y = inputs
+        ctx.save_for_backward(X, )
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
