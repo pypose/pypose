@@ -9,6 +9,7 @@ from torch.nn import Identity
 from contextlib import contextmanager
 from typing import Collection, Callable
 from torch.utils._pytree import tree_map
+from torchvision.transforms import Compose
 from torch.autograd.functional import jacobian
 from torch.func import functional_call, jacfwd, jacrev
 
@@ -158,12 +159,14 @@ class TestJacobian:
             raise AssertionError('should not reach here')
         except RuntimeError as e:
             assert 'shapes cannot be multiplied' in str(e)
+
     @pytest.mark.parametrize('input, op', [
         (pp.randn_SE3(1), identity),
         (pp.randn_SE3(1), pp.Inv),
         (pp.randn_SO3(1), pp.Inv),
         (pp.randn_se3(1), pp.Exp),
         (pp.randn_so3(1), pp.Exp),
+        (pp.randn_SE3(1), Compose([pp.Log, pp.Exp])),
     ])
     def test_lietensor_jacrev(self, input, op):
         pose = input.to(device)
@@ -190,12 +193,15 @@ class TestJacobian:
             jac = jac_func(pose, points)
             assert not pp.hasnan(jac)
 
-    def test_lietensor_vmap(self):
-        pose = pp.randn_SE3(5).to(device)
+    @pytest.mark.parametrize('input, op', [
+        (pp.randn_SE3(5), identity),
+    ])
+    def test_lietensor_vmap(self, input, op):
+        pose = input.to(device)
         points = torch.randn(5, 3).to(device)
 
         def func(pose, points):
-            return pose @ points
+            return op(pose) @ points
 
         # save functions to be checked
         TO_BE_CHECKED = {
@@ -223,4 +229,3 @@ if __name__ == '__main__':
     test.test_lietensor_jacobian()
     test.test_modjac()
     test.test_lietensor_jacfwd()
-    test.test_lietensor_jacrev()
