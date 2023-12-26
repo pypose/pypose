@@ -164,16 +164,26 @@ class TestJacobian:
         (pp.randn_SE3(1), identity),
         (pp.randn_SE3(1), pp.Inv),
         (pp.randn_SO3(1), pp.Inv),
+        (pp.randn_Sim3(1), pp.Inv),
+        (pp.randn_RxSO3(1), pp.Inv),
+        (pp.randn_se3(1), pp.Inv),
+        (pp.randn_so3(1), pp.Inv),
+        (pp.randn_sim3(1), pp.Inv),
+        (pp.randn_rxso3(1), pp.Inv),
+        (pp.randn_SE3(1), pp.Log),
+        (pp.randn_SO3(1), pp.Log),
+        (pp.randn_Sim3(1), pp.Log),
+        (pp.randn_RxSO3(1), pp.Log),
         (pp.randn_se3(1), pp.Exp),
         (pp.randn_so3(1), pp.Exp),
-        (pp.randn_SE3(1), Compose([pp.Log, pp.Exp])),
-    ])
+        (pp.randn_sim3(1), pp.Exp),
+        (pp.randn_rxso3(1), pp.Exp),
+        (pp.randn_SE3(1), Compose([pp.Log, pp.Exp])),])
     def test_lietensor_jacrev(self, input, op):
         pose = input.to(device)
-        points = torch.randn(1, 3).to(device)
 
-        def func(pose, points):
-            return op(pose) @ points
+        def func(pose):
+            return op(pose)
 
         # save functions to be checked
         TO_BE_CHECKED = {
@@ -184,13 +194,13 @@ class TestJacobian:
         with check_fn_equal(TO_BE_CHECKED):
             with pp.retain_ltype():
                 jac_func = jacrev(func)
-                jac = jac_func(pose, points)
+                jac = jac_func(pose)
                 assert not pp.hasnan(jac)
 
         # without context manager, call pp.func.jacrev
         with check_fn_equal(TO_BE_CHECKED):
             jac_func = pp.func.jacrev(func)
-            jac = jac_func(pose, points)
+            jac = jac_func(pose)
             assert not pp.hasnan(jac)
 
     @pytest.mark.parametrize('input, op', [
