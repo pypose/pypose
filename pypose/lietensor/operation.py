@@ -303,6 +303,7 @@ def Sim3_Act4_Jacobian(p):
 
 class SO3_Log(torch.autograd.Function):
     generate_vmap_rule = True
+    
     @staticmethod
     def forward(input):
         eps = torch.finfo(input.dtype).eps
@@ -514,6 +515,7 @@ class sim3_Exp(torch.autograd.Function):
 
 class SO3_Act(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, p):
         Xv, Xw = X[..., :3], X[..., 3:]
@@ -542,6 +544,7 @@ class SO3_Act(torch.autograd.Function):
 
 class SE3_Act(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, p):
         out = X[..., :3] + SO3_Act.apply(X[..., 3:], p)
@@ -567,6 +570,7 @@ class SE3_Act(torch.autograd.Function):
 
 class RxSO3_Act(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, p):
         out = X[..., 4:] * SO3_Act.apply(X[..., :4], p)
@@ -592,6 +596,7 @@ class RxSO3_Act(torch.autograd.Function):
 
 class Sim3_Act(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, p):
         out = X[..., :3] + RxSO3_Act.apply(X[..., 3:], p)
@@ -617,6 +622,7 @@ class Sim3_Act(torch.autograd.Function):
 
 class SO3_Act4(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, p):
         out = torch.cat((SO3_Act.apply(X, p[..., :3]), p[..., 3:]), dim=-1)
@@ -641,6 +647,7 @@ class SO3_Act4(torch.autograd.Function):
 
 class SE3_Act4(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, p):
         t = SO3_Act.apply(X[..., 3:], p[..., :3]) + X[..., :3] * p[..., 3:]
@@ -665,6 +672,7 @@ class SE3_Act4(torch.autograd.Function):
 
 
 class RxSO3_Act4(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
     def forward(X, p):
@@ -689,6 +697,7 @@ class RxSO3_Act4(torch.autograd.Function):
 
 
 class Sim3_Act4(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
     def forward(X, p):
@@ -714,6 +723,7 @@ class Sim3_Act4(torch.autograd.Function):
 
 
 class SO3_AdjXa(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
     def forward(X, a):
@@ -740,6 +750,7 @@ class SO3_AdjXa(torch.autograd.Function):
 
 class SE3_AdjXa(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, a):
         adj_matrix = SE3_Adj(X)
@@ -765,6 +776,7 @@ class SE3_AdjXa(torch.autograd.Function):
 
 class RxSO3_AdjXa(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, a):
         adj_matrix = RxSO3_Adj(X)
@@ -790,6 +802,7 @@ class RxSO3_AdjXa(torch.autograd.Function):
 
 class Sim3_AdjXa(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, a):
         adj_matrix = Sim3_Adj(X)
@@ -815,6 +828,7 @@ class Sim3_AdjXa(torch.autograd.Function):
 
 class SO3_Mul(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, Y):
         Xv, Xw, Yv, Yw = X[..., :3], X[..., 3:], Y[..., :3], Y[..., 3:]
@@ -840,6 +854,7 @@ class SO3_Mul(torch.autograd.Function):
 
 class SE3_Mul(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(ctx, X, Y):
         ctx.save_for_backward(X)
@@ -858,6 +873,7 @@ class SE3_Mul(torch.autograd.Function):
 
 
 class RxSO3_Mul(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
     def forward(X, Y):
@@ -883,6 +899,7 @@ class RxSO3_Mul(torch.autograd.Function):
 
 class Sim3_Mul(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, Y):
         t = X[..., :3] + RxSO3_Act.apply(X[..., 3:], Y[..., :3])
@@ -907,6 +924,7 @@ class Sim3_Mul(torch.autograd.Function):
 
 class SO3_Inv(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X):
         Y = torch.cat((-X[..., :3], X[..., 3:]), -1)
@@ -929,6 +947,7 @@ class SO3_Inv(torch.autograd.Function):
 
 class SE3_Inv(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X):
         q_inv = SO3_Inv.apply(X[..., 3:])
@@ -953,6 +972,7 @@ class SE3_Inv(torch.autograd.Function):
 
 class RxSO3_Inv(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X):
         q_inv = SO3_Inv.apply(X[..., :4])
@@ -977,6 +997,7 @@ class RxSO3_Inv(torch.autograd.Function):
 
 class Sim3_Inv(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X):
         qs_inv = RxSO3_Inv.apply(X[..., 3:])
@@ -1001,6 +1022,7 @@ class Sim3_Inv(torch.autograd.Function):
 
 class SO3_AdjTXa(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, a):
         out = SO3_AdjXa.apply(SO3_Inv.apply(X), a)
@@ -1023,6 +1045,7 @@ class SO3_AdjTXa(torch.autograd.Function):
 
 class SE3_AdjTXa(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, a):
         out = SE3_AdjXa.apply(SE3_Inv.apply(X), a)
@@ -1045,6 +1068,7 @@ class SE3_AdjTXa(torch.autograd.Function):
 
 class RxSO3_AdjTXa(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, a):
         out = RxSO3_AdjXa.apply(RxSO3_Inv.apply(X), a)
@@ -1067,6 +1091,7 @@ class RxSO3_AdjTXa(torch.autograd.Function):
 
 class Sim3_AdjTXa(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, a):
         out = Sim3_AdjXa.apply(Sim3_Inv.apply(X), a)
