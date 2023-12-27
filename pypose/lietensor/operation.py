@@ -302,9 +302,10 @@ def Sim3_Act4_Jacobian(p):
 
 
 class SO3_Log(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, input):
+    def forward(input):
         eps = torch.finfo(input.dtype).eps
         v, w = input[..., :3], input[..., 3:]
         v_norm = torch.norm(v, 2, dim=-1, keepdim=True)
@@ -320,8 +321,12 @@ class SO3_Log(torch.autograd.Function):
         factor[idx2] = pm(w[idx2]) * torch.pi / v_norm[idx2]
         factor[idx3] = 2.0 * (1.0 / w[idx3] - v_norm[idx3] * v_norm[idx3] / (3 * w[idx3]**3))
         output = factor * v
-        ctx.save_for_backward(output)
         return output
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        ctx.save_for_backward(output, )
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -333,10 +338,10 @@ class SO3_Log(torch.autograd.Function):
 
 
 class so3_Exp(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, input):
-        ctx.save_for_backward(input)
+    def forward(input):
         theta = torch.norm(input, 2, dim=-1, keepdim=True)
         theta_half, theta2 = 0.5 * theta, theta * theta
         theta4 = theta2 * theta2
@@ -352,6 +357,12 @@ class so3_Exp(torch.autograd.Function):
         return torch.cat([input * imag_factor, real_factor], -1)
 
     @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        input, = inputs
+        ctx.save_for_backward(input, )
+        return
+
+    @staticmethod
     def backward(ctx, grad_output):
         input = ctx.saved_tensors[0]
         Jl = so3_Jl(input)
@@ -360,15 +371,20 @@ class so3_Exp(torch.autograd.Function):
 
 
 class SE3_Log(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, input):
+    def forward(input):
         phi = SO3_Log.apply(input[..., 3:])
         Jl_inv = so3_Jl_inv(phi)
         tau = (Jl_inv @ input[..., :3].unsqueeze(-1)).squeeze(-1)
         output = torch.cat([tau, phi], -1)
-        ctx.save_for_backward(output)
         return output
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        ctx.save_for_backward(output, )
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -380,13 +396,19 @@ class SE3_Log(torch.autograd.Function):
 
 
 class se3_Exp(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, input):
-        ctx.save_for_backward(input)
+    def forward(input):
         t = (so3_Jl(input[..., 3:]) @ input[..., :3].unsqueeze(-1)).squeeze(-1)
         r = so3_Exp.apply(input[..., 3:])
         return torch.cat([t, r], -1)
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        input, = inputs
+        ctx.save_for_backward(input, )
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -397,13 +419,18 @@ class se3_Exp(torch.autograd.Function):
 
 
 class RxSO3_Log(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, input):
+    def forward(input):
         phi = SO3_Log.apply(input[..., :4])
         output = torch.cat([phi, input[..., 4:].log()], -1)
-        ctx.save_for_backward(output)
         return output
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        ctx.save_for_backward(output, )
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -415,13 +442,19 @@ class RxSO3_Log(torch.autograd.Function):
 
 
 class rxso3_Exp(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, input):
-        ctx.save_for_backward(input)
+    def forward(input):
         r = so3_Exp.apply(input[..., :3])
         s = torch.exp(input[..., 3:])
         return torch.cat([r, s], -1)
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        input, = inputs
+        ctx.save_for_backward(input, )
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -432,15 +465,20 @@ class rxso3_Exp(torch.autograd.Function):
 
 
 class Sim3_Log(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, input):
+    def forward(input):
         phi_sigma = RxSO3_Log.apply(input[..., 3:])
         Ws_inv = rxso3_Ws(phi_sigma).inverse()
         tau = (Ws_inv @ input[..., :3].unsqueeze(-1)).squeeze(-1)
         output = torch.cat([tau, phi_sigma], -1)
-        ctx.save_for_backward(output)
         return output
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        ctx.save_for_backward(output, )
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -452,14 +490,20 @@ class Sim3_Log(torch.autograd.Function):
 
 
 class sim3_Exp(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, input):
-        ctx.save_for_backward(input)
+    def forward(input):
         Ws = rxso3_Ws(input[..., 3:])
         t = (Ws @ input[..., :3].unsqueeze(-1)).squeeze(-1)
         r = rxso3_Exp.apply(input[..., 3:])
         return torch.cat([t, r], -1)
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        input, = inputs
+        ctx.save_for_backward(input, )
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -471,6 +515,7 @@ class sim3_Exp(torch.autograd.Function):
 
 class SO3_Act(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, p):
         Xv, Xw = X[..., :3], X[..., 3:]
@@ -499,6 +544,7 @@ class SO3_Act(torch.autograd.Function):
 
 class SE3_Act(torch.autograd.Function):
     generate_vmap_rule = True
+
     @staticmethod
     def forward(X, p):
         out = X[..., :3] + SO3_Act.apply(X[..., 3:], p)
@@ -523,12 +569,19 @@ class SE3_Act(torch.autograd.Function):
 
 
 class RxSO3_Act(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, p):
+    def forward(X, p):
         out = X[..., 4:] * SO3_Act.apply(X[..., :4], p)
-        ctx.save_for_backward(X, out)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, p = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -542,12 +595,19 @@ class RxSO3_Act(torch.autograd.Function):
 
 
 class Sim3_Act(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, p):
+    def forward(X, p):
         out = X[..., :3] + RxSO3_Act.apply(X[..., 3:], p)
-        ctx.save_for_backward(X, out)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, p = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -561,12 +621,19 @@ class Sim3_Act(torch.autograd.Function):
 
 
 class SO3_Act4(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, p):
+    def forward(X, p):
         out = torch.cat((SO3_Act.apply(X, p[..., :3]), p[..., 3:]), dim=-1)
-        ctx.save_for_backward(X, out)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, p = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -579,13 +646,20 @@ class SO3_Act4(torch.autograd.Function):
 
 
 class SE3_Act4(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, p):
+    def forward(X, p):
         t = SO3_Act.apply(X[..., 3:], p[..., :3]) + X[..., :3] * p[..., 3:]
         out = torch.cat((t, p[..., 3:]), dim=-1)
-        ctx.save_for_backward(X, out)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, p = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -598,12 +672,19 @@ class SE3_Act4(torch.autograd.Function):
 
 
 class RxSO3_Act4(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, p):
+    def forward(X, p):
         out = torch.cat((RxSO3_Act.apply(X, p[..., :3]), p[..., 3:]), dim=-1)
-        ctx.save_for_backward(X, out)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, p = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -616,13 +697,20 @@ class RxSO3_Act4(torch.autograd.Function):
 
 
 class Sim3_Act4(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, p):
+    def forward(X, p):
         t = RxSO3_Act.apply(X[..., 3:], p[..., :3]) + X[..., :3] * p[..., 3:]
         out = torch.cat((t, p[..., 3:]), dim=-1)
-        ctx.save_for_backward(X, out)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, p = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -635,13 +723,21 @@ class Sim3_Act4(torch.autograd.Function):
 
 
 class SO3_AdjXa(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, a):
+    def forward(X, a):
         adj_matrix = SO3_Adj(X)
         out = (adj_matrix @ a.unsqueeze(-1)).squeeze(-1)
-        ctx.save_for_backward(out, adj_matrix)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, a = inputs
+        adj_matrix = SO3_Adj(X)
+        out = output
+        ctx.save_for_backward(out, adj_matrix)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -653,13 +749,21 @@ class SO3_AdjXa(torch.autograd.Function):
 
 
 class SE3_AdjXa(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, a):
+    def forward(X, a):
         adj_matrix = SE3_Adj(X)
         out = (adj_matrix @ a.unsqueeze(-1)).squeeze(-1)
-        ctx.save_for_backward(out, adj_matrix)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, a = inputs
+        adj_matrix = SE3_Adj(X)
+        out = output
+        ctx.save_for_backward(out, adj_matrix)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -671,13 +775,21 @@ class SE3_AdjXa(torch.autograd.Function):
 
 
 class RxSO3_AdjXa(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, a):
+    def forward(X, a):
         adj_matrix = RxSO3_Adj(X)
         out = (adj_matrix @ a.unsqueeze(-1)).squeeze(-1)
-        ctx.save_for_backward(out, adj_matrix)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, a = inputs
+        adj_matrix = RxSO3_Adj(X)
+        out = output
+        ctx.save_for_backward(out, adj_matrix)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -689,13 +801,21 @@ class RxSO3_AdjXa(torch.autograd.Function):
 
 
 class Sim3_AdjXa(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, a):
+    def forward(X, a):
         adj_matrix = Sim3_Adj(X)
         out = (adj_matrix @ a.unsqueeze(-1)).squeeze(-1)
-        ctx.save_for_backward(out, adj_matrix)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, a = inputs
+        adj_matrix = Sim3_Adj(X)
+        out = output
+        ctx.save_for_backward(out, adj_matrix)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -707,14 +827,20 @@ class Sim3_AdjXa(torch.autograd.Function):
 
 
 class SO3_Mul(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, Y):
-        ctx.save_for_backward(X)
+    def forward(X, Y):
         Xv, Xw, Yv, Yw = X[..., :3], X[..., 3:], Y[..., :3], Y[..., 3:]
         Zv = Xw * Yv + Xv * Yw + torch.linalg.cross(Xv, Yv, dim=-1)
         Zw = Xw * Yw - (Xv * Yv).sum(dim=-1, keepdim=True)
         return torch.cat([Zv, Zw], -1)
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, Y = inputs
+        ctx.save_for_backward(X, )
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -727,13 +853,19 @@ class SO3_Mul(torch.autograd.Function):
 
 
 class SE3_Mul(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, Y):
-        ctx.save_for_backward(X)
+    def forward(X, Y):
         t = X[..., :3] + SO3_Act.apply(X[..., 3:], Y[..., :3])
         q = SO3_Mul.apply(X[..., 3:], Y[..., 3:])
         return torch.cat((t, q), -1)
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, Y = inputs
+        ctx.save_for_backward(X, )
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -746,13 +878,19 @@ class SE3_Mul(torch.autograd.Function):
 
 
 class RxSO3_Mul(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, Y):
-        ctx.save_for_backward(X)
+    def forward(X, Y):
         q = SO3_Mul.apply(X[..., :4], Y[..., :4])
         s = X[..., 4:] * Y[..., 4:]
         return torch.cat((q, s), -1)
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, Y = inputs
+        ctx.save_for_backward(X, )
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -765,13 +903,19 @@ class RxSO3_Mul(torch.autograd.Function):
 
 
 class Sim3_Mul(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, Y):
-        ctx.save_for_backward(X)
+    def forward(X, Y):
         t = X[..., :3] + RxSO3_Act.apply(X[..., 3:], Y[..., :3])
         q = RxSO3_Mul.apply(X[..., 3:], Y[..., 3:])
         return torch.cat((t, q), -1)
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, Y = inputs
+        ctx.save_for_backward(X, )
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -784,11 +928,19 @@ class Sim3_Mul(torch.autograd.Function):
 
 
 class SO3_Inv(torch.autograd.Function):
+    generate_vmap_rule = True
+
     @staticmethod
-    def forward(ctx, X):
+    def forward(X):
         Y = torch.cat((-X[..., :3], X[..., 3:]), -1)
-        ctx.save_for_backward(Y)
         return Y
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -799,13 +951,21 @@ class SO3_Inv(torch.autograd.Function):
 
 
 class SE3_Inv(torch.autograd.Function):
+    generate_vmap_rule = True
+
     @staticmethod
-    def forward(ctx, X):
+    def forward(X):
         q_inv = SO3_Inv.apply(X[..., 3:])
         t_inv = -SO3_Act.apply(q_inv, X[..., :3])
         Y = torch.cat((t_inv, q_inv), dim = -1)
-        ctx.save_for_backward(Y)
         return Y
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -816,13 +976,21 @@ class SE3_Inv(torch.autograd.Function):
 
 
 class RxSO3_Inv(torch.autograd.Function):
+    generate_vmap_rule = True
+
     @staticmethod
-    def forward(ctx, X):
+    def forward(X):
         q_inv = SO3_Inv.apply(X[..., :4])
         s_inv = 1.0 / X[..., 4:]
         Y = torch.cat((q_inv, s_inv), dim = -1)
-        ctx.save_for_backward(Y)
         return Y
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -833,13 +1001,21 @@ class RxSO3_Inv(torch.autograd.Function):
 
 
 class Sim3_Inv(torch.autograd.Function):
+    generate_vmap_rule = True
+
     @staticmethod
-    def forward(ctx, X):
+    def forward(X):
         qs_inv = RxSO3_Inv.apply(X[..., 3:])
         t_inv = -RxSO3_Act.apply(qs_inv, X[..., :3])
         Y = torch.cat((t_inv, qs_inv), dim = -1)
-        ctx.save_for_backward(Y)
         return Y
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -850,12 +1026,18 @@ class Sim3_Inv(torch.autograd.Function):
 
 
 class SO3_AdjTXa(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, a):
-        ctx.save_for_backward(X, a)
+    def forward(X, a):
         out = SO3_AdjXa.apply(SO3_Inv.apply(X), a)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, a = inputs
+        ctx.save_for_backward(X, a)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -867,12 +1049,18 @@ class SO3_AdjTXa(torch.autograd.Function):
 
 
 class SE3_AdjTXa(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, a):
-        ctx.save_for_backward(X, a)
+    def forward(X, a):
         out = SE3_AdjXa.apply(SE3_Inv.apply(X), a)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, a = inputs
+        ctx.save_for_backward(X, a)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -884,12 +1072,18 @@ class SE3_AdjTXa(torch.autograd.Function):
 
 
 class RxSO3_AdjTXa(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, a):
-        ctx.save_for_backward(X, a)
+    def forward(X, a):
         out = RxSO3_AdjXa.apply(RxSO3_Inv.apply(X), a)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, a = inputs
+        ctx.save_for_backward(X, a)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -901,12 +1095,18 @@ class RxSO3_AdjTXa(torch.autograd.Function):
 
 
 class Sim3_AdjTXa(torch.autograd.Function):
+    generate_vmap_rule = True
 
     @staticmethod
-    def forward(ctx, X, a):
-        ctx.save_for_backward(X, a)
+    def forward(X, a):
         out = Sim3_AdjXa.apply(Sim3_Inv.apply(X), a)
         return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, a = inputs
+        ctx.save_for_backward(X, a)
+        return
 
     @staticmethod
     def backward(ctx, grad_output):
