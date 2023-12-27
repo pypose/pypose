@@ -2,7 +2,7 @@ import torch
 from .lqr import LQR
 from torch import nn
 from ..utils.stepper import ReduceToBason
-from .dynamics import system_run
+from .dynamics import run_sys
 
 class MPC(nn.Module):
     r'''
@@ -228,7 +228,7 @@ class MPC(nn.Module):
         best = {'x': x, 'u': u, 'cost': None}
 
         self.stepper.reset()
-        x_init = system_run(self.lqr.system, self.lqr.T, x_init, u_init)
+        x_init = run_sys(self.lqr.system, self.lqr.T, x_init, u_init)
 
         with torch.no_grad():
             while self.stepper.continual():

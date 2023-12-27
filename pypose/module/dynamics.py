@@ -640,7 +640,7 @@ class NLS(System):
         return self._ref_g - bmv(self.C, self._ref_state) - bmv(self.D, self._ref_input)
 
 
-def system_mat(system, state, input_, t=None):
+def sysmat(system, state, input_, t=None):
     n_batch = state.shape[0]
     T = state.shape[1]
     tau = torch.cat((state, input_), -1)
@@ -660,7 +660,7 @@ def system_mat(system, state, input_, t=None):
         batched_jacrev_func = torch.vmap(jacrev(trans_func), in_dims=1)
         return batched_jacrev_func(tau).transpose(0, 1).squeeze(2, 4)
 
-def format_vec(vec,T):
+def make_BTV(vec, T):
     if vec.ndim == 1:
         vec = vec.unsqueeze(0)
 
@@ -672,12 +672,16 @@ def format_vec(vec,T):
 
     return vec
 
-def system_run(system,T,x_traj,u_traj):
-    x_traj = format_vec(x_traj, T)
-    u_traj = format_vec(u_traj, T)
 
-    for i in range(T-1):
-        x_traj[...,i+1:i+2,:] = system(x_traj[...,i:i+1,:].clone(),
-                                                u_traj[...,i:i+1,:], torch.arange(T))
+def run_sys(system: System, T, x_traj, u_traj):
+    x_traj = make_BTV(x_traj, T)
+    u_traj = make_BTV(u_traj, T)
+
+    for i in range(T - 1):
+        x_traj[..., i + 1 : i + 2, :] = system(
+            x_traj[..., i : i + 1, :].clone(),
+            u_traj[..., i : i + 1, :],
+            torch.arange(T),
+        )
 
     return x_traj

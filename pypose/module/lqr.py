@@ -3,7 +3,7 @@ from torch import nn
 from torch.autograd.functional import jacobian
 from .. import bmv, bvmv
 from torch.linalg import cholesky, vecdot
-from .dynamics import system_mat
+from .dynamics import sysmat
 import pypose.module.dynamics as dynamics
 import timeit
 
@@ -345,7 +345,7 @@ class LQR(nn.Module):
         k = torch.zeros((self.n_batch,self.T, nc), **self.dargs)
 
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
-        F = dynamics.system_mat(self.system,self.x_traj,self.u_traj,torch.arange(self.T))
+        F = dynamics.sysmat( self.system, self.x_traj, self.u_traj, torch.arange(self.T))
 
         p = (bmv(Q.transpose(2,3), xut)+bmv(Q, xut))/2 + p
 
@@ -382,19 +382,20 @@ class LQR(nn.Module):
         u = torch.zeros((self.n_batch,self.T, nc), **self.dargs)
         delta_u = torch.zeros((self.n_batch,self.T, nc), **self.dargs)
         cost = torch.zeros(self.n_batch, **self.dargs)
-        x = torch.zeros((self.n_batch,self.T+1, ns), **self.dargs)
-        xt = x[..., 0:1, :] = x_init[...,0:1,:]
+        x = torch.zeros((self.n_batch, self.T+1, ns), **self.dargs)
+        xt = x[..., 0:1, :] = x_init[..., 0:1,:]
 
         if isinstance(self.system, dynamics.LTV):
             self.system.reset()
 
         for t in range(self.T):
-            Kt, kt = K[..., t,:,:], k[..., t,:]
-            delta_xt = xt - self.x_traj[...,t:t+1,:]
+            Kt, kt = K[..., t, :, :], k[..., t, :]
+            delta_xt = xt - self.x_traj[..., t:t+1, :]
             delta_u[..., t, :] = bmv(Kt, delta_xt.squeeze(1)) + kt
-            u[...,t:t+1,:] = ut = delta_u[..., t:t+1, :] + self.u_traj[...,t:t+1,:]
+            u[..., t:t+1, :] = ut = delta_u[..., t:t+1, :] + self.u_traj[..., t:t+1, :]
             xut = torch.cat((xt, ut), dim=-1)
-            x[...,t+1:t+2,:] = xt = self.system(xt, ut,t)
-            cost += (0.5 * bvmv(xut, Q[...,t:t+1,:,:], xut) + vecdot(xut, p[...,t:t+1,:])).sum()
+            x[..., t+1:t+2, :] = xt = self.system(xt, ut, t)
+            cost += (0.5 * bvmv(xut, Q[..., t:t+1, :, :], xut) + vecdot(xut, p[..., t:t+1, :])).sum()
+
 
         return x, u, cost
