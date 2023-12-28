@@ -360,8 +360,8 @@ def svdtf(source, target):
 
 def ror(points, nbr=16, radius=0.05):
     r'''
-    Removes point cloud outliers by checking if they have fewer neighbors (nbr) than the
-    set limit within a certain radius.
+    Remove point cloud outliers by checking if they have fewer neighbors (nbr) than the 
+    set limit within a specified radius.
 
     Args:
         points (``torch.Tensor``): the input point cloud. It is essential that the last
@@ -376,8 +376,8 @@ def ror(points, nbr=16, radius=0.05):
             Default: ``0.05``.
 
     Returns:
-        ``mask``: The mask of the input pointcloud, where the filtered value is True and
-        the outlier is False. The shape is (..., N).
+        ``mask``: The mask of the input pointcloud, where the inlier is True and the 
+        outlier is False. The shape is (..., N).
 
     Example:
         >>> import torch, pypose as pp
