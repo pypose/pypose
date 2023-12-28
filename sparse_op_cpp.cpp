@@ -1,28 +1,30 @@
 #include <torch/extension.h>
+#include <ATen/ops/mm_native.h>
 // if vscode complains about the above include,
 // try to modify `.vscode/c_cpp_properties.json`
 #include <iostream>
 #include <vector>
+#include <fstream>
+#include <pybind11/pybind11.h>
 
+torch::jit::Function* _sparse_bsr_bsc_matmul;
 
-// implement this function:
-// https://github.com/nicknytko/numml/blob/60645b3c0f7fd3cc08f61dafb448515ed348d1ac/cpp/sparse_csr_cpu.cpp#L11
-torch::Tensor spgemv_forward(torch::Tensor bsr, torch::Tensor dense_vec) {
-  auto crow = bsr.crow_indices();
-  auto col = bsr.col_indices();
-  auto values = bsr.values();
-  // create an accessor for the crow pointer
-  auto crow_accessor = crow.accessor<int64_t, 1>();
-  auto col_accessor = col.accessor<int64_t, 1>();
-
-  // AT_DISPATCH_FLOATING_TYPES explained:
-  // https://pytorch.org/tutorials/advanced/cpp_extension.html#:~:text=The%20main%20point%20of%20interest%20here%20is%20the
-  AT_DISPATCH_FLOATING_TYPES(values.type(), "spgemv_forward_cpu", ([&] {
-      const auto A_data_acc = values.accessor<scalar_t, 1>();
-  }));
-
+torch::Tensor sparse_bsr_mm(const torch::Tensor& a, const torch::Tensor& b) {
+  if (a.layout() == at::kSparseBsr && b.layout() == at::kSparseBsc) {
+    auto output = (*_sparse_bsr_bsc_matmul)({a, b});
+    return output.toTensor();
+  }
+  return at::native::_sparse_csr_mm(a, b);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  m.def("forward", &spgemv_forward, "spgemv forward");
+  m.def("forward", &sparse_bsr_mm, "spgemv forward");
+}
+
+// https://pytorch.org/cppdocs/api/classtorch_1_1_library.html
+TORCH_LIBRARY_IMPL(aten, SparseCsrCPU, m) {
+  auto my_module = pybind11::module::import("pypose.sparse.ops");
+  auto script_function = my_module.attr("bsr_bsc_matmul").cast<torch::jit::StrongFunctionPtr>();
+  _sparse_bsr_bsc_matmul = script_function.function_;
+  m.impl("mm", sparse_bsr_mm);
 }

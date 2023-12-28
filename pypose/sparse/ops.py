@@ -110,8 +110,3 @@ def bsr_bsc_matmul(bsr:torch.Tensor, bsc:torch.Tensor):
                                    reduced,
                                    size=(m, p), dtype=reduced.dtype)
 
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    sparse_lib = Library('aten', 'IMPL')
-    sparse_lib.impl('mm', _sparse_csr_mm, 'SparseCsrCPU')
-    sparse_lib.impl('mm', _sparse_csr_mm, 'SparseCsrCUDA')
