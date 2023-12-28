@@ -2,9 +2,6 @@
 #include <ATen/ops/mm_native.h>
 // if vscode complains about the above include,
 // try to modify `.vscode/c_cpp_properties.json`
-#include <iostream>
-#include <vector>
-#include <fstream>
 #include <pybind11/pybind11.h>
 
 torch::jit::Function* _sparse_bsr_bsc_matmul;
