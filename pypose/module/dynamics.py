@@ -630,7 +630,7 @@ class NLS(System):
 
 def toBTN(vec, T):
     r'''
-    Reshape the input tensor of shape ``[..., n_dim]`` to ``[n_batch, n_timestep, n_dim]``.
+    Reshape the input tensor from ``[..., n_dim]`` to ``[n_batch, n_timestep, n_dim]``.
 
     Returns:
         The reshaped tensor in shape of ``[B, T, N]``.
@@ -649,10 +649,10 @@ def toBTN(vec, T):
 
 def runsys(system: System, T, x_traj, u_traj):
     r'''
-    Run the system for T steps, given state trajectories (or initial state) and input trajectories.
+    Run the system for T steps, given state and input trajectories or vectors.
 
     Returns:
-        The x trajectory of the system based on the input x and u trajectories.
+        The state trajectory of the system based on the state and input trajectories.
     '''
 
     #make initial states trajectories if not given
