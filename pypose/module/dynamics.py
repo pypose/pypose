@@ -5,23 +5,22 @@ from torch.autograd.functional import jacobian
 
 
 class System(nn.Module):
-    r"""
+    r'''
     The base class for a system dynamics model.
 
     In most of the cases, users only need to subclass a specific dynamic system,
     such as linear time invariant system :meth:`LTI`, Linear Time-Variant :meth:`LTV`,
     and a non-linear system :meth:`NLS`.
-    """
-
+    '''
     def __init__(self):
         super().__init__()
-        self.register_buffer("_t", torch.tensor(0, dtype=torch.int64))
+        self.register_buffer('_t',torch.tensor(0, dtype=torch.int64))
         self.register_forward_hook(self.forward_hook)
 
     def forward_hook(self, module, inputs, outputs):
-        r"""
+        r'''
         Automatically advances the time step.
-        """
+        '''
         self._t.add_(1)
 
     def reset(self, t=0):
@@ -29,7 +28,7 @@ class System(nn.Module):
         return self
 
     def forward(self, state, input):
-        r"""
+        r'''
         Defines the computation performed at every call that advances the system by one time step.
 
         Note:
@@ -41,14 +40,14 @@ class System(nn.Module):
         Note:
             To introduce noise in a model, redefine this method via
             subclassing. See example in ``examples/module/ekf/tank_robot.py``.
-        """
+        '''
         self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
         state = self.state_transition(self.state, self.input)
         obs = self.observation(self.state, self.input)
         return state, obs
 
     def state_transition(self, state, input, t=None):
-        r"""
+        r'''
         Args:
             state (:obj:`Tensor`): The state of the dynamical system
             input (:obj:`Tensor`): The input to the dynamical system
@@ -61,13 +60,11 @@ class System(nn.Module):
             The users need to define this method and can access the current time via the property
             :obj:`systime`. Don't introduce system transision noise in this function, as it will
             be used for linearizing the system automaticalluy.
-        """
-        raise NotImplementedError(
-            "The users need to define their own state transition method"
-        )
+        '''
+        raise NotImplementedError("The users need to define their own state transition method")
 
     def observation(self, state, input, t=None):
-        r"""
+        r'''
         Args:
             state (:obj:`Tensor`): The state of the dynamical system
             input (:obj:`Tensor`): The input to the dynamical system
@@ -80,13 +77,11 @@ class System(nn.Module):
             The users need to define this method and can access the current system time via the
             property :obj:`systime`. Don't introduce system transision noise in this function,
             as it will be used for linearizing the system automaticalluy.
-        """
-        raise NotImplementedError(
-            "The users need to define their own observation method"
-        )
+        '''
+        raise NotImplementedError("The users need to define their own observation method")
 
     def set_refpoint(self, state=None, input=None, t=None):
-        r"""
+        r'''
         Function to set the reference point for linearization.
 
         Args:
@@ -103,14 +98,14 @@ class System(nn.Module):
         Warning:
             For nonlinear systems, the users have to call this function before getting the
             linearized system.
-        """
+        '''
         return self
 
     @property
     def systime(self):
-        r"""
-        System time, automatically advanced by :obj:`forward_hook`.
-        """
+        r'''
+            System time, automatically advanced by :obj:`forward_hook`.
+        '''
         return self._t
 
     @systime.setter
@@ -121,7 +116,7 @@ class System(nn.Module):
 
 
 class LTI(System):
-    r"""
+    r'''
     Discrete-time Linear Time-Invariant (LTI) system.
 
     Args:
@@ -177,19 +172,19 @@ class LTI(System):
     Note:
         More practical examples can be found at `examples/module/dynamics
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
-    """
+    '''
 
     def __init__(self, A, B, C, D, c1=None, c2=None):
         super().__init__()
-        self.register_buffer("_A", A)
-        self.register_buffer("_B", B)
-        self.register_buffer("_C", C)
-        self.register_buffer("_D", D)
-        self.register_buffer("_c1", c1)
-        self.register_buffer("_c2", c2)
+        self.register_buffer('_A', A)
+        self.register_buffer('_B', B)
+        self.register_buffer('_C', C)
+        self.register_buffer('_D', D)
+        self.register_buffer('_c1', c1)
+        self.register_buffer('_c2', c2)
 
     def forward(self, state, input):
-        r"""
+        r'''
         Perform one step advance for the LTI system.
 
         Args:
@@ -198,11 +193,11 @@ class LTI(System):
 
         Returns:
             ``tuple`` of Tensor: The state and observation of the system in next time step.
-        """
+        '''
         return super().forward(state, input)
 
     def state_transition(self, state, input):
-        r"""
+        r'''
         Perform one step of LTI state transition.
 
         .. math::
@@ -214,12 +209,12 @@ class LTI(System):
 
         Returns:
             ``Tensor``: The state the system in next time step.
-        """
+        '''
         z = bmv(self.A, state) + bmv(self.B, input)
         return z if self.c1 is None else z + self.c1
 
     def observation(self, state, input):
-        r"""
+        r'''
         Return the observation of LTI system.
 
         .. math::
@@ -231,43 +226,44 @@ class LTI(System):
 
         Returns:
             ``Tensor``: The observation of the system in next time step.
-        """
+        '''
         y = bmv(self.C, state) + bmv(self.D, input)
         return y if self.c2 is None else y + self.c2
 
     @property
     def A(self):
-        r"""System transision matrix."""
+        r'''System transision matrix.'''
         return self._A
 
     @property
     def B(self):
-        r"""System input matrix."""
+        r'''System input matrix.'''
         return self._B
 
     @property
     def C(self):
-        r"""System output matrix."""
+        r'''System output matrix.'''
         return self._C
 
     @property
     def D(self):
-        r"""System observation matrix."""
+        r'''System observation matrix.'''
         return self._D
 
     @property
     def c1(self):
-        r"""Constant term generated by state-transition."""
+        r'''Constant term generated by state-transition.'''
         return self._c1
 
     @property
     def c2(self):
-        r"""Constant term generated by observation."""
+        r'''Constant term generated by observation.
+        '''
         return self._c2
 
 
 class LTV(LTI):
-    r"""
+    r'''
     Discrete-time Linear Time-Variant (LTV) system.
 
     Args:
@@ -373,13 +369,12 @@ class LTV(LTI):
     Note:
         More practical examples can be found at `examples/module/dynamics
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
-    """
-
+    '''
     def __init__(self, A=None, B=None, C=None, D=None, c1=None, c2=None):
         super().__init__(A, B, C, D, c1, c2)
 
     def set_refpoint(self, state=None, input=None, t=None):
-        r"""
+        r'''
         Function to set the reference point for linearization.
 
         Args:
@@ -396,13 +391,13 @@ class LTV(LTI):
         Warning:
             For nonlinear systems, the users have to call this function before getting the
             linearized system.
-        """
+        '''
         self.systime = t
         return self
 
 
 class NLS(System):
-    r"""
+    r'''
     Dynamics model for discrete-time non-linear system (NLS).
 
     The state transision function :math:`\mathbf{f}` and observation function
@@ -513,14 +508,13 @@ class NLS(System):
         For generating one trajecotry given a series of inputs, advanced use of
         linearization, and more practical examples can be found at `examples/module/dynamics
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
-    """
-
+    '''
     def __init__(self):
         super().__init__()
-        self.jacargs = {"vectorize": True, "strategy": "reverse-mode"}
+        self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
 
     def forward(self, state, input):
-        r"""
+        r'''
         Defines the computation performed at every call that advances the system by one time step.
 
         Note:
@@ -532,14 +526,14 @@ class NLS(System):
         Note:
             To introduce noise in a model, redefine this method via
             subclassing. See example in ``examples/module/ekf/tank_robot.py``.
-        """
+        '''
         self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
         state = self.state_transition(self.state, self.input, self.systime)
         obs = self.observation(self.state, self.input, self.systime)
         return state, obs
 
     def set_refpoint(self, state=None, input=None, t=None):
-        r"""
+        r'''
         Function to set the reference point for linearization.
 
         Args:
@@ -556,93 +550,91 @@ class NLS(System):
         Warning:
             For nonlinear systems, the users have to call this function before getting the
             linearized system.
-        """
+        '''
         self._ref_state = self.state if state is None else torch.atleast_1d(state)
         self._ref_input = self.input if input is None else torch.atleast_1d(input)
         self._ref_t = self.systime if t is None else torch.atleast_1d(t)
-        self._ref_f = self.state_transition(
-            self._ref_state, self._ref_input, self._ref_t
-        )
+        self._ref_f = self.state_transition(self._ref_state, self._ref_input, self._ref_t)
         self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
         return self
 
     @property
     def A(self):
-        r"""
+        r'''
         Linear/linearized system state matrix.
 
         .. math::
             \mathbf{A} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}} \right|_{\chi^*}
-        """
+        '''
         func = lambda x: self.state_transition(x, self._ref_input, self._ref_t)
         return jacobian(func, self._ref_state, **self.jacargs)
 
     @property
     def B(self):
-        r"""
+        r'''
         Linear/linearized system input matrix.
 
         .. math::
             \mathbf{B} = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{u}} \right|_{\chi^*}
-        """
+        '''
         func = lambda x: self.state_transition(self._ref_state, x, self._ref_t)
         return jacobian(func, self._ref_input, **self.jacargs)
 
     @property
     def C(self):
-        r"""
+        r'''
         Linear/linearized system output matrix.
 
         .. math::
             \mathbf{C} = \left. \frac{\partial \mathbf{g}}{\partial \mathbf{x}} \right|_{\chi^*}
-        """
+        '''
         func = lambda x: self.observation(x, self._ref_input, self._ref_t)
         return jacobian(func, self._ref_state, **self.jacargs)
 
     @property
     def D(self):
-        r"""
+        r'''
         Linear/Linearized system observation matrix.
 
         .. math::
             \mathbf{D} = \left. \frac{\partial \mathbf{g}}
                                 {\partial \mathbf{u}} \right|_{\chi^*}
-        """
+        '''
         func = lambda x: self.observation(self._ref_state, x, self._ref_t)
         return jacobian(func, self._ref_input, **self.jacargs)
 
     @property
     def c1(self):
-        r"""
+        r'''
         Constant term generated by state-transition.
 
         .. math::
             \mathbf{c}_1 = \mathbf{f}(\mathbf{x}^*, \mathbf{u}^*, t^*)
                            - \mathbf{A}\mathbf{x}^* - \mathbf{B}\mathbf{u}^*
-        """
+        '''
         # Potential performance loss here - self.A and self.B involves jacobian eval
         return self._ref_f - bmv(self.A, self._ref_state) - bmv(self.B, self._ref_input)
 
     @property
     def c2(self):
-        r"""
+        r'''
         Constant term generated by observation.
 
         .. math::
             \mathbf{c}_2 = \mathbf{g}(\mathbf{x}^*, \mathbf{u}^*, t^*)
                            - \mathbf{C}\mathbf{x}^* - \mathbf{D}\mathbf{u}^*
-        """
+        '''
         # Potential performance loss here - self.C and self.D involves jacobian eval
         return self._ref_g - bmv(self.C, self._ref_state) - bmv(self.D, self._ref_input)
 
 
 def make_BTV(vec, T):
-    r"""
+    r'''
     A helper class that makes the input vector to shape ``[B, T, V]``.
 
     Returns:
         The reshaped vector.
-    """
+    '''
     if vec.ndim == 1:
         vec = vec.unsqueeze(0)
 
@@ -656,18 +648,18 @@ def make_BTV(vec, T):
 
 
 def run_sys(system: System, T, x_traj, u_traj):
-    r"""
+    r'''
     A helper class that runs the system for T steps given x and u trajectory.
     Used for LQR and MPC.
 
 
     Returns:
         The trajectory of the system based on the input x and u.
-    """
+    '''
     x_traj = make_BTV(x_traj, T)
     u_traj = make_BTV(u_traj, T)
 
-    for i in range(T - 1):
-        x_traj[..., i + 1, :], _ = system(x_traj[..., i, :].clone(), u_traj[..., i, :])
+    for i in range(T-1):
+        x_traj[...,i+1,:], _ = system(x_traj[...,i,:].clone(), u_traj[...,i,:])
 
     return x_traj
