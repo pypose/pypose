@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from .. import bmv, bvmv
+from .dynamics import runsys
 from torch.linalg import cholesky, vecdot
 
 
@@ -317,9 +318,8 @@ class LQR(nn.Module):
             self.u_traj = u_traj
 
         self.x_traj = x_init.unsqueeze(-2).repeat((1, self.T, 1))
-        for i in range(self.T-1):
-            self.x_traj[...,i+1,:], _ = self.system(self.x_traj[...,i,:].clone(),
-                                                    self.u_traj[...,i,:])
+
+        self.x_traj = runsys(self.system, self.T, self.x_traj, self.u_traj)
 
         K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
