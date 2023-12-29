@@ -630,10 +630,10 @@ class NLS(System):
 
 def make_BTV(vec, T):
     r'''
-    A helper class that makes the input vector to shape ``[B, T, V]``.
+    A helper class that makes the input vector to shape ``[batch, timestep, value]``.
 
     Returns:
-        The reshaped vector.
+        The reshaped vector in shape of ``[B, T, V]``.
     '''
     if vec.ndim == 1:
         vec = vec.unsqueeze(0)
@@ -652,9 +652,8 @@ def run_sys(system: System, T, x_traj, u_traj):
     A helper class that runs the system for T steps given x and u trajectory.
     Used for LQR and MPC.
 
-
     Returns:
-        The trajectory of the system based on the input x and u.
+        The trajectory of the system based on the input x and u trajectory.
     '''
     x_traj = make_BTV(x_traj, T)
     u_traj = make_BTV(u_traj, T)
