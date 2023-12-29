@@ -1,6 +1,6 @@
 import torch
 from .. import bmv
-from torch import nn, Tensor
+from torch import nn
 from torch.autograd.functional import jacobian
 
 
@@ -628,7 +628,7 @@ class NLS(System):
         return self._ref_g - bmv(self.C, self._ref_state) - bmv(self.D, self._ref_input)
 
 
-def toBTN(vec: Tensor, T: int):
+def toBTN(vec, T):
     r'''
     A helper class that reshape the input tensor of shape ``[..., n_dim]``
     to ``[n_batch, n_timestep, n_dim]``.
@@ -648,7 +648,7 @@ def toBTN(vec: Tensor, T: int):
     return vec
 
 
-def runsys(system: System, T: int, x_traj: Tensor, u_traj: Tensor):
+def runsys(system: System, T, x_traj, u_traj):
     r'''
     A helper class that runs the system for T steps given x and u trajectories or intial states.
     Used internally for LQR and MPC modules.
