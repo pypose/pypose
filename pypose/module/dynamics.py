@@ -630,7 +630,7 @@ class NLS(System):
 
 def toBTN(vec, T):
     r'''
-    Reshapes the input tensor of shape ``[..., n_dim]`` to ``[n_batch, n_timestep, n_dim]``.
+    Reshape the input tensor of shape ``[..., n_dim]`` to ``[n_batch, n_timestep, n_dim]``.
 
     Returns:
         The reshaped tensor in shape of ``[B, T, N]``.
