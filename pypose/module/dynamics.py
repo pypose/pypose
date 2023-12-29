@@ -630,7 +630,7 @@ class NLS(System):
 
 def toBTN(vec, T):
     r'''
-    A helper class that reshape the input tensor of shape ``[..., n_dim]``
+    A helper function that reshape the input tensor of shape ``[..., n_dim]``
     to ``[n_batch, n_timestep, n_dim]``.
 
     Returns:
@@ -650,7 +650,7 @@ def toBTN(vec, T):
 
 def runsys(system: System, T, x_traj, u_traj):
     r'''
-    A helper class that runs the system for T steps given x and u trajectories or intial states.
+    A helper function that runs the system for T steps given x and u trajectories or intial states.
     Used internally for LQR and MPC modules.
 
     Returns:
