@@ -1,6 +1,6 @@
 import torch
 from .. import bmv
-from torch import nn
+from torch import nn, Tensor
 from torch.autograd.functional import jacobian
 
 
@@ -628,13 +628,13 @@ class NLS(System):
         return self._ref_g - bmv(self.C, self._ref_state) - bmv(self.D, self._ref_input)
 
 
-def toBTN(vec, T):
+def toBTN(vec: Tensor, T: int):
     r'''
-    A helper class that reshape the input vector of shape ``[..., n_dim]``
+    A helper class that reshape the input tensor of shape ``[..., n_dim]``
     to ``[n_batch, n_timestep, n_dim]``.
 
     Returns:
-        The reshaped vector in shape of ``[B, T, N]``.
+        The reshaped tensor in shape of ``[B, T, N]``.
     '''
     if vec.ndim == 1:
         vec = vec.unsqueeze(0)
@@ -648,13 +648,13 @@ def toBTN(vec, T):
     return vec
 
 
-def runsys(system: System, T, x_traj, u_traj):
+def runsys(system: System, T: int, x_traj: Tensor, u_traj: Tensor):
     r'''
-    A helper class that runs the system for T steps given x and u trajectory or intial state.
+    A helper class that runs the system for T steps given x and u trajectories or intial states.
     Used internally for LQR and MPC modules.
 
     Returns:
-        The trajectory of the system based on the input x and u trajectory.
+        The x trajectory of the system based on the input x and u trajectories.
     '''
 
     #make initial states trajectories if not given
