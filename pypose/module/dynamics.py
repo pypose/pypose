@@ -628,12 +628,13 @@ class NLS(System):
         return self._ref_g - bmv(self.C, self._ref_state) - bmv(self.D, self._ref_input)
 
 
-def make_BTV(vec, T):
+def toBTN(vec, T):
     r'''
-    A helper class that makes the input vector to shape ``[batch, timestep, value]``.
+    A helper class that reshape the input vector of shape ``[..., n_dim]``
+    to ``[n_batch, n_timestep, n_dim]``.
 
     Returns:
-        The reshaped vector in shape of ``[B, T, V]``.
+        The reshaped vector in shape of ``[B, T, N]``.
     '''
     if vec.ndim == 1:
         vec = vec.unsqueeze(0)
@@ -647,18 +648,20 @@ def make_BTV(vec, T):
     return vec
 
 
-def run_sys(system: System, T, x_traj, u_traj):
+def runsys(system: System, T, x_traj, u_traj):
     r'''
-    A helper class that runs the system for T steps given x and u trajectory.
-    Used for LQR and MPC.
+    A helper class that runs the system for T steps given x and u trajectory or intial state.
+    Used internally for LQR and MPC modules.
 
     Returns:
         The trajectory of the system based on the input x and u trajectory.
     '''
-    x_traj = make_BTV(x_traj, T)
-    u_traj = make_BTV(u_traj, T)
+
+    #make initial states trajectories if not given
+    x_traj = toBTN(x_traj, T)
+    u_traj = toBTN(u_traj, T)
 
     for i in range(T-1):
-        x_traj[...,i+1,:], _ = system(x_traj[...,i,:].clone(), u_traj[...,i,:])
+        x_traj[...,i+1,:], _ = system(x_traj[...,i,:], u_traj[...,i,:])
 
     return x_traj

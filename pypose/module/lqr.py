@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from .. import bmv, bvmv
 from torch.linalg import cholesky, vecdot
-from .dynamics import run_sys
+from .dynamics import runsys
 
 class LQR(nn.Module):
     r'''
@@ -318,7 +318,7 @@ class LQR(nn.Module):
 
         self.x_traj = x_init.unsqueeze(-2).repeat((1, self.T, 1))
 
-        self.x_traj = run_sys(self.system, self.T, self.x_traj, self.u_traj)
+        self.x_traj = runsys(self.system, self.T, self.x_traj, self.u_traj)
 
         K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
