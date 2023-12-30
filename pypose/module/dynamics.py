@@ -15,6 +15,7 @@ class System(nn.Module):
         super().__init__()
         # self.register_buffer('_t',torch.tensor(0, dtype=torch.int64))
         # self.register_forward_hook(self.forward_hook)
+        self._ref_state, self._ref_input, self._ref_t = None, None, None
 
     # def forward_hook(self, module, inputs, outputs):
     #     r'''
@@ -272,7 +273,7 @@ class LTI(System):
         Returns:
             ``Tensor``: The state the system in next time step.
         '''
-        z = bmv(self.A, state) + bmv(self.B, input)
+        z = bmv(self._A, state) + bmv(self._B, input)
         return z if self.c1 is None else z + self.c1
 
     def observation(self, state, input):
@@ -289,7 +290,7 @@ class LTI(System):
         Returns:
             ``Tensor``: The observation of the system in next time step.
         '''
-        y = bmv(self.C, state) + bmv(self.D, input)
+        y = bmv(self._C, state) + bmv(self._D, input)
         return y if self.c2 is None else y + self.c2
 
     # @property
@@ -435,19 +436,19 @@ class LTV(LTI):
     def __init__(self, A=None, B=None, C=None, D=None, c1=None, c2=None):
         super().__init__(A, B, C, D, c1, c2)
 
-    def A(self, T):
+    def getA(self, t):
         r'''System transision matrix.'''
         raise NotImplementedError("LTV transision matrix A getter not defined")
 
-    def B(self, T):
+    def getB(self, t):
         r'''System input matrix.'''
         raise NotImplementedError("LTV input matrix B getter not defined")
 
-    def C(self, T):
+    def getC(self, t):
         r'''System output matrix.'''
         raise NotImplementedError("LTV output matrix C getter not defined")
 
-    def D(self, T):
+    def getD(self, t):
         r'''System observation matrix.'''
         raise NotImplementedError("LTV observation matrix D getter not defined")
 
@@ -672,10 +673,10 @@ def sysmat(system:System, state, input, t):
     T = state.shape[-2]
 
     if isinstance(system, LTI):
-        A = system._A.repeat(T,1,1)
-        B = system._B.repeat(T,1,1)
-        C = system._C.repeat(T,1,1)
-        D = system._D.repeat(T,1,1)
+        A = system._A.unsqueeze(1).repeat(1,T,1,1)
+        B = system._B.unsqueeze(1).repeat(1,T,1,1)
+        C = system._C.unsqueeze(1).repeat(1,T,1,1)
+        D = system._D.unsqueeze(1).repeat(1,T,1,1)
         return A, B, C, D
 
     #get total number of states and inputs for NLS

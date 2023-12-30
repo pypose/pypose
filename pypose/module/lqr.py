@@ -327,19 +327,21 @@ class LQR(nn.Module):
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
         p = bmv(self.Q, xut) + self.p
 
+        self.system.set_refpoint(state=self.x_traj,
+                                    input=self.u_traj,
+                                    t=torch.arange(self.T, device=self.p.device)*dt)
+        A = self.system.A.squeeze(-2)
+        B = self.system.B.squeeze(-2)
+        F = torch.cat((A, B), dim=-1)
+
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
                 Qt = self.Q[...,t,:,:]
                 qt = p[...,t,:]
             else:
-                self.system.set_refpoint(state=self.x_traj[...,t,:],
-                                         input=self.u_traj[...,t,:],
-                                         t=torch.tensor(t*dt))
-                A = self.system.A.squeeze(-2)
-                B = self.system.B.squeeze(-2)
-                F = torch.cat((A, B), dim=-1)
-                Qt = self.Q[...,t,:,:] + F.mT @ V @ F
-                qt = p[...,t,:] + bmv(F.mT, v)
+                Ft = F[...,t,:,:]
+                Qt = self.Q[...,t,:,:] + Ft.mT @ V @ Ft
+                qt = p[...,t,:] + bmv(Ft.mT, v)
 
             Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]

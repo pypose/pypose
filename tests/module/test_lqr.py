@@ -131,21 +131,17 @@ class TestLQR:
             def __init__(self, A, B, C, D):
                 super().__init__(A, B, C, D)
 
-            @property
-            def A(self):
-                return self._A[...,self._t,:,:]
+            def getA(self, t):
+                return self._A[...,self.t,:,:]
 
-            @property
-            def B(self):
-                return self._B[...,self._t,:,:]
+            def getB(self, t):
+                return self._B[...,self.t,:,:]
 
-            @property
-            def C(self):
-                return self._C[...,self._t,:,:]
+            def getC(self, t):
+                return self._C[...,self.t,:,:]
 
-            @property
-            def D(self):
-                return self._D[...,self._t,:,:]
+            def getD(self, t):
+                return self._D[...,self.t,:,:]
 
         ltv = MyLTV(A, B, C, D).to(device)
         lqr  = pp.module.LQR(ltv, Q, p, T).to(device)
