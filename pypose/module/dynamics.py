@@ -27,7 +27,7 @@ class System(nn.Module):
     #     self._t.fill_(t)
     #     return self
 
-    def forward(self, state, input):
+    def forward(self, state, input, t):
         r'''
         Defines the computation performed at every call that advances the system by one time step.
 
@@ -42,9 +42,20 @@ class System(nn.Module):
             subclassing. See example in ``examples/module/ekf/tank_robot.py``.
         '''
         self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
+        self.set_refpoint(state, input, t)
         state = self.state_transition(self.state, self.input)
         obs = self.observation(self.state, self.input)
         return state, obs
+
+    def _register_attr(self, name, attr):
+        if isinstance(attr,torch.Tensor):
+            self.register_buffer(name,attr)
+        elif isinstance(attr,nn.Module):
+            self.register_module(name,attr)
+        elif attr is None:
+            self.register_parameter(name,None)
+        else:
+            raise TypeError("The attribute must be a Tensor or a Module")
 
     def state_transition(self, state, input, t=None):
         r'''
@@ -239,25 +250,12 @@ class LTI(System):
 
     def __init__(self, A, B, C, D, c1=None, c2=None):
         super().__init__()
-        self.register_buffer('_A', A)
-        self.register_buffer('_B', B)
-        self.register_buffer('_C', C)
-        self.register_buffer('_D', D)
-        self.register_buffer('_c1', c1)
-        self.register_buffer('_c2', c2)
-
-    def forward(self, state, input):
-        r'''
-        Perform one step advance for the LTI system.
-
-        Args:
-            state (:obj:`Tensor`): The state (:math:`\mathbf{x}`) of the system
-            input (:obj:`Tensor`): The input (:math:`\mathbf{u}`) of the system.
-
-        Returns:
-            ``tuple`` of Tensor: The state and observation of the system in next time step.
-        '''
-        return super().forward(state, input)
+        self._register_attr('_A', A)
+        self._register_attr('_B', B)
+        self._register_attr('_C', C)
+        self._register_attr('_D', D)
+        self._register_attr('_c1', c1)
+        self._register_attr('_c2', c2)
 
     def state_transition(self, state, input):
         r'''
@@ -273,7 +271,7 @@ class LTI(System):
         Returns:
             ``Tensor``: The state the system in next time step.
         '''
-        z = bmv(self._A, state) + bmv(self._B, input)
+        z = bmv(self.A, state) + bmv(self.B, input)
         return z if self.c1 is None else z + self.c1
 
     def observation(self, state, input):
@@ -290,7 +288,7 @@ class LTI(System):
         Returns:
             ``Tensor``: The observation of the system in next time step.
         '''
-        y = bmv(self._C, state) + bmv(self._D, input)
+        y = bmv(self.C, state) + bmv(self.D, input)
         return y if self.c2 is None else y + self.c2
 
     # @property
@@ -435,22 +433,6 @@ class LTV(LTI):
     '''
     def __init__(self, A=None, B=None, C=None, D=None, c1=None, c2=None):
         super().__init__(A, B, C, D, c1, c2)
-
-    def getA(self, t):
-        r'''System transision matrix.'''
-        raise NotImplementedError("LTV transision matrix A getter not defined")
-
-    def getB(self, t):
-        r'''System input matrix.'''
-        raise NotImplementedError("LTV input matrix B getter not defined")
-
-    def getC(self, t):
-        r'''System output matrix.'''
-        raise NotImplementedError("LTV output matrix C getter not defined")
-
-    def getD(self, t):
-        r'''System observation matrix.'''
-        raise NotImplementedError("LTV observation matrix D getter not defined")
 
 
 class NLS(System):
@@ -651,7 +633,7 @@ def runsys(system: System, T, x_traj, u_traj):
     u_traj = toBTN(u_traj, T)
 
     for i in range(T-1):
-        x_traj[...,i+1,:], _ = system(x_traj[...,i,:], u_traj[...,i,:])
+        x_traj[...,i+1,:], _ = system(x_traj[...,i,:], u_traj[...,i,:], i)
 
     return x_traj
 
@@ -665,18 +647,20 @@ def sysmat(system:System, state, input, t):
         Matrices A, B, C, D of the linearized system.
     '''
 
-
     if isinstance(system, LTV):
-        return system.A(t), system.B(t), system.C(t), system.D(t)
+        return system._A(t), system._B(t), system._C(t), system._D(t)
 
     #get total number of time steps for LTI
-    T = state.shape[-2]
+    if t is None or type(t) == int:
+        T = 1
+    else:
+        T = t.shape[-1]
 
     if isinstance(system, LTI):
-        A = system._A.unsqueeze(1).repeat(1,T,1,1)
-        B = system._B.unsqueeze(1).repeat(1,T,1,1)
-        C = system._C.unsqueeze(1).repeat(1,T,1,1)
-        D = system._D.unsqueeze(1).repeat(1,T,1,1)
+        A = system._A if T==1 else system._A.unsqueeze(1).repeat(1,T,1,1)
+        B = system._B if T==1 else system._B.unsqueeze(1).repeat(1,T,1,1)
+        C = system._C if T==1 else system._C.unsqueeze(1).repeat(1,T,1,1)
+        D = system._D if T==1 else system._D.unsqueeze(1).repeat(1,T,1,1)
         return A, B, C, D
 
     #get total number of states and inputs for NLS

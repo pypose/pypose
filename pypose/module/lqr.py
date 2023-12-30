@@ -376,7 +376,7 @@ class LQR(nn.Module):
             delta_u[..., t, :] = bmv(Kt, delta_xt) + kt
             u[...,t,:] = ut = delta_u[..., t, :] + self.u_traj[...,t,:]
             xut = torch.cat((xt, ut), dim=-1)
-            x[...,t+1,:] = xt = self.system(xt, ut)[0]
+            x[...,t+1,:] = xt = self.system(xt, ut, t)[0]
             cost += 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + vecdot(xut, self.p[...,t,:])
 
         return x, u, cost
