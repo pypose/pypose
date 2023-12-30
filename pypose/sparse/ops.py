@@ -33,6 +33,8 @@ def _bsr_diag(input, offset: int=0):
             results[indices[0, diag_indices]] = torch.diagonal(values, dim1=-2, dim2=-1)
         results = torch.flatten(results)
         return results
+    else:
+        raise NotImplementedError('Only square block and offset 0 is supported.')
 
 
 def _sparse_csr_mm(mat1, mat2):
