@@ -1,5 +1,4 @@
 import math
-from typing import List
 import torch
 '''
 This basics file includes functions needed to implement LieTensor.
