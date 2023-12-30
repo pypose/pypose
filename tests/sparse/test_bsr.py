@@ -1,6 +1,8 @@
+from functools import partial
 import torch
 import pytest
 import pypose as pp
+from torchvision.transforms import Compose
 
 def random_compressed(pshape, bshape, mode, zero_prob=0., block_prob=0.5):
     #generate coo
@@ -24,6 +26,10 @@ def random_compressed(pshape, bshape, mode, zero_prob=0., block_prob=0.5):
         crowi, coli = dummy_csc.ccol_indices(), dummy_csc.row_indices()
         return torch.sparse_bsc_tensor(crowi, coli, values, (m, p), dtype=values.dtype)
 
+diag_clamp_oop = Compose([torch.diag, partial(torch.clamp, max=1e-3)])
+def diag_clamp_inp(input):
+    diag_clamp_oop(input)
+    return input
 
 class TestBSR:
     @pytest.mark.parametrize('block_prob', [0.0, 0.5, 1.0])
@@ -31,7 +37,9 @@ class TestBSR:
     @pytest.mark.parametrize('op, dense_op, layouts, mode, dim', [
         (torch.matmul, torch.matmul, ['bsr', 'bsc'], 'mT', 2),
         (torch.matmul, torch.matmul, ['bsr', 'bsc'], 'identical_square', 2),
-        (torch.diag, torch.diag, ['bsr'], 'identical_square', 2),])
+        (torch.diag, torch.diag, ['bsr'], 'identical_square', 2),
+        (diag_clamp_oop, diag_clamp_oop, ['bsr'], 'identical_square', 2),
+        (diag_clamp_inp, diag_clamp_inp, ['bsr'], 'identical_square', 2),])
     def test_universal(self, op, dense_op, layouts, mode, dim, zero_prob, block_prob):
         if mode == 'identical':
             pshape = torch.Size(torch.randint(1, 10, (dim,)))
