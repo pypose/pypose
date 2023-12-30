@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from .. import bmv, bvmv
-from .dynamics import runsys
+from .dynamics import runsys, toBTN
 from torch.linalg import cholesky, vecdot
 
 
@@ -303,6 +303,7 @@ class LQR(nn.Module):
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
             associated quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
+        assert x_init.ndim == 3, "x_init should be a 3D [B,T,N] tensor."
         K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
         x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
         return x, u, cost
@@ -317,9 +318,7 @@ class LQR(nn.Module):
         else:
             self.u_traj = u_traj
 
-        self.x_traj = x_init.unsqueeze(-2).repeat((1, self.T, 1))
-
-        self.x_traj = runsys(self.system, self.T, self.x_traj, self.u_traj)
+        self.x_traj = runsys(self.system, self.T, x_init, self.u_traj)
 
         K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
@@ -360,7 +359,7 @@ class LQR(nn.Module):
 
         assert x_init.device == K.device == k.device
         assert x_init.dtype == K.dtype == k.dtype
-        assert x_init.ndim == 2, "Shape not compatible."
+        assert x_init.ndim == 3, "Shape not compatible."
 
         ns, nc = self.x_traj.size(-1), self.u_traj.size(-1)
 
@@ -368,7 +367,7 @@ class LQR(nn.Module):
         delta_u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
         cost = torch.zeros(self.n_batch, **self.dargs)
         x = torch.zeros(self.n_batch + (self.T+1, ns), **self.dargs)
-        xt = x[..., 0, :] = x_init
+        xt = x[..., 0:1, :] = x_init
 
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]

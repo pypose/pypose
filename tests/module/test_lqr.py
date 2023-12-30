@@ -70,8 +70,8 @@ class TestLQR:
         c1 = torch.tensor([[ 0.25, -0.56, -0.95,  1.18],
                            [ 0.76, -0.51, -0.95,  1.18]], device=device)
         c2 = torch.zeros(n_batch, n_state, device=device)
-        x_init = torch.tensor([[ 1.50, -0.34, -2.18,  0.54],
-                               [-1.05, -1.36,  0.43,  0.80]], device=device)
+        x_init = torch.tensor([[[ 1.50, -0.34, -2.18,  0.54]],
+                               [[-1.05, -1.36,  0.43,  0.80]]], device=device)
 
         lti = pp.module.LTI(A, B, C, D, c1, c2).to(device)
         LQR = pp.module.LQR(lti, Q, p, T).to(device)
