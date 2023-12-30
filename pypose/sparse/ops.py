@@ -98,6 +98,7 @@ def bsr_bsc_matmul(bsr:torch.Tensor, bsc:torch.Tensor):
     col = dummy_csr.col_indices().to(bsr.device)
     return torch.sparse_bsr_tensor(crow, col, reduced, size=(m, p), dtype=reduced.dtype)
 
+
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     sparse_lib = Library('aten', 'IMPL')
