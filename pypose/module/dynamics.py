@@ -61,7 +61,10 @@ class System(nn.Module):
             :obj:`systime`. Don't introduce system transision noise in this function, as it will
             be used for linearizing the system automaticalluy.
         '''
-        raise NotImplementedError("The users need to define their own state transition method")
+        self.set_refpoint(state, input, t)
+        A = self.A.squeeze(1)
+        B = self.B.squeeze(1)
+        return bmv(A, state) + bmv(B, input)
 
     def observation(self, state, input, t=None):
         r'''
@@ -257,7 +260,7 @@ class LTI(System):
         Returns:
             ``tuple`` of Tensor: The state and observation of the system in next time step.
         '''
-        return super().forward(state, input)
+        return self.state_transition(state, input)
 
     def state_transition(self, state, input):
         r'''
@@ -273,7 +276,7 @@ class LTI(System):
         Returns:
             ``Tensor``: The state the system in next time step.
         '''
-        z = bmv(self._A, state) + bmv(self._B, input)
+        z = super().state_transition(state, input)
         return z if self.c1 is None else z + self.c1
 
     def observation(self, state, input):
@@ -325,7 +328,7 @@ class LTI(System):
         return self._c2
 
 
-class LTV(LTI):
+class LTV(System):
     r'''
     Discrete-time Linear Time-Variant (LTV) system.
 
@@ -433,8 +436,8 @@ class LTV(LTI):
         More practical examples can be found at `examples/module/dynamics
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
     '''
-    def __init__(self, A=None, B=None, C=None, D=None, c1=None, c2=None):
-        super().__init__(A, B, C, D, c1, c2)
+    def __init__(self):
+        super().__init__()
 
     def getA(self, t):
         r'''System transision matrix.'''
@@ -656,7 +659,7 @@ def runsys(system: System, T, x_traj, u_traj):
     return x_traj
 
 
-def sysmat(system:System, state, input, t):
+def sysmat(system:System, state=None, input=None, t=None):
     r'''
     Find the linearized system matrices at given states, inputs, and time.
     Argument tensors state, input, and t should be batched.
@@ -670,7 +673,10 @@ def sysmat(system:System, state, input, t):
         return system.A(t), system.B(t), system.C(t), system.D(t)
 
     #get total number of time steps for LTI
-    T = state.shape[-2]
+    if state is None:
+        T = 1
+    else:
+        T = state.shape[-2]
 
     if isinstance(system, LTI):
         A = system._A.unsqueeze(1).repeat(1,T,1,1)

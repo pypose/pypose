@@ -129,19 +129,23 @@ class TestLQR:
         class MyLTV(pp.module.LTV):
 
             def __init__(self, A, B, C, D):
-                super().__init__(A, B, C, D)
+                super().__init__()
+                self.register_buffer('_A', A)
+                self.register_buffer('_B', B)
+                self.register_buffer('_C', C)
+                self.register_buffer('_D', D)
 
             def getA(self, t):
-                return self._A[...,self.t,:,:]
+                return self._A[...,t,:,:]
 
             def getB(self, t):
-                return self._B[...,self.t,:,:]
+                return self._B[...,t,:,:]
 
             def getC(self, t):
-                return self._C[...,self.t,:,:]
+                return self._C[...,t,:,:]
 
             def getD(self, t):
-                return self._D[...,self.t,:,:]
+                return self._D[...,t,:,:]
 
         ltv = MyLTV(A, B, C, D).to(device)
         lqr  = pp.module.LQR(ltv, Q, p, T).to(device)
