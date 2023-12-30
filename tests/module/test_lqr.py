@@ -118,7 +118,7 @@ class TestLQR:
         Q = torch.tile(torch.eye(n_state + n_ctrl, device=device), (n_batch, 1, 1))
         p = torch.tensor([[-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54],
                           [-1.00, -0.68, -0.35, -1.42, 0.23, -1.73, -0.54]], device=device)
-        rt = torch.arange(1, T+1).view(T, 1, 1)
+        rt = torch.arange(1, T+1, device=device).view(T, 1, 1)
         A = rt * torch.tile(torch.eye(n_state, device=device), (n_batch, T, 1, 1))
         B = rt * torch.ones(n_batch, T, n_state, n_ctrl, device=device)
         C = torch.tile(torch.eye(n_state, device=device), (n_batch, T, 1, 1))

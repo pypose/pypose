@@ -1,16 +1,21 @@
 import copy
 import torch
+import pytest
 import importlib
 import pypose as pp
 from torch import nn
 from torch import vmap
+from torch.nn import Identity
+from functools import partial
 from contextlib import contextmanager
 from typing import Collection, Callable
 from torch.utils._pytree import tree_map
+from torchvision.transforms import Compose
 from torch.autograd.functional import jacobian
 from torch.func import functional_call, jacfwd, jacrev
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+identity = Identity()
 
 @contextmanager
 def check_fn_equal(TO_BE_CHECKED: Collection[Callable]):
@@ -156,12 +161,30 @@ class TestJacobian:
         except RuntimeError as e:
             assert 'shapes cannot be multiplied' in str(e)
 
-    def test_lietensor_jacrev(self):
-        pose = pp.randn_SE3(1).to(device)
-        points = torch.randn(1, 3).to(device)
+    @pytest.mark.parametrize('input, op', [
+        (pp.randn_SE3(1), identity),
+        (pp.randn_SE3(1), pp.Inv),
+        (pp.randn_SO3(1), pp.Inv),
+        (pp.randn_Sim3(1), pp.Inv),
+        (pp.randn_RxSO3(1), pp.Inv),
+        (pp.randn_se3(1), pp.Inv),
+        (pp.randn_so3(1), pp.Inv),
+        (pp.randn_sim3(1), pp.Inv),
+        (pp.randn_rxso3(1), pp.Inv),
+        (pp.randn_SE3(1), pp.Log),
+        (pp.randn_SO3(1), pp.Log),
+        (pp.randn_Sim3(1), pp.Log),
+        (pp.randn_RxSO3(1), pp.Log),
+        (pp.randn_se3(1), pp.Exp),
+        (pp.randn_so3(1), pp.Exp),
+        (pp.randn_sim3(1), pp.Exp),
+        (pp.randn_rxso3(1), pp.Exp),
+        (pp.randn_SE3(1), Compose([pp.Log, pp.Exp])),])
+    def test_lietensor_jacrev(self, input, op):
+        pose = input.to(device)
 
-        def func(pose, points):
-            return pose @ points
+        def func(pose):
+            return op(pose)
 
         # save functions to be checked
         TO_BE_CHECKED = {
@@ -172,21 +195,33 @@ class TestJacobian:
         with check_fn_equal(TO_BE_CHECKED):
             with pp.retain_ltype():
                 jac_func = jacrev(func)
-                jac = jac_func(pose, points)
+                jac = jac_func(pose)
                 assert not pp.hasnan(jac)
 
         # without context manager, call pp.func.jacrev
         with check_fn_equal(TO_BE_CHECKED):
             jac_func = pp.func.jacrev(func)
-            jac = jac_func(pose, points)
+            jac = jac_func(pose)
             assert not pp.hasnan(jac)
 
-    def test_lietensor_vmap(self):
-        pose = pp.randn_SE3(5).to(device)
-        points = torch.randn(5, 3).to(device)
+    @pytest.mark.parametrize('input, op', [
+        (pp.randn_SE3(5), pp.Inv),
+        (pp.randn_SO3(5), pp.Inv),
+        (pp.randn_Sim3(5), pp.Inv),
+        (pp.randn_RxSO3(5), pp.Inv),
+        (pp.randn_se3(5), pp.Inv),
+        (pp.randn_so3(5), pp.Inv),
+        (pp.randn_sim3(5), pp.Inv),
+        (pp.randn_rxso3(5), pp.Inv),
+        (pp.randn_SE3(5), partial(pp.Act, p=torch.randn(5, 3))),
+        (pp.randn_SO3(5), partial(pp.Act, p=torch.randn(5, 3))),
+        # all log/exp functions are not yet supported
+    ])
+    def test_lietensor_vmap(self, input, op):
+        pose = input.to(device)
 
-        def func(pose, points):
-            return pose @ points
+        def func(pose):
+            return op(pose)
 
         # save functions to be checked
         TO_BE_CHECKED = {
@@ -196,16 +231,16 @@ class TestJacobian:
         with check_fn_equal(TO_BE_CHECKED):
             with pp.retain_ltype():
                 vmap_func = vmap(func)
-                res = vmap_func(pose, points)
+                res = vmap_func(pose)
                 assert not pp.hasnan(res)
 
         # without context manager, assume exception
         try:
             vmap_func = vmap(func)
-            res = vmap_func(pose, points)
-            raise AssertionError('should not reach here')
-        except RuntimeError as e:
-            assert 'Expected size' in str(e)
+            res = vmap_func(pose)
+            self.fail('should not reach here')
+        except Exception as e:
+            assert 'Expected size' in str(e) or 'Invalid LieTensor Type.' in str(e)
 
 if __name__ == '__main__':
     test = TestJacobian()
@@ -214,4 +249,3 @@ if __name__ == '__main__':
     test.test_lietensor_jacobian()
     test.test_modjac()
     test.test_lietensor_jacfwd()
-    test.test_lietensor_jacrev()
