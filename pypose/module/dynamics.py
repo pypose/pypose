@@ -13,19 +13,8 @@ class System(nn.Module):
     '''
     def __init__(self):
         super().__init__()
-        # self.register_buffer('_t',torch.tensor(0, dtype=torch.int64))
-        # self.register_forward_hook(self.forward_hook)
         self._ref_state, self._ref_input, self._ref_t = None, None, None
 
-    # def forward_hook(self, module, inputs, outputs):
-    #     r'''
-    #     Automatically advances the time step.
-    #     '''
-    #     self._t.add_(1)
-
-    # def reset(self, t=0):
-    #     self._t.fill_(t)
-    #     return self
 
     def forward(self, state, input, t=None):
         r'''
@@ -175,19 +164,6 @@ class System(nn.Module):
         '''
         raise NotImplementedError("The users need to define their own state transition method")
 
-    # @property
-    # def systime(self):
-    #     r'''
-    #         System time, automatically advanced by :obj:`forward_hook`.
-    #     '''
-    #     return self._t
-
-    # @systime.setter
-    # def systime(self, t):
-    #     if not isinstance(t, torch.Tensor):
-    #         t = torch.tensor(t)
-    #     self._t.copy_(t)
-
 
 class LTI(System):
     r'''
@@ -290,26 +266,6 @@ class LTI(System):
         '''
         y = bmv(self.C, state) + bmv(self.D, input)
         return y if self.c2 is None else y + self.c2
-
-    # @property
-    # def A(self):
-    #     r'''System transision matrix.'''
-    #     return self._A
-
-    # @property
-    # def B(self):
-    #     r'''System input matrix.'''
-    #     return self._B
-
-    # @property
-    # def C(self):
-    #     r'''System output matrix.'''
-    #     return self._C
-
-    # @property
-    # def D(self):
-    #     r'''System observation matrix.'''
-    #     return self._D
 
     @property
     def c1(self):
@@ -551,51 +507,6 @@ class NLS(System):
     def __init__(self):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
-
-    # def forward(self, state, input):
-    #     r'''
-    #     Defines the computation performed at every call that advances the system by one time step.
-
-    #     Note:
-    #         The :obj:`forward` method implicitly increments the time step via :obj:`forward_hook`.
-    #         :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity
-    #         such as time-varying system. One can directly access the current system time via the
-    #         property :obj:`systime`.
-
-    #     Note:
-    #         To introduce noise in a model, redefine this method via
-    #         subclassing. See example in ``examples/module/ekf/tank_robot.py``.
-    #     '''
-    #     self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
-    #     state = self.state_transition(self.state, self.input, self.systime)
-    #     obs = self.observation(self.state, self.input, self.systime)
-    #     return state, obs
-
-    # def set_refpoint(self, state=None, input=None, t=None):
-    #     r'''
-    #     Function to set the reference point for linearization.
-
-    #     Args:
-    #         state (:obj:`Tensor`): The reference state of the dynamical system. If ``None``,
-    #             the the most recent state is taken. Default: ``None``.
-    #         input (:obj:`Tensor`): The reference input to the dynamical system. If ``None``,
-    #             the the most recent input is taken. Default: ``None``.
-    #         t (:obj:`Tensor`): The reference time step of the dynamical system. If ``None``,
-    #             the the most recent timestamp is taken. Default: ``None``.
-
-    #     Returns:
-    #         The ``self`` module.
-
-    #     Warning:
-    #         For nonlinear systems, the users have to call this function before getting the
-    #         linearized system.
-    #     '''
-    #     self._ref_state = self.state if state is None else torch.atleast_1d(state)
-    #     self._ref_input = self.input if input is None else torch.atleast_1d(input)
-    #     self._ref_t = self.systime if t is None else torch.atleast_1d(t)
-    #     self._ref_f = self.state_transition(self._ref_state, self._ref_input, self._ref_t)
-    #     self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
-    #     return self
 
 class NLSJacWrapper(NLS):
     def __init__(self, nls, n_s):
