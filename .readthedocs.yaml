@@ -10,6 +10,11 @@ build:
   os: ubuntu-20.04  # <- add this line
   tools:
     python: "3.9"
+  apt_packages:
+    - gcc
+    - g++
+    - cmake
+
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
