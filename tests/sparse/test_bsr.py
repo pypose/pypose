@@ -69,7 +69,6 @@ class TestBSR:
 
 
 if __name__ == '__main__':
-    TestBSR.test_universal(None, torch.matmul, torch.matmul, ['bsr', 'bsc'], 'identical_square', 2, 0.7)
     TestBSR.test_universal(None, torch.matmul, torch.matmul, ['bsr', 'bsc'], 'mT', 2, 0.7)
 
     crow_indices = torch.tensor([0, 2, 4])

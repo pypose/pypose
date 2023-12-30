@@ -16,6 +16,7 @@ from .lietensor.lietensor import retain_ltype
 from . import func
 from .function import *
 from .basics import *
+from .sparse import *
 from . import module
 from . import optim
 from . import testing
