@@ -509,6 +509,9 @@ class NLS(System):
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
 
 class NLSJacWrapper(NLS):
+    r'''
+    An nn module wrapper class for NLS to compute the Jacobian with tau directly.
+    '''
     def __init__(self, nls, n_s):
         super().__init__()
         self.nls = nls
