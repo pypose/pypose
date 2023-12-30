@@ -70,8 +70,8 @@ class TestLQR:
         c1 = torch.tensor([[ 0.25, -0.56, -0.95,  1.18],
                            [ 0.76, -0.51, -0.95,  1.18]], device=device)
         c2 = torch.zeros(n_batch, n_state, device=device)
-        x_init = torch.tensor([[[ 1.50, -0.34, -2.18,  0.54]],
-                               [[-1.05, -1.36,  0.43,  0.80]]], device=device)
+        x_init = torch.tensor([[ 1.50, -0.34, -2.18,  0.54],
+                               [-1.05, -1.36,  0.43,  0.80]], device=device)
 
         lti = pp.module.LTI(A, B, C, D, c1, c2).to(device)
         LQR = pp.module.LQR(lti, Q, p, T).to(device)
@@ -129,23 +129,19 @@ class TestLQR:
         class MyLTV(pp.module.LTV):
 
             def __init__(self, A, B, C, D):
-                super().__init__()
-                self.register_buffer('_A', A)
-                self.register_buffer('_B', B)
-                self.register_buffer('_C', C)
-                self.register_buffer('_D', D)
+                super().__init__(A, B, C, D)
 
             def getA(self, t):
-                return self._A[...,t,:,:]
+                return self._A[...,self.t,:,:]
 
             def getB(self, t):
-                return self._B[...,t,:,:]
+                return self._B[...,self.t,:,:]
 
             def getC(self, t):
-                return self._C[...,t,:,:]
+                return self._C[...,self.t,:,:]
 
             def getD(self, t):
-                return self._D[...,t,:,:]
+                return self._D[...,self.t,:,:]
 
         ltv = MyLTV(A, B, C, D).to(device)
         lqr  = pp.module.LQR(ltv, Q, p, T).to(device)

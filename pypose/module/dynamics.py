@@ -27,7 +27,7 @@ class System(nn.Module):
     #     self._t.fill_(t)
     #     return self
 
-    def forward(self, state, input, t=None):
+    def forward(self, state, input):
         r'''
         Defines the computation performed at every call that advances the system by one time step.
 
@@ -41,9 +41,9 @@ class System(nn.Module):
             To introduce noise in a model, redefine this method via
             subclassing. See example in ``examples/module/ekf/tank_robot.py``.
         '''
-        state, input = torch.atleast_1d(state), torch.atleast_1d(input)
-        state = self.state_transition(state, input, t)
-        obs = self.observation(state, input)
+        self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
+        state = self.state_transition(self.state, self.input)
+        obs = self.observation(self.state, self.input)
         return state, obs
 
     def state_transition(self, state, input, t=None):
@@ -61,11 +61,7 @@ class System(nn.Module):
             :obj:`systime`. Don't introduce system transision noise in this function, as it will
             be used for linearizing the system automaticalluy.
         '''
-        assert state.ndim == 3 , "The state should be a 3D [B,T,V]tensor"
-        self.set_refpoint(state, input, t)
-        A = self.A
-        B = self.B
-        return bmv(A, state) + bmv(B, input)
+        raise NotImplementedError("The users need to define their own state transition method")
 
     def observation(self, state, input, t=None):
         r'''
@@ -82,8 +78,7 @@ class System(nn.Module):
             property :obj:`systime`. Don't introduce system transision noise in this function,
             as it will be used for linearizing the system automaticalluy.
         '''
-        return None
-        #raise NotImplementedError("The users need to define their own observation method")
+        raise NotImplementedError("The users need to define their own observation method")
 
     def set_refpoint(self, state=None, input=None, t=None):
         r'''
@@ -251,6 +246,19 @@ class LTI(System):
         self.register_buffer('_c1', c1)
         self.register_buffer('_c2', c2)
 
+    def forward(self, state, input):
+        r'''
+        Perform one step advance for the LTI system.
+
+        Args:
+            state (:obj:`Tensor`): The state (:math:`\mathbf{x}`) of the system
+            input (:obj:`Tensor`): The input (:math:`\mathbf{u}`) of the system.
+
+        Returns:
+            ``tuple`` of Tensor: The state and observation of the system in next time step.
+        '''
+        return super().forward(state, input)
+
     def state_transition(self, state, input):
         r'''
         Perform one step of LTI state transition.
@@ -265,8 +273,8 @@ class LTI(System):
         Returns:
             ``Tensor``: The state the system in next time step.
         '''
-        z = super().state_transition(state, input)
-        return z if self.c1 is None else z + self.c1.unsqueeze(1)
+        z = bmv(self._A, state) + bmv(self._B, input)
+        return z if self.c1 is None else z + self.c1
 
     def observation(self, state, input):
         r'''
@@ -317,7 +325,7 @@ class LTI(System):
         return self._c2
 
 
-class LTV(System):
+class LTV(LTI):
     r'''
     Discrete-time Linear Time-Variant (LTV) system.
 
@@ -425,8 +433,8 @@ class LTV(System):
         More practical examples can be found at `examples/module/dynamics
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
     '''
-    def __init__(self):
-        super().__init__()
+    def __init__(self, A=None, B=None, C=None, D=None, c1=None, c2=None):
+        super().__init__(A, B, C, D, c1, c2)
 
     def getA(self, t):
         r'''System transision matrix.'''
@@ -643,15 +651,12 @@ def runsys(system: System, T, x_traj, u_traj):
     u_traj = toBTN(u_traj, T)
 
     for i in range(T-1):
-        if isinstance(system, LTI):
-            x_traj[...,i+1:i+2,:] = system.state_transition(x_traj[...,i:i+1,:], u_traj[...,i:i+1,:])
-        else:
-            x_traj[...,i+1:i+2,:] = system.state_transition(x_traj[...,i:i+1,:], u_traj[...,i:i+1,:], i)
+        x_traj[...,i+1,:], _ = system(x_traj[...,i,:], u_traj[...,i,:])
 
     return x_traj
 
 
-def sysmat(system:System, state=None, input=None, t=None):
+def sysmat(system:System, state, input, t):
     r'''
     Find the linearized system matrices at given states, inputs, and time.
     Argument tensors state, input, and t should be batched.
@@ -662,13 +667,10 @@ def sysmat(system:System, state=None, input=None, t=None):
 
 
     if isinstance(system, LTV):
-        return system.getA(t), system.getB(t), system.getC(t), system.getD(t)
+        return system.A(t), system.B(t), system.C(t), system.D(t)
 
     #get total number of time steps for LTI
-    if t is None:
-        T = 1
-    else:
-        T = t.shape[-1]
+    T = state.shape[-2]
 
     if isinstance(system, LTI):
         A = system._A.unsqueeze(1).repeat(1,T,1,1)
