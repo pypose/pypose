@@ -2,9 +2,9 @@ import torch
 import pytest
 import pypose as pp
 
-def random_compressed(pshape, bshape, mode, zero_prob=0.):
+def random_compressed(pshape, bshape, mode, zero_prob=0., block_prob=0.5):
     #generate coo
-    proxy = torch.randn(pshape) > 0.5
+    proxy = torch.rand(pshape) < block_prob
     coo_indices = proxy.nonzero().T  # (dim, nnz)
     values = torch.randn((coo_indices.shape[-1], *bshape))
     values[torch.rand(values.shape) < zero_prob] = 0
@@ -26,12 +26,13 @@ def random_compressed(pshape, bshape, mode, zero_prob=0.):
 
 
 class TestBSR:
+    @pytest.mark.parametrize('block_prob', [0.0, 0.5, 1.0])
     @pytest.mark.parametrize('zero_prob', [0., 0.7, 1.0])
     @pytest.mark.parametrize('op, dense_op, layouts, mode, dim', [
         (torch.matmul, torch.matmul, ['bsr', 'bsc'], 'mT', 2),
         (torch.matmul, torch.matmul, ['bsr', 'bsc'], 'identical_square', 2),
         (torch.diag, torch.diag, ['bsr'], 'identical_square', 2),])
-    def test_universal(self, op, dense_op, layouts, mode, dim, zero_prob):
+    def test_universal(self, op, dense_op, layouts, mode, dim, zero_prob, block_prob):
         if mode == 'identical':
             pshape = torch.Size(torch.randint(1, 10, (dim,)))
             bshape = torch.Size(torch.randint(1, 10, (dim,)))
@@ -58,7 +59,7 @@ class TestBSR:
                         for pshape, bshape in zip(pshapes, bshapes)]
         args, args_dense = [], []
         for t, pshape, bshape, dshape in zip(layouts, pshapes, bshapes, dshapes):
-            arg = random_compressed(pshape, bshape, t, zero_prob)
+            arg = random_compressed(pshape, bshape, t, zero_prob, block_prob)
             arg_dense = arg.to_dense()
             assert arg_dense.shape == dshape
             args.append(arg)

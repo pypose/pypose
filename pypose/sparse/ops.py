@@ -10,12 +10,11 @@ def _bsr_diag(input, offset: int=0):
     col_indices = input.col_indices() # b + 1 dimensional
     bsr_values = input.values() # 1 + 2 dimensional
     m, n = input.shape[-2], input.shape[-1]
-    dense_m, dense_n = (bsr_values.shape[-2],
-                                 bsr_values.shape[-1])
-    sparse_m, sparse_n = m // dense_m, n // dense_n
+    dm, dn = (bsr_values.shape[-2], bsr_values.shape[-1])
+    sm, sn = m // dm, n // dn
 
     #simple case(block is square and offset is 0)
-    if dense_m == dense_n and offset == 0:
+    if dm == dn and offset == 0:
         dummy_val = torch.zeros(bsr_values.shape[0], device='cpu')
         dummy = torch.sparse_csr_tensor(crow_indices=crow_indices.to('cpu'),
                                         col_indices=col_indices.to('cpu'),
@@ -23,12 +22,15 @@ def _bsr_diag(input, offset: int=0):
         dummy_coo = dummy.to_sparse(layout=torch.sparse_coo).coalesce()
 
         indices = dummy_coo.indices().to(input.device)
-        diag_indices = indices[0] == indices[1]
+        diag_indices = (indices[0] == indices[1]).nonzero().squeeze(-1)
         values = bsr_values[diag_indices]
-        n_diag_blocks = sparse_m if sparse_m < sparse_n else sparse_n
-        results_shape = (n_diag_blocks, dense_m)
-        results = torch.zeros(results_shape, dtype=values.dtype, device=values.device)
-        results[indices[0, diag_indices]] = torch.diagonal(values, dim1=-2, dim2=-1)
+        n_diag_blocks = sm if sm < sn else sn
+        if diag_indices.shape[-1] == n_diag_blocks:
+            results = torch.diagonal(values, dim1=-2, dim2=-1)
+        else:
+            results_shape = (n_diag_blocks, dm)
+            results = torch.zeros(results_shape, dtype=values.dtype, device=values.device)
+            results[indices[0, diag_indices]] = torch.diagonal(values, dim1=-2, dim2=-1)
         results = torch.flatten(results)
         return results
 
