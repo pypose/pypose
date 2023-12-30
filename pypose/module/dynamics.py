@@ -27,7 +27,7 @@ class System(nn.Module):
     #     self._t.fill_(t)
     #     return self
 
-    def forward(self, state, input, t):
+    def forward(self, state, input, t=None):
         r'''
         Defines the computation performed at every call that advances the system by one time step.
 
@@ -552,24 +552,24 @@ class NLS(System):
         super().__init__()
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
 
-    def forward(self, state, input):
-        r'''
-        Defines the computation performed at every call that advances the system by one time step.
+    # def forward(self, state, input):
+    #     r'''
+    #     Defines the computation performed at every call that advances the system by one time step.
 
-        Note:
-            The :obj:`forward` method implicitly increments the time step via :obj:`forward_hook`.
-            :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity
-            such as time-varying system. One can directly access the current system time via the
-            property :obj:`systime`.
+    #     Note:
+    #         The :obj:`forward` method implicitly increments the time step via :obj:`forward_hook`.
+    #         :obj:`state_transition` and :obj:`observation` still accept time for the flexiblity
+    #         such as time-varying system. One can directly access the current system time via the
+    #         property :obj:`systime`.
 
-        Note:
-            To introduce noise in a model, redefine this method via
-            subclassing. See example in ``examples/module/ekf/tank_robot.py``.
-        '''
-        self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
-        state = self.state_transition(self.state, self.input, self.systime)
-        obs = self.observation(self.state, self.input, self.systime)
-        return state, obs
+    #     Note:
+    #         To introduce noise in a model, redefine this method via
+    #         subclassing. See example in ``examples/module/ekf/tank_robot.py``.
+    #     '''
+    #     self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
+    #     state = self.state_transition(self.state, self.input, self.systime)
+    #     obs = self.observation(self.state, self.input, self.systime)
+    #     return state, obs
 
     # def set_refpoint(self, state=None, input=None, t=None):
     #     r'''
@@ -597,7 +597,20 @@ class NLS(System):
     #     self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
     #     return self
 
+class NLSJacWrapper(NLS):
+    def __init__(self, nls, n_s):
+        super().__init__()
+        self.nls = nls
+        self.n_s = n_s
 
+    def forward(self, tau):
+        return super().forward(tau[...,:self.n_s], tau[...,self.n_s:])
+
+    def state_transition(self, state, input):
+        return self.nls.state_transition(state, input)
+
+    def observation(self, state, input):
+        return self.nls.observation(state, input)
 
 
 def toBTN(vec, T):
@@ -663,15 +676,15 @@ def sysmat(system:System, state, input, t):
         D = system._D if T==1 else system._D.unsqueeze(1).repeat(1,T,1,1)
         return A, B, C, D
 
-    #get total number of states and inputs for NLS
+    #make state and input 2D, a temporary solution before implementing batched jacobian
     n_s = state.shape[-1]
-    n_i = input.shape[-1]
 
     if isinstance(system, NLS):
-        n_s = state.shape[-1]
-        tau = torch.cat((state, input), -1)
-        trans_func = lambda x: system.tau_transition(x, n_s, t)
-        batched_jacrev_func = torch.vmap(jacrev(trans_func), in_dims=1)
-        return batched_jacrev_func(tau).transpose(0, 1).squeeze(2, 4)
+        wrapper=NLSJacWrapper(system, n_s)
+        tau=torch.cat((state, input), dim=-1)
+        trans_func = lambda x: wrapper(x)
+        jacFunc = jacrev(trans_func)
+        F = jacFunc(tau)[0].sum(4).squeeze(3)
+        return F[..., :n_s], F[..., n_s:]
 
     raise NotImplementedError("System type not recognized")
