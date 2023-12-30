@@ -45,8 +45,11 @@ def test_dynamics_cartpole():
             self._totalMass = self._cartmass + self._polemass
 
         def state_transition(self, state, input, t=None):
-            x, xDot, theta, thetaDot = state
-            force = input.squeeze()
+            x = state[..., 0]
+            xDot = state[..., 1]
+            theta = state[..., 2]
+            thetaDot = state[..., 3]
+            force = input[..., 0]
             costheta = torch.cos(theta)
             sintheta = torch.sin(theta)
 
@@ -58,8 +61,7 @@ def test_dynamics_cartpole():
             )
             xAcc = temp - self._polemassLength * thetaAcc * costheta / self._totalMass
 
-            _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
-
+            _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc), dim=-1)
             return state + torch.mul(_dstate, self._tau)
 
         def observation(self, state, input, t=None):
@@ -222,7 +224,7 @@ def test_dynamics_lti():
     input = torch.randn(N, 1, p)
     """
 
-    # The most general case that all parameters are in the batch. 
+    # The most general case that all parameters are in the batch.
     # The user could change the corresponding values according to the actual physical system and directions above.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -236,7 +238,7 @@ def test_dynamics_lti():
     input_1 = torch.randn(5, 2, device=device)
 
     lti_1 = pp.module.LTI(A_1, B_1, C_1, D_1, c1_1, c2_1).to(device)
-  
+
     # The user can implement this line to print each parameter for comparison.
 
     z_1, y_1 = lti_1(state_1,input_1)

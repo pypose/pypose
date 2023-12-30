@@ -99,6 +99,11 @@ class System(nn.Module):
             For nonlinear systems, the users have to call this function before getting the
             linearized system.
         '''
+        if t is None:
+            pass
+        else:
+            t=torch.tensor(t)
+
         self._ref_state, self._ref_input, self._ref_t = state, input, t
 
     @property
@@ -578,7 +583,7 @@ def sysmat(system:System, state, input, t):
         return system._A(t), system._B(t), system._C(t), system._D(t)
 
     #get total number of time steps for LTI
-    if t is None or type(t) == int:
+    if t is None or t.ndim == 0:
         T = 1
     else:
         T = t.shape[-1]
