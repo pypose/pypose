@@ -31,7 +31,12 @@ def diagonal_op_(input, offset: int=0, op: Optional[Callable]=None):
             results_shape = (n_diag_blocks, dm)
             results = torch.zeros(results_shape, dtype=values.dtype, device=values.device)
             results[indices[0, diag_indices]] = values
-        results = torch.flatten(results)
+            assert op is None, "op is not supported for diagonal that has empty values."
+        results = torch.flatten(results, start_dim=-2, end_dim=-1)
+        # apply the inplace op
+        if op is not None:
+            results = op(results)
+            block_diags[diag_indices] = results.view(n_diag_blocks, dm)
         return results
     else:
         raise NotImplementedError('Only square block and offset 0 is supported.')

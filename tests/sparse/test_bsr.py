@@ -29,6 +29,13 @@ def random_compressed(pshape, bshape, mode, zero_prob=0., block_prob=0.5):
 diag_max_thres = 1e-3
 diag_clamp_oop = Compose([torch.diagonal, partial(torch.clamp, max=diag_max_thres)])
 
+def diag_clamp_inp(x):
+    diag_clamp_oop(x)
+    return x
+
+def sp_diag_add_inp(x):
+    pp.sparse.diagonal_op_(x, op=partial(torch.add, other=torch.diagonal(x)))
+    return x
 
 class TestBSR:
     @pytest.mark.parametrize('block_prob', [0.0, 0.5, 1.0])
@@ -37,7 +44,8 @@ class TestBSR:
         (torch.matmul, torch.matmul, ['bsr', 'bsc'], 'mT', 2),
         (torch.matmul, torch.matmul, ['bsr', 'bsc'], 'identical_square', 2),
         (torch.diag, torch.diag, ['bsr'], 'identical_square', 2),
-        (diag_clamp_oop, diag_clamp_oop, ['bsr'], 'identical_square', 2),])
+        (diag_clamp_oop, diag_clamp_oop, ['bsr'], 'identical_square', 2),
+        ])
     def test_universal(self, op, dense_op, layouts, mode, dim, zero_prob, block_prob):
         if mode == 'identical':
             pshape = torch.Size(torch.randint(1, 10, (dim,)))
@@ -77,8 +85,8 @@ class TestBSR:
 
 
 if __name__ == '__main__':
-    TestBSR.test_universal(None, torch.matmul, torch.matmul, ['bsr', 'bsc'], 'mT', 2, 0.7)
-
+    TestBSR.test_universal(None, lambda x: pp.sparse.diagonal_op_(x, op=partial(torch.add, other=torch.diagonal(x))), lambda x: x.diag() + x.diag(), ['bsr'], 'identical_square', 2, 0, 1),
+    TestBSR.test_universal(None, sp_diag_add_inp, lambda x: x.diag().diag() + x, ['bsr'], 'identical_square', 2, 0, 1),
     crow_indices = torch.tensor([0, 2, 4])
     col_indices = torch.tensor([0, 1, 0, 1])
     values = torch.tensor([[[0, 1, 2], [6, 7, 8]],
