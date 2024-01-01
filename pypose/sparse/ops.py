@@ -1,11 +1,10 @@
 import torch
 import warnings
-from typing import List
+from typing import Callable, List, Optional
 from torch.library import Library
 
 
-@torch.jit.script
-def _bsr_diag(input, offset: int=0):
+def diagonal_op_(input, offset: int=0, op: Optional[Callable]=None):
     crow_indices = input.crow_indices() # b + 1 dimensional
     col_indices = input.col_indices() # b + 1 dimensional
     bsr_values = input.values() # 1 + 2 dimensional
@@ -23,14 +22,15 @@ def _bsr_diag(input, offset: int=0):
 
         indices = dummy_coo.indices().to(input.device)
         diag_indices = (indices[0] == indices[1]).nonzero().squeeze(-1)
-        values = bsr_values[diag_indices]
+        block_diags = bsr_values.diagonal(dim1=-2, dim2=-1)
+        values = block_diags[diag_indices]
         n_diag_blocks = sm if sm < sn else sn
         if diag_indices.shape[-1] == n_diag_blocks:
-            results = torch.diagonal(values, dim1=-2, dim2=-1)
+            results = values
         else:
             results_shape = (n_diag_blocks, dm)
             results = torch.zeros(results_shape, dtype=values.dtype, device=values.device)
-            results[indices[0, diag_indices]] = torch.diagonal(values, dim1=-2, dim2=-1)
+            results[indices[0, diag_indices]] = values
         results = torch.flatten(results)
         return results
     else:
@@ -137,5 +137,5 @@ with warnings.catch_warnings():
     sparse_lib = Library('aten', 'IMPL')
     sparse_lib.impl('mm', _sparse_csr_mm, 'SparseCsrCPU')
     sparse_lib.impl('mm', _sparse_csr_mm, 'SparseCsrCUDA')
-    sparse_lib.impl('diagonal', _bsr_diag, 'SparseCsrCPU')
-    sparse_lib.impl('diagonal', _bsr_diag, 'SparseCsrCUDA')
+    sparse_lib.impl('diagonal', diagonal_op_, 'SparseCsrCPU')
+    sparse_lib.impl('diagonal', diagonal_op_, 'SparseCsrCUDA')
