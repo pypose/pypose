@@ -128,7 +128,6 @@ def add(input, other, alpha=1):
     '''
     return input.add(other, alpha)
 
-
 def mul(input, other):
     r'''
     Multiply input LieTensor by other.
