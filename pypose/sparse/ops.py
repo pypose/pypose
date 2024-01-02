@@ -95,5 +95,6 @@ def bsr_bsc_matmul(bsr:torch.Tensor, bsc:torch.Tensor):
     dummy_csr = dummy.coalesce().to_sparse_csr()
     crow = dummy_csr.crow_indices().to(bsr.device)
     col = dummy_csr.col_indices().to(bsr.device)
-    return torch.sparse_bsr_tensor(crow, col, reduced, size=(m, p), dtype=reduced.dtype)
+    return torch.sparse_bsr_tensor(crow, col, reduced, size=(m, p),
+                                   dtype=reduced.dtype, device=reduced.device)
 
