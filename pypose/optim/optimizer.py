@@ -1,3 +1,46 @@
+
+from typing import Callable, Optional
+
+
+def diagonal_op_(input, offset: int=0, op: Optional[Callable]=None):
+    crow_indices = input.crow_indices() # b + 1 dimensional
+    col_indices = input.col_indices() # b + 1 dimensional
+    bsr_values = input.values() # 1 + 2 dimensional
+    m, n = input.shape[-2], input.shape[-1]
+    dm, dn = (bsr_values.shape[-2], bsr_values.shape[-1])
+    sm, sn = m // dm, n // dn
+
+    #simple case(block is square and offset is 0)
+    if dm == dn and offset == 0:
+        dummy_val = torch.zeros(bsr_values.shape[0], device='cpu')
+        dummy = torch.sparse_csr_tensor(crow_indices=crow_indices.to('cpu'),
+                                        col_indices=col_indices.to('cpu'),
+                                        values=dummy_val)
+        dummy_coo = dummy.to_sparse(layout=torch.sparse_coo).coalesce()
+
+        indices = dummy_coo.indices().to(input.device)
+        diag_indices = (indices[0] == indices[1]).nonzero().squeeze(-1)
+        block_diags = bsr_values.diagonal(dim1=-2, dim2=-1)
+        values = block_diags[diag_indices]
+        n_diag_blocks = sm if sm < sn else sn
+        if diag_indices.shape[-1] == n_diag_blocks:
+            results = values
+        else:
+            results_shape = (n_diag_blocks, dm)
+            results = torch.zeros(results_shape, dtype=values.dtype, device=values.device)
+            results[indices[0, diag_indices]] = values
+            assert op is None, "op is not supported for diagonal that has empty values."
+        results = torch.flatten(results, start_dim=-2, end_dim=-1)
+        # apply the inplace op
+        if op is not None:
+            results = op(results)
+            block_diags[diag_indices] = results.view(n_diag_blocks, dm)
+        return results
+    else:
+        raise NotImplementedError('Only square block and offset 0 is supported.')
+
+
+from functools import partial
 import torch
 from .. import bmv
 from torch import nn, finfo
@@ -536,17 +579,21 @@ class LevenbergMarquardt(_Optimizer):
                 A = A.to_dense()
             if A.is_sparse:
                 sparse_coo_diagonal_clamp_(A, pg['min'], pg['max'])
+            elif A.layout == torch.sparse_bsr:
+                diagonal_op_(A, op=partial(torch.clamp_, min=pg['min'], max=pg['max']))
             else:
                 A.diagonal().clamp_(pg['min'], pg['max'])
             while self.last <= self.loss:
                 if A.is_sparse:
                     sparse_coo_diagonal_add_(A, sparse_coo_diagonal(A) * pg['damping'])
+                elif A.layout == torch.sparse_bsr:
+                    diagonal_op_(A, op=partial(torch.add, other=pg['damping'] * torch.diagonal(A)))
                 else:
                     A.diagonal().add_(A.diagonal() * pg['damping'])
                 try:
                     solver_start = time.time()
                     if self.scipy:
-                        A = A.coalesce()
+                        A = A.coalesce() if A.is_sparse else A
                         A_indices = A.indices()
                         A_scipy = sp.coo_matrix((A.values().numpy(), (A_indices[0].numpy(), A_indices[1].numpy())))
                         D_scipy = self.solver(A_scipy, (-J_T @ R.view(-1, 1)).numpy(), x0 = self.prev_D, tol=1e-2, maxiter=10000)[0]
@@ -554,22 +601,23 @@ class LevenbergMarquardt(_Optimizer):
                         D = torch.from_numpy(D_scipy).to(torch.float32)
                         D = D.unsqueeze(-1)
                     elif not self.dense_A:
-                        D = self.solver(A = A.to(dtype=torch.float64), b = (-J_T @ R.view(-1, 1)).to(dtype=torch.float64), x = self.prev_D)
+                        D = self.solver(A = A.to(dtype=torch.float64), b = ((-J_T).to_sparse_coo().to_sparse_csr() @ R.view(-1, 1)).to(dtype=torch.float64), x = self.prev_D)
                         #D = self.solver(A = A.to_sparse_csr(), b = (-J_T @ R.view(-1, 1)), x = self.prev_D)
                         self.prev_D = D
                         D = D.unsqueeze(-1)
                         D = D.to(torch.float32)
                     else:
-                        D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
+                        D = self.solver(A = A, b = -J_T.to_dense() @ R.view(-1, 1))
+                        D = D.unsqueeze(-1)
                     solver_end = time.time()
                     self.solver_time += solver_end - solver_start
                 except Exception as e:
                     print(e, "\nLinear solver failed. Breaking optimization step...")
-                    raise e
+                    # raise e
                     break
                 self.update_parameter(pg['params'], D)
                 self.loss = self.model.loss(input, target)
-                self.strategy.update(pg, last=self.last, loss=self.loss, J=J, D=D, R=R.view(-1, 1))
+                self.strategy.update(pg, last=self.last, loss=self.loss, J=J.to_sparse_coo().to_sparse_csr(), D=D, R=R.view(-1, 1))
                 if self.last < self.loss and self.reject_count < self.reject: # reject step
                     self.update_parameter(params = pg['params'], step = -D)
                     self.loss, self.reject_count = self.last, self.reject_count + 1
