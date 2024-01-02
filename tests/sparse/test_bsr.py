@@ -37,6 +37,10 @@ def sp_diag_add_inp(x):
     pp.sparse.diagonal_op_(x, op=partial(torch.add, other=torch.diagonal(x)))
     return x
 
+def sp_diag_clamp_inp(x):
+    pp.sparse.diagonal_op_(x, op=partial(torch.clamp_, min=-diag_max_thres, max=diag_max_thres))
+    return x
+
 class TestBSR:
     @pytest.mark.parametrize('block_prob', [0.0, 0.5, 1.0])
     @pytest.mark.parametrize('zero_prob', [0., 0.7, 1.0])
