@@ -126,20 +126,25 @@ class TestLQR:
         x_init = torch.tensor([[ 1.50, -0.34, -2.18,  0.54],
                                [-1.05, -1.36,  0.43,  0.80]], device=device)
 
-        class MatrixGetter(torch.nn.Module):
-            def __init__(self, matrix):
+        class MyLTV(pp.module.LTV):
+            def __init__(self):
                 super().__init__()
-                self.register_buffer('matrix', matrix)
 
-            def forward(self, t):
-                return self.matrix[...,t,:,:]
+            def _A(self, t):
+                return A[...,t,:,:]
 
-        Agetter = MatrixGetter(A)
-        Bgetter = MatrixGetter(B)
-        Cgetter = MatrixGetter(C)
-        Dgetter = MatrixGetter(D)
+            def _B(self, t):
+                return B[...,t,:,:]
 
-        ltv = pp.module.LTV(Agetter, Bgetter, Cgetter, Dgetter).to(device)
+            def _C(self, t):
+                return C[...,t,:,:]
+
+            def _D(self, t):
+                return D[...,t,:,:]
+
+        ltv = MyLTV().to(device)
+
+
         lqr  = pp.module.LQR(ltv, Q, p, T).to(device)
         x, u, cost = lqr(x_init)
 
