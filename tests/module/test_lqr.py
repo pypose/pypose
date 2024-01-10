@@ -130,20 +130,20 @@ class TestLQR:
             def __init__(self):
                 super().__init__()
 
-            def _A(self, t):
+            def A(self, t):
                 return A[...,t,:,:]
 
-            def _B(self, t):
+            def B(self, t):
                 return B[...,t,:,:]
 
-            def _C(self, t):
+            def C(self, t):
                 return C[...,t,:,:]
 
-            def _D(self, t):
+            def D(self, t):
                 return D[...,t,:,:]
 
         ltv = MyLTV().to(device)
-
+        ltv.A
 
         lqr  = pp.module.LQR(ltv, Q, p, T).to(device)
         x, u, cost = lqr(x_init)

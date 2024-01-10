@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from .. import bmv, bvmv
-from .dynamics import runsys
+from .dynamics import runsys,sysmat
 from torch.linalg import cholesky, vecdot
 
 
@@ -327,12 +327,16 @@ class LQR(nn.Module):
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
         p = bmv(self.Q, xut) + self.p
 
-        self.system.set_refpoint(state=self.x_traj,
-                                    input=self.u_traj,
-                                    t=torch.arange(self.T, device=self.p.device)*dt)
-        A = self.system.A.squeeze(-2)
-        B = self.system.B.squeeze(-2)
-        F = torch.cat((A, B), dim=-1)
+        # self.system.set_refpoint(state=self.x_traj,
+        #                             input=self.u_traj,
+        #                             t=torch.arange(self.T, device=self.p.device)*dt)
+        # A = self.system.A.squeeze(-2)
+        # B = self.system.B.squeeze(-2)
+        t = torch.arange(self.T, device=self.p.device)*dt
+
+        AB=sysmat(self.system, self.x_traj, self.u_traj, t,"AB")
+
+        F = torch.cat(AB, dim=-1)
 
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
