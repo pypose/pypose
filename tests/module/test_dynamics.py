@@ -92,12 +92,14 @@ def test_dynamics_cartpole():
     cartPoleSolver.set_refpoint(state=jacob_state, input=jacob_input.unsqueeze(0), t=time[-1])
 
     A,B,C,D = sysmat(cartPoleSolver,jacob_state, jacob_input.unsqueeze(0), time[-1], "ABCD")
+    c1 = cartPoleSolver.c1(jacob_state, jacob_input.unsqueeze(0), time[-1])
+    c2 = cartPoleSolver.c2(jacob_state, jacob_input.unsqueeze(0), time[-1])
     assert torch.allclose(A_ref, A)
     assert torch.allclose(B_ref, B)
     assert torch.allclose(C_ref, C)
     assert torch.allclose(D_ref, D)
-    assert torch.allclose(c1_ref, cartPoleSolver.c1)
-    assert torch.allclose(c2_ref, cartPoleSolver.c2)
+    assert torch.allclose(c1_ref, c1)
+    assert torch.allclose(c2_ref, c2)
 
 
 def test_dynamics_floquet():
@@ -167,7 +169,7 @@ def test_dynamics_floquet():
     obser_all = torch.zeros(N, 2, device=device)
 
     for i in range(N):
-        state_all[i + 1], obser_all[i] = solver(state_all[i], input[i])
+        state_all[i + 1], obser_all[i] = solver(state_all[i], input[i], time[i])
 
     assert torch.allclose(state_all, state_ref, atol=1e-5)
     assert torch.allclose(obser_all, obser_ref)
@@ -192,10 +194,14 @@ def test_dynamics_floquet():
     # errors the values can be ~ 1e-7, and hence we increase the atol
     # Same story below
     solver.set_refpoint()
-    assert torch.allclose(A0_N, solver.A)
-    assert torch.allclose(B0_N, solver.B)
-    assert torch.allclose(C0, solver.C)
-    assert torch.allclose(D0, solver.D)
+    A = sysmat(solver, state_all[0], input[0], time[0], "A")
+    B = sysmat(solver, state_all[0], input[0], time[0], "B")
+    C = sysmat(solver, state_all[0], input[0], time[0], "C")
+    D = sysmat(solver, state_all[0], input[0], time[0], "D")
+    assert torch.allclose(A0_N, A)
+    assert torch.allclose(B0_N, B)
+    assert torch.allclose(C0, C)
+    assert torch.allclose(D0, D)
     assert torch.allclose(c1, solver.c1, atol=1e-6)
     assert torch.allclose(c2_N, solver.c2)
 
