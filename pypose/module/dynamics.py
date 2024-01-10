@@ -690,10 +690,6 @@ def sysmat(system:System, state, input, t, matrices):
         Matrices A, B, C, D of the linearized system.
     '''
 
-    if isinstance(system, LTV):
-        dict = {'A':system.A, 'B':system.B, 'C':system.C, 'D':system.D}
-        return [dict[m](t) for m in matrices]
-
     #get total number of time steps for LTI
     if t is None:
         T = 1
@@ -702,12 +698,13 @@ def sysmat(system:System, state, input, t, matrices):
     else:
         T = t.shape[-1]
 
+    if isinstance(system, LTV):
+        dict = {'A':system.A, 'B':system.B, 'C':system.C, 'D':system.D}
+        return [dict[m](t) for m in matrices]
+
     if isinstance(system, LTI):
         dict = {'A':system.A, 'B':system.B, 'C':system.C, 'D':system.D}
         return [dict[m] if T==1 else dict[m].unsqueeze(1).repeat(1,T,1,1) for m in matrices]
-
-    #make state and input 2D, a temporary solution before implementing batched jacobian
-    n_s = state.shape[-1]
 
     if isinstance(system, NLS):
 
@@ -721,15 +718,14 @@ def sysmat(system:System, state, input, t, matrices):
         res = []
 
         for m in matrices:
-            trans_func = funcs[m]
-            jacFunc = jacrev(trans_func)
+            jacFunc = jacrev(funcs[m])
             M = jacFunc(jac_inputs[m])
 
-            if M.ndim == 6:#some cases
+            if M.ndim == 6: #some cases for different input shape
                 M = M.squeeze(3).sum(3)
 
             res.append(M)
 
         return res
 
-    raise NotImplementedError("System type not recognized")
+    raise TypeError("System type not recognized")
