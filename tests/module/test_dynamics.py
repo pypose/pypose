@@ -148,10 +148,16 @@ def test_dynamics_floquet():
         def state_transition(self, state, input, t):
             cc = torch.cos(2*math.pi*t/100)
             ss = torch.sin(2*math.pi*t/100)
-            A = torch.tensor([[   1., cc/10],
-                            [cc/10,    1.]], device=device)
-            B = torch.tensor([[ss],
+
+            A = torch.tensor([[   1., 0],
+                            [0,    1.]], device=device)
+            A[0,1]=cc/10
+            A[1,0]=cc/10
+
+            B = torch.tensor([[0],
                             [1.]], device=device)
+            B[0,0]=ss
+
             return state.matmul(A) + B.matmul(input)
 
         def observation(self, state, input, t):
@@ -193,26 +199,27 @@ def test_dynamics_floquet():
     # Note for c1, the values are supposed to be zero, but due to numerical
     # errors the values can be ~ 1e-7, and hence we increase the atol
     # Same story below
-    solver.set_refpoint()
-    A = sysmat(solver, state_all[0], input[0], time[0], "A")
-    B = sysmat(solver, state_all[0], input[0], time[0], "B")
-    C = sysmat(solver, state_all[0], input[0], time[0], "C")
-    D = sysmat(solver, state_all[0], input[0], time[0], "D")
+    A,B,C,D = sysmat(solver,state_all[-1], input[-2:-1], time[-1], "ABCD")
+    c1 = solver.c1(state_all[-1], input[-2:-1], time[-1])
+    c2 = solver.c2(state_all[-1], input[-2:-1], time[-1])
     assert torch.allclose(A0_N, A)
     assert torch.allclose(B0_N, B)
     assert torch.allclose(C0, C)
     assert torch.allclose(D0, D)
-    assert torch.allclose(c1, solver.c1, atol=1e-6)
-    assert torch.allclose(c2_N, solver.c2)
+    assert torch.allclose(c1, c1, atol=1e-6)
+    assert torch.allclose(c2_N, c2)
 
     # Jacobian computation - at the step idx
-    solver.set_refpoint(state=state_all[idx], input=input[idx], t=time[idx])
-    assert torch.allclose(A0_i, solver.A)
-    assert torch.allclose(B0_i, solver.B)
-    assert torch.allclose(C0, solver.C)
-    assert torch.allclose(D0, solver.D)
-    assert torch.allclose(c1, solver.c1, atol=1e-6)
-    assert torch.allclose(c2_i, solver.c2)
+    idx=5
+    A,B,C,D = sysmat(solver,state_all[idx], input[idx-1:idx], time[idx], "ABCD")
+    c1 = solver.c1(state_all[idx], input[idx-1:idx], time[idx])
+    c2 = solver.c2(state_all[idx], input[idx-1:idx], time[idx])
+    assert torch.allclose(A0_i, A)
+    assert torch.allclose(B0_i, B)
+    assert torch.allclose(C0, C)
+    assert torch.allclose(D0, D)
+    assert torch.allclose(c1, c1, atol=1e-6)
+    assert torch.allclose(c2_i, c2)
 
 
 def test_dynamics_lti():

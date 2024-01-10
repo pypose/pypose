@@ -723,7 +723,12 @@ def sysmat(system:System, state, input, t, matrices):
         for m in matrices:
             trans_func = funcs[m]
             jacFunc = jacrev(trans_func)
-            res.append(jacFunc(jac_inputs[m]))
+            M = jacFunc(jac_inputs[m])
+
+            if M.ndim == 6:#some cases
+                M = M.squeeze(3).sum(3)
+
+            res.append(M)
 
         return res
 
