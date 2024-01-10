@@ -622,23 +622,24 @@ class NLS(System):
         C, D = sysmat(self, state, input, t, 'CD')
         return g - bmv(C, state) - bmv(D, input)
 
-class NLSJacWrapper(NLS):
-    r'''
-    An nn module wrapper class for NLS to compute the Jacobian with tau directly.
-    '''
-    def __init__(self, nls, n_s):
-        super().__init__()
-        self.nls = nls
-        self.n_s = n_s
 
-    def forward(self, tau):
-        return super().forward(tau[...,:self.n_s], tau[...,self.n_s:],None)
+# class NLSJacWrapper(NLS):
+#     r'''
+#     An nn module wrapper class for NLS to compute the Jacobian with tau directly.
+#     '''
+#     def __init__(self, nls, n_s):
+#         super().__init__()
+#         self.nls = nls
+#         self.n_s = n_s
 
-    def state_transition(self, state, input,t):
-        return self.nls.state_transition(state, input, None)
+#     def forward(self, tau):
+#         return super().forward(tau[...,:self.n_s], tau[...,self.n_s:],None)
 
-    def observation(self, state, input,t):
-        return self.nls.observation(state, input, None)
+#     def state_transition(self, state, input,t):
+#         return self.nls.state_transition(state, input, None)
+
+#     def observation(self, state, input,t):
+#         return self.nls.observation(state, input, None)
 
 
 def toBTN(vec, T):
@@ -679,7 +680,7 @@ def runsys(system: System, T, x_traj, u_traj):
     return x_traj
 
 
-def sysmat(system:System, state, input, t, matrices):
+def sysmat(system:System, state, input, t, mats):
     r'''
     Find the linearized system matrices at given states, inputs, and time.
     Argument tensors state, input, and t should be batched.
@@ -687,6 +688,8 @@ def sysmat(system:System, state, input, t, matrices):
     Returns:
         Matrices A, B, C, D of the linearized system.
     '''
+
+    mats = mats.upper()
 
     #get total number of time steps for LTI
     if t is None:
@@ -698,29 +701,29 @@ def sysmat(system:System, state, input, t, matrices):
 
     if isinstance(system, LTV):
         dict = {'A':system.A, 'B':system.B, 'C':system.C, 'D':system.D}
-        return [dict[m](t) for m in matrices]
+        return [dict[m](t) for m in mats]
 
     if isinstance(system, LTI):
         dict = {'A':system.A, 'B':system.B, 'C':system.C, 'D':system.D}
-        return [dict[m] if T==1 else dict[m].unsqueeze(1).repeat(1,T,1,1) for m in matrices]
+        return [dict[m] if T==1 else dict[m].unsqueeze(1).repeat(1,T,1,1) for m in mats]
 
     if isinstance(system, NLS):
 
-        funcs = {'A':lambda x: system.state_transition(x, input, t),
-                'B':lambda x: system.state_transition(state, x, t),
-                'C':lambda x: system.observation(x, input, t),
-                'D':lambda x: system.observation(state, x, t)}
+        funcs = {'A': lambda x: system.state_transition(x, input, t),
+                 'B': lambda x: system.state_transition(state, x, t),
+                 'C': lambda x: system.observation(x, input, t),
+                 'D': lambda x: system.observation(state, x, t)}
 
-        jac_inputs = {'A':state, 'B':input, 'C':state, 'D':input}
+        jac_inputs = {'A': state, 'B': input, 'C': state, 'D': input}
 
         res = []
 
-        for m in matrices:
+        for m in mats:
             jacFunc = jacrev(funcs[m])
             M = jacFunc(jac_inputs[m])
 
-            if M.ndim == 6: #some cases for different input shape
-                M = M.squeeze(3).sum(3)
+            # if M.ndim == 6: #some cases for different input shape
+            #     M = M.squeeze(3).sum(3)
 
             res.append(M)
 

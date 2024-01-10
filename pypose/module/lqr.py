@@ -327,14 +327,9 @@ class LQR(nn.Module):
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
         p = bmv(self.Q, xut) + self.p
 
-        # self.system.set_refpoint(state=self.x_traj,
-        #                             input=self.u_traj,
-        #                             t=torch.arange(self.T, device=self.p.device)*dt)
-        # A = self.system.A.squeeze(-2)
-        # B = self.system.B.squeeze(-2)
         t = torch.arange(self.T, device=self.p.device)*dt
 
-        AB=sysmat(self.system, self.x_traj, self.u_traj, t,"AB")
+        AB = sysmat(self.system, self.x_traj, self.u_traj, t, "AB")
 
         F = torch.cat(AB, dim=-1)
 
