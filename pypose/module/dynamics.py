@@ -683,8 +683,8 @@ def sysmat(system:System, state, input, t, matrices):
     #get total number of time steps for LTI
     if t is None:
         T = 1
-    elif isinstance(t,int):
-        T = t
+    elif isinstance(t,int) or t.ndim==0:
+        T = int(t)
     else:
         T = t.shape[-1]
 
@@ -696,11 +696,21 @@ def sysmat(system:System, state, input, t, matrices):
     n_s = state.shape[-1]
 
     if isinstance(system, NLS):
-        wrapper=NLSJacWrapper(system, n_s)
-        tau=torch.cat((state, input), dim=-1)
-        trans_func = lambda x: wrapper(x)
-        jacFunc = jacrev(trans_func)
-        F = jacFunc(tau)[0].sum(4).squeeze(3)
-        return F[..., :n_s], F[..., n_s:]
+
+        funcs = {'A':lambda x: system.state_transition(x, input, t),
+                'B':lambda x: system.state_transition(state, x, t),
+                'C':lambda x: system.observation(x, input, t),
+                'D':lambda x: system.observation(state, x, t)}
+
+        jac_inputs = {'A':state, 'B':input, 'C':state, 'D':input}
+
+        res = []
+
+        for m in matrices:
+            trans_func = funcs[m]
+            jacFunc = jacrev(trans_func)
+            res.append(jacFunc(jac_inputs[m]))
+
+        return res
 
     raise NotImplementedError("System type not recognized")

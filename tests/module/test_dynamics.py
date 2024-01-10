@@ -1,6 +1,7 @@
 import math
 import pypose as pp
 import torch as torch
+from pypose.module.dynamics import sysmat
 
 
 def test_dynamics_cartpole():
@@ -90,10 +91,11 @@ def test_dynamics_cartpole():
     jacob_state, jacob_input = state_all[-1], input[-1]
     cartPoleSolver.set_refpoint(state=jacob_state, input=jacob_input.unsqueeze(0), t=time[-1])
 
-    assert torch.allclose(A_ref, cartPoleSolver.A)
-    assert torch.allclose(B_ref, cartPoleSolver.B)
-    assert torch.allclose(C_ref, cartPoleSolver.C)
-    assert torch.allclose(D_ref, cartPoleSolver.D)
+    A,B,C,D = sysmat(cartPoleSolver,jacob_state, jacob_input.unsqueeze(0), time[-1], "ABCD")
+    assert torch.allclose(A_ref, A)
+    assert torch.allclose(B_ref, B)
+    assert torch.allclose(C_ref, C)
+    assert torch.allclose(D_ref, D)
     assert torch.allclose(c1_ref, cartPoleSolver.c1)
     assert torch.allclose(c2_ref, cartPoleSolver.c2)
 
