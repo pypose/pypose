@@ -613,15 +613,13 @@ class NLS(System):
     def c1(self, state, input, t):
 
         f = self.state_transition(state, input,t)
-        A, = sysmat(self, state, input, t, 'A')
-        B, = sysmat(self, state, input, t, 'B')
+        A, B = sysmat(self, state, input, t, 'AB')
         return f - bmv(A, state) - bmv(B, input)
 
     def c2(self, state, input, t):
 
         g = self.observation(state, input,t)
-        C, = sysmat(self, state, input, t, 'C')
-        D, = sysmat(self, state, input, t, 'D')
+        C, D = sysmat(self, state, input, t, 'CD')
         return g - bmv(C, state) - bmv(D, input)
 
 class NLSJacWrapper(NLS):
