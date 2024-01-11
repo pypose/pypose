@@ -75,8 +75,6 @@ if __name__ == "__main__":
         state[i + 1], _ = model(state[i], input[i])
 
     # Jacobian computation - Find jacobians at the last step
-    # model.set_refpoint(state=state[-1,:], input=input[-1], t=time[-1])
-    # vars = ['A', 'B', 'C', 'D', 'c1', 'c2']
     A, B, C, D = sysmat(model, state[-1], input[-1], time[-1], "ABCD")
     c1 = model.c1(state[-1], input[-2:-1], time[-2:-1])
     c2 = model.c2(state[-1], input[-2:-1], time[-2:-1])
