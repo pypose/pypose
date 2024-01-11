@@ -59,12 +59,6 @@ def bmv(mat, vec, *, out=None):
     mat = mat.tensor() if isinstance(mat, LieTensor) else mat
     vec = vec.tensor() if isinstance(vec, LieTensor) else vec
 
-    # if mat.ndim == 4:
-    #     n_batch, n_t = mat.shape[:2]
-    #     mat = mat.flatten(0, 1)
-    #     vec = vec.flatten(0, 1)
-    #     return torch.matmul(mat, vec.unsqueeze(-1), out=out).squeeze_(-1).reshape(n_batch, n_t, -1)
-
     return torch.matmul(mat, vec.unsqueeze(-1), out=out).squeeze_(-1)
 
 

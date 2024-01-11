@@ -333,6 +333,9 @@ class LQR(nn.Module):
 
         F = torch.cat(AB, dim=-1)
 
+        if F.ndim == 6: #in shape of (b,t,n,b,n,n) by jacobian
+            F = F.sum(3).sum(3) #make shape (b,t,n,n)
+
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
                 Qt = self.Q[...,t,:,:]

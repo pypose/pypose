@@ -722,9 +722,6 @@ def sysmat(system:System, state, input, t, mats):
             jacFunc = jacrev(funcs[m])
             M = jacFunc(jac_inputs[m])
 
-            # if M.ndim == 6: #some cases for different input shape
-            #     M = M.squeeze(3).sum(3)
-
             res.append(M)
 
         return res
