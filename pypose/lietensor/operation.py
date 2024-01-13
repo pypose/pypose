@@ -330,7 +330,7 @@ class SO3_Log(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        output = ctx.saved_tensors[0]
+        output, = ctx.saved_tensors
         Jl_inv = so3_Jl_inv(output)
         grad = (grad_output.unsqueeze(-2) @ Jl_inv).squeeze(-2)
         zero = torch.zeros(output.shape[:-1]+(1,), device=output.device, dtype=output.dtype)
@@ -364,7 +364,7 @@ class so3_Exp(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        input = ctx.saved_tensors[0]
+        input, = ctx.saved_tensors
         Jl = so3_Jl(input)
         grad_input = grad_output[..., :-1].unsqueeze(-2) @ Jl
         return grad_input.squeeze(-2)
@@ -388,7 +388,7 @@ class SE3_Log(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        output = ctx.saved_tensors[0]
+        output, = ctx.saved_tensors
         Jl_inv = se3_Jl_inv(output)
         grad = (grad_output.unsqueeze(-2) @ Jl_inv).squeeze(-2)
         zero = torch.zeros(output.shape[:-1]+(1,), device=output.device, dtype=output.dtype)
@@ -412,7 +412,7 @@ class se3_Exp(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        input = ctx.saved_tensors[0]
+        input, = ctx.saved_tensors
         Jl = se3_Jl(input)
         grad_input = grad_output[..., :-1].unsqueeze(-2) @ Jl
         return grad_input.squeeze(-2)
@@ -434,7 +434,7 @@ class RxSO3_Log(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        output = ctx.saved_tensors[0]
+        output, = ctx.saved_tensors
         Jl_inv = rxso3_Jl_inv(output)
         grad = (grad_output.unsqueeze(-2) @ Jl_inv).squeeze(-2)
         zero = torch.zeros(output.shape[:-1]+(1,), device=output.device, dtype=output.dtype)
@@ -458,7 +458,7 @@ class rxso3_Exp(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        input = ctx.saved_tensors[0]
+        input, = ctx.saved_tensors
         Jl = rxso3_Jl(input)
         grad_input = grad_output[..., :-1].unsqueeze(-2) @ Jl
         return grad_input.squeeze(-2)
@@ -482,7 +482,7 @@ class Sim3_Log(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        output = ctx.saved_tensors[0]
+        output, = ctx.saved_tensors
         Jl_inv = sim3_Jl_inv(output)
         grad = (grad_output.unsqueeze(-2) @ Jl_inv).squeeze(-2)
         zero = torch.zeros(output.shape[:-1]+(1,), device=output.device, dtype=output.dtype)
@@ -507,7 +507,7 @@ class sim3_Exp(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        input = ctx.saved_tensors[0]
+        input, = ctx.saved_tensors
         Jl = sim3_Jl(input)
         grad_input = grad_output[..., :-1].unsqueeze(-2) @ Jl
         return grad_input.squeeze(-2)
