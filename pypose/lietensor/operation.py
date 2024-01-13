@@ -844,7 +844,7 @@ class SO3_Mul(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        X = ctx.saved_tensors[0]
+        X, = ctx.saved_tensors
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
         X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
         dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), SO3_Adj(X)).squeeze(-2)
@@ -869,7 +869,7 @@ class SE3_Mul(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        X = ctx.saved_tensors[0]
+        X, = ctx.saved_tensors
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
         X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
         dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), SE3_Adj(X)).squeeze(-2)
@@ -894,7 +894,7 @@ class RxSO3_Mul(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        X = ctx.saved_tensors[0]
+        X, = ctx.saved_tensors
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
         X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
         dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), RxSO3_Adj(X)).squeeze(-2)
@@ -919,7 +919,7 @@ class Sim3_Mul(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        X = ctx.saved_tensors[0]
+        X, = ctx.saved_tensors
         zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
         X_grad = torch.cat((grad_output[..., :-1], zero), dim = -1)
         dZxX = torch.matmul(grad_output[..., :-1].unsqueeze(-2), Sim3_Adj(X)).squeeze(-2)
@@ -937,14 +937,13 @@ class SO3_Inv(torch.autograd.Function):
 
     @staticmethod
     def setup_context(ctx: Any, inputs, output) -> Any:
-        X, = inputs
-        out = output
-        ctx.save_for_backward(X, out)
+        Y = output
+        ctx.save_for_backward(Y, )
         return
 
     @staticmethod
     def backward(ctx, grad_output):
-        _, Y = ctx.saved_tensors
+        Y, = ctx.saved_tensors
         X_grad = -(grad_output[..., :-1].unsqueeze(-2) @ SO3_Adj(Y)).squeeze(-2)
         zero = torch.zeros(Y.shape[:-1]+(1,), device=Y.device, dtype=Y.dtype)
         return torch.cat((X_grad, zero), dim = -1)
@@ -962,14 +961,13 @@ class SE3_Inv(torch.autograd.Function):
 
     @staticmethod
     def setup_context(ctx: Any, inputs, output) -> Any:
-        X, = inputs
-        out = output
-        ctx.save_for_backward(X, out)
+        Y = output
+        ctx.save_for_backward(Y, )
         return
 
     @staticmethod
     def backward(ctx, grad_output):
-        _, Y = ctx.saved_tensors
+        Y, = ctx.saved_tensors
         X_grad = -(grad_output[..., :-1].unsqueeze(-2) @ SE3_Adj(Y)).squeeze(-2)
         zero = torch.zeros(Y.shape[:-1]+(1,), device=Y.device, dtype=Y.dtype)
         return torch.cat((X_grad, zero), dim = -1)
@@ -987,14 +985,13 @@ class RxSO3_Inv(torch.autograd.Function):
 
     @staticmethod
     def setup_context(ctx: Any, inputs, output) -> Any:
-        X, = inputs
-        out = output
-        ctx.save_for_backward(X, out)
+        Y = output
+        ctx.save_for_backward(Y, )
         return
 
     @staticmethod
     def backward(ctx, grad_output):
-        _, Y = ctx.saved_tensors
+        Y, = ctx.saved_tensors
         X_grad = -(grad_output[..., :-1].unsqueeze(-2) @ RxSO3_Adj(Y)).squeeze(-2)
         zero = torch.zeros(Y.shape[:-1]+(1,), device=Y.device, dtype=Y.dtype)
         return torch.cat((X_grad, zero), dim = -1)
@@ -1012,14 +1009,13 @@ class Sim3_Inv(torch.autograd.Function):
 
     @staticmethod
     def setup_context(ctx: Any, inputs, output) -> Any:
-        X, = inputs
-        out = output
-        ctx.save_for_backward(X, out)
+        Y = output
+        ctx.save_for_backward(Y, )
         return
 
     @staticmethod
     def backward(ctx, grad_output):
-        _, Y = ctx.saved_tensors
+        Y, = ctx.saved_tensors
         X_grad = -(grad_output[..., :-1].unsqueeze(-2) @ Sim3_Adj(Y)).squeeze(-2)
         zero = torch.zeros(Y.shape[:-1]+(1,), device=Y.device, dtype=Y.dtype)
         return torch.cat((X_grad, zero), dim = -1)
