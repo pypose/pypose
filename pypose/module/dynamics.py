@@ -12,10 +12,11 @@ class System(nn.Module):
     such as linear time invariant system :meth:`LTI`, Linear Time-Variant :meth:`LTV`,
     and a non-linear system :meth:`NLS`.
     '''
-    def __init__(self):
+    def __init__(self, xdim = None, udim = None, ydim = None):
         super().__init__()
         self.register_buffer('_t',torch.tensor(0, dtype=torch.int64))
         self.register_forward_hook(self.forward_hook)
+        self._xdim, self._udim, self._ydim = xdim, udim, ydim
 
     def forward_hook(self, module, inputs, outputs):
         r'''
@@ -100,6 +101,27 @@ class System(nn.Module):
             linearized system.
         '''
         return self
+
+    @property
+    def xdim(self):
+        r'''
+        dim of state
+        '''
+        return self._xdim
+
+    @property
+    def udim(self):
+        r'''
+        dim of input
+        '''
+        return self._udim
+
+    @property
+    def ydim(self):
+        r'''
+        dim of observation
+        '''
+        return self._ydim
 
     @property
     def systime(self):
@@ -553,7 +575,7 @@ class NLS(System):
         '''
         self._ref_state = self.state if state is None else torch.atleast_1d(state)
         self._ref_input = self.input if input is None else torch.atleast_1d(input)
-        self._ref_t = self.systime if t is None else torch.atleast_1d(t)
+        self._ref_t = self.systime if t is None else torch.tensor(t)
         self._ref_f = self.state_transition(self._ref_state, self._ref_input, self._ref_t)
         self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
         return self
@@ -660,6 +682,7 @@ def runsys(system: System, T, x_traj, u_traj):
     x_traj = toBTN(x_traj, T)
     u_traj = toBTN(u_traj, T)
 
+    system.systime = torch.tensor(0)
     for i in range(T-1):
         x_traj[...,i+1,:], _ = system(x_traj[...,i,:], u_traj[...,i,:])
 
