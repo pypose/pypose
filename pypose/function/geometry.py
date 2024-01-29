@@ -389,3 +389,59 @@ def random_downsample(points, num_points):
     indices = torch.randperm(points.size(-2))[:num_points]
     downsampled_points = points[..., indices, :]
     return downsampled_points
+
+def voxel_filter(points, leaf_size, random=False):
+    r'''
+    Perform voxel filtering on a point cloud to reduce the number of points by grouping
+    them into voxels and selecting a representative point for each voxel.
+
+    Args:
+        points (torch.Tensor): The input point cloud. It is essential that the last
+            dimension (D) exceeds 3, with the point's coordinates occupying the initial
+            three values. Subsequent values may contain additional information like
+            intensity, RGB channels, etc. The shape has to be (..., N, D).
+        leaf_size (list of float): The sizes of the voxel in each dimension, provided as
+            [l_x, l_y, l_z].
+        random (bool, optional): If True, a random point within each voxel is chosen as
+            the representative. If False, the centroid of the points in the voxel is used.
+            Default: False.
+
+    Returns:
+        torch.Tensor: The downsampled point cloud, with each point representing a voxel.
+        The shape is (..., M, D), where M is the number of voxels.
+
+    Example:
+        >>> points = torch.tensor([[1., 2., 3.],
+        ...                        [4., 5., 6.],
+        ...                        [7., 8., 9.],
+        ...                        [10., 11., 12.],
+        ...                        [13., 14., 15.]])
+        >>> voxel_filter(points, [5., 5., 5.])
+        tensor([[ 2.5000,  3.5000,  4.5000],
+                [ 8.5000,  9.5000, 10.5000],
+                [13.0000, 14.0000, 15.0000]])
+    '''
+    assert points.size(-1) >= 3, "The last dimension of the pointcloud should exceed 3."
+    assert len(leaf_size) == 3, "Leaf size should be a list of three floats."
+
+    min_bound = torch.min(points[..., :3], dim=-2).values
+    voxel_indices = ((points[..., :3] - min_bound) / torch.tensor(leaf_size)).to(torch.int64)
+
+    unique_indices, inverse_indices = torch.unique(voxel_indices, dim=-2, return_inverse=True)
+    if random:
+        downsampled_points = []
+        for i in range(torch.max(inverse_indices) + 1):
+            voxel_points = points[inverse_indices == i]
+            random_point = voxel_points[torch.randint(len(voxel_points), (1,))]
+            downsampled_points.append(random_point)
+        downsampled_points = torch.vstack(downsampled_points)
+        return downsampled_points
+    else:
+        voxel_means = torch.zeros_like(unique_indices,dtype=torch.float32)
+        voxel_counts = torch.zeros(unique_indices.size(0), dtype=torch.float32)
+
+        voxel_means.index_add_(0, inverse_indices, points[..., :3])
+        voxel_counts.index_add_(0, inverse_indices, torch.ones_like(inverse_indices, dtype=torch.float32))
+
+        voxel_means /= voxel_counts.view(-1, 1)
+        return voxel_means
