@@ -356,3 +356,36 @@ def svdtf(source, target):
     t = ctntarget.mT - R @ ctnsource.mT
     T = torch.cat((R, t), dim=-1)
     return mat2SE3(T, check=False)
+
+def random_downsample(points, num_points):
+    r'''
+    Randomly downsample a point cloud to a specified number of points.
+
+    Args:
+        points (torch.Tensor): the input point cloud, where the last dimension (D)
+            should be at least 3, with the first three values being the x, y, z coordinates.
+            The shape should be (..., N, D), where N is the number of points.
+        num_points (int): the number of points to downsample to.
+
+    Returns:
+        downsampled_points (torch.Tensor): The downsampled point cloud, with the shape
+        (..., num_points, D).
+
+    Example:
+        >>> import torch
+        >>> points = torch.tensor([[1., 2., 3.],
+        ...                        [4., 5., 6.],
+        ...                        [7., 8., 9.],
+        ...                        [10., 11., 12.],
+        ...                        [13., 14., 15.]])
+        >>> random_downsample(points, 3)
+        tensor([[ 4.,  5.,  6.],
+                [ 1.,  2.,  3.],
+                [10., 11., 12.]])
+    '''
+    assert points.size(-1) >= 3, "The last dimension of the pointcloud should exceed 3."
+    assert num_points <= points.size(-2), "Number of points to downsample to must be less than or equal to the number of points in the point cloud."
+
+    indices = torch.randperm(points.size(-2))[:num_points]
+    downsampled_points = points[..., indices, :]
+    return downsampled_points
