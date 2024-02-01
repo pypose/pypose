@@ -411,6 +411,7 @@ def voxel_filter(points, leaf_size, random=False):
         The shape is (..., M, D), where M is the number of voxels.
 
     Example:
+        >>> import torch
         >>> points = torch.tensor([[1., 2., 3.],
         ...                        [4., 5., 6.],
         ...                        [7., 8., 9.],
@@ -427,14 +428,13 @@ def voxel_filter(points, leaf_size, random=False):
     min_bound = torch.min(points[..., :3], dim=-2).values
     voxel_indices = ((points[..., :3] - min_bound) / torch.tensor(leaf_size)).to(torch.int64)
 
-    unique_indices, inverse_indices = torch.unique(voxel_indices, dim=-2, return_inverse=True)
+    unique_indices, inverse_indices,counts = torch.unique(voxel_indices, dim=-2, return_inverse=True, return_counts=True)
     if random:
-        downsampled_points = []
-        for i in range(torch.max(inverse_indices) + 1):
-            voxel_points = points[inverse_indices == i]
-            random_point = voxel_points[torch.randint(len(voxel_points), (1,))]
-            downsampled_points.append(random_point)
-        downsampled_points = torch.vstack(downsampled_points)
+        sorting_indices = torch.argsort(inverse_indices).squeeze()
+        sorted_points = points[sorting_indices, :]
+        random_indices = torch.cat([torch.randint(low=0, high=count.item(), size=(1,)) for count in counts])
+        selected_indices = (random_indices + torch.cumsum(counts,dim=0) - counts).squeeze()
+        downsampled_points = sorted_points[..., selected_indices, :]
         return downsampled_points
     else:
         voxel_means = torch.zeros_like(unique_indices,dtype=torch.float32)
