@@ -384,7 +384,8 @@ def random_downsample(points, num_points):
                 [10., 11., 12.]])
     '''
     assert points.size(-1) >= 3, "The last dimension of the pointcloud should exceed 3."
-    assert num_points <= points.size(-2), "Number of points to downsample to must be less than or equal to the number of points in the point cloud."
+    assert num_points <= points.size(-2), "Number of points to downsample to must be \
+        less than or equal to the number of points in the point cloud."
 
     indices = torch.randperm(points.size(-2))[:num_points]
     downsampled_points = points[..., indices, :]
@@ -421,6 +422,11 @@ def voxel_filter(points, leaf_size, random=False):
         tensor([[ 2.5000,  3.5000,  4.5000],
                 [ 8.5000,  9.5000, 10.5000],
                 [13.0000, 14.0000, 15.0000]])
+        >>> voxel_filter(points, [5., 5., 5.],True)
+        tensor([[ 4.,  5.,  6.],
+                [10., 11., 12.],
+                [13., 14., 15.]])
+
     '''
     assert points.size(-1) >= 3, "The last dimension of the pointcloud should exceed 3."
     assert len(leaf_size) == 3, "Leaf size should be a list of three floats."
@@ -428,11 +434,13 @@ def voxel_filter(points, leaf_size, random=False):
     min_bound = torch.min(points[..., :3], dim=-2).values
     voxel_indices = ((points[..., :3] - min_bound) / torch.tensor(leaf_size)).to(torch.int64)
 
-    unique_indices, inverse_indices,counts = torch.unique(voxel_indices, dim=-2, return_inverse=True, return_counts=True)
+    unique_indices, inverse_indices,counts = torch.unique(
+        voxel_indices, dim=-2, return_inverse=True, return_counts=True)
     if random:
         sorting_indices = torch.argsort(inverse_indices).squeeze()
         sorted_points = points[sorting_indices, :]
-        random_indices = torch.cat([torch.randint(low=0, high=count.item(), size=(1,)) for count in counts])
+        random_indices = torch.cat([
+            torch.randint(low=0, high=count.item(), size=(1,)) for count in counts])
         selected_indices = (random_indices + torch.cumsum(counts,dim=0) - counts).squeeze()
         downsampled_points = sorted_points[..., selected_indices, :]
         return downsampled_points
@@ -441,7 +449,8 @@ def voxel_filter(points, leaf_size, random=False):
         voxel_counts = torch.zeros(unique_indices.size(0), dtype=torch.float32)
 
         voxel_means.index_add_(0, inverse_indices, points[..., :3])
-        voxel_counts.index_add_(0, inverse_indices, torch.ones_like(inverse_indices, dtype=torch.float32))
+        voxel_counts.index_add_(0, inverse_indices,
+                                torch.ones_like(inverse_indices, dtype=torch.float32))
 
         voxel_means /= voxel_counts.view(-1, 1)
         return voxel_means
