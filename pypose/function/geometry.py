@@ -430,6 +430,7 @@ def voxel_filter(points, leaf_size, random=False):
     '''
     assert points.size(-1) >= 3, "The last dimension of the pointcloud should exceed 3."
     assert len(leaf_size) == 3, "Leaf size should be a list of three floats."
+    assert all(item != 0 for item in leaf_size), "Leaf size should be nonzero."
 
     min_bound = torch.min(points[..., :3], dim=-2).values
     voxel_indices = ((points[..., :3] - min_bound) / torch.tensor(leaf_size)).to(torch.int64)
