@@ -357,6 +357,7 @@ def svdtf(source, target):
     T = torch.cat((R, t), dim=-1)
     return mat2SE3(T, check=False)
 
+
 def random_downsample(points, num_points):
     r'''
     Randomly downsample a point cloud to a specified number of points.
@@ -388,8 +389,9 @@ def random_downsample(points, num_points):
         less than or equal to the number of points in the point cloud."
 
     indices = torch.randperm(points.size(-2))[:num_points]
-    downsampled_points = points[..., indices, :]
+    downsampled_points = torch.index_select(points, 0, indices)
     return downsampled_points
+
 
 def voxel_filter(points, leaf_size, random=False):
     r'''
@@ -435,23 +437,23 @@ def voxel_filter(points, leaf_size, random=False):
     min_bound = torch.min(points[..., :3], dim=-2).values
     voxel_indices = ((points[..., :3] - min_bound) / torch.tensor(leaf_size)).to(torch.int64)
 
-    unique_indices, inverse_indices,counts = torch.unique(
+    unique_indices, inverse_indices, counts = torch.unique(
         voxel_indices, dim=-2, return_inverse=True, return_counts=True)
     if random:
         sorting_indices = torch.argsort(inverse_indices).squeeze()
         sorted_points = points[sorting_indices, :]
-        random_indices = torch.cat([
-            torch.randint(low=0, high=count.item(), size=(1,)) for count in counts])
+        _rand = [torch.randint(low=0, high=count.item(), size=(1,)) for count in counts]
+        random_indices = torch.cat(_rand)
         selected_indices = (random_indices + torch.cumsum(counts,dim=0) - counts).squeeze()
         downsampled_points = sorted_points[..., selected_indices, :]
         return downsampled_points
     else:
-        voxel_means = torch.zeros_like(unique_indices,dtype=torch.float32)
-        voxel_counts = torch.zeros(unique_indices.size(0), dtype=torch.float32)
+        voxel_means = torch.zeros_like(unique_indices,dtype=input.dtype)
+        voxel_counts = torch.zeros(unique_indices.size(0), dtype=input.dtype)
 
         voxel_means.index_add_(0, inverse_indices, points[..., :3])
-        voxel_counts.index_add_(0, inverse_indices,
-                                torch.ones_like(inverse_indices, dtype=torch.float32))
+        _ones = torch.ones_like(inverse_indices, dtype=input.dtype)
+        voxel_counts.index_add_(0, inverse_indices, _ones)
 
         voxel_means /= voxel_counts.view(-1, 1)
         return voxel_means
