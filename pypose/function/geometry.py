@@ -358,19 +358,18 @@ def svdtf(source, target):
     return mat2SE3(T, check=False)
 
 
-def random_downsample(points, num_points):
+def random_filter(points, num):
     r'''
-    Randomly downsample a point cloud to a specified number of points.
+    Randomly sample a number of points from a point cloud.
 
     Args:
-        points (torch.Tensor): the input point cloud, where the last dimension (D)
-            should be at least 3, with the first three values being the x, y, z coordinates.
-            The shape should be (..., N, D), where N is the number of points.
-        num_points (int): the number of points to downsample to.
+        points (``torch.Tensor``): the input point cloud, where the last dimension (D)
+            is the dimension of the points. The shape should be (..., N, D), where N is
+            the number of points.
+        num (``int``): the number of points to sample.
 
     Returns:
-        downsampled_points (torch.Tensor): The downsampled point cloud, with the shape
-        (..., num_points, D).
+        output (``torch.Tensor``): The sampled points, with the shape (..., num, D).
 
     Example:
         >>> import torch
@@ -379,39 +378,39 @@ def random_downsample(points, num_points):
         ...                        [7., 8., 9.],
         ...                        [10., 11., 12.],
         ...                        [13., 14., 15.]])
-        >>> random_downsample(points, 3)
+        >>> random_filter(points, 3)
         tensor([[ 4.,  5.,  6.],
                 [ 1.,  2.,  3.],
                 [10., 11., 12.]])
     '''
-    assert points.size(-1) >= 3, "The last dimension of the pointcloud should exceed 3."
-    assert num_points <= points.size(-2), "Number of points to downsample to must be \
-        less than or equal to the number of points in the point cloud."
+    assert points.size(-1) >= 1, "The last dim of the points should not less than 1."
+    assert num <= points.size(-2), "Number of points to sample must not larger than " \
+        "the number of input points."
 
-    indices = torch.randperm(points.size(-2))[:num_points]
-    downsampled_points = torch.index_select(points, 0, indices)
-    return downsampled_points
+    indices = torch.randperm(points.size(-2))[:num]
+    return torch.index_select(points, 0, indices)
 
 
-def voxel_filter(points, leaf_size, random=False):
+def voxel_filter(points, voxel, random=False, dim=3):
     r'''
     Perform voxel filtering on a point cloud to reduce the number of points by grouping
     them into voxels and selecting a representative point for each voxel.
 
     Args:
-        points (torch.Tensor): The input point cloud. It is essential that the last
+        points (``torch.Tensor``): The input point cloud. It is essential that the last
             dimension (D) exceeds 3, with the point's coordinates occupying the initial
             three values. Subsequent values may contain additional information like
             intensity, RGB channels, etc. The shape has to be (..., N, D).
-        leaf_size (list of float): The sizes of the voxel in each dimension, provided as
+        voxel (list of ``float``): The sizes of the voxel in each dimension, provided as
             [l_x, l_y, l_z].
-        random (bool, optional): If True, a random point within each voxel is chosen as
-            the representative. If False, the centroid of the points in the voxel is used.
-            Default: False.
+        random (``bool``, optional): If ``True``, a random point within each voxel is
+            chosen as the representative, othewise the centroid of the points is used.
+            Default: ``False``.
+        dim (``int``, optinoal): the dimension of the voxel space. Default: 3.
 
     Returns:
-        torch.Tensor: The downsampled point cloud, with each point representing a voxel.
-        The shape is (..., M, D), where M is the number of voxels.
+        output (``torch.Tensor``): The sampled point cloud, with each point representing a
+            voxel. The shape is (..., M, D), where M is the number of voxels.
 
     Example:
         >>> import torch
@@ -428,30 +427,29 @@ def voxel_filter(points, leaf_size, random=False):
         tensor([[ 4.,  5.,  6.],
                 [10., 11., 12.],
                 [13., 14., 15.]])
-
     '''
-    assert points.size(-1) >= 3, "The last dimension of the pointcloud should exceed 3."
-    assert len(leaf_size) == 3, "Leaf size should be a list of three floats."
-    assert all(item != 0 for item in leaf_size), "Leaf size should be nonzero."
+    assert points.size(-1) >= dim, "The last dimension of the pointcloud should exceed \
+        the dimenson of the voxel space."
+    assert len(voxel) == dim, "Voxel size should match the space dimension."
+    assert all(item != 0 for item in voxel), "Voxel size should be nonzero."
 
-    min_bound = torch.min(points[..., :3], dim=-2).values
-    voxel_indices = ((points[..., :3] - min_bound) / torch.tensor(leaf_size)).to(torch.int64)
+    minp = torch.min(points[..., :dim], dim=-2).values
+    indices = ((points[..., :dim] - minp) / torch.tensor(voxel)).to(torch.int64)
 
     unique_indices, inverse_indices, counts = torch.unique(
-        voxel_indices, dim=-2, return_inverse=True, return_counts=True)
+        indices, dim=-2, return_inverse=True, return_counts=True)
     if random:
         sorting_indices = torch.argsort(inverse_indices).squeeze()
         sorted_points = points[sorting_indices, :]
         _rand = [torch.randint(low=0, high=count.item(), size=(1,)) for count in counts]
         random_indices = torch.cat(_rand)
-        selected_indices = (random_indices + torch.cumsum(counts,dim=0) - counts).squeeze()
-        downsampled_points = sorted_points[..., selected_indices, :]
-        return downsampled_points
+        selected_indices = (random_indices + torch.cumsum(counts, dim=0) - counts).squeeze()
+        return sorted_points[..., selected_indices, :]
     else:
         voxel_means = torch.zeros_like(unique_indices,dtype=input.dtype)
         voxel_counts = torch.zeros(unique_indices.size(0), dtype=input.dtype)
 
-        voxel_means.index_add_(0, inverse_indices, points[..., :3])
+        voxel_means.index_add_(0, inverse_indices, points[..., :dim])
         _ones = torch.ones_like(inverse_indices, dtype=input.dtype)
         voxel_counts.index_add_(0, inverse_indices, _ones)
 

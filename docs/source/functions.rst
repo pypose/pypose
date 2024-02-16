@@ -56,3 +56,5 @@ Functions
     svdtf
     chspline
     bspline
+    random_filter
+    voxel_filter
