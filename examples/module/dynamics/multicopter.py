@@ -136,7 +136,7 @@ if __name__ == "__main__":
     subPlot(ax, time, get_sub_states(state, 0), ylabel='X')
     subPlot(ax, time, get_sub_states(state, 1), ylabel='Y')
     subPlot(ax, time, get_sub_states(state, 2), ylabel='Z')
-    figure = os.path.join(args.save + 'multicoptor_controller_tuner.png')
+    figure = os.path.join(args.save + 'multicoptor.png')
     plt.savefig(figure)
     print("Saved to", figure)
 
