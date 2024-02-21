@@ -1,6 +1,6 @@
 import argparse, os
 import torch, pypose as pp
-import math, matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 
 class DubinCar(pp.module.NLS):

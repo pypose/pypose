@@ -3,7 +3,6 @@ import time
 import torch
 import argparse
 import pypose as pp
-import torch.optim as optim
 import matplotlib.pyplot as plt
 
 
