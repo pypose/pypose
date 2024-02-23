@@ -34,16 +34,16 @@ class DubinCar(pp.module.NLS):
         return state
 
     def xdot(self, state, input):
-        orientation, vel, w = state[2:]
+        speed, orientation, w = state[2:]
         # acceleration and angular acceleration
         acc, w_dot = input
 
         return torch.stack(
             [
-                vel * torch.cos(orientation),
-                vel * torch.sin(orientation),
-                w,
+                speed * torch.cos(orientation),
+                speed * torch.sin(orientation),
                 acc,
+                w,
                 w_dot
             ]
         )
@@ -56,29 +56,30 @@ class DubinCarController(torch.nn.Module):
 
     def compute_position_error(self, state, ref_state):
         x_desired, y_desired = ref_state[0:2]
-        px, py, ori = state[0:3]
+        px, py = state[0:2]
+        ori = state[3]
         return torch.cos(ori) * (x_desired - px) + torch.sin(ori) * (y_desired - py)
 
-    def compute_velocity_error(self, state, ref_state):
-        v_desired = ref_state[2]
+    def compute_speed_error(self, state, ref_state):
+        speed_desired = ref_state[2]
         ori_desired = ref_state[4]
 
-        ori = state[2]
-        vel = state[3]
+        speed = state[2]
+        ori = state[3]
 
         ori_cos = torch.cos(ori)
         ori_sin = torch.sin(ori)
         des_ori_cos = torch.cos(ori_desired)
         des_ori_sin = torch.sin(ori_desired)
 
-        return (ori_cos * (v_desired * des_ori_cos - vel * ori_cos) \
-            + ori_sin * (v_desired * des_ori_sin - vel * ori_sin))
+        return (ori_cos * (speed_desired * des_ori_cos - speed * ori_cos) \
+            + ori_sin * (speed_desired * des_ori_sin - speed * ori_sin))
 
     def forward(self, state, ref_state):
         kp, kv, kori, kw = self.parameters
 
-        v_desired, acc_desired, ori_desired, w_desired, wdot_desired = ref_state[2:]
-        orientation = state[2]
+        speed_desired, acc_desired, ori_desired, w_desired, wdot_desired = ref_state[2:]
+        orientation = state[3]
         w = state[4]
 
         ori_cos = torch.cos(orientation)
@@ -86,45 +87,43 @@ class DubinCarController(torch.nn.Module):
         des_ori_cos = torch.cos(ori_desired)
         des_ori_sin = torch.sin(ori_desired)
 
-        position_pid = PID(kp, 0, 0)
-        velocity_pid = PID(kv, 0, 0)
+        position_pid = PID(kp, 0, kv)
+        orientation_pid = PID(kori, 0, kw)
 
         # calculate the input of acceleration
-        ff = ori_cos * (acc_desired * des_ori_cos - v_desired * w_desired * des_ori_sin) \
-            + ori_sin * (acc_desired * des_ori_sin + v_desired * w_desired * des_ori_cos)
+        ff = ori_cos * (acc_desired *des_ori_cos- speed_desired * w_desired * des_ori_sin) \
+            + ori_sin * (acc_desired * des_ori_sin + speed_desired * w_desired * des_ori_cos)
 
         acceleration = \
-          position_pid.forward(self.compute_position_error(state, ref_state), 0) \
-          + velocity_pid.forward(self.compute_velocity_error(state, ref_state), 0) \
+          position_pid.forward(self.compute_position_error(state, ref_state),
+                               self.compute_speed_error(state, ref_state)) \
           + ff
 
         # calculate the input of angular acceleration
-        err_angle = ori_desired - orientation
-        wdot = kori * err_angle + kw * (w_desired - w) + wdot_desired
+        wdot = orientation_pid.forward(ori_desired - orientation, w_desired - w) \
+            + wdot_desired
 
         return torch.stack([acceleration, wdot])
 
 
 def get_ref_states(dt, N, device):
     """
-    Generate the trajectory based on constant angular velocity and constant linear velocity
+    Generate the trajectory based on constant angular velocity and constant linear speed.
+    The trajectory is a repeated circle with 1 radius and starts at position (1, 0).
     """
+    # ref states: x, y, speed, acc, ori, w, w_dot
     ref_state = torch.zeros(N, 7, device=device)
-    init_state = torch.tensor([0., 0., 0., 1., 1., 0., 0.], device=device)
-    ref_state[0] = init_state
-    waypoint, ori, desired_vel, des_angular_vel = init_state[0:2], init_state[2], \
-        init_state[3], init_state[4]
-    zero_tensor = torch.zeros(1, device=device)
-
-    # get the waypoints and orientation at each timestamp using euler intergration
-    for i in range(1, N):
-        vel = desired_vel * torch.stack([torch.cos(ori), torch.sin(ori)])
-        waypoint += vel * dt
-        ori += des_angular_vel * dt
-
-        ref_state[i] = torch.tensor(
-          [waypoint[0], waypoint[1], desired_vel, zero_tensor, \
-            ori, des_angular_vel, zero_tensor], device=device)
+    time  = torch.arange(0, N, device=args.device) * dt
+    constant_speed = 1
+    constant_w = 1
+    init_orientation = torch.pi / 2
+    radius = constant_speed / constant_w
+    trajectory_angles = time * constant_w
+    ref_state[..., 4] = trajectory_angles + init_orientation
+    ref_state[..., 0] = radius * torch.cos(trajectory_angles)
+    ref_state[..., 1] = radius * torch.sin(trajectory_angles)
+    ref_state[..., 2] = constant_speed
+    ref_state[..., 5] = constant_w
 
     return ref_state
 
@@ -139,7 +138,7 @@ def subPlot(ax, x, y, style, xlabel=None, ylabel=None, label=None):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='PID controller Example')
+    parser = argparse.ArgumentParser(description='DubinCar controller Example')
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
     parser.add_argument("--save", type=str, default='./examples/module/pid/save/',
                         help="location of png files to save")
@@ -149,13 +148,13 @@ if __name__ == "__main__":
     args = parser.parse_args(); print(args)
     os.makedirs(os.path.join(args.save), exist_ok=True)
 
-    N = 100    # Number of time steps
+    N = 200    # Number of time steps
     dt = 0.1
-    state = torch.zeros(N, 5, device=args.device)
+    state = torch.zeros(N, 5, device=args.device) # x, y, ori, speed, w
     ref_state = get_ref_states(dt, N, args.device)
     time  = torch.arange(0, N, device=args.device) * dt
 
-    parameters = torch.ones(4, device=args.device)
+    parameters = torch.ones(4, device=args.device) # kp, kv, kori, kw
     controller = DubinCarController(parameters)
 
     model = DubinCar(dt).to(args.device)
@@ -170,14 +169,14 @@ if __name__ == "__main__":
     subPlot(ax[0], time, ref_state[:, 0], '--', ylabel='X position (m)', label='sp')
     subPlot(ax[1], time, state[:, 1], '-', ylabel='Y position (m)', label='true')
     subPlot(ax[1], time, ref_state[:, 1], '--', ylabel='Y position (m)', label='sp')
-    subPlot(ax[2], time, state[:, 2] / torch.pi * 180, '-', ylabel='Orientation (degree)', label='true')
-    subPlot(ax[2], time, ref_state[:, 4] / torch.pi * 180, '--', ylabel='Orientation (degree)', label='sp')
+    subPlot(ax[2], time, state[:, 3], '-', ylabel='Orientation', label='true')
+    subPlot(ax[2], time, ref_state[:, 4], '--', ylabel='Orientation', label='sp')
 
     ax[0].legend()
     ax[1].legend()
     ax[2].legend()
 
-    figure = os.path.join(args.save + 'dubincar.png')
+    figure = os.path.join(args.save + 'dubincar_controller.png')
     plt.savefig(figure)
     print("Saved to", figure)
 
