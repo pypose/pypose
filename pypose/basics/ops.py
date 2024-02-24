@@ -36,18 +36,24 @@ def cumops_(input, dim, ops):
     return v
 
 
-def cummul_(input, dim):
+def cummul_(input, dim, left = True):
     r'''
         Inplace version of :meth:`pypose.cummul`
     '''
-    return cumops_(input, dim, lambda a, b : a * b)
+    if left:
+        return cumops_(input, dim, lambda a, b : b * a)
+    else:
+        return cumops_(input, dim, lambda a, b : a * b)
 
 
-def cumprod_(input, dim):
+def cumprod_(input, dim, left = True):
     r'''
         Inplace version of :meth:`pypose.cumprod`
     '''
-    return cumops_(input, dim, lambda a, b : a @ b)
+    if left:
+        return cumops_(input, dim, lambda a, b : b @ a)
+    else:
+        return cumops_(input, dim, lambda a, b : a @ b)
 
 
 def cumops(input, dim, ops):
@@ -138,9 +144,9 @@ def cummul(input, dim, left = True):
                 [ 2.0905e-04,  5.2031e-01,  8.4301e-01, -1.3642e-01]]])
     """
     if left:
-        return cumops(input, dim, lambda a, b : a * b)
-    else:
         return cumops(input, dim, lambda a, b : b * a)
+    else:
+        return cumops(input, dim, lambda a, b : a * b)
 
 
 def cumprod(input, dim, left = True):
@@ -192,6 +198,6 @@ def cumprod(input, dim, left = True):
                 [ 0.7515, -0.1920,  0.5072,  0.3758]]])
     """
     if left:
-        return cumops(input, dim, lambda a, b : a @ b)
-    else:
         return cumops(input, dim, lambda a, b : b @ a)
+    else:
+        return cumops(input, dim, lambda a, b : a @ b)
