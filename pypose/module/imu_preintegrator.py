@@ -357,7 +357,7 @@ class IMUPreintegrator(nn.Module):
         B, F = dt.shape[:2]
         dr =  so3(gyro*dt).Exp()
         w = torch.cat([identity_SO3(B, 1, dtype=dt.dtype, device=dt.device), dr], dim=1)
-        incre_r = cumprod(w, dim = 1, left=True)
+        incre_r = cumprod(w, dim = 1, left=False)
 
         if isinstance(rot, LieTensor):
             a = acc - rot.Inv() @ self.gravity
@@ -457,7 +457,7 @@ class IMUPreintegrator(nn.Module):
         B_cov = torch.einsum('...xy,...t -> ...xy', Bg @ Cg @ Bg.mT + Ba @ Ca @ Ba.mT, 1/cov_input['dt'])
         B_cov = torch.cat([init_cov[:,None,...], B_cov], dim=1)
 
-        A_left_cum = cumprod(A.flip([1]), dim=1, left=False).flip([1]) # cum from An to I, then flip
+        A_left_cum = cumprod(A.flip([1]), dim=1).flip([1]) # cum from An to I, then flip
         A_right_cum = A_left_cum.mT
         cov = torch.sum(A_left_cum @ B_cov @ A_right_cum, dim=1)
         return {'cov': cov, 'Rij': cov_input['Rij'][..., -1:, :]}

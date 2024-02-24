@@ -32,7 +32,7 @@ def cumops_(input, dim, ops):
     assert dim != -1 or dim != v.shape[-1], "Invalid dim"
     for i in torch.pow(2, torch.arange(math.log2(L)+1, device=v.device, dtype=torch.int64)):
         index = torch.arange(i, L, device=v.device, dtype=torch.int64)
-        v.index_copy_(dim, index, ops(v.index_select(dim, index), v.index_select(dim, index-i)))
+        v.index_copy_(dim, index, ops(v.index_select(dim, index-i), v.index_select(dim, index)))
     return v
 
 
