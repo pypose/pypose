@@ -12,7 +12,7 @@ class TestOps:
             pm = torch.tensor([1, 1, -1], dtype=dtype, device=self.device)
             assert torch.equal(x, pm), "Results incorrect."
 
-    def text_cum(self):
+    def test_cum(self):
         N = 4
         x = pp.randn_SO3(N, dtype=torch.float64)
 
@@ -59,4 +59,4 @@ class TestOps:
 if __name__ == '__main__':
     test = TestOps()
     test.test_pm()
-    test.text_cum()
+    test.test_cum()
