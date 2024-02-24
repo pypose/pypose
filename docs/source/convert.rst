@@ -14,6 +14,7 @@ Convert
     from_matrix
     euler2SO3
     vec2skew
+    skew2vec
     tensor
     translation
     rotation
