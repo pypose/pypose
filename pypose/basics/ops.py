@@ -82,12 +82,13 @@ def cumops(input, dim, ops):
           :math:`N` is the LieTensor size along the :obj:`dim` dimension.
 
     Examples:
+        >>> # The following operations are equivalent.
         >>> input = pp.randn_SE3(2)
-        >>> input.cumprod(dim = 0)
+        >>> input.cumprod(dim = 0, left=True)
         SE3Type LieTensor:
         tensor([[-0.6466,  0.2956,  2.4055, -0.4428,  0.1893,  0.3933,  0.7833],
                 [ 1.2711,  1.2020,  0.0651, -0.0685,  0.6732,  0.7331, -0.0685]])
-        >>> pp.cumops(input, 0, lambda a, b : a @ b)
+        >>> pp.cumops(input, 0, lambda a, b : b @ a) # Left multiplication
         SE3Type LieTensor:
         tensor([[-0.6466,  0.2956,  2.4055, -0.4428,  0.1893,  0.3933,  0.7833],
                 [ 1.2711,  1.2020,  0.0651, -0.0685,  0.6732,  0.7331, -0.0685]])
