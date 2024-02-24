@@ -119,9 +119,9 @@ if __name__ == "__main__":
     input[..., 0] = 2
     input[..., 1:4] = 0.001
 
-    inertia = torch.tensor([[0.00025, 0., 0.00000255],
-                            [0., 0.000232, 0.],
-                            [0.00000255, 0., 0.0003738]], device=args.device)
+    inertia = torch.tensor([[0.0820, 0., 0.00000255],
+                            [0., 0.0845, 0.],
+                            [0.00000255, 0., 0.1377]], device=args.device)
     model = MultiCopter(0.18,
                     torch.tensor(9.81, device=args.device), inertia, dt).to(args.device)
 
