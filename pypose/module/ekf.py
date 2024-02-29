@@ -1,8 +1,8 @@
 import torch
 from .. import bmv
 from torch import nn
+from .dynamics import sysmat
 from torch.linalg import pinv
-
 
 class EKF(nn.Module):
     r'''
@@ -147,11 +147,10 @@ class EKF(nn.Module):
             list of :obj:`Tensor`: posteriori state and covariance estimation
         '''
         # Upper cases are matrices, lower cases are vectors
-        self.model.set_refpoint(state=x, input=u, t=t)
         I = torch.eye(P.shape[-1], device=P.device, dtype=P.dtype)
-        A, B = self.model.A, self.model.B
-        C, D = self.model.C, self.model.D
-        c1, c2 = self.model.c1, self.model.c2
+        A, B, C, D = sysmat(self.model, x, u, t, "ABCD")
+        c1 = self.model.c1(x, u, t)
+        c2 = self.model.c2(x, u, t)
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
 

@@ -1,7 +1,7 @@
 import argparse, os
 import torch, pypose as pp
 import math, matplotlib.pyplot as plt
-
+from pypose.module.dynamics import sysmat
 
 class CartPole(pp.module.NLS):
     def __init__(self, dt, length, cartmass, polemass, gravity):
@@ -24,7 +24,7 @@ class CartPole(pp.module.NLS):
 
         thetaAcc = (self.gravity * sintheta - costheta * temp) / \
             (self.length * (4.0 / 3.0 - self.polemass * costheta**2 / self.totalMass))
-    
+
         xAcc = temp - self.polemassLength * thetaAcc * costheta / self.totalMass
 
         _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Cartpole Example')
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
-    parser.add_argument("--save", type=str, default='./examples/module/dynamics/save/', 
+    parser.add_argument("--save", type=str, default='./examples/module/dynamics/save/',
                         help="location of png files to save")
     parser.add_argument('--show', dest='show', action='store_true',
                         help="show plot, default: False")
@@ -75,9 +75,10 @@ if __name__ == "__main__":
         state[i + 1], _ = model(state[i], input[i])
 
     # Jacobian computation - Find jacobians at the last step
-    model.set_refpoint(state=state[-1,:], input=input[-1], t=time[-1])
-    vars = ['A', 'B', 'C', 'D', 'c1', 'c2']
-    [print(v, getattr(model, v)) for v in vars]
+    A, B, C, D = sysmat(model, state[-1], input[-1], time[-1], "ABCD")
+    c1 = model.c1(state[-1], input[-2:-1], time[-2:-1])
+    c2 = model.c2(state[-1], input[-2:-1], time[-2:-1])
+    [print(v) for v in [A, B, C, D, c1, c2]]
 
     # Create time plots to show dynamics
     f, ax = plt.subplots(nrows=4, sharex=True)
