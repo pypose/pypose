@@ -12,10 +12,11 @@ class System(nn.Module):
     such as linear time invariant system :meth:`LTI`, Linear Time-Variant :meth:`LTV`,
     and a non-linear system :meth:`NLS`.
     '''
-    def __init__(self):
+    def __init__(self, xdim = None, udim = None, ydim = None):
         super().__init__()
         self.register_buffer('_t',torch.tensor(0, dtype=torch.int64))
         self.register_forward_hook(self.forward_hook)
+        self._xdim, self._udim, self._ydim = xdim, udim, ydim
 
     def forward_hook(self, module, inputs, outputs):
         r'''
@@ -114,6 +115,83 @@ class System(nn.Module):
             t = torch.tensor(t)
         self._t.copy_(t)
 
+    @property
+    def xdim(self):
+        r'''
+        dim of state
+        '''
+        return self._xdim
+
+    @property
+    def udim(self):
+        r'''
+        dim of input
+        '''
+        return self._udim
+
+    @property
+    def ydim(self):
+        r'''
+        dim of observation
+        '''
+        return self._ydim
+
+    # second order derivative
+    @property
+    def fxx(self):
+        r'''
+        Quadraticized system state tensor.
+
+        .. math::
+            \mathbf{f}_{\mathbf{xx}} = \left. \frac{\partial^{2} \mathbf{f}}{\partial \mathbf{x}^{2}} \right|_{\chi^*}
+        '''
+        def jac_func(x): # create a functional here
+            func = lambda x: self.state_transition(x, self._ref_input)
+            jac = jacobian(func, x, create_graph=True)
+            return jac
+        return jacobian(jac_func, self._ref_state, **self.jacargs)
+
+    @property
+    def fxu(self):
+        r'''
+        Quadraticized system state-input tensor.
+
+        .. math::
+            \mathbf{f}_{\mathbf{xu}} = \left. \frac{\partial^{2} \mathbf{f}}{\partial \mathbf{x} \partial \mathbf{u}} \right|_{\chi^*}
+        '''
+        def jac_func(u):
+            func = lambda x: self.state_transition(x, u)
+            jac = jacobian(func, self._ref_state, create_graph=True) # substitute x here
+            return jac
+        return jacobian(jac_func, self._ref_input,  **self.jacargs)
+
+    @property
+    def fux(self):
+        r'''
+        Quadraticized system input-state tensor.
+
+        .. math::
+            \mathbf{f}_{\mathbf{ux}} = \left. \frac{\partial^{2} \mathbf{f}}{\partial \mathbf{u} \partial \mathbf{x}} \right|_{\chi^*}
+        '''
+        def jac_func(x):
+            func = lambda u: self.state_transition(x, u)
+            jac = jacobian(func, self._ref_input, create_graph=True)
+            return jac
+        return jacobian(jac_func, self._ref_state,  **self.jacargs)
+
+    @property
+    def fuu(self):
+        r'''
+        Quadraticized system input tensor.
+
+        .. math::
+            \mathbf{f}_{\mathbf{uu}} = \left. \frac{\partial^{2} \mathbf{f}}{\partial \mathbf{u}^{2}} \right|_{\chi^*}
+        '''
+        def jac_func(u):
+            func = lambda u: self.state_transition(self._ref_state, u)
+            jac = jacobian(func, u, create_graph=True)
+            return jac
+        return jacobian(jac_func, self._ref_input, **self.jacargs)
 
 class LTI(System):
     r'''
@@ -175,7 +253,8 @@ class LTI(System):
     '''
 
     def __init__(self, A, B, C, D, c1=None, c2=None):
-        super().__init__()
+        xdim, udim, ydim = A.shape[-2], B.shape[-2], C.shape[-2]
+        super().__init__(xdim, udim, ydim)
         self.register_buffer('_A', A)
         self.register_buffer('_B', B)
         self.register_buffer('_C', C)
@@ -509,8 +588,8 @@ class NLS(System):
         linearization, and more practical examples can be found at `examples/module/dynamics
         <https://github.com/pypose/pypose/tree/main/examples/module/dynamics>`_.
     '''
-    def __init__(self):
-        super().__init__()
+    def __init__(self, xdim = None, udim = None, ydim = None):
+        super().__init__(xdim, udim, ydim)
         self.jacargs = {'vectorize':True, 'strategy':'reverse-mode'}
 
     def forward(self, state, input):
