@@ -19,10 +19,10 @@ class TestDownsample:
 
         # test multiple dimensions
         points = torch.randn(100,2,2, device=device)
-        result = pp.geometry.voxel_filter(points, 10, dim=2)
+        result = pp.geometry.voxel_filter(points, [1., 1.], dim=2)
         # test voxel size larger than total num of point cloud
         points = torch.randn(100,2,3, device=device)
-        result = pp.geometry.voxel_filter(points, 100)
+        result = pp.geometry.voxel_filter(points, [1., 1., 1.] 100)
         # test random select with
 
 
