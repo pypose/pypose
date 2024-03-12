@@ -446,11 +446,11 @@ def voxel_filter(points, voxel, random=False, dim=3):
         selected_indices = (random_indices + torch.cumsum(counts, dim=0) - counts).squeeze()
         return sorted_points[..., selected_indices, :]
     else:
-        voxel_means = torch.zeros_like(unique_indices,dtype=input.dtype)
-        voxel_counts = torch.zeros(unique_indices.size(0), dtype=input.dtype)
+        voxel_means = torch.zeros_like(unique_indices,dtype=points.dtype)
+        voxel_counts = torch.zeros(unique_indices.size(0), dtype=points.dtype)
 
         voxel_means.index_add_(0, inverse_indices, points[..., :dim])
-        _ones = torch.ones_like(inverse_indices, dtype=input.dtype)
+        _ones = torch.ones_like(inverse_indices, dtype=points.dtype)
         voxel_counts.index_add_(0, inverse_indices, _ones)
 
         voxel_means /= voxel_counts.view(-1, 1)
