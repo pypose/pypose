@@ -455,3 +455,4 @@ def voxel_filter(points, voxel, random=False, dim=3):
 
         voxel_means /= voxel_counts.view(-1, 1)
         return voxel_means
+
