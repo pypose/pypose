@@ -9,7 +9,7 @@ from pypose import bvmv
 from torch.linalg import vecdot
 
 
-class CartPole(pp.module.System):
+class CartPole(pp.module.NLS):
         def __init__(self, dt, length, cartmass, polemass, gravity):
             super().__init__()
             self._tau=dt
@@ -23,8 +23,10 @@ class CartPole(pp.module.System):
 
         def state_transition(self, state, input, t=None):
             #x, xDot, theta, thetaDot = state.squeeze().moveaxis(-1, 0)
-            x, xDot, theta, thetaDot = state.moveaxis(-1, 0)
-            force = input.squeeze()
+            x, xDot, theta, thetaDot = state[:, 0], state[:, 1], state[:, 2], state[:, 3]
+            if input.dim() == 1:
+                input = input.unsqueeze(1)
+            force = input[:, 0]
             costheta = torch.cos(theta)
             sintheta = torch.sin(theta)
 
@@ -32,16 +34,22 @@ class CartPole(pp.module.System):
             thetaAcc = (self.gravity * sintheta - costheta * temp) / \
                 (self.length * (4.0 / 3.0 - self.polemass * costheta**2 / self.totalMass))
             xAcc = temp - self.poleml * thetaAcc * costheta / self.totalMass
-            _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc), dim=-1)
-            return (state.squeeze() + torch.mul(_dstate, self.tau)).unsqueeze(0)
 
+            x = x + xDot * self.tau
+            xDot = xDot + xAcc * self.tau
+            theta = theta + thetaDot * self.tau
+            thetaDot = thetaDot + thetaAcc * self.tau
+
+            # Stacking the updated components into a new state tensor
+            new_state = torch.stack((x, xDot, theta, thetaDot), dim=1)
+            return new_state
         def observation(self, state, input, t=None):
             return state
 
 
 
 if __name__ == "__main__":
-
+    torch.manual_seed(0)
     parser = argparse.ArgumentParser(description='MPPI Nonl-inear Learning Example \
                                      (Cartpole)')
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
@@ -73,26 +81,50 @@ if __name__ == "__main__":
         m_cart = torch.tensor(20.0).to(args.device),
         m_pole = torch.tensor(10.0).to(args.device))
 
-    torch.manual_seed(0)
+
     len = torch.tensor(2.0).to(args.device).requires_grad_()
     m_pole = torch.tensor(11.1).to(args.device).requires_grad_()
 
     def get_loss(x_init, _len, _m_pole):
 
-        def cost_fn(state, u, t):
+        # def cost_fn(state, u, t):
 
+        #     Q = exp['Q'].squeeze(0)
+        #     p = exp['p'].squeeze(0)
+        #     tau_t = torch.cat([state, u], dim=-1)
+        #     total_cost=[]
+
+        #     for i in range(tau_t.shape[0]):
+        #         xut = tau_t[i:i+1]
+        #         cost = 0.5 * bvmv(xut, Q[...,t,:,:], xut) + vecdot(xut, p[...,t,:])
+        #         total_cost.append(cost)
+
+        #     return torch.stack(total_cost).squeeze(-1)
+        def cost_fn(state, u, t):
+            # Ensure 'Q' and 'p' are correctly accessed from 'exp' and squeezed
             Q = exp['Q'].squeeze(0)
             p = exp['p'].squeeze(0)
-            tau_t = torch.cat([state, u], dim=-1)
-            total_cost=[]
+            #import pdb; pdb.set_trace()
+            # Assuming 'state' and 'u' are tensors that can be concatenated
+            # If they cannot be directly concatenated due to size mismatch, consider reshaping or padding
+            tau_t = torch.cat([state, u], dim=-1)  # Concatenate state and action along the last dimension
+
+            # Preallocate a tensor for total_cost for efficiency
+            total_cost = torch.empty(tau_t.shape[0], device=tau_t.device)
 
             for i in range(tau_t.shape[0]):
-                xut = tau_t[i:i+1]
-                cost = 0.5 * bvmv(xut, Q[...,t,:,:], xut) + vecdot(xut, p[...,t,:])
-                total_cost.append(cost)
+                xut = tau_t[i:i+1]  # Extract the i-th row and keep its dimensions
 
-            return torch.stack(total_cost).squeeze(-1)
+                # Assuming bvmv is batched vector-matrix-vector product, replace with PyTorch operations
+                cost_bvmv = 0.5 * torch.matmul(torch.matmul(xut, Q[..., t, :, :]), xut.transpose(-2, -1))
 
+                # Assuming vecdot is vector dot product, replace with PyTorch operation
+                cost_vecdot = torch.matmul(xut, p[..., t, :].unsqueeze(-1))
+
+                # Sum up the two costs and store in the preallocated tensor
+                total_cost[i] = cost_bvmv.squeeze() + cost_vecdot.squeeze()
+
+            return total_cost.squeeze(-1)
         # expert
         solver_exp = CartPole(dt, exp['len'], exp['m_cart'], exp['m_pole'], g)
         mppi_expert = pp.module.MPPI(
@@ -123,7 +155,7 @@ if __name__ == "__main__":
 
     opt = optim.RMSprop([len, m_pole], lr=3e-2)
 
-    steps = 50
+    steps = 100
     traj_losses = []
     model_losses = []
 
