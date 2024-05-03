@@ -20,8 +20,10 @@ class Simple2DNav(pp.module.System):
         v, omega = input.squeeze().moveaxis(-1, 0)
         xDot = v * torch.cos(theta)
         yDot = v * torch.sin(theta)
-        thetaDot = omega
+
+        thetaDot = omega.expand_as(xDot)
         _dstate = torch.stack((xDot, yDot, thetaDot), dim=-1)
+
         return (state.squeeze() + torch.mul(_dstate, self._tau)).unsqueeze(0)
 
     def observation(self, state, input, t=None):
@@ -32,57 +34,13 @@ class Simple2DNav(pp.module.System):
         return state
 
 
-
-def visualize(system, traj, controls, costs):
-    """
-    pyplot visualization of Simple2DNav for debugging
-    Args:
-        system: The Simple2DNav system
-        traj: [T x 3] Tensor of states to plot
-        controls: [T x 2] Tensor of controls to plot
-        costs: [T] List of costs to plot
-    Returns:
-        None
-    """
-
-    fig, axs = plt.subplots(1, 3, figsize=(18, 6))
-    plt.show(block=False)
-
-    x = traj[:, 0]
-    y = traj[:, 1]
-    th = traj[:, 2]
-
-    #plot position
-    for i in range(traj.shape[0]):
-        for ax in axs:
-            ax.cla()
-
-        axs[0].set_xlim(min(x)-1., max(x)+1.)
-        axs[0].set_ylim(min(y)-1., max(y)+1.)
-
-        axs[0].plot(x[:i], y[:i], alpha=0.3, c='b')
-        axs[0].scatter(x[i], y[i], c='r', label='Current Position')
-
-        #plot states
-        for j, (label, color) in enumerate(zip(['x', 'y', 'th'], ['r', 'g', 'b'])):
-            axs[1].plot(traj[:i, j], label=label, c=color)
-            axs[1].scatter(i, traj[i, j], c=color, marker='.')
-
-        # Plot cost
-        axs[2].plot(costs[:i], label='Cost', c='r')
-
-        for ax in axs:
-            ax.legend()
-
-        plt.pause(system._tau)
-
-
 if __name__ == '__main__':
     # Define initial state
     torch.manual_seed(0)
     x0 = torch.tensor([0., 0., 0.], requires_grad=False)
     dt=0.1
-
+    target_position = torch.tensor([10., 10.])
+    tolerance = 0.5
     cost_fn = lambda x, u, t: (x[..., 0] - 10)**2 + (x[..., 1] - 10)**2 + (u[..., 0])**2
 
 
@@ -96,22 +54,43 @@ if __name__ == '__main__':
         lambda_=0.01
         )
 
-    N = 40
+    N = 10
     X = [x0]
     U = []
     costs=[]
     i = 0
     xn=x0
 
-    while abs((xn[0] - 10))>0.1 and  abs((xn[1] - 10)) > 0.1:
+
+    while torch.norm(xn[:2] - target_position) > tolerance:
         xc = X[-1]
-        u, xn= mppi.forward(xc)
-        xn=xn[-1]
-        costs.append(cost_fn(xc,u[-1],1))
+        u, xn = mppi.forward(xc)
+        print(u)
+        print(xn)
+        xn = xn[1]
+        costs.append(cost_fn(xc, u[1], 1))
         X.append(xn)
         U.append(u)
         i += 1
-        if i > 100: break
+        if i == 100:
+            break
 
-    visualize(Simple2DNav(dt), torch.stack(X), torch.stack(U), costs)
+
+    # Convert all elements in X to 2D tensors
+    X_2D = [x.unsqueeze(0) if x.dim() == 1 else x for x in X]
+
+    # Now stack these tensors to make a single tensor for easier slicing
+    X_tensor = torch.cat(X_2D, dim=0)
+
+    # Extract x and y coordinates
+    x_coords = X_tensor[:, 0]
+    y_coords = X_tensor[:, 1]
+
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(x_coords, y_coords, marker='o', linestyle='-', color='b')
+    plt.title('Trajectory of the System (X-Y Positions)')
+    plt.xlabel('X Position')
+    plt.ylabel('Y Position')
+    plt.grid(True)
     plt.show()
