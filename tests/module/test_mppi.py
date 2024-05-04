@@ -10,13 +10,15 @@ class TestMPPI:
             self._length=length
 
         def state_transition(self, state, input, t=None):
+            """
+            The simple 2D nav has state: (x, y, theta) and input: (v, omega)
+            """
             x, y, theta = state.moveaxis(-1, 0)
             v, omega = input.squeeze().moveaxis(-1, 0)
-
             xDot = v * torch.cos(theta)
             yDot = v * torch.sin(theta)
-            thetaDot = omega
 
+            thetaDot = omega.expand_as(xDot)
             _dstate = torch.stack((xDot, yDot, thetaDot), dim=-1)
 
             return (state.squeeze() + torch.mul(_dstate, self._tau)).unsqueeze(0)
