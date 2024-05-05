@@ -1,6 +1,4 @@
 import torch
-import functools
-import numpy as np
 from torch.distributions.multivariate_normal import MultivariateNormal
 
 
