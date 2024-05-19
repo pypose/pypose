@@ -101,8 +101,8 @@ jobs:
       - run:
           name: Build PyPose documentation
           command: |
-            pip install --use-pep517 dist/pypose-*.whl
-            pip install --use-pep517 -r requirements/docs.txt
+            pip install dist/pypose-*.whl
+            pip install -r requirements/docs.txt
             cd docs
             make dirhtml
             tar -czvf build/docs.tar.gz build/dirhtml/*
@@ -136,7 +136,7 @@ jobs:
       - run:
           name: Setup tests
           command: |
-            pip install --use-pep517 dist/pypose-*.whl
+            pip install dist/pypose-*.whl
             mkdir pytest-results
             pytest --junitxml=pytest-results/junit.xml
       - store_test_results:
