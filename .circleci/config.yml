@@ -51,9 +51,6 @@ commands:
       build_tag:
         type: string
         default: "dev"
-      dist_type:
-        type: string
-        default: "bdist_wheel"
       max_jobs:
         type: integer
         default: 1
@@ -64,7 +61,7 @@ commands:
           command: |
             export MAX_JOBS=<< parameters.max_jobs >>
             mkdir -p dist
-            python3 setup.py egg_info --tag-build=<< parameters.build_tag >> << parameters.dist_type >>
+            python3 -m build egg_info --tag-build=<< parameters.build_tag >>
 
 ##############################################################################
 # Job specs
