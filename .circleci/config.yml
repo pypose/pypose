@@ -49,12 +49,9 @@ commands:
   build_package: &build_package
     description: Build PyPose package of specified type
     parameters:
-      build_tag:
-        type: string
-        default: "dev"
       max_jobs:
         type: integer
-        default: 1
+        default: 4
     steps:
       - run:
           name: Build PyPose package
@@ -62,7 +59,7 @@ commands:
           command: |
             export MAX_JOBS=<< parameters.max_jobs >>
             mkdir -p dist
-            python3 -m build egg_info --tag-build=<< parameters.build_tag >>
+            python3 -m build
 
 ##############################################################################
 # Job specs
