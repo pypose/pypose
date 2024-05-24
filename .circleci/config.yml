@@ -56,7 +56,7 @@ commands:
         default: 1
     steps:
       - run:
-          name: Build PyPose package (<< parameters.dist_type >>)
+          name: Build PyPose package
           no_output_timeout: 30m
           command: |
             export MAX_JOBS=<< parameters.max_jobs >>
