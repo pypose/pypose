@@ -47,11 +47,11 @@ commands:
             pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
             pip3 install build
   build_package: &build_package
-    description: Build PyPose package of specified type
+    description: Build the PyPose wheel
     parameters:
       max_jobs:
         type: integer
-        default: 4
+        default: 1
     steps:
       - run:
           name: Build PyPose package
