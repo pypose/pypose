@@ -45,6 +45,7 @@ commands:
             sudo apt-get update -y
             sudo apt-get install -y make
             pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+            pip3 install build
   build_package: &build_package
     description: Build PyPose package of specified type
     parameters:
