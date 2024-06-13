@@ -16,6 +16,11 @@ Modules
    module.PF
    module.LQR
    module.IMUPreintegrator
+   module.Cost
+   module.QuadCost
+   module.Constraint
+   module.LinCon
+   module.IPDDP
    module.EPnP
    module.MPC
    module.ICP
