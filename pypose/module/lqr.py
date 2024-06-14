@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from .. import bmv, bvmv
-from .dynamics import runsys
+from .dynamics import runsys,sysmat
 from torch.linalg import cholesky, vecdot
 
 
@@ -327,19 +327,23 @@ class LQR(nn.Module):
         xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
         p = bmv(self.Q, xut) + self.p
 
+        t = torch.arange(self.T, device=self.p.device)*dt
+
+        AB = sysmat(self.system, self.x_traj, self.u_traj, t, "AB")
+
+        F = torch.cat(AB, dim=-1)
+
+        if F.ndim == 6: #in shape of (b,t,n,b,n,n) by jacobian
+            F = F.sum(3).sum(3) #make shape (b,t,n,n)
+
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
                 Qt = self.Q[...,t,:,:]
                 qt = p[...,t,:]
             else:
-                self.system.set_refpoint(state=self.x_traj[...,t,:],
-                                         input=self.u_traj[...,t,:],
-                                         t=torch.tensor(t*dt))
-                A = self.system.A.squeeze(-2)
-                B = self.system.B.squeeze(-2)
-                F = torch.cat((A, B), dim=-1)
-                Qt = self.Q[...,t,:,:] + F.mT @ V @ F
-                qt = p[...,t,:] + bmv(F.mT, v)
+                Ft = F[...,t,:,:]
+                Qt = self.Q[...,t,:,:] + Ft.mT @ V @ Ft
+                qt = p[...,t,:] + bmv(Ft.mT, v)
 
             Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
@@ -374,7 +378,7 @@ class LQR(nn.Module):
             delta_u[..., t, :] = bmv(Kt, delta_xt) + kt
             u[...,t,:] = ut = delta_u[..., t, :] + self.u_traj[...,t,:]
             xut = torch.cat((xt, ut), dim=-1)
-            x[...,t+1,:] = xt = self.system(xt, ut)[0]
+            x[...,t+1,:] = xt = self.system(xt, ut, t)[0]
             cost += 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + vecdot(xut, self.p[...,t,:])
 
         return x, u, cost
