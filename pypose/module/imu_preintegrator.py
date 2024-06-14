@@ -98,6 +98,8 @@ class IMUPreintegrator(nn.Module):
                        reset = False):
         super().__init__()
         self.reset, self.prop_cov = reset, prop_cov
+        if not self.reset and not self.prop_cov:
+            raise RuntimeError('In IMUPreintegrator, prop_cov must be set to True if reset = False.')
 
         if isinstance(acc_cov, float):
             acc_cov = torch.tensor([[acc_cov, acc_cov, acc_cov]])
