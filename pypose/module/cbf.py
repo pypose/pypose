@@ -1,10 +1,10 @@
 import cvxpy as cp
+import matplotlib.pyplot as plt
+from scipy.linalg import solve_continuous_are
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import matplotlib.pyplot as plt
 from torch.autograd import grad, Function
-from scipy.linalg import solve_continuous_are
 
 class CBF(nn.Module):
     """
