@@ -35,6 +35,11 @@ class CBF(nn.Module):
 
     The controller integrates nonlinear dynamics, safety constraints through CBFs, and trajectory optimization via iLQR,
     making it suitable for tasks requiring safe navigation around obstacles in dynamic environments.
+
+    Paper:
+    Xiao, Wei, and Calin Belta. "High-order control barrier functions." IEEE Transactions on Automatic Control 67, no. 7 (2021): 3655-3662.
+    
+    Note that the vanilla CBF is a special case of High Order CBF's
     """
 
     def __init__(self, model, gamma_coeffs, horizon_length=10, Q=None, R=None, Q_f=None):
