@@ -10,7 +10,7 @@ class CBF(nn.Module):
     """
     The CBF is designed to compute safe control inputs for dynamic systems,
     ensuring collision avoidance through the application of high-order Control Barrier Functions (CBFs)
-    and optimization of control inputs using an iterative Linear Quadratic Regulator (iLQR) approach.
+    and optimization of control inputs using an iterative Linear Quadratic Regulator (iLQR) or a PID controller.
 
     Attributes:
         f: A function representing the system dynamics without control inputs.
@@ -20,6 +20,7 @@ class CBF(nn.Module):
         state_dim: The dimension of the state space.
         control_dim: The dimension of the control input space.
         horizon_length: The horizon length used in the iLQR algorithm for trajectory optimization.
+        Kp, Ki, Kd: PID gains.
         Q, R, Q_f: Cost matrices for the state, control input, and final state in the iLQR algorithm, respectively.
 
     Methods:
