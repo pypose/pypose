@@ -40,6 +40,17 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
                         torch.stack([ v[...,2],         O, -v[...,0]], dim=-1),
                         torch.stack([-v[...,1],  v[...,0],         O], dim=-1)], dim=-2)
 
+def scalar2skew(scalar:torch.Tensor) -> torch.Tensor:
+    skew = torch.concatenate(
+        [torch.zeros_like(scalar), -scalar, scalar, torch.zeros_like(scalar)],
+        dim=-1,
+    ).view(
+        scalar.shape[:-1] + (2, 2)
+    )  # or cat(dim=-1) to construct rows and then cat(dim=-2) to stack them
+    skew = skew.to(scalar.device)
+    skew = skew.type(scalar.dtype)
+    return skew
+
 
 def add_(input, other, alpha=1):
     r'''
