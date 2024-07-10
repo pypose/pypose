@@ -1,6 +1,6 @@
 from typing import Any, Tuple
 import torch
-from .basics import vec2skew, scalar2skew
+from .basics import vec2skew
 from ..basics import pm, cumops, cummul, cumprod
 
 
@@ -305,7 +305,7 @@ def so2_V(theta):
     I = torch.eye(2, device=theta.device, dtype=theta.dtype).expand(
         theta.shape[:-1] + (2, 2)
     )
-    skewI = scalar2skew(torch.ones(theta.shape[:-1] + (1,)))
+    skewI = vec2skew(torch.ones(theta.shape[:-1] + (1,)))
     theta_ = theta.unsqueeze(-1)  # Add last dimensions to have ..., 1, 1
     theta2_ = theta_**2
 
@@ -353,7 +353,7 @@ def se2_Jl(x):
     I = torch.eye(2, device=theta.device, dtype=theta.dtype).expand(
         theta.shape[:-1] + (2, 2)
     )
-    skewI = scalar2skew(torch.ones(theta.shape[:-1] + (1,)))
+    skewI = vec2skew(torch.ones(theta.shape[:-1] + (1,)))
 
     unknown_matrix = coef1 * I + coef2 * skewI
 

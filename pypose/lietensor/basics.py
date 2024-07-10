@@ -4,20 +4,55 @@ import torch
 This basics file includes functions needed to implement LieTensor.
 '''
 
-def vec2skew(input:torch.Tensor) -> torch.Tensor:
-    r"""
-    Convert batched vectors to skew matrices.
+def is_triangular(input:torch.Tensor) -> torch.Tensor:
+    r'''
+    Check if elements in a tensor or a scalar is triangular numbers (sum of 1 + 2 + ... n).
 
     Args:
-        input (Tensor): the tensor :math:`\mathbf{x}` to convert.
+        input (torch.Tensor or scalar): A tensor of numbers to check.
+
+    Returns:
+        torch.Tensor: A tensor of booleans.
+
+    Example:
+
+        >>> nums = torch.tensor([1, 3, 6, 10, 11, 15, 21, 28], dtype=torch.float32)
+        >>> pp.is_triangular(nums)
+        tensor([ True,  True,  True,  True, False,  True,  True,  True])
+    '''
+    # Calculate the discriminant and check if it's a perfect square
+    if not torch.is_tensor(input):
+        input = torch.tensor([input], dtype=torch.float32)
+
+    discriminants = 1 + 8 * input
+
+    # Compute the integer square roots of the discriminants
+    roots = torch.sqrt(discriminants).floor().int()
+
+    # Check if the square of the roots equals the discriminants
+    perfect_squares = roots * roots == discriminants
+
+    # Calculate n using the positive part of the quadratic formula
+    n = (-1 + roots) // 2
+
+    # Check if n is positive and the discriminants are perfect squares
+    return (n > 0) & perfect_squares
+
+
+def vec2skew(input:torch.Tensor) -> torch.Tensor:
+    r"""
+    Convert batched vectors to skew matrices, generalized for n-dimensional vectors,
+    where n has to be a triangular number (sum of 1 + 2 + ... +n)
+
+    Args:
+        input (Tensor): The tensor of vectors to convert.
 
     Return:
-        Tensor: the skew matrices :math:`\mathbf{y}`.
+        Tensor: The skew matrices derived from the vectors.
 
     Shape:
-        Input: :obj:`(*, 3)`
-
-        Output: :obj:`(*, 3, 3)`
+        Input: :obj:`(*, N)`
+        Output: :obj:`(*, n, n)` if N = 1, 3, 6, ... then n = 2, 3, 4, ..., respectively.
 
     .. math::
         {\displaystyle \mathbf{y}_i={\begin{bmatrix}\,\,
@@ -25,7 +60,7 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
         \\\!-x_{i,2}&\,\,x_{i,1}&\,\,0\end{bmatrix}}}
 
     Note:
-        The last dimension of the input tensor has to be 3.
+        The last dimension of the input tensor has to be a triangular number.
 
     Example:
         >>> pp.vec2skew(torch.randn(1,3))
@@ -34,21 +69,28 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
                 [ 1.2761, -0.2929,  0.0000]]])
     """
     v = input.tensor() if hasattr(input, 'ltype') else input
-    assert v.shape[-1] == 3, "Last dim should be 3"
-    O = torch.zeros(v.shape[:-1], device=v.device, dtype=v.dtype, requires_grad=v.requires_grad)
-    return torch.stack([torch.stack([        O, -v[...,2],  v[...,1]], dim=-1),
-                        torch.stack([ v[...,2],         O, -v[...,0]], dim=-1),
-                        torch.stack([-v[...,1],  v[...,0],         O], dim=-1)], dim=-2)
 
-def scalar2skew(scalar:torch.Tensor) -> torch.Tensor:
-    skew = torch.concatenate(
-        [torch.zeros_like(scalar), -scalar, scalar, torch.zeros_like(scalar)],
-        dim=-1,
-    ).view(
-        scalar.shape[:-1] + (2, 2)
-    )  # or cat(dim=-1) to construct rows and then cat(dim=-2) to stack them
-    skew = skew.to(scalar.device)
-    skew = skew.type(scalar.dtype)
+    N = input.shape[-1]
+    assert is_triangular(N), "Last dimension of input shape invalid."
+    n = int(math.sqrt(1 + 8 * N) - 1) // 2 + 1
+
+    batch = input.shape[:-1]
+    skew = torch.zeros(*batch, n, n, device=input.device,
+                       dtype=input.dtype, requires_grad=False)
+    if n == 2:
+        skew[..., 0, 1] = -v[..., 0]
+        skew[..., 1, 0] = v[..., 0]
+    elif n == 3:
+        skew[..., 0, 1], skew[..., 0, 2] = -v[...,2],  v[...,1]
+        skew[..., 1, 0], skew[..., 1, 2] =  v[...,2], -v[...,0]
+        skew[..., 2, 0], skew[..., 2, 1] = -v[...,1],  v[...,0]
+    else:
+        s = 0
+        for i in range(n):
+            for j in range(i + 1, n):
+                skew[..., i, j] = -input[..., s]
+                skew[..., j, i] = input[..., s]
+                s = s + 1
     return skew
 
 
