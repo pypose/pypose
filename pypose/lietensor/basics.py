@@ -70,13 +70,11 @@ def vec2skew(input:torch.Tensor) -> torch.Tensor:
     """
     v = input.tensor() if hasattr(input, 'ltype') else input
 
-    N = input.shape[-1]
+    N = v.shape[-1]
     assert is_triangular(N), "Last dimension of input shape invalid."
     n = int(math.sqrt(1 + 8 * N) - 1) // 2 + 1
 
-    batch = input.shape[:-1]
-    skew = torch.zeros(*batch, n, n, device=input.device,
-                       dtype=input.dtype, requires_grad=False)
+    skew = torch.zeros(*v.shape[:-1], n, n, device=v.device, dtype=v.dtype)
     if n == 2:
         skew[..., 0, 1] = -v[..., 0]
         skew[..., 1, 0] = v[..., 0]
