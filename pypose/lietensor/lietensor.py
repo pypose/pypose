@@ -757,12 +757,11 @@ class so2Type(LieType):
         return SO2_type.Log(SO2_type.identity(*size, **kwargs))
 
     def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
-        raise NotImplementedError()
         assert isinstance(
             sigma, numbers.Number
         ), "Only accepts sigma as a single number"
         size = self.to_tuple(size)
-        data = torch.randn(*(size + torch.Size([3])), **kwargs)
+        data = torch.randn(*(size + torch.Size([1])), **kwargs)
         dist = data.norm(dim=-1, keepdim=True)
         theta = sigma * torch.randn(*(size + torch.Size([1])), **kwargs)
         return LieTensor(data / dist * theta, ltype=so2_type).requires_grad_(
@@ -878,8 +877,7 @@ class SO2Type(LieType):
 
     @classmethod
     def identity(cls, *size, **kwargs):
-        raise NotImplementedError()
-        data = torch.tensor([0.0, 0.0, 0.0, 1.0], **kwargs)
+        data = torch.tensor([0.0, 1.0], **kwargs)
         return LieTensor(data.repeat(size + (1,)), ltype=SO2_type)
 
     def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
@@ -941,8 +939,6 @@ class se2Type(LieType):
 
     def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         #  convert different types of inputs to SE3 sigma
-        raise NotImplementedError()
-
         if not isinstance(sigma, collections.abc.Iterable):
             sigma = _triple(sigma)
         elif len(sigma) == 2:
@@ -953,7 +949,7 @@ class se2Type(LieType):
             assert len(sigma) == 4, "Only accepts a tuple of sigma in size 1, 2, or 3."
         size = self.to_tuple(size)
         rotation = so2_type.randn(*size, sigma=sigma[-1], **kwargs).detach().tensor()
-        sigma = torch.tensor([sigma[0], sigma[1], sigma[2]], **kwargs)
+        sigma = torch.tensor([sigma[0], sigma[1]], **kwargs)
         translation = sigma * torch.randn(*(size + torch.Size([2])), **kwargs)
         data = torch.cat([translation, rotation], dim=-1)
         return LieTensor(data, ltype=se2_type).requires_grad_(requires_grad)
@@ -1049,12 +1045,10 @@ class SE2Type(LieType):
 
     @classmethod
     def identity(cls, *size, **kwargs):
-        raise NotImplementedError()
-        data = torch.tensor([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], **kwargs)
+        data = torch.tensor([0.0, 0.0, 0.0, 1.0], **kwargs)
         return LieTensor(data.repeat(size + (1,)), ltype=SE2_type)
 
     def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
-        raise NotImplementedError()
         data = se2_type.Exp(se2_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=SE2_type).requires_grad_(requires_grad)
 

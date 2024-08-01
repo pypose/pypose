@@ -251,8 +251,32 @@ def test_lietensor():
             assert(torch.all(m[:, 0:3, 3:4].view(-1, 3) == t))
         assert(torch.all(m[:, 0:3, 0:3] == s.view(-1, 1, 1) * r.matrix()))
 
-    print('Done')
+
+def test_lietensor_2D():
+    a_ = torch.randn(3, 1) * 0.1
+    a = pp.so2(a_)
+    b = pp.randn_so2(3, sigma=0.1, dtype=torch.float64, requires_grad=True, device=device)
+    c = pp.SO2_type.randn(3, sigma=0.1, requires_grad=True)
+
+    d = pp.randn_se2(3, sigma=0.1, requires_grad=True)
+    e = pp.SE2_type.randn(3, sigma=0.1, requires_grad=True)
+
+    assert a.is_leaf and b.is_leaf and c.is_leaf and d.is_leaf and e.is_leaf
+    assert (a.Exp() != c).all() and (b.Exp().to("cpu") != c).all() and (d.Exp() != e).all()
+
+    f = pp.identity_like(a)
+    _ = pp.identity_so2()
+    g = pp.identity_SO2(3)
+
+    h = pp.identity_like(d)
+    _ = pp.identity_se2()
+    i = pp.identity_SE2(3)
+
+    assert f.is_leaf and g.is_leaf and h.is_leaf and i.is_leaf
+    assert torch.isclose(f.Exp(), g, atol=1e-5).all() and torch.isclose(h.Exp(), i, atol=1e-5).all()
 
 
 if __name__ == '__main__':
     test_lietensor()
+    test_lietensor_2D()
+    print('Done')
