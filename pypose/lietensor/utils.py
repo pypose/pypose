@@ -4,6 +4,8 @@ from .lietensor import SE3_type, se3_type
 from .lietensor import SO3_type, so3_type
 from .lietensor import Sim3_type, sim3_type
 from .lietensor import RxSO3_type, rxso3_type
+from .lietensor import SO2_type, so2_type
+from .lietensor import SE2_type, se2_type
 
 
 def _LieTensor_wrapper_add_docstr(wrapper: functools.partial, embedding_doc):
@@ -221,6 +223,34 @@ sim3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=sim3_typ
         >>> pp.sim3([0, 0, 0, 0, 0, 0, 1])
         sim3Type LieTensor:
         tensor([0., 0., 0., 0., 0., 0., 1.])
+    ''')
+
+so2 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=so2_type),
+    r'''Internally, so2 LieTensors are stored by a single angle:
+
+    TODO
+
+    Examples:
+        >>> pp.so2(torch.randn(2, 1))
+        so2Type LieTensor:
+        tensor([[ 0.1477],
+                [ 0.2251]])
+        >>> pp.so2([1])
+        sim3Type LieTensor:
+        tensor([1.])
+    ''')
+
+
+SO2 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=SO2_type),
+    r''' TODO
+    ''')
+
+se2 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=se2_type),
+    r''' TODO
+    ''')
+
+SE2 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=SE2_type),
+    r''' TODO
     ''')
 
 def randn_like(input, sigma=1.0, **kwargs):
