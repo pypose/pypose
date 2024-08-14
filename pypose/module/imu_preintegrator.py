@@ -38,7 +38,7 @@ class IMUPreintegrator(nn.Module):
 
         2. Get IMU measurement
 
-        >>> ang = torch.tensor([0.1,0.1,0.1]) # angular velocity 
+        >>> ang = torch.tensor([0.1,0.1,0.1]) # angular velocity
         >>> acc = torch.tensor([0.1,0.1,0.1]) # acceleration
         >>> rot = pp.mat2SO3(torch.eye(3))    # Rotation (Optional)
         >>> dt = torch.tensor([0.002])        # Time difference between two measurements
@@ -103,7 +103,7 @@ class IMUPreintegrator(nn.Module):
             acc_cov = torch.tensor([[acc_cov, acc_cov, acc_cov]])
         if isinstance(gyro_cov, float):
             gyro_cov = torch.tensor([[gyro_cov, gyro_cov, gyro_cov]])
-        
+
         # Initial status of IMU: (pos)ition, (rot)ation, (vel)ocity, (cov)ariance
         self.register_buffer('gravity', torch.tensor([0, 0, gravity]), persistent=False)
         self.register_buffer('pos', self._check(pos).clone(), persistent=False)
@@ -186,7 +186,7 @@ class IMUPreintegrator(nn.Module):
 
             - :math:`w_k` is angular rate at the :math:`k`-th time step.
 
-            - :math:`{\Delta}t` is the time interval from time step :math:`k`-th to time 
+            - :math:`{\Delta}t` is the time interval from time step :math:`k`-th to time
               step :math:`{k+1}`-th time step.
 
         Uncertainty Propagation:
@@ -213,7 +213,7 @@ class IMUPreintegrator(nn.Module):
             B_g = \begin{bmatrix}
                     J_r^k \Delta t  \\
                     0_{3*3}  \\
-                    0_{3*3} 
+                    0_{3*3}
                 \end{bmatrix},
 
             B_a = \begin{bmatrix}
@@ -293,7 +293,7 @@ class IMUPreintegrator(nn.Module):
                 'Rij': Rij.detach(),
                 'Rk': inte_state['w'].detach(),
                 'Ha': vec2skew(inte_state['a'].detach()),
-                'dt': dt.detach() 
+                'dt': dt.detach()
             }
             cov = self.propagate_cov(cov_input = cov_input_state, init_cov = init_cov,
                                     gyro_cov = gyro_cov, acc_cov = acc_cov)
@@ -340,7 +340,7 @@ class IMUPreintegrator(nn.Module):
               :math:`B` is the batch size (or the number of IMU), :math:`F` is the number of
               frames (measurements), and :math:`H_{in}` is the raw sensor signals.
 
-            - init_rot: The initial orientation of the integration, which helps to 
+            - init_rot: The initial orientation of the integration, which helps to
               compensate for the gravity. It contains the shape :math:`(B, H_{in})`. d
 
             - rot: The ground truth orientation of the integration. If this parameter is
@@ -384,7 +384,7 @@ class IMUPreintegrator(nn.Module):
     @classmethod
     def predict(cls, init_state, integrate):
         r"""
-        Propogate the next IMU state from the initial IMU state (:obj:`init_state`) with 
+        Propogate the next IMU state from the initial IMU state (:obj:`init_state`) with
         the preintegrated IMU measurements (:math:`\Delta{p}`, :math:`\Delta{v}` and
         :math:`\Delta{r}`).
 
@@ -432,11 +432,11 @@ class IMUPreintegrator(nn.Module):
         Cg = torch.diag_embed(gyro_cov)
         Ca = torch.diag_embed(acc_cov)
 
-        # constructing the propagate 
+        # constructing the propagate
         A = torch.eye(9, device=device, dtype=dtype).repeat([B, F+1, 1, 1])
         Bg = torch.zeros(B, F, 9, 3, device=device, dtype=dtype)
         Ba = torch.zeros(B, F, 9, 3, device=device, dtype=dtype)
-        
+
         A[:, :-1, 0:3, 0:3] = cov_input['Rk'].matrix().mT # R_{k,k+1}^T
         A[:, :-1, 3:6, 0:3] = torch.einsum('...xy,...t -> ...xy', \
             - cov_input['Rij'].matrix() @ cov_input['Ha'], cov_input['dt'])
