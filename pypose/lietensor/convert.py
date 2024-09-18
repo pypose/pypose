@@ -1,6 +1,8 @@
 import torch, warnings
+from torch.nn.functional import normalize
 from .utils import SO3, so3, SE3, RxSO3, Sim3
-from .lietensor import LieTensor, SE3_type, SO3_type, Sim3_type, RxSO3_type
+from .lietensor import LieTensor,  liegroup, liealgebra
+from .lietensor import SE3_type, SO3_type, Sim3_type, RxSO3_type
 
 
 def mat2SO3(mat, check=True, rtol=1e-5, atol=1e-5):
@@ -824,3 +826,41 @@ def euler(inputs, eps=2e-4):
     See :obj:`euler2SO3` for more information.
     '''
     return inputs.euler(eps=eps)
+
+
+def quat2unit(input: LieTensor, eps=1e-12) -> LieTensor:
+    r'''
+    Normalize the quaternion part of a ``LieTensor``, which has to be a Lie Group.
+    If input is a Lie algebra, then do nothing and return the input tensor.
+    If the quaternion parts are zeros, then initilize unit quaternions.
+
+    The quaternion parts :math:`v` are normalized as
+
+    .. math::
+        v = \frac{v}{\max(\lVert v \rVert_2, \epsilon)},
+
+    where :math:`\epsilon` is a small value to avoid division by zero
+
+    Args:
+        input (``LieTensor``): input LieTensor of any type and shape.
+        eps (``float``): small value to avoid division by zero. Default: 1e-12.
+
+    Return:
+        :obj:`LieTensor`: the output LieTensor.
+    '''
+    assert isinstance(input, LieTensor), "Input should be a LieTensor"
+
+    if input.ltype in liealgebra:
+        return input
+    elif input.ltype in liegroup:
+        data = input.tensor()
+        if input.ltype in [SO3_type, RxSO3_type]:
+            data[..., :4] = normalize(data[..., :4], p=2, dim=-1, eps=eps)
+        elif input.ltype in [SE3_type, Sim3_type]:
+            data[..., 3:7] = normalize(data[..., 3:7], p=2, dim=-1, eps=eps)
+        output = LieTensor(data, ltype=input.ltype)
+        if torch.norm(output.rotation()) < eps:
+            output.rotation().identity_()
+        return output
+    else:
+        raise "LieType of Input LieTensor not recognized."

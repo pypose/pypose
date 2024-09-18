@@ -56,7 +56,31 @@ class TestOps:
         OX = pp.cumops(x, dim=0, ops=right)[N-1]
         pp.testing.assert_close(O3, OX, rtol=1e-4, atol=1e-4)
 
+    def test_quat2unit(self):
+        x = pp.randn_SE3(2, 2)
+        pp.quat2unit(x)
+
+        x = pp.SE3([0, 0, 0, 0, 0, 0, 0.5])
+        pp.quat2unit(x)
+
+        x = pp.SE3([0, 0, 0, 0, 0, 0, 0])
+        pp.quat2unit(x)
+
+        x = pp.SO3([0, 0, 0, 0])
+        pp.quat2unit(x)
+
+        x = pp.SO3([0, 0, 0, 0.5])
+        pp.quat2unit(x)
+
+        x = pp.Sim3([0, 0, 0, 0, 0, 0, 0.5, 0.2])
+        pp.quat2unit(x)
+
+        x = pp.RxSO3([0, 0.5, 0, 0.1, 0.2])
+        pp.quat2unit(x)
+
+
 if __name__ == '__main__':
     test = TestOps()
     test.test_pm()
     test.test_cum()
+    test.test_quat2unit()

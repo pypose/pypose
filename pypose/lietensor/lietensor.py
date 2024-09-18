@@ -740,7 +740,8 @@ SO3_type, so3_type = SO3Type(), so3Type()
 SE3_type, se3_type = SE3Type(), se3Type()
 Sim3_type, sim3_type = Sim3Type(), sim3Type()
 RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
-
+liegroup = [SO3_type, SE3_type, Sim3_type, RxSO3_type]
+liealgebra = [so3_type, se3_type, sim3_type, rxso3_type]
 
 class LieTensor(torch.Tensor):
     r""" A sub-class of :obj:`torch.Tensor` to represent Lie Algebra and Lie Group.
