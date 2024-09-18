@@ -832,7 +832,7 @@ def quat2unit(input: LieTensor, eps=1e-12) -> LieTensor:
     r'''
     Normalize the quaternion part of a ``LieTensor``, which has to be a Lie Group.
     If input is a Lie algebra, then do nothing and return the input tensor.
-    If the quaternion parts are zeros, then initilize unit quaternions.
+    If the quaternion parts are zeros, then initilize identity quaternions.
 
     The quaternion parts :math:`v` are normalized as
 
