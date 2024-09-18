@@ -830,8 +830,8 @@ def euler(inputs, eps=2e-4):
 
 def quat2unit(input: LieTensor, eps=1e-12) -> LieTensor:
     r'''
-    Normalize the quaternion part of a ``LieTensor``, which has to be a Lie Group.
-    If input is a Lie algebra, then do nothing and return the input tensor.
+    Normalize the quaternion part of a ``LieTensor``, which has to be a Lie group.
+    If input is a not a Lie group, then do nothing and return the input.
     If the quaternion parts are zeros, then initilize identity quaternions.
 
     The quaternion parts :math:`v` are normalized as
@@ -848,11 +848,7 @@ def quat2unit(input: LieTensor, eps=1e-12) -> LieTensor:
     Return:
         :obj:`LieTensor`: the output LieTensor.
     '''
-    assert isinstance(input, LieTensor), "Input should be a LieTensor"
-
-    if input.ltype in liealgebra:
-        return input
-    elif input.ltype in liegroup:
+    if isinstance(input, LieTensor) and (input.ltype in liegroup):
         data = input.tensor()
         if input.ltype in [SO3_type, RxSO3_type]:
             data[..., :4] = normalize(data[..., :4], p=2, dim=-1, eps=eps)
@@ -863,4 +859,5 @@ def quat2unit(input: LieTensor, eps=1e-12) -> LieTensor:
             output.rotation().identity_()
         return output
     else:
-        raise "LieType of Input LieTensor not recognized."
+        warnings.warn("Input is not Lie group, doing thing and returning input..")
+        return input
