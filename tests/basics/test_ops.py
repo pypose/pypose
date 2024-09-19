@@ -58,25 +58,28 @@ class TestOps:
 
     def test_quat2unit(self):
         x = pp.randn_SE3(2, 2)
-        pp.quat2unit(x)
+        y = pp.quat2unit(x)
+        print(y)
 
         x = pp.SE3([0, 0, 0, 0, 0, 0, 0.5])
-        pp.quat2unit(x)
-
-        x = pp.SE3([0, 0, 0, 0, 0, 0, 0])
-        pp.quat2unit(x)
-
-        x = pp.SO3([0, 0, 0, 0])
-        pp.quat2unit(x)
+        y = pp.quat2unit(x)
+        print(y)
 
         x = pp.SO3([0, 0, 0, 0.5])
-        pp.quat2unit(x)
+        y = pp.quat2unit(x)
+        print(y)
 
         x = pp.Sim3([0, 0, 0, 0, 0, 0, 0.5, 0.2])
-        pp.quat2unit(x)
+        y = pp.quat2unit(x)
+        print(y)
 
         x = pp.RxSO3([0, 0.5, 0, 0.1, 0.2])
-        pp.quat2unit(x)
+        y = pp.quat2unit(x)
+        print(y)
+
+        x = pp.RxSO3([[0, 0.5, 0, 0.1, 0.2], [0, 0.2, 0, 0, 0.2]])
+        y = pp.quat2unit(x)
+        print(y)
 
 
 if __name__ == '__main__':

@@ -832,7 +832,7 @@ def quat2unit(input: LieTensor, eps=1e-12) -> LieTensor:
     r'''
     Normalize the quaternion part of a ``LieTensor``, which has to be a Lie group.
     If input is a not a Lie group, then do nothing and return the input.
-    If the quaternion parts are zeros, then initilize identity quaternions.
+    If the quaternion parts contain pure zeros, then raise an error.
 
     The quaternion parts :math:`v` are normalized as
 
@@ -855,8 +855,8 @@ def quat2unit(input: LieTensor, eps=1e-12) -> LieTensor:
         elif input.ltype in [SE3_type, Sim3_type]:
             data[..., 3:7] = normalize(data[..., 3:7], p=2, dim=-1, eps=eps)
         output = LieTensor(data, ltype=input.ltype)
-        if torch.norm(output.rotation()) < eps:
-            output.rotation().identity_()
+        if (output.rotation().norm(p=2, dim=-1) < eps).any():
+            raise ValueError("Detected zero quaternions, which cannot be normalized.")
         return output
     else:
         warnings.warn("Input is not Lie group, doing thing and returning input..")
