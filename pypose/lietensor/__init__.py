@@ -9,5 +9,5 @@ from .utils import identity_Sim3, identity_sim3, identity_RxSO3, identity_rxso3
 from .utils import SO3, so3, SE3, se3, Sim3, sim3, RxSO3, rxso3
 from .utils import Exp, Log, Inv, Mul, Retr, Act, Adj, AdjT, Jinvp, Jr
 from .basics import vec2skew, add, add_, mul
-from .convert import tensor, translation, rotation, scale, matrix, euler
+from .convert import tensor, translation, rotation, scale, matrix, euler, quat2unit
 from .convert import mat2SO3, mat2SE3, mat2Sim3, mat2RxSO3, from_matrix, matrix, euler2SO3

@@ -20,6 +20,7 @@ Convert
     euler
     scale
     matrix
+    quat2unit
     cart2homo
     homo2cart
     point2pixel
