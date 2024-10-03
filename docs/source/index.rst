@@ -7,7 +7,7 @@ PyPose Documentation
    :maxdepth: 2
    :caption: Contents:
 
-   lietensor
+
    func
    functions
    convert
