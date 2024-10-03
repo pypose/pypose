@@ -356,3 +356,46 @@ def svdtf(source, target):
     t = ctntarget.mT - R @ ctnsource.mT
     T = torch.cat((R, t), dim=-1)
     return mat2SE3(T, check=False)
+
+
+def ror(points, nbr=16, radius=0.05):
+    r'''
+    Remove point cloud outliers by checking if they have fewer neighbors (nbr) than the 
+    set limit within a specified radius.
+
+    Args:
+        points (``torch.Tensor``): the input point cloud. It is essential that the last
+            dimension (D) exceeds 3, with the point's coordinates occupying the initial
+            three values. Subsequent values may contain additional information like
+            intensity, RGB channels, etc. The shape has to be (..., N, D).
+        nbr (``int``, optional): the minimum amount of neighbors within the certain
+            radius.
+            Default: ``16``.
+        radius (``float``, optional): the radius of the sphere that will be used for
+            counting the neighbors.
+            Default: ``0.05``.
+
+    Returns:
+        ``mask``: The mask of the input pointcloud, where the inlier is True and the 
+        outlier is False. The shape is (..., N).
+
+    Example:
+        >>> import torch, pypose as pp
+        >>> points = torch.tensor([[0., 0., 0.],
+        ...                        [1., 0., 0.],
+        ...                        [0., 1., 0.],
+        ...                        [0., 1., 1.],
+        ...                        [10., 1., 1.],
+        ...                        [10., 1., 10.]])
+        >>> pp.ror(points, nbr=2, radius=5)
+        tensor([ True,  True,  True,  True, False, False])
+        >>> pp.ror(points, nbr=2, radius=12)
+        tensor([ True,  True,  True,  True,  True, False])
+    '''
+    assert points.size(-1) >= 3, {
+        "The last dimension of the pointcloud should exceed 3."}
+    diff = points[..., :3].unsqueeze(-2) - points[..., :3].unsqueeze(-3)
+    dist = torch.linalg.norm(diff, dim=-1)
+    count = torch.sum(dist < radius, dim=-1) - 1
+    mask = count >= nbr
+    return mask
