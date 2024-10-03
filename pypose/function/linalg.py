@@ -108,3 +108,9 @@ def bvmv(lvec, mat, rvec):
     rvec = rvec.tensor() if isinstance(rvec, LieTensor) else rvec
     lvec, rvec = lvec.unsqueeze(-1), rvec.unsqueeze(-1)
     return torch.atleast_1d((lvec.mT @ mat @ rvec).squeeze_(-1).squeeze_(-1))
+
+def btdot(mat1, mat2):
+    # mat1 [B, ns]
+    # mat2 [B, ns, ns+nc, ns+nc]
+    # out  [B, ns+nc, ns+nc]
+    return (torch.tile(mat1, mat2.shape[-2:] + (1,1)).permute(-2,-1,0,1) * mat2).sum(-3)
