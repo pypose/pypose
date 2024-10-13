@@ -29,11 +29,11 @@ def read_tum_pose_file(file_path: str):
     return tstamp, pose
 
 if __name__ == '__main__':
-    # The txt can be drived from evo github
+    # The txt can be obtained from evo github
     t_gt_stamp, pose_gt = read_tum_pose_file('fr2_desk_groundtruth.txt')
     t_est_stamp, pose_est = read_tum_pose_file('fr2_desk_ORB.txt')
     traj_gt = StampedSE3(pose_gt, t_gt_stamp)
     traj_est = StampedSE3(pose_est, t_est_stamp)
 
-    result = compute_APE(traj_est, traj_gt, match_thresh = 0.4)
+    result = compute_APE(traj_gt, traj_est, match_thresh = 0.4)
     pass
