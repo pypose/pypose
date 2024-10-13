@@ -139,10 +139,9 @@ def matching_time_indices(stamps_1, stamps_2, max_diff=0.01, offset_2=0.0):
 
     return matching_indices_1, matching_indices_2
 
-def assoc_traj(traj_est, traj_ref, max_diff=0.01, offset_2=0.0, threshold=0.3):
+def assoc_traj(traj_ref, traj_est, max_diff=0.01, offset_2=0.0, threshold=0.3):
     r"""
     Associates two trajectories by matching their timestamps
-
     Args:
         traj_est: StampedSE3
             The trajectory for estimation.
@@ -154,19 +153,17 @@ def assoc_traj(traj_est, traj_ref, max_diff=0.01, offset_2=0.0, threshold=0.3):
             The aligned offset (s) for the second timestamps.
         threshold: float
             The threshold (%) for the matching warning
-
     Returns:
         traj_est_aligned: StampedSE3
             The aligned estimation trajectory
         traj_ref_aligned: StampedSE3
             The aligned reference trajectory
-
     Warning:
         The matched stamps are under the threshold
     """
-    snd_longer = len(traj_ref.timestamps) > len(traj_est.timestamps)
-    traj_long = traj_ref if snd_longer else traj_est
-    traj_short = traj_est if snd_longer else traj_ref
+    snd_longer = len(traj_est.timestamps) > len(traj_ref.timestamps)
+    traj_long = traj_est if snd_longer else traj_ref
+    traj_short = traj_ref if snd_longer else traj_est
     max_pairs = len(traj_short.timestamps)
 
     matching_indices_short, matching_indices_long = matching_time_indices(
@@ -177,8 +174,8 @@ def assoc_traj(traj_est, traj_ref, max_diff=0.01, offset_2=0.0, threshold=0.3):
     traj_short = traj_short[matching_indices_short]
     traj_long = traj_long[matching_indices_long]
 
-    traj_est_aligned = traj_short if snd_longer else traj_long
-    traj_ref_aligned = traj_long if snd_longer else traj_short
+    traj_ref_aligned = traj_short if snd_longer else traj_long
+    traj_est_aligned = traj_long if snd_longer else traj_short
 
     assert len(matching_indices_short) == len(matching_indices_long), \
         {r"matching_time_indices returned unequal number of indices"}
@@ -196,7 +193,7 @@ def assoc_traj(traj_est, traj_ref, max_diff=0.01, offset_2=0.0, threshold=0.3):
     print(f"Found {num_matches} of maximum {max_pairs} possible matching "
           f"timestamps between estimation and reference with maximum time "
           f"diff.: {max_diff} (s) and time offset: {offset_2} (s).")
-  
+
     return traj_est_aligned, traj_ref_aligned
 
 def process_data(traj_est, traj_ref, pose_type: PoseRelaType = 'translation'):
