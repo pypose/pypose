@@ -21,6 +21,8 @@ def read_tum_pose_file(file_path: str):
     rot_q = torch.from_numpy(rot).float()
     trans = torch.from_numpy(trans).float()
 
+    print(f"Loaded {len(tstamp)} stamps and poses from: {file_path}")
+
     pose_torch = torch.cat((trans, rot_q), dim=-1)
     pose = pp.SE3(pose_torch)
 
