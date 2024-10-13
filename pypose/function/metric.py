@@ -238,7 +238,7 @@ def process_data(traj_est, traj_ref, pose_type: PoseRelaType = 'translation'):
         I = torch.eye(4, device=E.device, dtype=E.dtype).expand_as(E)
         return torch.linalg.norm((E - I), dim=(-2, -1))
     elif pose_type == 'rotation_angle_rad':
-        return mat2SO3(E[:,:3,:3]).euler().norm(dim=-1)
+        return (mat2SO3(E[:,:3,:3]).euler()).norm(dim=-1)
     elif pose_type == 'rotation_angle_deg':
         error = (mat2SO3(E[:,:3,:3]).euler()).norm(dim=-1)
         return torch.rad2deg(error)
