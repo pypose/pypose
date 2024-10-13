@@ -193,10 +193,10 @@ def assoc_traj(traj_est, traj_ref, max_diff=0.01, offset_2=0.0, threshold=0.3):
                        May be not be enough for aligned and not accurate results.",
                       category=Warning, stacklevel=2)
 
-    print(f"Found {num_matches} of maxiumn {max_pairs} possible matching."
-          f"timestamps between estimation and reference with max time"
-          f"diff: {max_diff} (s) and time offset: {offset_2} (s).")
-
+    print(f"Found {num_matches} of maximum {max_pairs} possible matching "
+          f"timestamps between estimation and reference with maximum time "
+          f"diff.: {max_diff} (s) and time offset: {offset_2} (s).")
+  
     return traj_est_aligned, traj_ref_aligned
 
 def process_data(traj_est, traj_ref, pose_type: PoseRelaType = 'translation'):
