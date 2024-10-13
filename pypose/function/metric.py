@@ -194,7 +194,7 @@ def assoc_traj(traj_ref, traj_est, max_diff=0.01, offset_2=0.0, threshold=0.3):
           f"timestamps between estimation and reference with maximum time "
           f"diff.: {max_diff} (s) and time offset: {offset_2} (s).")
 
-    return traj_est_aligned, traj_ref_aligned
+    return traj_ref_aligned, traj_est_aligned
 
 def process_data(traj_est, traj_ref, pose_type: PoseRelaType = 'translation'):
     r'''
@@ -294,7 +294,7 @@ def compute_APE(traj_est, traj_ref, pose_relation: PoseRelaType='translation',
         error: The statics error of the trajectory
     '''
 
-    traj_est, traj_ref = assoc_traj(traj_est, traj_ref, max_diff, offset_2, match_thresh)
+    traj_ref, traj_est = assoc_traj(traj_est, traj_ref, max_diff, offset_2, match_thresh)
     trans_mat = identity_Sim3(1, dtype=traj_est.dtype, device=traj_est.device)
 
     if align:
@@ -404,7 +404,7 @@ def compute_RPE(traj_est, traj_ref, pose_relation: PoseRelaType='translation',
             id_pairs = (idx[:-1], idx[1:])
         return id_pairs
 
-    traj_est, traj_ref = assoc_traj(traj_est, traj_ref, max_diff, offset_2, match_thresh)
+    traj_ref, traj_est = assoc_traj(traj_est, traj_ref, max_diff, offset_2, match_thresh)
     trans_mat = identity_Sim3(1, dtype=traj_est.dtype, device=traj_est.device)
 
     if align:
