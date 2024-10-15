@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import pypose as pp
-from pypose.function.metric import compute_APE, StampedSE3
+from pypose.function.metric import compute_APE, compute_RPE, StampedSE3
 
 def csv_read_matrix(file_path:str, column:tuple[int],
                     delim: str=',', comment_str:str ="#"):
