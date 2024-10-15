@@ -35,5 +35,6 @@ if __name__ == '__main__':
     traj_gt = StampedSE3(pose_gt, t_gt_stamp)
     traj_est = StampedSE3(pose_est, t_est_stamp)
 
-    result = compute_APE(traj_gt, traj_est, match_thresh = 0.4)
+    result_ape = compute_APE(traj_gt, traj_est, match_thresh = 0.4)
+    result_rpe = compute_RPE(traj_gt, traj_est, match_thresh = 0.4)
     pass
