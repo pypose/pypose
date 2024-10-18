@@ -20,7 +20,6 @@ def read_tum_pose_file(file_path: str):
     return stamp, pose
 
 if __name__ == '__main__':
-    # The txt can be drived from evo github
     download_url('https://raw.githubusercontent.com/MichaelGrupp/evo/master/'\
                   'test/data/fr2_desk_groundtruth.txt', \
                   './test/data')
