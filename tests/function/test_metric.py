@@ -1,40 +1,35 @@
 import torch
+from torchvision.datasets.utils import download_url
 import numpy as np
 import pypose as pp
-from pypose.function.metric import compute_APE, compute_RPE, StampedSE3
+from pypose.function import ape, rpe
 
-def csv_read_matrix(file_path:str, column:tuple[int],
-                    delim: str=',', comment_str:str ="#"):
-    mat = np.loadtxt(file_path,  comments=comment_str,
-                     delimiter=delim, usecols=column)
-    return mat
 
 def read_tum_pose_file(file_path: str):
-    tstamp = csv_read_matrix(file_path, column=(0),
-                            delim=' ', comment_str='#')
-    trans = csv_read_matrix(file_path, column=(1,2,3), delim=' ',
-                            comment_str='#')
-    rot = csv_read_matrix(file_path, column=(4,5,6,7),
-                            delim=' ', comment_str='#')
+    stamp = np.loadtxt(file_path, comments='#', delimiter=' ', usecols=(0))
+    trans = np.loadtxt(file_path, comments='#', delimiter=' ', usecols=(1,2,3))
+    rot = np.loadtxt(file_path, comments='#', delimiter=' ', usecols=(4,5,6,7))
 
-    tstamp = torch.from_numpy(tstamp)
+    stamp = torch.from_numpy(stamp)
     rot_q = torch.from_numpy(rot).float()
     trans = torch.from_numpy(trans).float()
-
-    print(f"Loaded {len(tstamp)} stamps and poses from: {file_path}")
 
     pose_torch = torch.cat((trans, rot_q), dim=-1)
     pose = pp.SE3(pose_torch)
 
-    return tstamp, pose
+    return stamp, pose
 
 if __name__ == '__main__':
-    # The txt can be obtained from evo github
-    t_gt_stamp, pose_gt = read_tum_pose_file('fr2_desk_groundtruth.txt')
-    t_est_stamp, pose_est = read_tum_pose_file('fr2_desk_ORB.txt')
-    traj_gt = StampedSE3(pose_gt, t_gt_stamp)
-    traj_est = StampedSE3(pose_est, t_est_stamp)
+    # The txt can be drived from evo github
+    download_url('https://raw.githubusercontent.com/MichaelGrupp/evo/master/'\
+                  'test/data/fr2_desk_groundtruth.txt', \
+                  './test/data')
+    download_url('https://raw.githubusercontent.com/MichaelGrupp/evo/master/'\
+                  'test/data/fr2_desk_ORB.txt', \
+                  './test/data')
+    stamp_gt, pose_gt = read_tum_pose_file('./test/data/fr2_desk_groundtruth.txt')
+    stamp_est, pose_est = read_tum_pose_file('./test/data/fr2_desk_ORB.txt')
 
-    result_ape = compute_APE(traj_gt, traj_est, match_thresh = 0.4)
-    result_rpe = compute_RPE(traj_gt, traj_est, match_thresh = 0.4)
+    result_ape = ape(stamp_gt, pose_gt, stamp_est, pose_est, thresh = 0.4)
+    result_rpe = rpe(stamp_gt, pose_gt, stamp_est, pose_est, thresh = 0.4)
     pass
