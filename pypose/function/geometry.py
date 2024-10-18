@@ -311,6 +311,51 @@ def knn(ref, nbr, k=1, ord=2, dim=-1, largest=False, sorted=True):
     dist = torch.linalg.norm(diff, dim=dim, ord=ord)
     return dist.topk(k, dim=dim, largest=largest, sorted=sorted)
 
+def svdtf(source, target):
+    r'''
+    Computes the rigid transformation ( :math:`SE(3)` ) between two sets of associated
+    point clouds (source and target) using Singular Value Decomposition (SVD).
+
+    Args:
+        source (``torch.Tensor``): the coordinates of the source point cloud.
+            The shape has to be (..., N, 3).
+        target (``torch.Tensor``): the coordinates of the target point cloud.
+            The shape has to be (..., N, 3).
+
+    Returns:
+        ``LieTensor``: The rigid transformation matrix in ``SE3Type``  that
+        minimizes the mean squared error between the input point sets.
+
+    Warning:
+        The number of points N has to be the same for both point clouds.
+
+    Example:
+        >>> import torch, pypose as pp
+        >>> source = torch.tensor([[0., 0., 0.],
+        ...                     [1., 0., 0.],
+        ...                     [0., 1., 0.]])
+        >>> target = torch.tensor([[1., 1., 1.],
+        ...                     [2., 1., 1.],
+        ...                     [1., 2., 1.]])
+        >>> pp.svdtf(source, target)
+        SE3Type LieTensor:
+        LieTensor([1., 1., 1., 0., 0., 0., 1.])
+    '''
+    assert source.size(-2) == target.size(-2), {
+        "The number of points N has to be the same for both point clouds."}
+    ctnsource = source.mean(dim=-2, keepdim=True)
+    ctntarget = target.mean(dim=-2, keepdim=True)
+    source = source - ctnsource
+    target = target - ctntarget
+    M = torch.einsum('...Na, ...Nb -> ...ab', target, source)
+    U, S, Vh = torch.linalg.svd(M)
+    R = U @ Vh
+    mask = (R.det() + 1).abs() < 1e-6
+    R[mask] = - R[mask]
+    t = ctntarget.mT - R @ ctnsource.mT
+    T = torch.cat((R, t), dim=-1)
+    return mat2SE3(T, check=False)
+
 def svdstf(source: torch.Tensor, target: torch.Tensor, with_scale: bool=True):
     r'''
     Compute the affine transformation ( :math:`Sim(3)` ) between two sets of associated
@@ -384,48 +429,3 @@ def svdstf(source: torch.Tensor, target: torch.Tensor, with_scale: bool=True):
     T = torch.cat((scale * R, t), dim=-1)
 
     return mat2Sim3(T, check=True)
-
-def svdtf(source, target):
-    r'''
-    Computes the rigid transformation ( :math:`SE(3)` ) between two sets of associated
-    point clouds (source and target) using Singular Value Decomposition (SVD).
-
-    Args:
-        source (``torch.Tensor``): the coordinates of the source point cloud.
-            The shape has to be (..., N, 3).
-        target (``torch.Tensor``): the coordinates of the target point cloud.
-            The shape has to be (..., N, 3).
-
-    Returns:
-        ``LieTensor``: The rigid transformation matrix in ``SE3Type``  that
-        minimizes the mean squared error between the input point sets.
-
-    Warning:
-        The number of points N has to be the same for both point clouds.
-
-    Example:
-        >>> import torch, pypose as pp
-        >>> source = torch.tensor([[0., 0., 0.],
-        ...                     [1., 0., 0.],
-        ...                     [0., 1., 0.]])
-        >>> target = torch.tensor([[1., 1., 1.],
-        ...                     [2., 1., 1.],
-        ...                     [1., 2., 1.]])
-        >>> pp.svdtf(source, target)
-        SE3Type LieTensor:
-        LieTensor([1., 1., 1., 0., 0., 0., 1.])
-    '''
-    assert source.size(-2) == target.size(-2), {
-        "The number of points N has to be the same for both point clouds."}
-    ctnsource = source.mean(dim=-2, keepdim=True)
-    ctntarget = target.mean(dim=-2, keepdim=True)
-    source = source - ctnsource
-    target = target - ctntarget
-    M = torch.einsum('...Na, ...Nb -> ...ab', target, source)
-    U, S, Vh = torch.linalg.svd(M)
-    R = U @ Vh
-    mask = (R.det() + 1).abs() < 1e-6
-    R[mask] = - R[mask]
-    t = ctntarget.mT - R @ ctnsource.mT
-    T = torch.cat((R, t), dim=-1)
-    return mat2SE3(T, check=False)
