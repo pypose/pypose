@@ -361,16 +361,15 @@ def svdstf(source: torch.Tensor, target: torch.Tensor, with_scale: bool=True):
     Compute the affine transformation ( :math:`Sim(3)` ) between two sets of associated
     point clouds (source and target) using Umeyama alignment.
 
-    ref: Least-squares estimation of transformation parameters between two point patterns
+    Ref: Least-squares estimation of transformation parameters between two point patterns.
 
     Args:
         source (``torch.Tensor``): the coordinates of the source point cloud.
             The shape has to be (..., N, 3).
         target (``torch.Tensor``): the coordinates of the target point cloud.
             The shape has to be (..., N, 3).
-        with_scale (``bool``):
-            True: with scale
-            False: without scale i.e. scale = 1
+        with_scale (``bool``): True: with scale, False: without scale i.e. scale = 1.
+            Default: ``True``.
 
     Returns:
         ``LieTensor``: The affine transformation matrix in ``Sim3Type``  that
