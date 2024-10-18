@@ -313,7 +313,7 @@ def knn(ref, nbr, k=1, ord=2, dim=-1, largest=False, sorted=True):
 
 def svdstf(source: torch.Tensor, target: torch.Tensor, with_scale: bool=True):
     r'''
-    Computes the affine transformation ( :math:`Sim(3)` ) between two sets of associated
+    Compute the affine transformation ( :math:`Sim(3)` ) between two sets of associated
     point clouds (source and target) using Umeyama alignment.
 
     ref: Least-squares estimation of transformation parameters between two point patterns
