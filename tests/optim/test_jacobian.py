@@ -213,8 +213,8 @@ class TestJacobian:
         (pp.randn_so3(5), pp.Inv),
         (pp.randn_sim3(5), pp.Inv),
         (pp.randn_rxso3(5), pp.Inv),
-        (pp.randn_SE3(5), partial(pp.Act, p=torch.randn(5, 3))),
-        (pp.randn_SO3(5), partial(pp.Act, p=torch.randn(5, 3))),
+        (pp.randn_SE3(5), partial(pp.Act, p=torch.randn(5, 3, device=device))),
+        (pp.randn_SO3(5), partial(pp.Act, p=torch.randn(5, 3, device=device))),
         # all log/exp functions are not yet supported
     ])
     def test_lietensor_vmap(self, input, op):
