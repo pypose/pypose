@@ -1,17 +1,19 @@
 import torch, warnings
+from torch.nn.functional import normalize
 from .utils import SO3, so3, SE3, RxSO3, Sim3
-from .lietensor import LieTensor, SE3_type, SO3_type, Sim3_type, RxSO3_type
+from .lietensor import LieTensor,  liegroup, liealgebra
+from .lietensor import SE3_type, SO3_type, Sim3_type, RxSO3_type
 
 
 def mat2SO3(mat, check=True, rtol=1e-5, atol=1e-5):
     r"""Convert batched rotation or transformation matrices to SO3Type LieTensor.
 
     Args:
-        mat (Tensor): the batched matrices to convert. If input is of shape :obj:`(*, 3, 4)`
-            or :obj:`(*, 4, 4)`, only the top left 3x3 submatrix is used.
-        check (bool, optional): flag to check if the input is valid rotation matrices (orthogonal
-            and with a determinant of one). Set to ``False`` if less computation is needed.
-            Default: ``True``.
+        mat (Tensor): the batched matrices to convert. If input is of shape
+            :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`, only the top left 3x3 submatrix is used.
+        check (bool, optional): flag to check if the input is valid rotation matrices
+            (orthogonal and with a determinant of one). Set to ``False`` if less
+            computation is needed. Default: ``True``.
         rtol (float, optional): relative tolerance when check is enabled. Default: 1e-05
         atol (float, optional): absolute tolerance when check is enabled. Default: 1e-05
 
@@ -36,7 +38,8 @@ def mat2SO3(mat, check=True, rtol=1e-5, atol=1e-5):
             \sqrt{1 - \mathbf{R}^{1,1}_i + \mathbf{R}^{2,2}_i - \mathbf{R}^{3,3}_i}\\
         q^z_i &= \mathrm{sign}(\mathbf{R}^{1,2}_i - \mathbf{R}^{2,1}_i) \frac{1}{2}
             \sqrt{1 - \mathbf{R}^{1,1}_i - \mathbf{R}^{2,2}_i + \mathbf{R}^{3,3}_i}\\
-        q^w_i &= \frac{1}{2} \sqrt{1 + \mathbf{R}^{1,1}_i + \mathbf{R}^{2,2}_i + \mathbf{R}^{3,3}_i}
+        q^w_i &= \frac{1}{2} \sqrt{1 + \mathbf{R}^{1,1}_i + \mathbf{R}^{2,2}_i +
+            \mathbf{R}^{3,3}_i}
         \end{aligned}\right.,
 
     In summary, the output LieTensor should be of format:
@@ -302,7 +305,8 @@ def mat2Sim3(mat, check=True, rtol=1e-5, atol=1e-5):
             \sqrt{1 - \mathbf{R}^{1,1}_i + \mathbf{R}^{2,2}_i - \mathbf{R}^{3,3}_i}\\
         q^z_i &= \mathrm{sign}(\mathbf{R}^{1,2}_i - \mathbf{R}^{2,1}_i) \frac{1}{2}
             \sqrt{1 - \mathbf{R}^{1,1}_i - \mathbf{R}^{2,2}_i + \mathbf{R}^{3,3}_i}\\
-        q^w_i &= \frac{1}{2} \sqrt{1 + \mathbf{R}^{1,1}_i + \mathbf{R}^{2,2}_i + \mathbf{R}^{3,3}_i}
+        q^w_i &= \frac{1}{2} \sqrt{1 + \mathbf{R}^{1,1}_i + \mathbf{R}^{2,2}_i +
+            \mathbf{R}^{3,3}_i}
         \end{aligned}\right.,
 
     In summary, the output LieTensor should be of format:
@@ -499,7 +503,7 @@ def mat2RxSO3(mat, check=True, rtol=1e-5, atol=1e-5):
     shape = mat.shape
     rot = mat[..., :3, :3]
 
-    s = torch.pow(torch.det(mat), 1/3).unsqueeze(-1)
+    s = torch.pow(torch.det(rot), 1/3).unsqueeze(-1)
     if torch.allclose(s,  torch.zeros(shape[:-2], dtype=mat.dtype, device=mat.device), rtol=rtol, atol=atol):
         raise ValueError("Rotation matrix not full rank.")
 
@@ -821,3 +825,38 @@ def euler(inputs, eps=2e-4):
     See :obj:`euler2SO3` for more information.
     '''
     return inputs.euler(eps=eps)
+
+
+def quat2unit(input: LieTensor, eps=1e-12) -> LieTensor:
+    r'''
+    Normalize the quaternion part of a ``LieTensor``, which has to be a Lie group.
+    If input is a not a Lie group, then do nothing and return the input.
+    If the quaternion parts contain pure zeros, then raise an error.
+
+    The quaternion parts :math:`v` are normalized as
+
+    .. math::
+        v = \frac{v}{\max(\lVert v \rVert_2, \epsilon)},
+
+    where :math:`\epsilon` is a small value to avoid division by zero
+
+    Args:
+        input (``LieTensor``): input LieTensor of any type and shape.
+        eps (``float``): small value to avoid division by zero. Default: 1e-12.
+
+    Return:
+        :obj:`LieTensor`: the output LieTensor.
+    '''
+    if isinstance(input, LieTensor) and (input.ltype in liegroup):
+        data = input.tensor()
+        if input.ltype in [SO3_type, RxSO3_type]:
+            data[..., :4] = normalize(data[..., :4], p=2, dim=-1, eps=eps)
+        elif input.ltype in [SE3_type, Sim3_type]:
+            data[..., 3:7] = normalize(data[..., 3:7], p=2, dim=-1, eps=eps)
+        output = LieTensor(data, ltype=input.ltype)
+        if (output.rotation().norm(p=2, dim=-1) < eps).any():
+            raise ValueError("Detected zero quaternions, which cannot be normalized.")
+        return output
+    else:
+        warnings.warn("Input is not Lie group, doing thing and returning input..")
+        return input

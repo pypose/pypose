@@ -1,6 +1,9 @@
 import torch, warnings
+from typing import Optional
 from torch import Tensor, nn
-from torch.linalg import pinv, lstsq, cholesky_ex
+from functools import partial
+from ..function.linalg import bmv
+from torch.linalg import pinv, lstsq, cholesky_ex, vecdot
 
 
 class PINV(nn.Module):
@@ -16,7 +19,7 @@ class PINV(nn.Module):
 
     .. math::
         \bm{x}_i = \mathrm{pinv}(\mathbf{A}_i) \mathbf{b}_i,
-        
+
     where :math:`\mathrm{pinv}()` is the `pseudo inversion
     <https://en.wikipedia.org/wiki/Moore-Penrose_inverse>`_ function.
 
@@ -77,7 +80,7 @@ class LSTSQ(nn.Module):
 
     .. math::
         \bm{x}_i = \mathrm{lstsq}(\mathbf{A}_i, \mathbf{b}_i),
-        
+
     where :math:`\mathrm{lstsq}()` computes a solution to the least squares problem
     of a system of linear equations. More details go to `torch.linalg.lstsq
     <https://pytorch.org/docs/stable/generated/torch.linalg.lstsq.html>`_.
@@ -210,3 +213,118 @@ class Cholesky(nn.Module):
         assert not torch.any(torch.isnan(L)), \
             'Cholesky decomposition failed. Check your matrix (may not be positive-definite)'
         return b.cholesky_solve(L, upper=self.upper)
+
+
+class CG(nn.Module):
+    r'''The batched linear solver with conjugate gradient method.
+
+    .. math::
+        \mathbf{A}_i \bm{x}_i = \mathbf{b}_i,
+
+    where :math:`\mathbf{A}_i \in \mathbb{C}^{M \times N}` and :math:`\bm{b}_i \in
+    \mathbb{C}^{M \times 1}` are the :math:`i`-th item of batched linear equations.
+
+    This function is a 1:1 replica of `scipy.sparse.linalg.cg <https://docs.scipy.org/doc
+    /scipy/reference/generated/scipy.sparse.linalg.cg.html>`_.
+    The solution is consistent with the scipy version up to numerical precision.
+    Variable names are kept the same as the scipy version for easy reference.
+    We recommend using only non-batched or batch size 1 input for this solver, as
+    the batched version was not appeared in the original scipy version. When handling
+    sparse matrices, the batched computation may introduce additional overhead.
+
+    Examples:
+        >>> # dense example
+        >>> import pypose.optim.solver as ppos
+        >>> A = torch.tensor([[0.1802967, 0.3151198, 0.4548111, 0.3860016, 0.2870615],
+                              [0.3151198, 1.4575327, 1.5533425, 1.0540756, 1.0795838],
+                              [0.4548111, 1.5533425, 2.3674474, 1.1222278, 1.2365348],
+                              [0.3860016, 1.0540756, 1.1222278, 1.3748058, 1.2223261],
+                              [0.2870615, 1.0795838, 1.2365348, 1.2223261, 1.2577004]])
+        >>> b = torch.tensor([[ 2.64306851],
+                              [-0.03593633],
+                              [ 0.73612658],
+                              [ 0.51501254],
+                              [-0.26689271]])
+        >>> solver = ppos.CG()
+        >>> x = solver(A, b)
+        tensor([[246.4098],
+                [ 22.6997],
+                [-56.9239],
+                [-161.7914],
+                [137.2683]])
+
+        >>> # sparse csr example
+        >>> import pypose.optim.solver as ppos
+        >>> crow_indices = torch.tensor([0, 2, 4])
+        >>> col_indices = torch.tensor([0, 1, 0, 1])
+        >>> values = torch.tensor([1, 2, 3, 4], dtype=torch.float)
+        >>> A = torch.sparse_csr_tensor(crow_indices, col_indices, values)
+        >>> A.to_dense()  # visualize
+        tensor([[1., 2.],
+                [3., 4.]])
+        >>> b = torch.tensor([[1.], [2.]])
+        >>> solver = ppos.CG()
+        >>> x = solver(A, b)
+        tensor([-4.4052e-05,  5.0003e-01])
+
+    '''
+    def __init__(self, maxiter=None, tol=1e-5):
+        super().__init__()
+        self.maxiter, self.tol = maxiter, tol
+
+    def forward(self, A: Tensor, b: Tensor, x: Optional[Tensor]=None,
+                M: Optional[Tensor]=None) -> Tensor:
+        '''
+        Args:
+            A (Tensor): the input tensor. It is assumed to be a symmetric
+                positive-definite matrix. Layout is allowed to be COO, CSR, BSR, or dense.
+            b (Tensor): the tensor on the right hand side. Layout could be sparse or dense
+                but is only allowed to be a type that is compatible with the layout of A.
+                In other words, `A @ b` operation must be supported by the layout of A.
+            x (Tensor, optional): the initial guess for the solution. Default: ``None``.
+            M (Tensor, optional): the preconditioner for A. Layout is allowed to be COO,
+                CSR, BSR, or dense. Default: ``None``.
+
+        Return:
+            Tensor: the solved tensor. Layout is the same as the layout of b.
+        '''
+        if A.ndim == b.ndim:
+            b = b.squeeze(-1)
+        else:
+            assert A.ndim == b.ndim + 1, \
+                'The number of dimensions of A and b must differ by 1'
+        if x is None:
+            x = torch.zeros_like(b)
+        bnrm2 = torch.linalg.norm(b, dim=-1)
+        if (bnrm2 == 0).all():
+            return b
+        atol = self.tol * bnrm2
+        n = b.shape[-1]
+
+        if self.maxiter is None:
+            maxiter = n * 10
+        else:
+            maxiter = self.maxiter
+        r = b - bmv(A, x) if x.any() else b.clone()
+        rho_prev, p = None, None
+
+        for iteration in range(maxiter):
+            if (torch.linalg.norm(r, dim=-1) < atol).all():
+                return x
+
+            z = bmv(M, r) if M is not None else r
+            rho_cur = vecdot(r, z)
+            if iteration > 0:
+                beta = rho_cur / rho_prev
+                p = p * beta.unsqueeze(-1) + z
+            else:  # First spin
+                p = torch.empty_like(r)
+                p[:] = z[:]
+
+            q = bmv(A, p)
+            alpha = rho_cur / vecdot(p, q)
+            x += alpha.unsqueeze(-1)*p
+            r -= alpha.unsqueeze(-1)*q
+            rho_prev = rho_cur
+
+        return x
