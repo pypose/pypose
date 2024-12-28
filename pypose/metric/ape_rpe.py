@@ -2,21 +2,15 @@ import warnings
 from typing import TypedDict, Literal
 
 import torch
-from .geometry import svdstf
+from ..function.geometry import svdstf
 from ..lietensor import mat2SO3, SE3, Sim3, identity_Sim3
 from ..lietensor.lietensor import SE3Type, Sim3Type
 
-OutputType = Literal['translation', 'rotation', 'pose',
-                     'radian', 'degree']
-
-AccType = Literal['frame', 'distance']
-
-MericType = Literal['ape', 'rpe']
 
 class StampedSE3(object):
     def __init__(self, timestamps=None, poses_SE3=None, dtype=torch.float64):
         r"""
-        Class for represent the trajectory with timestamps.
+        Internal class for represent the trajectory with timestamps.
         Args:
             timestamps: The timestamps of the trajectory.
                         Must have same length with poses.
@@ -102,8 +96,10 @@ class StampedSE3(object):
     @property
     def accumulated_distances(self) -> torch.tensor:
         trans = self.translation()
-        return torch.cat(
-            (torch.zeros(1, dtype=trans.dtype), torch.cumsum(torch.linalg.norm(trans[:-1] - trans[1:], dim=-1, dtype=trans.dtype), dim=0)))
+        zeros = torch.zeros(1, dtype=trans.dtype)
+        norm = torch.linalg.norm(trans[:-1] - trans[1:], dim=-1, dtype=trans.dtype)
+        return torch.cat((zeros, torch.cumsum(norm, dim=0)))
+
 
 def matching_time_indices(stamps_1, stamps_2, max_diff=0.01, offset_2=0.0):
     r"""
@@ -133,13 +129,14 @@ def matching_time_indices(stamps_1, stamps_2, max_diff=0.01, offset_2=0.0):
 
     return matching_indices_1, matching_indices_2
 
-def associate_trajectories(traj_ref, traj_est, max_diff=0.01, offset_2=0.0, threshold=0.3):
+
+def associate_traj(ttraj, etraj, max_diff=0.01, offset_2=0.0, threshold=0.3):
     r"""
     Associate two trajectories by matching their timestamps.
     Args:
-        traj_ref: StampedSE3
+        ttraj: StampedSE3
             The trajectory for reference.
-        traj_est: StampedSE3
+        etraj: StampedSE3
             The trajectory for estimation.
         max_diff: float
             Max allowed absolute time difference (s) for associating
@@ -148,16 +145,16 @@ def associate_trajectories(traj_ref, traj_est, max_diff=0.01, offset_2=0.0, thre
         threshold: float
             The threshold (%) for the matching warning
     Returns:
-        traj_est_aligned: StampedSE3
+        etraj_aligned: StampedSE3
             The aligned estimation trajectory
-        traj_ref_aligned: StampedSE3
+        ttraj_aligned: StampedSE3
             The aligned reference trajectory
     Warning:
         The matched stamps are under the threshold
     """
-    snd_longer = len(traj_est.timestamps) > len(traj_ref.timestamps)
-    traj_long = traj_est if snd_longer else traj_ref
-    traj_short = traj_ref if snd_longer else traj_est
+    snd_longer = len(etraj.timestamps) > len(ttraj.timestamps)
+    traj_long = etraj if snd_longer else ttraj
+    traj_short = ttraj if snd_longer else etraj
     max_pairs = len(traj_short.timestamps)
 
     matching_indices_short, matching_indices_long = matching_time_indices(
@@ -171,8 +168,8 @@ def associate_trajectories(traj_ref, traj_est, max_diff=0.01, offset_2=0.0, thre
     traj_short = traj_short[matching_indices_short]
     traj_long = traj_long[matching_indices_long]
 
-    traj_ref_aligned = traj_short if snd_longer else traj_long
-    traj_est_aligned = traj_long if snd_longer else traj_short
+    ttraj_aligned = traj_short if snd_longer else traj_long
+    etraj_aligned = traj_long if snd_longer else traj_short
 
     assert num_matches != 0, \
         {f"found no matching timestamps between estimation and reference with max time "
@@ -185,17 +182,16 @@ def associate_trajectories(traj_ref, traj_est, max_diff=0.01, offset_2=0.0, thre
                        May be not be enough for aligned and not accurate results.",
                       category=Warning, stacklevel=2)
 
-    return traj_ref_aligned, traj_est_aligned
+    return ttraj_aligned, etraj_aligned
 
-def process_data(traj_ref, traj_est,
-                 output: OutputType = 'translation',
-                 metric_type: MericType = 'ape'):
+
+def compute_error(ttraj, etraj, output: str = 'translation', metric_type: str = 'ape'):
     r'''
     Get the error of the pose based on the output type.
     Args:
-        traj_ref: StampedSE3
+        ttraj: StampedSE3
             The trajectory for reference.
-        traj_est: StampedSE3
+        etraj: StampedSE3
             The trajectory for estimation.
         output: OutputType
             The type of the output error
@@ -212,32 +208,44 @@ def process_data(traj_ref, traj_est,
     '''
     if metric_type == 'ape':
         if output == 'translation':
-            E = traj_est.translation() - traj_ref.translation()
+            E = etraj.translation() - ttraj.translation()
         else:
-            E = (traj_est.poses.Inv() @ traj_ref.poses).matrix()
+            E = (etraj.poses.Inv() @ ttraj.poses).matrix()
     elif metric_type == 'rpe':
-        E = (traj_ref.poses.Inv() @ traj_est.poses).matrix()
+        E = (ttraj.poses.Inv() @ etraj.poses).matrix()
 
     if output == 'translation':
         if metric_type == 'ape':
-            return torch.linalg.norm(E, dim=-1)
+            error = torch.linalg.norm(E, dim=-1)
         elif metric_type == 'rpe':
-            return torch.tensor([torch.linalg.norm(E_i[:3, 3]) for E_i in E])
+            error = torch.tensor([torch.linalg.norm(E_i[:3, 3]) for E_i in E])
     elif output == 'rotation':
         I = torch.eye(3, device=E.device, dtype=E.dtype).expand_as(E[:,:3,:3])
-        return torch.linalg.norm((E[:,:3,:3] - I), dim=(-2, -1))
+        error = torch.linalg.norm((E[:,:3,:3] - I), dim=(-2, -1))
     elif output == 'pose':
         I = torch.eye(4, device=E.device, dtype=E.dtype).expand_as(E)
-        return torch.linalg.norm((E - I), dim=(-2, -1))
+        error = torch.linalg.norm((E - I), dim=(-2, -1))
     elif output == 'radian':
-        return mat2SO3(E[:,:3,:3] ).euler().norm(dim=-1)
+        error = mat2SO3(E[:,:3,:3] ).euler().norm(dim=-1)
     elif output == 'degree':
         error = (mat2SO3(E[:,:3,:3]).euler()).norm(dim=-1)
-        return torch.rad2deg(error)
+        error = torch.rad2deg(error)
     else:
         raise ValueError(f"Unknown output type: {output}")
 
-def get_pairs_by_frames(traj, delta, all_pairs=False):
+    result_dict = {}
+    result_dict['Max']    = torch.max(error.abs()).item()
+    result_dict['Mean']   = torch.mean(error.abs()).item()
+    result_dict['Median'] = torch.median(error.abs()).item()
+    result_dict['Min']    = torch.min(error.abs()).item()
+    result_dict['RMSE']   = torch.sqrt(torch.mean(torch.pow(error, 2))).item()
+    result_dict['SSE']    = torch.sum(torch.pow(error, 2)).item()
+    result_dict['STD']    = torch.std(error.abs()).item()
+
+    return result_dict
+
+
+def pairs_by_frames(traj, delta, use_all=False):
     r'''
     Get index of pairs in the trajectory by its index distance.
     Args:
@@ -245,7 +253,7 @@ def get_pairs_by_frames(traj, delta, all_pairs=False):
             The trajectory
         delta: float
             The delta to select the pair.
-        all_pairs: bool
+        use_all: bool
             If True, all pairs will be used for evaluation.
     Returns: list
         id_pairs: list of index pairs
@@ -253,7 +261,7 @@ def get_pairs_by_frames(traj, delta, all_pairs=False):
     traj_len = traj.num_poses
     delta = int(delta)
     assert delta >= 1, "delta must >= 1"
-    if all_pairs:
+    if use_all:
         ids_1 = torch.arange(traj_len, device=traj.device, dtype=torch.long)
         ids_2 = ids_1 + delta
         id_pairs = (ids_1[ids_2<traj_len].tolist(),
@@ -264,7 +272,8 @@ def get_pairs_by_frames(traj, delta, all_pairs=False):
 
     return id_pairs
 
-def get_pairs_by_distance(traj, delta, tol=0.0, all_pairs=False):
+
+def pairs_by_dist(traj, delta, tol=0.0, use_all=False):
     r'''
     Get index of pairs in the trajectory by its path distance.
     Args:
@@ -273,13 +282,13 @@ def get_pairs_by_distance(traj, delta, tol=0.0, all_pairs=False):
         delta: float
             The delta to select the pair.
         tol: float
-            Absolute path tolerance to accept or reject pairs in all_pairs mode.
-        all_pairs: bool
+            Absolute path tolerance to accept or reject pairs in use_all mode.
+        use_all: bool
             If True, all pairs will be used for evaluation.
     Returns: list
         id_pairs: list of index pairs
     '''
-    if all_pairs:
+    if use_all:
         idx_0 = []
         idx_1 = []
         distances = traj.accumulated_distances
@@ -305,199 +314,197 @@ def get_pairs_by_distance(traj, delta, tol=0.0, all_pairs=False):
         id_pairs = (idx[:-1], idx[1:])
     return id_pairs
 
-def id_pairs_from_delta(traj, delta=1.0,
-                        acc: AccType='frame', rel_tol=0.1,
-                        all_pairs= False):
+
+def pair_id(traj, delta=1.0, associate: str='frame', rtol=0.1, use_all= False):
     r'''
     Get index of pairs with distance==delta from a trajectory
     Args:
-        traj: StampedSE3
+        traj (``StampedSE3``):
             The trajectory
-        delta: float
+        delta (``float``):
             The delta to select the pair.
-        acc: AccType
+        associate (``str``):
             The type of the association relation between the two trajectory.
             Including: 'frame', 'distance'.
-        rel_tol: float
+        rtol (``float``):
             Relative tolerance to accept or reject deltas.
-        all_pairs: bool
+        use_all (``bool``):
             If True, all pairs will be used for evaluation.
-    Returns: list
-        id_pairs: list of index pairs
+    Returns:
+        list: list of index pairs
     '''
-    if acc == 'frame':
-        id_pairs = get_pairs_by_frames(traj, int(delta), all_pairs)
-    elif acc == 'distance':
-        id_pairs = get_pairs_by_distance(traj, delta, delta * rel_tol, all_pairs)
+    if associate == 'frame':
+        id_pairs = pairs_by_frames(traj, int(delta), use_all)
+    elif associate == 'distance':
+        id_pairs = pairs_by_dist(traj, delta, delta * rtol, use_all)
     else:
-        raise ValueError(f"unsupported delta unit: {acc}")
+        raise ValueError(f"unsupported delta unit: {associate}")
 
     if len(id_pairs) == 0:
         raise ValueError(
-            f"delta = {delta} ({acc}) produced an empty index list - "
+            f"delta = {delta} ({associate}) produced an empty index list - "
             "try lower values or a less strict tolerance")
 
     return id_pairs
 
-def get_result(error) -> dict:
-    '''
-    statistical data of the error.
-    '''
-    result_dict ={}
-    result_dict['max']    = torch.max(error.abs()).item()
-    result_dict['mean']   = torch.mean(error.abs()).item()
-    result_dict['median'] = torch.median(error.abs()).item()
-    result_dict['min']    = torch.min(error.abs()).item()
-    result_dict['rmse']   = torch.sqrt(torch.mean(torch.pow(error, 2))).item()
-    result_dict['sse']    = torch.sum(torch.pow(error, 2)).item()
-    result_dict['std']    = torch.std(error.abs()).item()
 
-    return result_dict
-
-def ape(stamp_ref, pose_ref, stamp_est, pose_est,
-        output: OutputType='translation',
-        diff=0.01, offset=0.0, align=False, scale=False,
-        nposes=-1, origin=False, thresh = 0.3):
+def ape(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 0.01,
+        offset: float = 0.0, align: bool = False, scale: bool = False, nposes: int = -1,
+        origin: bool = False, thresh: float = 0.3):
     r'''
-    Compute the Absolute Pose Error (RPE) between two trajectories.
+    Compute the Absolute Pose Error (APE) between two trajectories.
+
     Args:
-        stamp_ref: float
-                   The timestamps of reference trajectory.
-        pose_ref: SE3
-                  The poses of the reference trajectory poses.
-                  Must have same length with stamp_ref.
-        stamp_ref: float
-                   The timestamps of estimated trajectory.
-        pose_ref: SE3
-                  The poses of the estimated trajectory poses.
-                  Must have same length with stamp_ref.
-        output: OutputType
-            The type of the output error.
-            Including: 'translation', 'rotation', 'pose',
-                        'radian', 'degree'.
-            The details are in the process_data function.
-        diff: float
-            Max allowed absolute time difference (s) for associating.
-        offset: float
-            The aligned offset (s) for the second timestamps.
-        align: bool
-            If True, the trajectory will be aligned by the scaled svd method.
-        with_scale: bool
-            If True, the scale will be corrected by the svd method.
-        nposes: int
-            The number of poses to use for alignment.
-            If nposes == -1, all poses will be aligned.
-        origin: bool
-            If True, the trajectory will be aligned by the first pose.
-        thresh: float
-            The threshold for the matching pair.
-            i.e. If the matching pairs are under the threshold,
-                 the warning will given.
-    Returns:
-        error: The statics error of the trajectory
+        tstamp (array-like of ``float``):
+            The timestamps of the true trajectory.
+        tpose (array-like of ``SE3``):
+            The poses of the true trajectory. Must have the same length as `tstamp`.
+        estamp (array-like of ``float``):
+            The timestamps of the estimated trajectory.
+        epose (array-like of ``SE3``):
+            The poses of the estimated trajectory. Must have the same length as `estamp`.
+        etype (``str``, optional):
+            The type of pose error. Supported options include:
+
+            'translation': :math:`|| t_{est} - t_{ref} ||_2`
+
+            'rotation': :math:`|| R_{est} - R_{ref} ||_2`
+
+            'pose': :math:`|| T_{est} - T_{ref} ||_2`
+
+            'radian': :math:`||\mathrm{Log}(R_{est} - R_{ref})||_2`
+
+            'degree': :math:`\mathrm{Degree}(||Log(R_{est} - R_{ref})||_2)`
+
+        diff (``float``, optional):
+            The maximum allowed absolute time difference (in seconds)
+            for associating poses. Defaults to 0.01.
+        offset (``float``, optional):
+            The aligned offset (in seconds) for the second timestamps. Defaults to 0.0.
+        align (``bool``, optional):
+            If True, aligns the trajectory via a scaled SVD method. Defaults to False.
+        scale (``bool``, optional):
+            If True, corrects the scale using the SVD method. Defaults to False.
+        nposes (``int``, optional):
+            The number of poses to use for alignment. If -1, all poses
+            are used. Defaults to -1.
+        origin (``bool``, optional):
+            If True, aligns the trajectory by the first pose. Defaults to False.
+        thresh (``float``, optional):
+            The threshold for matching pairs. If the matching pairs
+            are below this threshold, a warning is given. Defaults to 0.3.
+
+    Return:
+        dict: The computed statistics of the APE (Absolute Pose Error).
     '''
-    traj_ref = StampedSE3(stamp_ref, pose_ref)
-    traj_est = StampedSE3(stamp_est, pose_est)
-    traj_ref, traj_est = associate_trajectories(traj_ref, traj_est, diff, offset, thresh)
-    trans_mat = identity_Sim3(1, dtype=traj_est.dtype, device=traj_est.device)
+    ttraj, etraj = StampedSE3(tstamp, tpose), StampedSE3(estamp, epose)
+    ttraj, etraj = associate_traj(ttraj, etraj, diff, offset, thresh)
+    trans_mat = identity_Sim3(1, dtype=etraj.dtype, device=etraj.device)
 
     if align or scale:
-        nposes = traj_est.num_poses if nposes == -1 else nposes
-        est_trans = traj_est.translation()[..., :nposes]
-        ref_trans = traj_ref.translation()[..., :nposes]
+        nposes = etraj.num_poses if nposes == -1 else nposes
+        est_trans = etraj.translation()[..., :nposes]
+        ref_trans = ttraj.translation()[..., :nposes]
         trans_mat = svdstf(est_trans, ref_trans, scale)
     elif origin:
-        trans_mat[..., :7] = (traj_ref.first_pose @ traj_est.first_pose.Inv()).data
+        trans_mat[..., :7] = (ttraj.first_pose @ etraj.first_pose.Inv()).data
 
-    traj_est.align(trans_mat)
+    etraj.align(trans_mat)
 
-    error = process_data(traj_ref, traj_est, output, metric_type = 'ape')
-    result = get_result(error)
+    return compute_error(ttraj, etraj, etype, metric_type = 'ape')
 
-    return result
 
-def rpe(stamp_ref, pose_ref, stamp_est, pose_est,
-        output: OutputType='translation',
-        diff=0.01, offset=0.0, align=False, scale=False,
-        nposes=-1, origin=False, acc: AccType='frame',
-        delta=1.0, rel_delta_tol=0.1, all_pairs=False,
-        thresh=0.3, pairs_from_ref=False):
+def rpe(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 0.01,
+        offset: float = 0.0, align: bool = False, scale: bool = False, nposes: int = -1,
+        origin: bool = False, associate: str='frame', delta: float = 1.0, rtol: float = 0.1,
+        use_all: bool = False, thresh: float = 0.3, tpair: bool = False):
     r'''
     Compute the Relative Pose Error (RPE) between two trajectories.
+
     Args:
-        stamp_ref: The timestamps of reference trajectory
-                   Must have same length with pose_ref.
-                   e.g torch.tensor(...) or None
-        pose_ref: The poses of the reference trajectory poses.
-                  Must be SE3
-                  e.g. pypose.SE3(torch.rand(10, 7))
-        stamp_ref: The timestamps of estimated trajectory
-                   Must have same length with pose_est.
-                   e.g torch.tensor(...) or None
-        pose_ref: The poses of the estimated trajectory poses.
-                  Must be SE3
-                  e.g. pypose.SE3(torch.rand(10, 7))
-        output: OutputType
-            The type of the output error.
-            Including: 'translation', 'rotation', 'pose',
-                        'radian', 'degree'.
-            The details are in the process_data function.
-        diff: float
-            Max allowed absolute time difference (s) for associating.
-        offset: float
-            The aligned offset (s) for the second timestamps.
-        align: bool
-            If True, the trajectory will be aligned by the scaled svd method.
-        with_scale: bool
-            If True, the scale will be corrected by the svd method.
-        nposes: int
-            The number of poses to use for alignment.
-            If nposes == -1, all poses will be aligned.
-        origin: bool
-            If True, the trajectory will be aligned by the first pose.
-        acc: AccType
-            The type of the association relation between the two trajectory.
-            Including: 'frame', 'distance'.
-        delta: float
-            The delta to select the pair.
-        rel_delta_tol: float
-            Relative tolerance to accept or reject deltas.
-        all_pairs: bool
-            If True, all pairs will be used for evaluation.
-        match_thresh: float
-            The threshold for the matching pair.
-            i.e. If the matching pairs are under the threshold,
-                 the warning will given.
-        pairs_from_reference: bool
-            If True, reference trajectory will be used for get index of pairs.
-    Returns: dict
-        error: The statics error of the trajectory
+        tstamp (array-like of ``float`` or ``None``):
+            The timestamps of the true (reference) trajectory.
+            Must have the same length as `tpose`.
+            For example, `torch.tensor([...])` or `None`.
+        tpose (array-like of ``SE3``):
+            The poses of the true (reference) trajectory.
+            For example, `pypose.SE3(torch.rand(10, 7))`.
+        estamp (array-like of ``float`` or ``None``):
+            The timestamps of the estimated trajectory.
+            Must have the same length as `epose`.
+            For example, `torch.tensor([...])` or `None`.
+        epose (array-like of ``SE3``):
+            The poses of the estimated trajectory.
+            For example, `pypose.SE3(torch.rand(10, 7))`.
+        etype (``str``, optional):
+            The type of pose error. Supported options include:
+
+            'translation': :math:`|| t_{est} - t_{ref} ||_2`
+
+            'rotation': :math:`|| R_{est} - R_{ref} ||_2`
+
+            'pose': :math:`|| T_{est} - T_{ref} ||_2`
+
+            'radian': :math:`||\mathrm{Log}(R_{est} - R_{ref})||_2`
+
+            'degree': :math:`\mathrm{Degree}(||Log(R_{est} - R_{ref})||_2)`
+        diff (``float``, optional):
+            The maximum allowed absolute time difference (in seconds)
+            for associating poses. Defaults to 0.01.
+        offset (``float``, optional):
+            The aligned offset (in seconds) for the second timestamps.
+            Defaults to 0.0.
+        align (``bool``, optional):
+            If True, the trajectory is aligned using a scaled SVD method.
+            Defaults to False.
+        scale (``bool``, optional):
+            If True, the scale is corrected using the SVD method.
+            Defaults to False.
+        nposes (``int``, optional):
+            The number of poses to use for alignment. If -1, all
+            poses are used. Defaults to -1.
+        origin (``bool``, optional):
+            If True, the trajectory is aligned by the first pose.
+            Defaults to False.
+        associate (``str``, optional):
+            The method used to associate pairs between the two trajectories.
+            Supported options: 'frame', 'distance'. Defaults to 'frame'.
+        delta (``float``, optional):
+            The delta used to select the pair. For example, when
+            `associate='distance'`, it can represent the distance
+            step in meters. Defaults to 1.0.
+        rtol (``float``, optional):
+            The relative tolerance for accepting or rejecting deltas.
+            Defaults to 0.1.
+        use_all (``bool``, optional):
+            If True, all associated pairs are used for evaluation.
+            Defaults to False.
+        thresh (``float``, optional):
+            The threshold for valid matching pairs. If the ratio of
+            matching pairs is below this threshold, a warning is issued.
+            Defaults to 0.3.
+        tpair (``bool``, optional):
+            Use true trajectory to compute the pairing indices or not. Defaults to False.
     '''
-    traj_ref = StampedSE3(stamp_ref, pose_ref)
-    traj_est = StampedSE3(stamp_est, pose_est)
-    traj_ref, traj_est = associate_trajectories(traj_ref, traj_est, diff, offset, thresh)
-    trans_mat = identity_Sim3(1, dtype=traj_est.dtype, device=traj_est.device)
+    ttraj, etraj = StampedSE3(tstamp, tpose), StampedSE3(estamp, epose)
+    ttraj, etraj = associate_traj(ttraj, etraj, diff, offset, thresh)
+    trans_mat = identity_Sim3(1, dtype=etraj.dtype, device=etraj.device)
 
     if align or scale:
-        nposes = traj_est.num_poses if nposes == -1 else nposes
-        est_trans = traj_est.translation()[:,:nposes]
-        ref_trans = traj_ref.translation()[:,:nposes]
+        nposes = etraj.num_poses if nposes == -1 else nposes
+        est_trans = etraj.translation()[:,:nposes]
+        ref_trans = ttraj.translation()[:,:nposes]
         trans_mat = svdstf(est_trans, ref_trans, scale)
     elif origin:
-        trans_mat[...,:7] = (traj_ref.first_pose @ traj_est.first_pose.Inv()).data
+        trans_mat[...,:7] = (ttraj.first_pose @ etraj.first_pose.Inv()).data
 
-    traj_est.align(trans_mat)
+    etraj.align(trans_mat)
 
-    sour_id, tar_id = id_pairs_from_delta(
-            (traj_ref if pairs_from_ref else traj_est), delta,
-            acc, rel_delta_tol, all_pairs)
+    sour_id, tar_id = pair_id((ttraj if tpair else etraj), delta, associate, rtol, use_all)
 
-    pose_ref_rela = traj_ref[sour_id].poses.Inv() @ traj_ref[tar_id].poses
-    pose_est_rela = traj_est[sour_id].poses.Inv() @ traj_est[tar_id].poses
-    traj_ref_rela = StampedSE3(traj_ref[sour_id].timestamps, pose_ref_rela)
-    traj_est_rela = StampedSE3(traj_est[sour_id].timestamps, pose_est_rela)
+    tpose_rela = ttraj[sour_id].poses.Inv() @ ttraj[tar_id].poses
+    epose_rela = etraj[sour_id].poses.Inv() @ etraj[tar_id].poses
+    ttraj_rela = StampedSE3(ttraj[sour_id].timestamps, tpose_rela)
+    etraj_rela = StampedSE3(etraj[sour_id].timestamps, epose_rela)
 
-    error = process_data(traj_ref_rela, traj_est_rela, output, metric_type = 'rpe')
-    result = get_result(error)
-
-    return result
+    return compute_error(ttraj_rela, etraj_rela, etype, metric_type = 'rpe')
