@@ -1,8 +1,6 @@
-import torch
+import torch, numpy as np, pypose as pp
+from pypose.metric import ape, rpe
 from torchvision.datasets.utils import download_url
-import numpy as np
-import pypose as pp
-from pypose.function import ape, rpe
 
 
 def read_tum_pose_file(file_path: str):
@@ -31,4 +29,3 @@ if __name__ == '__main__':
 
     result_ape = ape(stamp_gt, pose_gt, stamp_est, pose_est, thresh = 0.4)
     result_rpe = rpe(stamp_gt, pose_gt, stamp_est, pose_est, thresh = 0.4)
-    pass
