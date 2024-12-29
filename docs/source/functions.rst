@@ -56,7 +56,6 @@ Functions
     svdtf
     chspline
     bspline
-    ror
     random_filter
     voxel_filter
-
+    knn_filter

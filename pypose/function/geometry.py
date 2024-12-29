@@ -359,26 +359,29 @@ def svdtf(source, target):
     return mat2SE3(T, check=False)
 
 
-def ror(points, nbr=16, radius=0.05):
+def knn_filter(points, k:int, radius:float, pdim:int = None, return_mask:bool = False):
     r'''
-    Remove point cloud outliers by checking if they have fewer neighbors (nbr) than the 
-    set limit within a specified radius.
+    Remove points outliers by checking if a point has less than k neighbors within a radius.
 
     Args:
-        points (``torch.Tensor``): the input point cloud. It is essential that the last
-            dimension (D) exceeds 3, with the point's coordinates occupying the initial
-            three values. Subsequent values may contain additional information like
-            intensity, RGB channels, etc. The shape has to be (..., N, D).
-        nbr (``int``, optional): the minimum amount of neighbors within the certain
-            radius.
-            Default: ``16``.
-        radius (``float``, optional): the radius of the sphere that will be used for
-            counting the neighbors.
-            Default: ``0.05``.
+        points (``torch.Tensor``): the input point cloud. It is possible that the last
+            dimension (D) is larger than ``pdim``, with point's coordinates using first
+            ``pdim`` values. Subsequent values may contain additional information like
+            intensity, RGB channels, etc. The shape has to be (N, D).
+        k (``int``): the minimum number of neighbors within a certain radius.
+        radius (``float``): the radius of the sphere for counting the neighbors.
+        pdim (``int``, optional): the dimsion of points, where :math:`\text{pdim} \le D`.
+            Default to the last dimension of points, if ``None``.
+        return_mask (``bool``, optional): return the mask of inliers of not.
 
     Returns:
-        ``mask``: The mask of the input pointcloud, where the inlier is True and the 
-        outlier is False. The shape is (..., N).
+        ``torch.Tensor``: The point clouds removed outliers.
+        ``torch.BoolTensor``: The mask of point clouds removed outliers, where the inlier
+        is True and the outlier is False. The shape is (..., N).
+
+    Warning:
+        Note that this operation does not support batch operations, since the number of
+        output voxels can be different on different batches.
 
     Example:
         >>> import torch, pypose as pp
@@ -388,23 +391,35 @@ def ror(points, nbr=16, radius=0.05):
         ...                        [0., 1., 1.],
         ...                        [10., 1., 1.],
         ...                        [10., 1., 10.]])
-        >>> pp.ror(points, nbr=2, radius=5)
-        tensor([ True,  True,  True,  True, False, False])
-        >>> pp.ror(points, nbr=2, radius=12)
-        tensor([ True,  True,  True,  True,  True, False])
+        >>> pp.knn_filter(points, k=2, radius=5)
+        tensor([[0., 0., 0.],
+                [1., 0., 0.],
+                [0., 1., 0.],
+                [0., 1., 1.]])
+        >>> pp.knn_filter(points, k=2, radius=12, return_mask=True)
+        (tensor([[ 0.,  0.,  0.],
+                 [ 1.,  0.,  0.],
+                 [ 0.,  1.,  0.],
+                 [ 0.,  1.,  1.],
+                 [10.,  1.,  1.]]),
+        tensor([ True,  True,  True,  True,  True, False]))
     '''
-    assert points.size(-1) >= 3, {
-        "The last dimension of the pointcloud should exceed 3."}
-    diff = points[..., :3].unsqueeze(-2) - points[..., :3].unsqueeze(-3)
+    assert len(points.shape) == 2, "The point cloud dimension has to be 2."
+    pdim = points.size(-1) if pdim == None else pdim
+    assert points.size(-1) >= pdim, "The last dim of points should not less than pdim."
+    diff = points[..., :pdim].unsqueeze(-2) - points[..., :pdim].unsqueeze(-3)
     dist = torch.linalg.norm(diff, dim=-1)
-    count = torch.sum(dist < radius, dim=-1) - 1
-    mask = count >= nbr
-    return mask
+    count = torch.sum(dist <= radius, dim=-1) - 1
+    mask = count >= k
+    if return_mask:
+        return points[mask], mask
+    else:
+        return points[mask]
 
 
 def random_filter(points:torch.Tensor, num:int):
     r'''
-    Randomly sample a number of points from a point cloud.
+    Randomly sample a number of points from a batched point cloud.
 
     Args:
         points (``torch.Tensor``): the input point cloud, where the last dimension (D)
@@ -442,8 +457,8 @@ def voxel_filter(points: torch.Tensor, voxel: List[float], random:bool = False):
     them into voxels and selecting a representative point for each voxel.
 
     Args:
-        points (``torch.Tensor``): The input point cloud. It is essential that the last
-            dimension (D) is not less than dimension of voxel :math:`v` (vdim), with the
+        points (``torch.Tensor``): The input point cloud. It is possible that the last
+            dimension (D) is larger than dimension of voxel :math:`v` (vdim), with the
             point's coordinates as the first :math:`v` values.
             Subsequent values are additional information such as intensity, RGB channels.
             The shape has to be (N, D), where :math:`D \geq v`.
@@ -478,6 +493,7 @@ def voxel_filter(points: torch.Tensor, voxel: List[float], random:bool = False):
                 [10., 11., 12.],
                 [13., 14., 15.]])
     '''
+    assert len(points.shape) == 2, "The point cloud dimension has to be 2."
     D, vdim = points.size(-1), len(voxel)
     assert D >= vdim, "The last dimension of the pointcloud should exceed \
         the dimenson of the voxel space."
