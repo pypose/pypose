@@ -14,6 +14,7 @@ PyPose Documentation
    modules
    optim
    utils
+   metric
    testing
 
 
