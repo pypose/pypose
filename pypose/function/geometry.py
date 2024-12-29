@@ -408,8 +408,7 @@ def knn_filter(points, k:int, radius:float, pdim:int = None, return_mask:bool = 
     pdim = points.size(-1) if pdim == None else pdim
     assert points.size(-1) >= pdim, "The last dim of points should not less than pdim."
     diff = points[..., :pdim].unsqueeze(-2) - points[..., :pdim].unsqueeze(-3)
-    dist = torch.linalg.norm(diff, dim=-1)
-    count = torch.sum(dist <= radius, dim=-1) - 1
+    count = torch.sum(torch.linalg.norm(diff, dim=-1) <= radius, dim=-1) - 1
     mask = count >= k
     if return_mask:
         return points[mask], mask
