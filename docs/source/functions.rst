@@ -58,4 +58,4 @@ Functions
     bspline
     random_filter
     voxel_filter
-    knn_filter
+    nbr_filter

@@ -359,16 +359,17 @@ def svdtf(source, target):
     return mat2SE3(T, check=False)
 
 
-def knn_filter(points, k:int, radius:float, pdim:int = None, return_mask:bool = False):
+def nbr_filter(points, nbr:int, radius:float, pdim:int = None, return_mask:bool = False):
     r'''
-    Remove points outliers by checking if a point has less than k neighbors within a radius.
+    Filter point outliers by checking if a point has less than n neighbors (nbr) within a
+    radius.
 
     Args:
         points (``torch.Tensor``): the input point cloud. It is possible that the last
             dimension (D) is larger than ``pdim``, with point's coordinates using first
             ``pdim`` values. Subsequent values may contain additional information like
             intensity, RGB channels, etc. The shape has to be (N, D).
-        k (``int``): the minimum number of neighbors within a certain radius.
+        nbr (``int``): the minimum number of neighbors (nbr) within a certain radius.
         radius (``float``): the radius of the sphere for counting the neighbors.
         pdim (``int``, optional): the dimsion of points, where :math:`\text{pdim} \le D`.
             Default to the last dimension of points, if ``None``.
@@ -391,12 +392,12 @@ def knn_filter(points, k:int, radius:float, pdim:int = None, return_mask:bool = 
         ...                        [0., 1., 1.],
         ...                        [10., 1., 1.],
         ...                        [10., 1., 10.]])
-        >>> pp.knn_filter(points, k=2, radius=5)
+        >>> pp.nbr_filter(points, nbr=2, radius=5)
         tensor([[0., 0., 0.],
                 [1., 0., 0.],
                 [0., 1., 0.],
                 [0., 1., 1.]])
-        >>> pp.knn_filter(points, k=2, radius=12, return_mask=True)
+        >>> pp.nbr_filter(points, nbr=2, radius=12, return_mask=True)
         (tensor([[ 0.,  0.,  0.],
                  [ 1.,  0.,  0.],
                  [ 0.,  1.,  0.],
@@ -409,7 +410,7 @@ def knn_filter(points, k:int, radius:float, pdim:int = None, return_mask:bool = 
     assert points.size(-1) >= pdim, "The last dim of points should not less than pdim."
     diff = points[..., :pdim].unsqueeze(-2) - points[..., :pdim].unsqueeze(-3)
     count = torch.sum(torch.linalg.norm(diff, dim=-1) <= radius, dim=-1) - 1
-    mask = count >= k
+    mask = count >= nbr
     if return_mask:
         return points[mask], mask
     else:

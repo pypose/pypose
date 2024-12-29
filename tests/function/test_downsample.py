@@ -126,17 +126,17 @@ class TestDownsample:
                                [0.,  1.,  1.],
                                [10., 1.,  1.],
                                [10., 1., 10.]], device=device)
-        result1 = pp.knn_filter(points, k=2, radius=5)
+        result1 = pp.nbr_filter(points, nbr=2, radius=5)
         assert result1.shape == torch.Size([4, 3]), "output shape incorrect"
-        result2, mask2 = pp.knn_filter(points, k=2, radius=12, return_mask=True)
+        result2, mask2 = pp.nbr_filter(points, nbr=2, radius=12, return_mask=True)
         assert result2.shape == torch.Size([5, 3]),  "output shape incorrect"
         assert mask2.sum() == 5, "output mask incorrect"
 
-        result3, mask3 = pp.knn_filter(points, k=2, radius=10, pdim=2, return_mask=True)
+        result3, mask3 = pp.nbr_filter(points, nbr=2, radius=10, pdim=2, return_mask=True)
         assert result3.shape == torch.Size([6, 3]),  "output shape incorrect"
         assert mask3.sum() == 6, "output mask incorrect"
 
-        result4, mask4 = pp.knn_filter(points, k=2, radius=10, pdim=3, return_mask=True)
+        result4, mask4 = pp.nbr_filter(points, nbr=2, radius=10, pdim=3, return_mask=True)
         assert result4.shape == torch.Size([5, 3]),  "output shape incorrect"
         assert mask4.sum() == 5, "output mask incorrect"
 
