@@ -57,3 +57,6 @@ Functions
     chspline
     bspline
     ror
+    random_filter
+    voxel_filter
+
