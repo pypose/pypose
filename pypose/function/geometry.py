@@ -1,4 +1,5 @@
 import torch
+from typing import List
 from .. import mat2SE3
 from ..basics import pm
 from .checking import is_lietensor
@@ -358,7 +359,7 @@ def svdtf(source, target):
     return mat2SE3(T, check=False)
 
 
-def random_filter(points, num):
+def random_filter(points:torch.Tensor, num:int):
     r'''
     Randomly sample a number of points from a point cloud.
 
@@ -392,7 +393,7 @@ def random_filter(points, num):
     return points[..., indices, :]
 
 
-def voxel_filter(points, voxel, random:bool = False):
+def voxel_filter(points: torch.Tensor, voxel: List[float], random:bool = False):
     r'''
     Perform voxel filtering on a point cloud to reduce the number of points by grouping
     them into voxels and selecting a representative point for each voxel.
