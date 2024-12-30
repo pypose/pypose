@@ -45,26 +45,21 @@ commands:
             sudo apt-get update -y
             sudo apt-get install -y make
             pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+            pip3 install build
   build_package: &build_package
-    description: Build PyPose package of specified type
+    description: Build the PyPose wheel
     parameters:
-      build_tag:
-        type: string
-        default: "dev"
-      dist_type:
-        type: string
-        default: "bdist_wheel"
       max_jobs:
         type: integer
         default: 1
     steps:
       - run:
-          name: Build PyPose package (<< parameters.dist_type >>)
+          name: Build PyPose package
           no_output_timeout: 30m
           command: |
             export MAX_JOBS=<< parameters.max_jobs >>
             mkdir -p dist
-            python3 setup.py egg_info --tag-build=<< parameters.build_tag >> << parameters.dist_type >>
+            python3 -m build
 
 ##############################################################################
 # Job specs
@@ -151,15 +146,15 @@ workflows:
     jobs:
       - linux_build_wheel:
           cuda_version: "11.7"
-          torch_version: "2.0.*"
+          torch_version: "2.*"
           python_version: "3.9"
       - build_docs:
           requires: [linux_build_wheel]
           cuda_version: "11.7"
-          torch_version: "2.0.*"
+          torch_version: "2.*"
           python_version: "3.9"
       - run_tests:
           requires: [linux_build_wheel]
           cuda_version: "11.7"
-          torch_version: "2.0.*"
+          torch_version: "2.*"
           python_version: "3.9"

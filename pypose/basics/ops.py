@@ -1,7 +1,7 @@
 import math, torch
 
 
-def pm(input, *, out=None):
+def pm(input):
     r'''
     Returns plus or minus (:math:`\pm`) states for tensor.
 
@@ -21,9 +21,7 @@ def pm(input, *, out=None):
         >>> pp.pm(torch.tensor([0.1, 0, -0.2], dtype=torch.float64))
         tensor([ 1.,  1., -1.], dtype=torch.float64)
     '''
-    out = torch.sign(input, out=None)
-    out[out==0] = 1
-    return out
+    return torch.sign(torch.sign(input) * 2 + 1)
 
 
 def cumops_(input, dim, ops):
@@ -34,22 +32,28 @@ def cumops_(input, dim, ops):
     assert dim != -1 or dim != v.shape[-1], "Invalid dim"
     for i in torch.pow(2, torch.arange(math.log2(L)+1, device=v.device, dtype=torch.int64)):
         index = torch.arange(i, L, device=v.device, dtype=torch.int64)
-        v.index_copy_(dim, index, ops(v.index_select(dim, index), v.index_select(dim, index-i)))
+        v.index_copy_(dim, index, ops(v.index_select(dim, index-i), v.index_select(dim, index)))
     return v
 
 
-def cummul_(input, dim):
+def cummul_(input, dim, left = True):
     r'''
         Inplace version of :meth:`pypose.cummul`
     '''
-    return cumops_(input, dim, lambda a, b : a * b)
+    if left:
+        return cumops_(input, dim, lambda a, b : b * a)
+    else:
+        return cumops_(input, dim, lambda a, b : a * b)
 
 
-def cumprod_(input, dim):
+def cumprod_(input, dim, left = True):
     r'''
         Inplace version of :meth:`pypose.cumprod`
     '''
-    return cumops_(input, dim, lambda a, b : a @ b)
+    if left:
+        return cumops_(input, dim, lambda a, b : b @ a)
+    else:
+        return cumops_(input, dim, lambda a, b : a @ b)
 
 
 def cumops(input, dim, ops):
@@ -78,12 +82,13 @@ def cumops(input, dim, ops):
           :math:`N` is the LieTensor size along the :obj:`dim` dimension.
 
     Examples:
+        >>> # The following operations are equivalent.
         >>> input = pp.randn_SE3(2)
-        >>> input.cumprod(dim = 0)
+        >>> input.cumprod(dim = 0, left=True)
         SE3Type LieTensor:
         tensor([[-0.6466,  0.2956,  2.4055, -0.4428,  0.1893,  0.3933,  0.7833],
                 [ 1.2711,  1.2020,  0.0651, -0.0685,  0.6732,  0.7331, -0.0685]])
-        >>> pp.cumops(input, 0, lambda a, b : a @ b)
+        >>> pp.cumops(input, 0, lambda a, b : b @ a) # Left multiplication
         SE3Type LieTensor:
         tensor([[-0.6466,  0.2956,  2.4055, -0.4428,  0.1893,  0.3933,  0.7833],
                 [ 1.2711,  1.2020,  0.0651, -0.0685,  0.6732,  0.7331, -0.0685]])
@@ -140,9 +145,9 @@ def cummul(input, dim, left = True):
                 [ 2.0905e-04,  5.2031e-01,  8.4301e-01, -1.3642e-01]]])
     """
     if left:
-        return cumops(input, dim, lambda a, b : a * b)
-    else:
         return cumops(input, dim, lambda a, b : b * a)
+    else:
+        return cumops(input, dim, lambda a, b : a * b)
 
 
 def cumprod(input, dim, left = True):
@@ -194,6 +199,6 @@ def cumprod(input, dim, left = True):
                 [ 0.7515, -0.1920,  0.5072,  0.3758]]])
     """
     if left:
-        return cumops(input, dim, lambda a, b : a @ b)
-    else:
         return cumops(input, dim, lambda a, b : b @ a)
+    else:
+        return cumops(input, dim, lambda a, b : a @ b)
