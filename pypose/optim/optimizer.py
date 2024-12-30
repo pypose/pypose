@@ -35,7 +35,7 @@ class RobustModel(nn.Module):
 
     def flatten_row_jacobian(self, J, params_values):
         if isinstance(J, (tuple, list)):
-            J = torch.cat([j.view(-1, p.numel()) for j, p in zip(J, params_values)], 1)
+            J = torch.cat([j.reshape(-1, p.numel()) for j, p in zip(J, params_values)], 1)
         return J
 
     def normalize_RWJ(self, R, weight, J):

@@ -58,8 +58,11 @@ Functions
     cumops_
     reprojerr
     recover_pose
-    knn
+    triangulate_points
     svdtf
     chspline
     bspline
-    triangulate_points
+    random_filter
+    voxel_filter
+    nbr_filter
+    knn_filter

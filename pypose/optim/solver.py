@@ -1,7 +1,7 @@
-import torch, warnings
+import torch
+from .. import hasnan
 from typing import Optional
 from torch import Tensor, nn
-from functools import partial
 from ..function.linalg import bmv
 from torch.linalg import pinv, lstsq, cholesky_ex, vecdot
 
@@ -326,5 +326,8 @@ class CG(nn.Module):
             x += alpha.unsqueeze(-1)*p
             r -= alpha.unsqueeze(-1)*q
             rho_prev = rho_cur
+
+        assert not hasnan(x), 'Conjugate Gradient Solver Failed. \
+            Check your matrix (may not be Symmetric Positive Definite)'
 
         return x
