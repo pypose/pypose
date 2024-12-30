@@ -97,6 +97,8 @@ class IMUPreintegrator(nn.Module):
                        prop_cov = True,
                        reset = False):
         super().__init__()
+        if not reset and not prop_cov:
+            raise RuntimeError('"prop_cov" and "reset" cannot be False simultaneously.')
         self.reset, self.prop_cov = reset, prop_cov
 
         if isinstance(acc_cov, float):
