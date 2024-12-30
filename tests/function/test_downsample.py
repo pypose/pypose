@@ -116,7 +116,7 @@ class TestDownsample:
             assert p in points
 
 
-    def test_knn(self):
+    def test_nbr(self):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # test multiple dimensions
@@ -141,8 +141,28 @@ class TestDownsample:
         assert mask4.sum() == 5, "output mask incorrect"
 
 
+    def test_knn(self):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        points = torch.tensor([[0.,  0.,  0.],
+                               [1.,  0.,  0.],
+                               [0.,  1.,  0.],
+                               [0.,  1.,  1.],
+                               [10., 1.,  1.],
+                               [10., 1., 10.]], device=device)
+        point2 = torch.tensor([[1.,  0.,  0.],
+                               [1.,  0.,  0.],
+                               [0.,  1.,  0.],
+                               [4.,  1.,  1.],
+                               [10., 1.,  1.],
+                               [1.,  1., 10.]], device=device)
+        results = pp.knn_filter(points, k=2)
+        result2 = pp.knn_filter(point2, k=2)
+        result3 = pp.knn_filter(torch.stack([points, point2], dim=0), k=2)
+        pp.testing.assert_close(result3, torch.stack([results, result2], dim=0))
+
 if __name__=="__main__":
-    spline = TestDownsample()
-    spline.test_random()
-    spline.test_voxel()
-    spline.test_knn()
+    test = TestDownsample()
+    test.test_random()
+    test.test_voxel()
+    test.test_nbr()
+    test.test_knn()
