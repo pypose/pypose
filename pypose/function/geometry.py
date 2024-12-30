@@ -359,7 +359,7 @@ def svdtf(source, target):
     return mat2SE3(T, check=False)
 
 
-def nbr_filter(points, nbr:int, radius:float, pdim:int = None, return_mask:bool = False):
+def nbr_filter(points, nbr:int, radius:float, pdim:int=None, ord:int=2, return_mask:bool=False):
     r'''
     Filter point outliers by checking if a point has less than n neighbors (nbr) within a
     radius.
@@ -370,6 +370,8 @@ def nbr_filter(points, nbr:int, radius:float, pdim:int = None, return_mask:bool 
             ``pdim`` values. Subsequent values may contain additional information like
             intensity, RGB channels, etc. The shape has to be (N, D).
         nbr (``int``): the minimum number of neighbors (nbr) within a certain radius.
+        ord (``int``, optional): the order of norm to use for distance calculation.
+            Default: ``2`` (Euclidean distance).
         radius (``float``): the radius of the sphere for counting the neighbors.
         pdim (``int``, optional): the dimsion of points, where :math:`\text{pdim} \le D`.
             Default to the last dimension of points, if ``None``.
@@ -409,7 +411,7 @@ def nbr_filter(points, nbr:int, radius:float, pdim:int = None, return_mask:bool 
     pdim = points.size(-1) if pdim == None else pdim
     assert points.size(-1) >= pdim, "The last dim of points should not less than pdim."
     diff = points[..., :pdim].unsqueeze(-2) - points[..., :pdim].unsqueeze(-3)
-    count = torch.sum(torch.linalg.norm(diff, dim=-1) <= radius, dim=-1) - 1
+    count = torch.sum(torch.linalg.norm(diff, dim=-1, ord=ord) <= radius, dim=-1) - 1
     mask = count >= nbr
     if return_mask:
         return points[mask], mask
@@ -524,3 +526,65 @@ def voxel_filter(points: torch.Tensor, voxel: List[float], random:bool = False):
         voxels /= counts.view(-1, 1)
 
         return voxels
+
+
+def knn_filter(points:torch.Tensor, k:int, pdim:int=None, radius:float=None, ord:int=2):
+    r'''
+    Filter batched points by averaging its k-nearest neighbors and that point, removing
+    points if number of neighbors within radius is less than k.
+
+    Args:
+        points (``torch.Tensor``): the input point cloud, where the last dimension (D)
+            is the dimension of the points. The shape should be (..., N, D), where N is
+            the number of points in each batch.
+        k (``int``): the number of neighbors within a radius.
+        pdim (``int``, optional): the dimsion of points, where :math:`\text{pdim} \le D`.
+            Default to the last dimension of points, if ``None``.
+        radius (``float``, optional): the radius of the sphere for counting the neighbors.
+            Not use if None,
+            Default: ``None``
+        ord (``int``, optional): the order of norm to use for distance calculation.
+            Default: ``2`` (Euclidean distance).
+
+    Returns:
+        output (``torch.Tensor``): The sampled points, with the shape (..., num, D).
+
+    Warning:
+        This operation **supports** batch operations if ``radius`` is **not** given, where
+        the dimension of input points is (..., N, D), otherwise it has to be (N, D).
+        This is because given a radius to remove outliers, the number of output points in
+        each batch can be different.
+
+    Example:
+        >>> import torch, pypose as pp
+        >>> points = torch.tensor([[0.,  0.,  0.],
+        ...                        [1.,  0.,  0.],
+        ...                        [0.,  1.,  0.],
+        ...                        [0.,  1.,  1.],
+        ...                        [10., 1.,  1.],
+        ...                        [10., 1., 10.]])
+        >>> pp.knn_filter(points, k=2, radius=5)
+        tensor([[0.3333, 0.3333, 0.0000],
+                [0.3333, 0.3333, 0.0000],
+                [0.0000, 0.6667, 0.3333],
+                [0.0000, 0.6667, 0.3333]])
+    '''
+    if radius is not None:
+        assert len(points.shape) == 2, "The points dimension has to be 2 given radius."
+    else:
+        assert len(points.shape) >= 2, "The points dimension cannot be less than 2."
+    pdim = points.size(-1) if pdim == None else pdim
+    assert points.size(-1) >= pdim, "The last dim of points should not less than pdim."
+    diff = points[..., :pdim].unsqueeze(-2) - points[..., :pdim].unsqueeze(-3)
+    dist = torch.linalg.norm(diff, dim=-1, ord=ord)
+
+    if radius is not None:
+        count = torch.sum(dist <= radius, dim=-1) - 1
+        rmask = count >= k
+        points, dist = points[rmask], dist[rmask]
+
+    _, idx = dist.topk(k+1, dim=-1, largest=False, sorted=True)
+    shape = points.size() + torch.Size([k+1])
+    idx = idx.unsqueeze(-2).expand(shape) # expand to [B, D, K+1]
+    points = points.unsqueeze(-1).expand(shape) # expand to [B, D, K+1]
+    return torch.gather(points, -3, idx).mean(dim=-1)
