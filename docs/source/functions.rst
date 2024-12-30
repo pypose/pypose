@@ -52,7 +52,10 @@ Functions
     cumops
     cumops_
     reprojerr
-    knn
     svdtf
     chspline
     bspline
+    random_filter
+    voxel_filter
+    nbr_filter
+    knn_filter
