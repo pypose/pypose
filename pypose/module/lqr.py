@@ -1,7 +1,8 @@
 import torch
 from torch import nn
 from .. import bmv, bvmv
-from torch.linalg import lstsq, vecdot
+from .dynamics import runsys
+from torch.linalg import cholesky, vecdot
 
 
 class LQR(nn.Module):
@@ -317,9 +318,8 @@ class LQR(nn.Module):
             self.u_traj = u_traj
 
         self.x_traj = x_init.unsqueeze(-2).repeat((1, self.T, 1))
-        for i in range(self.T-1):
-            self.x_traj[...,i+1,:], _ = self.system(self.x_traj[...,i,:].clone(),
-                                                    self.u_traj[...,i,:])
+
+        self.x_traj = runsys(self.system, self.T, self.x_traj, self.u_traj)
 
         K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
@@ -336,7 +336,7 @@ class LQR(nn.Module):
                                          input=self.u_traj[...,t,:],
                                          t=torch.tensor(t*dt))
                 A = self.system.A.squeeze(-2)
-                B = self.system.B.squeeze(-1)
+                B = self.system.B.squeeze(-2)
                 F = torch.cat((A, B), dim=-1)
                 Qt = self.Q[...,t,:,:] + F.mT @ V @ F
                 qt = p[...,t,:] + bmv(F.mT, v)
@@ -345,8 +345,9 @@ class LQR(nn.Module):
             Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
             qx, qu = qt[..., :ns], qt[..., ns:]
 
-            K[...,t,:,:] = Kt = -lstsq(Quu, Qux).solution
-            k[...,t,:] = kt = -lstsq(Quu, qu.unsqueeze(-1)).solution.squeeze(-1)
+            L = cholesky(Quu)
+            K[...,t,:,:] = Kt = -torch.cholesky_solve(Qux, L)
+            k[...,t,:] = kt = -torch.cholesky_solve(qu.unsqueeze(-1), L).squeeze(-1)
 
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
             v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)

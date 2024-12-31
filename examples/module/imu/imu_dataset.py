@@ -14,6 +14,7 @@ class KITTI_IMU(Data.Dataset):
         super().__init__()
         self.duration = duration
         if download:
+            print("Downloading KITTI dataset...")
             download_and_extract_archive(self.datalink, root)
         self.data = pykitti.raw(root, dataname, drive)
         self.seq_len = len(self.data.timestamps) - 1
@@ -60,7 +61,6 @@ class KITTI_IMU(Data.Dataset):
         return {
             'dt': self.dt[frame_id: end_frame_id],
             'acc': self.acc[frame_id: end_frame_id],
-            'gyro': self.gyro[frame_id: end_frame_id],
             'gyro': self.gyro[frame_id: end_frame_id],
             'gt_pos': self.gt_pos[frame_id+1 : end_frame_id+1],
             'gt_rot': self.gt_rot[frame_id+1 : end_frame_id+1],

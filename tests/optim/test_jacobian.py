@@ -1,12 +1,42 @@
 import copy
 import torch
+import pytest
+import importlib
 import pypose as pp
 from torch import nn
-from torch.func import functional_call
+from torch import vmap
+from torch.nn import Identity
+from functools import partial
+from contextlib import contextmanager
+from typing import Collection, Callable
 from torch.utils._pytree import tree_map
+from torchvision.transforms import Compose
 from torch.autograd.functional import jacobian
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+from torch.func import functional_call, jacfwd, jacrev
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+identity = Identity()
+
+@contextmanager
+def check_fn_equal(TO_BE_CHECKED: Collection[Callable]):
+    # assert func1 and func2 are equal according to memory reference, module name,
+    # function name, and bytecode
+    def assert_fn_equal(func1, func2):
+        assert func1 == func2 \
+        and type(func1) == type(func2) \
+        and func1.__module__  == func2.__module__ \
+        and func1.__name__  == func2.__name__ \
+        and 'builtin_function_or_method' in str(type(func1)) \
+        or func1.__code__.co_code == func2.__code__.co_code
+    try:
+        yield
+    finally:
+        # make sure functions has been restored
+        for func1 in TO_BE_CHECKED:
+            module, name = func1.__module__, func1.__name__
+            module = importlib.import_module(module)
+            func2 = getattr(module, name)
+            assert_fn_equal(func1, func2)
 
 class TestJacobian:
 
@@ -117,9 +147,105 @@ class TestJacobian:
         J = pp.optim.functional.modjac(invnet, input=inputs, **jackwargs)
         assert not pp.hasnan(J)
 
+    def test_lietensor_jacfwd(self):
+        pose = pp.randn_SE3(1).to(device)
+        points = torch.randn(1, 3).to(device)
+
+        def func(pose, points):
+            return pose @ points
+
+        try: # the torch behavior since ver 2.0.0
+            jac_func = jacfwd(func)
+            jac = jac_func(pose, points)
+            raise AssertionError('should not reach here')
+        except RuntimeError as e:
+            assert 'shapes cannot be multiplied' in str(e)
+
+    @pytest.mark.parametrize('input, op', [
+        (pp.randn_SE3(1), identity),
+        (pp.randn_SE3(1), pp.Inv),
+        (pp.randn_SO3(1), pp.Inv),
+        (pp.randn_Sim3(1), pp.Inv),
+        (pp.randn_RxSO3(1), pp.Inv),
+        (pp.randn_se3(1), pp.Inv),
+        (pp.randn_so3(1), pp.Inv),
+        (pp.randn_sim3(1), pp.Inv),
+        (pp.randn_rxso3(1), pp.Inv),
+        (pp.randn_SE3(1), pp.Log),
+        (pp.randn_SO3(1), pp.Log),
+        (pp.randn_Sim3(1), pp.Log),
+        (pp.randn_RxSO3(1), pp.Log),
+        (pp.randn_se3(1), pp.Exp),
+        (pp.randn_so3(1), pp.Exp),
+        (pp.randn_sim3(1), pp.Exp),
+        (pp.randn_rxso3(1), pp.Exp),
+        (pp.randn_SE3(1), Compose([pp.Log, pp.Exp])),])
+    def test_lietensor_jacrev(self, input, op):
+        pose = input.to(device)
+
+        def func(pose):
+            return op(pose)
+
+        # save functions to be checked
+        TO_BE_CHECKED = {
+            torch.autograd.forward_ad.make_dual,
+            torch._functorch.eager_transforms._wrap_tensor_for_grad,
+        }
+
+        with check_fn_equal(TO_BE_CHECKED):
+            with pp.retain_ltype():
+                jac_func = jacrev(func)
+                jac = jac_func(pose)
+                assert not pp.hasnan(jac)
+
+        # without context manager, call pp.func.jacrev
+        with check_fn_equal(TO_BE_CHECKED):
+            jac_func = pp.func.jacrev(func)
+            jac = jac_func(pose)
+            assert not pp.hasnan(jac)
+
+    @pytest.mark.parametrize('input, op', [
+        (pp.randn_SE3(5), pp.Inv),
+        (pp.randn_SO3(5), pp.Inv),
+        (pp.randn_Sim3(5), pp.Inv),
+        (pp.randn_RxSO3(5), pp.Inv),
+        (pp.randn_se3(5), pp.Inv),
+        (pp.randn_so3(5), pp.Inv),
+        (pp.randn_sim3(5), pp.Inv),
+        (pp.randn_rxso3(5), pp.Inv),
+        (pp.randn_SE3(5), partial(pp.Act, p=torch.randn(5, 3, device=device))),
+        (pp.randn_SO3(5), partial(pp.Act, p=torch.randn(5, 3, device=device))),
+        # all log/exp functions are not yet supported
+    ])
+    def test_lietensor_vmap(self, input, op):
+        pose = input.to(device)
+
+        def func(pose):
+            return op(pose)
+
+        # save functions to be checked
+        TO_BE_CHECKED = {
+            torch._functorch.vmap._add_batch_dim,
+        }
+
+        with check_fn_equal(TO_BE_CHECKED):
+            with pp.retain_ltype():
+                vmap_func = vmap(func)
+                res = vmap_func(pose)
+                assert not pp.hasnan(res)
+
+        # without context manager, assume exception
+        try:
+            vmap_func = vmap(func)
+            res = vmap_func(pose)
+            self.fail('should not reach here')
+        except Exception as e:
+            assert 'Expected size' in str(e) or 'Invalid LieTensor Type.' in str(e)
+
 if __name__ == '__main__':
     test = TestJacobian()
     test.test_tensor_jacobian_single_param()
     test.test_tensor_jacobian_multi_param()
     test.test_lietensor_jacobian()
     test.test_modjac()
+    test.test_lietensor_jacfwd()

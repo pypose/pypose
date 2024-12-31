@@ -29,7 +29,8 @@ class TestPF:
         Q = torch.eye(N, device=device) * q ** 2
         R = torch.eye(N, device=device) * r ** 2
         P = torch.eye(N, device=device).repeat(T, 1, 1) * p ** 2
-        estim = torch.randn(T, N, device=device) * p
+        estim = torch.ones(T, N, device=device) * p
+
         for i in range(T - 1):
             w = q * torch.randn(N, device=device)  # transition noise
             v = r * torch.randn(N, device=device)  # observation noise

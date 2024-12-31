@@ -1,17 +1,19 @@
 import torch, warnings
+from torch.nn.functional import normalize
 from .utils import SO3, so3, SE3, RxSO3, Sim3
-from .lietensor import LieTensor, SE3_type, SO3_type, Sim3_type, RxSO3_type
+from .lietensor import LieTensor,  liegroup, liealgebra
+from .lietensor import SE3_type, SO3_type, Sim3_type, RxSO3_type
 
 
 def mat2SO3(mat, check=True, rtol=1e-5, atol=1e-5):
     r"""Convert batched rotation or transformation matrices to SO3Type LieTensor.
 
     Args:
-        mat (Tensor): the batched matrices to convert. If input is of shape :obj:`(*, 3, 4)`
-            or :obj:`(*, 4, 4)`, only the top left 3x3 submatrix is used.
-        check (bool, optional): flag to check if the input is valid rotation matrices (orthogonal
-            and with a determinant of one). Set to ``False`` if less computation is needed.
-            Default: ``True``.
+        mat (Tensor): the batched matrices to convert. If input is of shape
+            :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`, only the top left 3x3 submatrix is used.
+        check (bool, optional): flag to check if the input is valid rotation matrices
+            (orthogonal and with a determinant of one). Set to ``False`` if less
+            computation is needed. Default: ``True``.
         rtol (float, optional): relative tolerance when check is enabled. Default: 1e-05
         atol (float, optional): absolute tolerance when check is enabled. Default: 1e-05
 
@@ -25,7 +27,7 @@ def mat2SO3(mat, check=True, rtol=1e-5, atol=1e-5):
 
     Let the input be matrix :math:`\mathbf{R}`, :math:`\mathbf{R}_i` represents each individual
     matrix in the batch. :math:`\mathbf{R}^{m,n}_i` represents the :math:`m^{\mathrm{th}}` row
-    and :math:`n^{\mathrm{th}}` column of :math:`\mathbf{R}_i`, :math:`m,n\geq 1`, then the 
+    and :math:`n^{\mathrm{th}}` column of :math:`\mathbf{R}_i`, :math:`m,n\geq 1`, then the
     quaternion can be computed by:
 
     .. math::
@@ -36,9 +38,10 @@ def mat2SO3(mat, check=True, rtol=1e-5, atol=1e-5):
             \sqrt{1 - \mathbf{R}^{1,1}_i + \mathbf{R}^{2,2}_i - \mathbf{R}^{3,3}_i}\\
         q^z_i &= \mathrm{sign}(\mathbf{R}^{1,2}_i - \mathbf{R}^{2,1}_i) \frac{1}{2}
             \sqrt{1 - \mathbf{R}^{1,1}_i - \mathbf{R}^{2,2}_i + \mathbf{R}^{3,3}_i}\\
-        q^w_i &= \frac{1}{2} \sqrt{1 + \mathbf{R}^{1,1}_i + \mathbf{R}^{2,2}_i + \mathbf{R}^{3,3}_i}
+        q^w_i &= \frac{1}{2} \sqrt{1 + \mathbf{R}^{1,1}_i + \mathbf{R}^{2,2}_i +
+            \mathbf{R}^{3,3}_i}
         \end{aligned}\right.,
-    
+
     In summary, the output LieTensor should be of format:
 
     .. math::
@@ -49,12 +52,13 @@ def mat2SO3(mat, check=True, rtol=1e-5, atol=1e-5):
 
         .. math::
             |{\rm det}(\mathbf{R}) - 1| \leq \texttt{atol} + \texttt{rtol}\times 1\\
-            |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
-        
-        where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
-        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed. 
-        Illegal input will output an irrelevant result, which likely contains ``nan``.
-        
+            |\mathbf{RR}^{T}-\mathbf{I}|\leq\texttt{atol} + \texttt{rtol}\times\mathbf{I}
+
+        where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to
+        ``True``, illegal input will raise a ``ValueError``. Otherwise, no data validation
+        is performed. Illegal input will output an irrelevant result, which likely
+        contains ``nan``.
+
     Examples:
 
         >>> input = torch.tensor([[0., -1.,  0.],
@@ -164,9 +168,9 @@ def mat2SE3(mat, check=True, rtol=1e-5, atol=1e-5):
         Output: :obj:`(*, 7)`
 
     Let the input be matrix :math:`\mathbf{T}`,  :math:`\mathbf{T}_i` represents each individual
-    matrix in the batch. :math:`\mathbf{R}_i\in\mathbb{R}^{3\times 3}` be the top left 3x3 block 
-    matrix of :math:`\mathbf{T}_i`. :math:`\mathbf{T}^{m,n}_i` represents the :math:`m^{\mathrm{th}}` 
-    row and :math:`n^{\mathrm{th}}` column of :math:`\mathbf{T}_i`, :math:`m,n\geq 1`, then the 
+    matrix in the batch. :math:`\mathbf{R}_i\in\mathbb{R}^{3\times 3}` be the top left 3x3 block
+    matrix of :math:`\mathbf{T}_i`. :math:`\mathbf{T}^{m,n}_i` represents the :math:`m^{\mathrm{th}}`
+    row and :math:`n^{\mathrm{th}}` column of :math:`\mathbf{T}_i`, :math:`m,n\geq 1`, then the
     translation and quaternion can be computed by:
 
     .. math::
@@ -194,13 +198,13 @@ def mat2SE3(mat, check=True, rtol=1e-5, atol=1e-5):
         .. math::
             |{\rm det}(\mathbf{R}) - 1| \leq \texttt{atol} + \texttt{rtol}\times 1\\
             |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
-        
+
         where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
-        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed. 
+        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed.
         Illegal input will output an irrelevant result, which likely contains ``nan``.
 
         For input with shape :obj:`(*, 4, 4)`, when ``check`` is set to ``True`` and the last row
-        of the each individual matrix is not ``[0, 0, 0, 1]``, a warning will be triggered. 
+        of the each individual matrix is not ``[0, 0, 0, 1]``, a warning will be triggered.
         Even though the last row is not used in the computation, it is worth noting that a matrix not
         satisfying this condition is not a valid transformation matrix.
 
@@ -238,7 +242,7 @@ def mat2SE3(mat, check=True, rtol=1e-5, atol=1e-5):
     if not (mat.shape[-2:] == (3, 3) or mat.shape[-2:] == (3, 4) or mat.shape[-2:] == (4, 4)):
         raise ValueError("Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. \
                 Got {}".format(mat.shape))
-    
+
     shape = mat.shape
     if shape[-2:] == (4, 4) and check == True:
         zerosone = torch.tensor([0, 0, 0, 1], dtype=mat.dtype, device=mat.device)
@@ -259,8 +263,8 @@ def mat2Sim3(mat, check=True, rtol=1e-5, atol=1e-5):
     r"""Convert batched rotation or transformation matrices to Sim3Type LieTensor.
 
     Args:
-        mat (Tensor): the batched matrices to convert. If input is of shape :obj:`(*, 3, 3)`, 
-            then translation will be filled with zero. For input with shape :obj:`(*, 3, 4)`, 
+        mat (Tensor): the batched matrices to convert. If input is of shape :obj:`(*, 3, 3)`,
+            then translation will be filled with zero. For input with shape :obj:`(*, 3, 4)`,
             the last row will be treated as ``[0, 0, 0, 1]``.
         check (bool, optional): flag to check if the input is valid rotation matrices (orthogonal
             and with a determinant of one). Set to ``False`` if less computation is needed.
@@ -277,9 +281,9 @@ def mat2Sim3(mat, check=True, rtol=1e-5, atol=1e-5):
         Output: :obj:`(*, 8)`
 
     Let the input be matrix :math:`\mathbf{T}`,  :math:`\mathbf{T}_i` represents each individual
-    matrix in the batch. :math:`\mathbf{U}_i\in\mathbb{R}^{3\times 3}` be the top left 3x3 block 
-    matrix of :math:`\mathbf{T}_i`. Let :math:`\mathbf{T}^{m,n}_i` represents the 
-    :math:`m^{\mathrm{th}}` row and :math:`n^{\mathrm{th}}` column of :math:`\mathbf{T}_i`, 
+    matrix in the batch. :math:`\mathbf{U}_i\in\mathbb{R}^{3\times 3}` be the top left 3x3 block
+    matrix of :math:`\mathbf{T}_i`. Let :math:`\mathbf{T}^{m,n}_i` represents the
+    :math:`m^{\mathrm{th}}` row and :math:`n^{\mathrm{th}}` column of :math:`\mathbf{T}_i`,
     :math:`m,n\geq 1`, then the scaling factor :math:`s_i\in\mathbb{R}` and the rotation matrix
     :math:`\mathbf{R}_i\in\mathbb{R}^{3\times 3}` can be computed as:
 
@@ -288,7 +292,7 @@ def mat2Sim3(mat, check=True, rtol=1e-5, atol=1e-5):
             s_i &= \sqrt[3]{\vert \mathbf{U}_i \vert}\\
             \mathbf{R}_i &= \mathbf{U}_i/s_i
         \end{aligned}
-        
+
     the translation and quaternion can be computed by:
 
     .. math::
@@ -302,9 +306,10 @@ def mat2Sim3(mat, check=True, rtol=1e-5, atol=1e-5):
             \sqrt{1 - \mathbf{R}^{1,1}_i + \mathbf{R}^{2,2}_i - \mathbf{R}^{3,3}_i}\\
         q^z_i &= \mathrm{sign}(\mathbf{R}^{1,2}_i - \mathbf{R}^{2,1}_i) \frac{1}{2}
             \sqrt{1 - \mathbf{R}^{1,1}_i - \mathbf{R}^{2,2}_i + \mathbf{R}^{3,3}_i}\\
-        q^w_i &= \frac{1}{2} \sqrt{1 + \mathbf{R}^{1,1}_i + \mathbf{R}^{2,2}_i + \mathbf{R}^{3,3}_i}
+        q^w_i &= \frac{1}{2} \sqrt{1 + \mathbf{R}^{1,1}_i + \mathbf{R}^{2,2}_i +
+            \mathbf{R}^{3,3}_i}
         \end{aligned}\right.,
-    
+
     In summary, the output LieTensor should be of format:
 
     .. math::
@@ -317,16 +322,16 @@ def mat2Sim3(mat, check=True, rtol=1e-5, atol=1e-5):
             \vert s \vert > \texttt{atol} \\
             |{\rm det}(\mathbf{R}) - 1| \leq \texttt{atol} + \texttt{rtol}\times 1\\
             |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
-        
+
         where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
-        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed. 
+        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed.
         Illegal input will output an irrelevant result, which likely contains ``nan``.
 
         For input with shape :obj:`(*, 4, 4)`, when ``check`` is set to ``True`` and the last row
-        of the each individual matrix is not ``[0, 0, 0, 1]``, a warning will be triggered. 
+        of the each individual matrix is not ``[0, 0, 0, 1]``, a warning will be triggered.
         Even though the last row is not used in the computation, it is worth noting that a matrix not
         satisfying this condition is not a valid transformation matrix.
-        
+
     Examples:
         >>> input = torch.tensor([[ 0.,-0.5,  0., 0.1],
         ...                       [0.5,  0.,  0., 0.2],
@@ -349,10 +354,10 @@ def mat2Sim3(mat, check=True, rtol=1e-5, atol=1e-5):
 
         * J. Sola et al., `A micro Lie theory for state estimation in
           robotics <https://arxiv.org/abs/1812.01537>`_, arXiv preprint arXiv:1812.01537 (2018),
-        
-        where :math:`\mathbf{R}` is the individual matrix in a batch. The scaling factor 
+
+        where :math:`\mathbf{R}` is the individual matrix in a batch. The scaling factor
         :math:`s` defines a linear transformation that enlarges or diminishes the object in the
-        same ratio across 3 dimensions, the translation vector :math:`\mathbf{t}` defines the 
+        same ratio across 3 dimensions, the translation vector :math:`\mathbf{t}` defines the
         displacement between the original position and the transformed position.
 
         We also notice that there is another popular convention:
@@ -381,7 +386,7 @@ def mat2Sim3(mat, check=True, rtol=1e-5, atol=1e-5):
     if not (mat.shape[-2:] == (3, 3) or mat.shape[-2:] == (3, 4) or mat.shape[-2:] == (4, 4)):
         raise ValueError("Input size must be a * x 3 x 3 or * x 3 x 4 or * x 4 x 4  tensor. \
                 Got {}".format(mat.shape))
-    
+
     shape = mat.shape
     if shape[-2:] == (4, 4) and check == True:
         zerosone = torch.tensor([0, 0, 0, 1], dtype=mat.dtype, device=mat.device)
@@ -391,7 +396,7 @@ def mat2Sim3(mat, check=True, rtol=1e-5, atol=1e-5):
     shape = mat.shape
     rot = mat[..., :3, :3]
 
-    s = torch.pow(torch.det(mat), 1/3).unsqueeze(-1)
+    s = torch.pow(torch.det(rot), 1/3).unsqueeze(-1)
     zeros = torch.zeros(shape[:-2], dtype=mat.dtype, device=mat.device)
     if torch.allclose(s,  zeros, rtol=rtol, atol=atol):
         raise ValueError("Rotation matrix not full rank.")
@@ -412,7 +417,7 @@ def mat2RxSO3(mat, check=True, rtol=1e-5, atol=1e-5):
     r"""Convert batched rotation or transformation matrices to RxSO3Type LieTensor.
 
     Args:
-        mat (Tensor): the batched matrices to convert. If input is of shape :obj:`(*, 3, 4)` 
+        mat (Tensor): the batched matrices to convert. If input is of shape :obj:`(*, 3, 4)`
             or :obj:`(*, 4, 4)`, only the top left 3x3 submatrix is used.
         check (bool, optional): flag to check if the input is valid rotation matrices (orthogonal
             and with a determinant of one). Set to ``False`` if less computation is needed.
@@ -427,11 +432,11 @@ def mat2RxSO3(mat, check=True, rtol=1e-5, atol=1e-5):
         Input: :obj:`(*, 3, 3)` or :obj:`(*, 3, 4)` or :obj:`(*, 4, 4)`
 
         Output: :obj:`(*, 5)`
-    
+
     Let the input be matrix :math:`\mathbf{T}`, :math:`\mathbf{T}_i` represents each individual
     matrix in the batch. :math:`\mathbf{T}^{m,n}_i` represents the :math:`m^{\mathrm{th}}` row and
-    :math:`n^{\mathrm{th}}` column of :math:`\mathbf{T}_i`, :math:`m,n\geq 1`, then the scaling factor 
-    :math:`s_i\in\mathbb{R}` and the rotation matrix :math:`\mathbf{R}_i\in\mathbb{R}^{3\times 3}` 
+    :math:`n^{\mathrm{th}}` column of :math:`\mathbf{T}_i`, :math:`m,n\geq 1`, then the scaling factor
+    :math:`s_i\in\mathbb{R}` and the rotation matrix :math:`\mathbf{R}_i\in\mathbb{R}^{3\times 3}`
     can be computed as:
 
     .. math::
@@ -439,9 +444,9 @@ def mat2RxSO3(mat, check=True, rtol=1e-5, atol=1e-5):
             s_i &= \sqrt[3]{\vert \mathbf{T_i} \vert}\\
             \mathbf{R}_i &= \mathbf{R}_i/s_i
         \end{aligned},
-    
+
     the translation and quaternion can be computed by:
-    
+
     .. math::
         \left\{\begin{aligned}
         q^x_i &= \mathrm{sign}(\mathbf{R}^{2,3}_i - \mathbf{R}^{3,2}_i) \frac{1}{2}
@@ -452,7 +457,7 @@ def mat2RxSO3(mat, check=True, rtol=1e-5, atol=1e-5):
             \sqrt{1 - \mathbf{R}^{1,1}_i - \mathbf{R}^{2,2}_i + \mathbf{R}^{3,3}_i}\\
         q^w_i &= \frac{1}{2} \sqrt{1 + \mathbf{R}^{1,1}_i + \mathbf{R}^{2,2}_i + \mathbf{R}^{3,3}_i}
         \end{aligned}\right.,
-    
+
     In summary, the output LieTensor should be of format:
 
     .. math::
@@ -465,9 +470,9 @@ def mat2RxSO3(mat, check=True, rtol=1e-5, atol=1e-5):
             \vert s \vert > \texttt{atol} \\
             |{\rm det}(\mathbf{R}) - 1| \leq \texttt{atol} + \texttt{rtol}\times 1\\
             |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
-        
+
         where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
-        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed. 
+        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed.
         Illegal input will output an irrelevant result, which likely contains ``nan``.
 
     Examples:
@@ -479,9 +484,9 @@ def mat2RxSO3(mat, check=True, rtol=1e-5, atol=1e-5):
         tensor([0.0000, 0.0000, 0.7071, 0.7071, 0.5000])
 
     Note:
-        The individual matrix in a batch can be written as: :math:`s\mathbf{R}_{3\times3}`, 
-        where :math:`\mathbf{R}` is the rotation matrix. where  the scaling factor 
-        :math:`s` defines a linear transformation that enlarges or diminishes the object 
+        The individual matrix in a batch can be written as: :math:`s\mathbf{R}_{3\times3}`,
+        where :math:`\mathbf{R}` is the rotation matrix. where  the scaling factor
+        :math:`s` defines a linear transformation that enlarges or diminishes the object
         in the same ratio across 3 dimensions.
 
     See :meth:`pypose.RxSO3` for more details of the output LieTensor format.
@@ -499,7 +504,7 @@ def mat2RxSO3(mat, check=True, rtol=1e-5, atol=1e-5):
     shape = mat.shape
     rot = mat[..., :3, :3]
 
-    s = torch.pow(torch.det(mat), 1/3).unsqueeze(-1)
+    s = torch.pow(torch.det(rot), 1/3).unsqueeze(-1)
     if torch.allclose(s,  torch.zeros(shape[:-2], dtype=mat.dtype, device=mat.device), rtol=rtol, atol=atol):
         raise ValueError("Rotation matrix not full rank.")
 
@@ -529,11 +534,11 @@ def from_matrix(mat, ltype, check=True, rtol=1e-5, atol=1e-5):
         .. math::
             |{\rm det}(\mathbf{R}) - 1| \leq \texttt{atol} + \texttt{rtol}\times 1\\
             |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
-        
+
         where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
-        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed. 
+        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed.
         Illegal input will output an irrelevant result, which likely contains ``nan``.
-    
+
     Return:
         LieTensor: the converted LieTensor.
     Examples:
@@ -736,7 +741,7 @@ def scale(inputs):
         Tensor: the batched scale scalars.
 
     Warning:
-        The :obj:`SO3`, :obj:`so3`, :obj:`SE3`, and :obj:`se3` types do not contain scale. 
+        The :obj:`SO3`, :obj:`so3`, :obj:`SE3`, and :obj:`se3` types do not contain scale.
         Calling :obj:`scale()` on these types will return one(s).
 
     Example:
@@ -783,7 +788,7 @@ def euler(inputs, eps=2e-4):
 
     Args:
         inputs (:obj:`LieTensor`): the input LieTensor.
-        eps (:obj:`float`, optional): the threshold to avoid the sigularity caused 
+        eps (:obj:`float`, optional): the threshold to avoid the sigularity caused
             by gimbal lock. Default: 2e-4.
 
     Return:
@@ -798,7 +803,7 @@ def euler(inputs, eps=2e-4):
         solution that can result in the same orientation, while this function
         only returns one of them.
 
-        When the pitch angle is around :math:`\pm \frac{\pi}{2}` (north/south pole), 
+        When the pitch angle is around :math:`\pm \frac{\pi}{2}` (north/south pole),
         there will be sigularity problem due to the `gimbal lock
         <https://en.wikipedia.org/wiki/Gimbal_lock>`_ and some information can be
         found in `this pape <https://tinyurl.com/py8frs6v>`_.
@@ -821,3 +826,38 @@ def euler(inputs, eps=2e-4):
     See :obj:`euler2SO3` for more information.
     '''
     return inputs.euler(eps=eps)
+
+
+def quat2unit(input: LieTensor, eps=1e-12) -> LieTensor:
+    r'''
+    Normalize the quaternion part of a ``LieTensor``, which has to be a Lie group.
+    If input is a not a Lie group, then do nothing and return the input.
+    If the quaternion parts contain pure zeros, then raise an error.
+
+    The quaternion parts :math:`v` are normalized as
+
+    .. math::
+        v = \frac{v}{\max(\lVert v \rVert_2, \epsilon)},
+
+    where :math:`\epsilon` is a small value to avoid division by zero
+
+    Args:
+        input (``LieTensor``): input LieTensor of any type and shape.
+        eps (``float``): small value to avoid division by zero. Default: 1e-12.
+
+    Return:
+        :obj:`LieTensor`: the output LieTensor.
+    '''
+    if isinstance(input, LieTensor) and (input.ltype in liegroup):
+        data = input.tensor()
+        if input.ltype in [SO3_type, RxSO3_type]:
+            data[..., :4] = normalize(data[..., :4], p=2, dim=-1, eps=eps)
+        elif input.ltype in [SE3_type, Sim3_type]:
+            data[..., 3:7] = normalize(data[..., 3:7], p=2, dim=-1, eps=eps)
+        output = LieTensor(data, ltype=input.ltype)
+        if (output.rotation().norm(p=2, dim=-1) < eps).any():
+            raise ValueError("Detected zero quaternions, which cannot be normalized.")
+        return output
+    else:
+        warnings.warn("Input is not Lie group, doing thing and returning input..")
+        return input
