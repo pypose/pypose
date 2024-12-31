@@ -14,6 +14,7 @@ Optimization
    optim.solver.PINV
    optim.solver.LSTSQ
    optim.solver.Cholesky
+   optim.solver.CG
    optim.strategy.Constant
    optim.strategy.Adaptive
    optim.strategy.TrustRegion
