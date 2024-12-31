@@ -1,10 +1,11 @@
 import torch
-from ransac import RANSAC
+from . import RANSAC
+
 
 def normalize_points(coordinates:torch.Tensor):
-    r"""  
-    Calculate the normalized transformation of each coordinate set. After the transformation, 
-    the centroid of each coordinate set is located at the coordinate origin, 
+    r"""
+    Calculate the normalized transformation of each coordinate set. After the transformation,
+    the centroid of each coordinate set is located at the coordinate origin,
     and the average distance from the origin is sqrt(2).
     Args:
         coordinates (``torch.Tensor``): Homogeneous coordinates with the shape (..., N, 3).
@@ -14,7 +15,7 @@ def normalize_points(coordinates:torch.Tensor):
         ``norm_pts``: normalized coordinates with the shape (..., N, 3).
 
         ``transform``: transformation matrix with the shape (..., 3, 3).
-    
+
     Example:
         >>> pts = torch.tensor([[ 40, 368],[ 63, 224], [ 85, 447], [108, 151], [ 77, 319], [411, 371],[335, 183],[ 42, 151],[144, 440],
                             [407, 403],[208, 153], [216, 288], [156, 318]])
@@ -41,23 +42,23 @@ def normalize_points(coordinates:torch.Tensor):
 
     """
     assert coordinates.shape[-1] == 3, "the coordinates has to be the homogeneous!"
-    
+
     # keep data at same device
     device = coordinates.device
-    coordinates = coordinates.type(torch.FloatTensor).to(device)  
+    coordinates = coordinates.type(torch.FloatTensor).to(device)
 
     # mean = torch.mean(coordinates, dim = 0)
     mean = torch.mean(coordinates, dim = -2, keepdim = True)  # (..., 1, 3)
     scale = 1.4142135623730950488 / (torch.linalg.norm(coordinates - mean, dim = -1).mean(dim = -1) + 1e-8)  # (...)
     mean_x, mean_y, _ = torch.chunk(mean, dim = -1, chunks = 3)
-    
+
     scale, mean_x, mean_y = scale.view(-1,1), mean_x.view(-1,1), mean_y.view(-1,1)
     zeros, ones = torch.zeros_like(scale), torch.ones_like(scale)
 
     transform = torch.cat((scale, zeros, - scale * mean_x,
                         zeros, scale, - scale * mean_y,
                         zeros, zeros, ones), dim = -1).view(-1,3,3)
-    
+
     if len(coordinates.shape) == 2: transform = transform.squeeze()
 
     #norm_pts = transform @ coordinates.T
@@ -68,18 +69,18 @@ def normalize_points(coordinates:torch.Tensor):
 def triangulate_points(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intrinsic1,intrinsic2,R,t):
     r"""
     Convert 2D corresponding coordinates to 3D points.
-    
+
     Args:
         coordinates1 (``torch.Tensor``): Image coordinates with the shape (..., N, 2).
         coordinates2 (``torch.Tensor``): Image coordinates with the shape (..., N, 2).
         intrinsic1 (``torch.Tensor``): The intrinsic matrix of the first camera with the shape (3, 3).
         intrinsic2 (``torch.Tensor``): The intrinsic matrix of the second camera with the shape (3, 3).
-        R (``torch.Tensor``): The rotation matrix with the shape(3, 3). 
-        t (``torch.Tensor``): The translation matrix with the shape(3, 1). 
-    
+        R (``torch.Tensor``): The rotation matrix with the shape(3, 3).
+        t (``torch.Tensor``): The translation matrix with the shape(3, 1).
+
     Returns:
-        (``points3D: torch.Tensor``): 
-        ``points3D``: The 3D points with the shape(N, 3). 
+        (``points3D: torch.Tensor``):
+        ``points3D``: The 3D points with the shape(N, 3).
 
     Example:
         >>> K = torch.tensor([[320., 0., 320.], [0., 320., 240.], [0., 0., 1.]])
@@ -95,7 +96,7 @@ def triangulate_points(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
         >>> pts2 = torch.tensor([[ 16.0156, 377.1875],[ 45.9062, 229.5703],[ 59.3750, 459.8750], [ 94.4766, 155.7422], [ 56.5469, 326.3945], [409.6777, 378.8906],
         ...                      [327.7773, 185.5117], [ 27.0625, 156.4453], [121.6250, 452.5000], [402.8477, 412.9609], [196.8281, 156.6094], [202.9375, 293.7734],
         ...                      [139.6562, 324.9727],[ 84.5312, 326.2695], [ 52.7656, 293.5781],[367.6094, 182.1094], [379.1543, 202.5859], [169.1406, 312.4688],
-        ...                      [356.0312, 187.2891],[191.6719, 476.9531],[381.6484, 213.8477],[ 91.6328,  92.5391],[ 62.7266, 200.2344],[396.4111, 226.1543]])   
+        ...                      [356.0312, 187.2891],[191.6719, 476.9531],[381.6484, 213.8477],[ 91.6328,  92.5391],[ 62.7266, 200.2344],[396.4111, 226.1543]])
         >>> pts1 = pp.cart2homo(pts1)
         >>> pts2 = pp.cart2homo(pts2)
         >>> pts_3D = triangulate_points(pts1,pts2,K,K,R,t)
@@ -149,7 +150,7 @@ def triangulate_points(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
 
     row1_0_2, row2_0_2, row3_0_2, row4_0_2 = row1_0_2.unsqueeze(-2), row2_0_2.unsqueeze(-2), row3_0_2.unsqueeze(-2), row4_0_2.unsqueeze(-2)  # (..., N, 1, 3)
     row1_3, row2_3, row3_3, row4_3 = row1_3.unsqueeze(-1), row2_3.unsqueeze(-1), row3_3.unsqueeze(-1), row4_3.unsqueeze(-1)  # (..., N, 1, 1)
-    
+
     A  = torch.cat([row1_0_2,row2_0_2,row3_0_2,row4_0_2], dim = -2)   # (..., N, 4, 3)
     AT = A.transpose(-2,-1)                          # (..., N, 3, 4)
     b  = - torch.cat([row1_3,row2_3,row3_3,row4_3], dim = -2)  # (..., N, 4, 1)
@@ -160,18 +161,18 @@ def triangulate_points(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
 
 def eight_pts_alg(coordinates1:torch.Tensor, coordinates2:torch.Tensor):
     r"""
-    A minimum of eight corresponding points from two images 
-    to obtain an initial estimate of the essential or fundamental matrix. 
+    A minimum of eight corresponding points from two images
+    to obtain an initial estimate of the essential or fundamental matrix.
 
     Args:
         coordinates1 (``torch.Tensor``): Homogeneous coordinates with the shape (..., N, 3).
         coordinates2 (``torch.Tensor``): Homogeneous coordinates with the shape (..., N, 3).
-        
-    
+
+
     Returns:
         (``F: torch.Tensor``):
         ``F``: essential or fundamental matrix with the shape (..., 3, 3).
-    
+
     Example:
         >>> pts1 = torch.tensor([[ 40, 368],[ 63, 224], [ 85, 447], [108, 151], [ 77, 319], [411, 371],[335, 183],[ 42, 151],[144, 440],
         ...                      [407, 403],[208, 153], [216, 288], [156, 318], [104, 319], [ 72, 287], [373, 180], [383, 200], [184, 306],
@@ -179,7 +180,7 @@ def eight_pts_alg(coordinates1:torch.Tensor, coordinates2:torch.Tensor):
         >>> pts2 = torch.tensor([[ 16.0156, 377.1875],[ 45.9062, 229.5703],[ 59.3750, 459.8750], [ 94.4766, 155.7422], [ 56.5469, 326.3945], [409.6777, 378.8906],
         ...                      [327.7773, 185.5117], [ 27.0625, 156.4453], [121.6250, 452.5000], [402.8477, 412.9609], [196.8281, 156.6094], [202.9375, 293.7734],
         ...                      [139.6562, 324.9727],[ 84.5312, 326.2695], [ 52.7656, 293.5781],[367.6094, 182.1094], [379.1543, 202.5859], [169.1406, 312.4688],
-        ...                      [356.0312, 187.2891],[191.6719, 476.9531],[381.6484, 213.8477],[ 91.6328,  92.5391],[ 62.7266, 200.2344],[396.4111, 226.1543]])   
+        ...                      [356.0312, 187.2891],[191.6719, 476.9531],[381.6484, 213.8477],[ 91.6328,  92.5391],[ 62.7266, 200.2344],[396.4111, 226.1543]])
         >>> pts1 = pp.cart2homo(pts1)
         >>> pts2 = pp.cart2homo(pts2)
         >>> F = eight_pts_alg(pts1,pts2)
@@ -201,14 +202,14 @@ def eight_pts_alg(coordinates1:torch.Tensor, coordinates2:torch.Tensor):
     A = torch.cat([x2*x1, x2*y1, x2, y2*x1, y2*y1, y2, x1, y1, torch.ones_like(x1)], dim=-1)
     _,_,VT = torch.linalg.svd(A.transpose(-2, -1) @ A)
 
-    if len(VT.shape) == 2: M = VT[-1,:].view(3,3)  
+    if len(VT.shape) == 2: M = VT[-1,:].view(3,3)
     if len(VT.shape) == 3: M = VT[:,-1,:].view(-1,3,3)  # (..., 3, 3)
 
     # Enforce rank 2 of F, put the last singular value to 0
     U,S,VT = torch.linalg.svd(M)
 
     if len(S.shape) == 1: S[-1] = 0.0
-    if len(S.shape) == 2: S[:,-1] = 0.0  
+    if len(S.shape) == 2: S[:,-1] = 0.0
     M_new = U @ torch.diag_embed(S) @ VT
 
     F = transfer_matrix2.transpose(-2,-1) @ M_new @ transfer_matrix1
@@ -221,14 +222,14 @@ def eight_pts_alg(coordinates1:torch.Tensor, coordinates2:torch.Tensor):
     return F
 
 def find_essential_mat(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intrinsic,method = 'none',terminate =10000, threshold = 0.5):
-    r""" 
+    r"""
     Comupte the essential matrix.
 
     Args:
         coordinates1 (``torch.Tensor``): Image coordinates with the shape (N, 2).
         coordinates2 (``torch.Tensor``): Image coordinates with the shape (N, 2).
         intrinsic (``torch.Tensor``): The intrinsic matrix with the shape (3, 3).
-        method (``str``, optional): The method to calculate the fundamental matrix.``'none'``| ``'RANSAC'`` | ``'RANSAC_ADAPT'`` 
+        method (``str``, optional): The method to calculate the fundamental matrix.``'none'``| ``'RANSAC'`` | ``'RANSAC_ADAPT'``
 
                               ``'none'``: No method is applied. This method will compute the E or F with all points in the corresponding points set.
 
@@ -241,8 +242,8 @@ def find_essential_mat(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
                                                 The probabilty of obtaining a model fitted by all selected data that are inliers ( type: float, method: 'RANSAC_ADAPT') in RANSAC method.
 
         threshold (``float``, optional): The maximum tolerable distance from the corresponding points to the epipolarlines.
-                                         It is only used in RANSAC method. 
-    
+                                         It is only used in RANSAC method.
+
     Returns:
         (``E: torch.Tensor, mask: torch.Tensor``):
         ``E``: Essential matrix with the shape (3, 3).
@@ -250,9 +251,9 @@ def find_essential_mat(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
         ``mask``: For ``'RANSAC'`` or ``'RANSAC_ADAPT'``, it will return the index of the inliers in the corresponding points set.The shape is (..., 1).
 
                   For ``'none'``, no mask will be returned.
-    
+
     Example:
-        
+
         >>> K = torch.tensor([[320., 0., 320.], [0., 320., 240.], [0., 0., 1.]])
         >>> pts1 = torch.tensor([[ 40, 368],[ 63, 224], [ 85, 447], [108, 151], [ 77, 319], [411, 371],[335, 183],[ 42, 151],[144, 440],
         ...                      [407, 403],[208, 153], [216, 288], [156, 318], [104, 319], [ 72, 287], [373, 180], [383, 200], [184, 306],
@@ -260,8 +261,8 @@ def find_essential_mat(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
         >>> pts2 = torch.tensor([[ 16.0156, 377.1875],[ 45.9062, 229.5703],[ 59.3750, 459.8750], [ 94.4766, 155.7422], [ 56.5469, 326.3945], [409.6777, 378.8906],
         ...                      [327.7773, 185.5117], [ 27.0625, 156.4453], [121.6250, 452.5000], [402.8477, 412.9609], [196.8281, 156.6094], [202.9375, 293.7734],
         ...                      [139.6562, 324.9727],[ 84.5312, 326.2695], [ 52.7656, 293.5781],[367.6094, 182.1094], [379.1543, 202.5859], [169.1406, 312.4688],
-        ...                      [356.0312, 187.2891],[191.6719, 476.9531],[381.6484, 213.8477],[ 91.6328,  92.5391],[ 62.7266, 200.2344],[396.4111, 226.1543]])                
-        
+        ...                      [356.0312, 187.2891],[191.6719, 476.9531],[381.6484, 213.8477],[ 91.6328,  92.5391],[ 62.7266, 200.2344],[396.4111, 226.1543]])
+
         * use the ``'RANSAC'`` to compute E:
         >>> E, mask= find_essential_mat(pts1,pts2,K,method='RANSAC', terminate = 2000, threshold = 0.5)
         >>> E
@@ -282,15 +283,15 @@ def find_essential_mat(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
         tensor([[  0.0472,  -9.2785,   1.8953],
                 [  9.6489,   0.4045, -17.9023],
                 [ -2.2366,  18.1083,   0.2606]])
-        
+
     """
     assert coordinates1.shape == coordinates2.shape, "Point sets has to be the same shape!"
     assert coordinates1.shape[-1] == 2, "the coordinates shape has to be (..., N, 2)!"
-    
-    supported_methods = ["none","ransac", "ransac_adapt"]   
+
+    supported_methods = ["none","ransac", "ransac_adapt"]
     # transfer to float and keep data at same device
     device = coordinates1.device
-    
+
     coordinates1 = coordinates1.type(torch.FloatTensor).to(device)
     coordinates2 = coordinates2.type(torch.FloatTensor).to(device)
 
@@ -312,11 +313,11 @@ def find_essential_mat(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
         ransac = RANSAC('ransac')
         data = {'coordinates_1': PH1, 'coordinates_2': PH2, 'highest_int': len(PH1)}
         num_of_select = 18
-        
+
         F, mask = ransac(data,fit_model,check_model,terminate,num_of_select,threshold)
         E =  intrinsic.T @ F @ intrinsic
         return E, mask
-    
+
     elif method == 'RANSAC_ADAPT':
         ransac = RANSAC('ransac_adapt')
         data = {'coordinates_1': PH1, 'coordinates_2': PH2, 'highest_int': len(PH1)}
@@ -324,7 +325,7 @@ def find_essential_mat(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
         F, mask = ransac(data,fit_model,check_model,terminate,num_of_select,threshold)
         E =  intrinsic.T @ F @ intrinsic
         return E, mask
-    
+
     elif method == 'none':
         F = eight_pts_alg(PH1,PH2)
         E =  intrinsic.T @ F @ intrinsic
@@ -333,12 +334,12 @@ def find_essential_mat(coordinates1:torch.Tensor,coordinates2:torch.Tensor,intri
         raise NotImplementedError(f"{method} is unknown. Try one of {supported_methods}")
 
 def decompose_essential_mat(E):
-    r""" 
+    r"""
     Decompose the essential matrix into possible rotation and translation matrices.
-   
+
     Args:
         E (``torch.Tensor``): The essential matrix with the shape (..., 3, 3).
-    
+
     Returns:
         (``R1: torch.Tensor, R2: torch.Tensor, t: torch.Tensor``):
         ``R1``: The first possible rotation matrix. The shape is (..., 3, 3).
@@ -370,12 +371,12 @@ def decompose_essential_mat(E):
     device = E.device
 
     W = torch.tensor([0.0, -1.0, 0.0,
-                      1.0,  0.0, 0.0, 
+                      1.0,  0.0, 0.0,
                       0.0,  0.0, 1.0]).view(3,3).to(device)
     U,S,VT = torch.linalg.svd(E)
 
     _, _, t = torch.chunk(U, dim = -1, chunks = 3)
-    
+
     R1 = U @ W @ VT
     R2 = U @ W.T @ VT
 
@@ -383,7 +384,7 @@ def decompose_essential_mat(E):
     if len(R1.shape) == 3:
         R1 = torch.linalg.det(R1).view(-1,1,1) * R1
         R2 = torch.linalg.det(R2).view(-1,1,1) * R2
-    
+
     if len(R1.shape) == 2:
         R1 = torch.linalg.det(R1).view(-1,1) * R1
         R2 = torch.linalg.det(R2).view(-1,1) * R2
@@ -394,18 +395,18 @@ def recover_pose(E,coordinates1:torch.Tensor,coordinates2:torch.Tensor,intrinsic
     r"""
     Decompose the essential matrix into 4 possible poses,[R1,t],[R1,-t],[R2,t],[R2,-t].
     Return the rotation and translation matrices in which the triangulated points are in front of both cameras.
-    
+
     Args:
         E (``torch.Tensor``): The essential matrix with the shape (..., 3, 3).
         coordinates1 (``torch.Tensor``): Image coordinates with the shape (..., N, 2).
         coordinates2 (``torch.Tensor``): Image coordinates with the shape (..., N, 2).
         intrinsic (``torch.Tensor``): The intrinsic matrix with the shape (..., 3, 3).
-    
+
     Returns:
         (``R: torch.Tensor, t: torch.Tensor, mask: torch.Tensor``):
-        ``R``: The rotation matrix with the shape(..., 3, 3). 
+        ``R``: The rotation matrix with the shape(..., 3, 3).
 
-        ``t``: The translation matrix with the shape(..., 3, 1). 
+        ``t``: The translation matrix with the shape(..., 3, 1).
 
 
     Example:
@@ -416,8 +417,8 @@ def recover_pose(E,coordinates1:torch.Tensor,coordinates2:torch.Tensor,intrinsic
         >>> pts2 = torch.tensor([[ 16.0156, 377.1875],[ 45.9062, 229.5703],[ 59.3750, 459.8750], [ 94.4766, 155.7422], [ 56.5469, 326.3945], [409.6777, 378.8906],
         ...                      [327.7773, 185.5117], [ 27.0625, 156.4453], [121.6250, 452.5000], [402.8477, 412.9609], [196.8281, 156.6094], [202.9375, 293.7734],
         ...                      [139.6562, 324.9727],[ 84.5312, 326.2695], [ 52.7656, 293.5781],[367.6094, 182.1094], [379.1543, 202.5859], [169.1406, 312.4688],
-        ...                      [356.0312, 187.2891],[191.6719, 476.9531],[381.6484, 213.8477],[ 91.6328,  92.5391],[ 62.7266, 200.2344],[396.4111, 226.1543]])                
-        
+        ...                      [356.0312, 187.2891],[191.6719, 476.9531],[381.6484, 213.8477],[ 91.6328,  92.5391],[ 62.7266, 200.2344],[396.4111, 226.1543]])
+
         >>> E = find_essential_mat(pts1,pts2,K)
         >>> R, t = recover_pose(E,pts1,pts2,K)
         >>> R
@@ -449,30 +450,30 @@ def recover_pose(E,coordinates1:torch.Tensor,coordinates2:torch.Tensor,intrinsic
 
     if len(R1.shape) == 3: shape = [-1,1,1]
     if len(R1.shape) == 2: shape = [-1,1]
-    
+
     seq1 = torch.where(max_seq < 2, 1, 0).view(shape)
     seq2 = torch.where(max_seq >= 2, 1, 0).view(shape)
     seq3 = torch.where(((max_seq == 2) + (max_seq ==0)) == True, 1, -1).view(shape)
 
     R = seq1 * R1 + seq2 * R2
     t = seq3 * t
-   
+
     return R, t
 
 def compute_error(coordinates1:torch.Tensor,coordinates2:torch.Tensor, F):
     r"""
-    Finding the epipolar line and caculating the distance (error) between 
+    Finding the epipolar line and caculating the distance (error) between
     the corroseponding point and epipolarline.
-    
+
     Args:
         coordinates1 (``torch.Tensor``): Image coordinates with the shape (..., N, 2).
         coordinates2 (``torch.Tensor``): Image coordinates with the shape (..., N, 2).
         F (``torch.Tensor``): The fundamental matrix with the shape (..., 3, 3).
         threshold (``float``): The maximum tolerable distance from the corresponding points to the epipolarlines.
-        
+
     Returns:
         (``err: torch.Tensor``, mask: torch.Tensor``):
-        ``err``: The distance (error) between the corroseponding points and epipolarlines. The shape is (..., N). 
+        ``err``: The distance (error) between the corroseponding points and epipolarlines. The shape is (..., N).
 
     Example:
         >>> pts1 = torch.tensor([[ 40, 368],[ 63, 224], [ 85, 447], [108, 151], [ 77, 319], [411, 371],[335, 183],[ 42, 151],[144, 440],
@@ -481,7 +482,7 @@ def compute_error(coordinates1:torch.Tensor,coordinates2:torch.Tensor, F):
         >>> pts2 = torch.tensor([[ 16.0156, 377.1875],[ 45.9062, 229.5703],[ 59.3750, 459.8750], [ 94.4766, 155.7422], [ 56.5469, 326.3945], [409.6777, 378.8906],
         ...                      [327.7773, 185.5117], [ 27.0625, 156.4453], [121.6250, 452.5000], [402.8477, 412.9609], [196.8281, 156.6094], [202.9375, 293.7734],
         ...                      [139.6562, 324.9727],[ 84.5312, 326.2695], [ 52.7656, 293.5781],[367.6094, 182.1094], [379.1543, 202.5859], [169.1406, 312.4688],
-        ...                      [356.0312, 187.2891],[191.6719, 476.9531],[381.6484, 213.8477],[ 91.6328,  92.5391],[ 62.7266, 200.2344],[396.4111, 226.1543]])   
+        ...                      [356.0312, 187.2891],[191.6719, 476.9531],[381.6484, 213.8477],[ 91.6328,  92.5391],[ 62.7266, 200.2344],[396.4111, 226.1543]])
         >>> pts1 = pp.cart2homo(pts1)
         >>> pts2 = pp.cart2homo(pts2)
         >>> F = eight_pts_alg(pts1,pts2)
@@ -501,11 +502,11 @@ def compute_error(coordinates1:torch.Tensor,coordinates2:torch.Tensor, F):
     left_ab = torch.cat((left_a,left_b),dim =-1)
     left_err = left_d.abs() / torch.linalg.norm(left_ab, dim = -1)
 
-    right_d = torch.sum(right_epi_lines * coordinates1,dim= -1) 
+    right_d = torch.sum(right_epi_lines * coordinates1,dim= -1)
     right_a, right_b, _ = torch.chunk(left_epi_lines, dim = -1, chunks = 3)
     right_ab = torch.cat((right_a,right_b),dim =-1)
     right_err = right_d.abs() / torch.linalg.norm(right_ab, dim = -1)
 
     err = torch.maximum(left_err,right_err)  # (..., N)
-    
+
     return err
