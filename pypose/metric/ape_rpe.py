@@ -355,14 +355,22 @@ def ape(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
     Compute the Absolute Pose Error (APE) between two trajectories.
 
     Args:
-        tstamp (array-like of ``float``):
-            The timestamps of the true trajectory.
+        tstamp (array-like of ``float`` or ``None``):
+            The timestamps of the true (reference) trajectory.
+            Must have the same length as `tpose`.
+            For example, `torch.tensor([...])` or `None`.
         tpose (array-like of ``SE3``):
-            The poses of the true trajectory. Must have the same length as `tstamp`.
-        estamp (array-like of ``float``):
+            The poses of the true (reference) trajectory.
+            Must have the same length as `tstamp`.
+            For example, `pypose.SE3(torch.rand(10, 7))`.
+        estamp (array-like of ``float`` or ``None``):
             The timestamps of the estimated trajectory.
+            Must have the same length as `epose`.
+            For example, `torch.tensor([...])` or `None`.
         epose (array-like of ``SE3``):
-            The poses of the estimated trajectory. Must have the same length as `estamp`.
+            The poses of the estimated trajectory.
+            Must have the same length as `estamp`.
+            For example, `pypose.SE3(torch.rand(10, 7))`.
         etype (``str``, optional):
             The type of pose error. Supported options include:
 
@@ -380,19 +388,24 @@ def ape(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
             The maximum allowed absolute time difference (in seconds)
             for associating poses. Defaults to 0.01.
         offset (``float``, optional):
-            The aligned offset (in seconds) for the second timestamps. Defaults to 0.0.
+            The aligned offset (in seconds) for the second timestamps.
+            Defaults to 0.0.
         align (``bool``, optional):
-            If True, aligns the trajectory via a scaled SVD method. Defaults to False.
+            If True, the trajectory is aligned using a scaled SVD method.
+            Defaults to False.
         scale (``bool``, optional):
-            If True, corrects the scale using the SVD method. Defaults to False.
+            If True, the scale is corrected using the SVD method.
+            Defaults to False.
         nposes (``int``, optional):
-            The number of poses to use for alignment. If -1, all poses
-            are used. Defaults to -1.
+            The number of poses to use for alignment. If -1, all
+            poses are used. Defaults to -1.
         origin (``bool``, optional):
-            If True, aligns the trajectory by the first pose. Defaults to False.
+            If True, the trajectory is aligned by the first pose.
+            Defaults to False.
         thresh (``float``, optional):
-            The threshold for matching pairs. If the matching pairs
-            are below this threshold, a warning is given. Defaults to 0.3.
+            The threshold for valid matching pairs. If the ratio of
+            matching pairs is below this threshold, a warning is issued.
+            Defaults to 0.3.
 
     Return:
         dict: The computed statistics of the APE (Absolute Pose Error).
@@ -416,7 +429,7 @@ def ape(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
 
 def rpe(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 0.01,
         offset: float = 0.0, align: bool = False, scale: bool = False, nposes: int = -1,
-        origin: bool = False, associate: str='frame', delta: float = 1.0, rtol: float = 0.1,
+        origin: bool = False, associate: str = 'frame', delta: float = 1.0, rtol: float = 0.1,
         use_all: bool = False, thresh: float = 0.3, tpair: bool = False):
     r'''
     Compute the Relative Pose Error (RPE) between two trajectories.
@@ -485,6 +498,9 @@ def rpe(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
             Defaults to 0.3.
         tpair (``bool``, optional):
             Use true trajectory to compute the pairing indices or not. Defaults to False.
+    
+    Return:
+        dict: The computed statistics of the RPE (Relative Pose Error).
     '''
     ttraj, etraj = StampedSE3(tstamp, tpose), StampedSE3(estamp, epose)
     ttraj, etraj = associate_traj(ttraj, etraj, diff, offset, thresh)
