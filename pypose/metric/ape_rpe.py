@@ -190,21 +190,21 @@ def compute_error(ttraj, etraj, output: str = 'translation', metric_type: str = 
     Get the error of the pose based on the output type.
     Args:
         ttraj: StampedSE3
-            The trajectory for reference.
+            The true (reference) trajectory.
         etraj: StampedSE3
-            The trajectory for estimation.
-        output: OutputType
-            The type of the output error
+            The estimated trajectory.
+        etype: (``str``, optional):
+            The type of pose error.
     Returns:
-        error: The all error of the pose
+        error: The all errors of the pose
     Error:
         ValueError: The output type is not supported
     Remarks:
         'translation': || t_{est} - t_{ref} ||_2
-        'rotation': || R_{est} - R_{ref} ||_2
-        'full':  || T_{est} - T_{ref} ||_2
-        'rotation_angle_rad': ||Log(R_{est} - R_{ref})||_2
-        'rotation_angle_deg': Degree(||Log(R_{est} - R_{ref})||_2)
+        'rotation': || R_{est}^T * R_{ref} - I_3||_2
+        'pose':  || T_{est}^{-1} * T_{ref} - I_4 ||_2
+        'radian': :math:`\mathrm{Rad}(|| R_{est}^T * R_{ref}||_2)`
+        'degree': :math:`\mathrm{Degree}(|| R_{est}^T * R_{ref}||_2)`
     '''
     if metric_type == 'ape':
         if output == 'translation':
@@ -228,7 +228,7 @@ def compute_error(ttraj, etraj, output: str = 'translation', metric_type: str = 
     elif output == 'radian':
         error = mat2SO3(E[:,:3,:3] ).euler().norm(dim=-1)
     elif output == 'degree':
-        error = (mat2SO3(E[:,:3,:3]).euler()).norm(dim=-1)
+        error = mat2SO3(E[:,:3,:3]).euler().norm(dim=-1)
         error = torch.rad2deg(error)
     else:
         raise ValueError(f"Unknown output type: {output}")
@@ -376,13 +376,13 @@ def ape(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
 
             'translation': :math:`|| t_{est} - t_{ref} ||_2`
 
-            'rotation': :math:`|| R_{est} - R_{ref} ||_2`
+            'rotation': :math:`|| R_{est}^T * R_{ref} - I_3 ||_2`
 
-            'pose': :math:`|| T_{est} - T_{ref} ||_2`
+            'pose': :math:`|| T_{est}^{-1} * T_{ref} - I_4 ||_2`
 
-            'radian': :math:`||\mathrm{Log}(R_{est} - R_{ref})||_2`
+            'radian': :math:`\mathrm{Rad}(|| R_{est}^T * R_{ref}||_2)`
 
-            'degree': :math:`\mathrm{Degree}(||Log(R_{est} - R_{ref})||_2)`
+            'degree': :math:`\mathrm{Degree}(|| R_{est}^T * R_{ref}||_2)`
 
         diff (``float``, optional):
             The maximum allowed absolute time difference (in seconds)
