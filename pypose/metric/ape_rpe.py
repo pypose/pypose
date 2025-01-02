@@ -193,18 +193,27 @@ def compute_error(ttraj, etraj, output: str = 'translation', metric_type: str = 
             The true (reference) trajectory.
         etraj: StampedSE3
             The estimated trajectory.
-        etype: (``str``, optional):
+        output: (``str``, optional):
             The type of pose error.
+        metric_type: (``str``, optional):
+            The type of metrics
     Returns:
         error: The all errors of the pose
     Error:
         ValueError: The output type is not supported
     Remarks:
-        'translation': || t_{est} - t_{ref} ||_2
-        'rotation': || R_{est}^T * R_{ref} - I_3||_2
-        'pose':  || T_{est}^{-1} * T_{ref} - I_4 ||_2
-        'radian': :math:`\mathrm{Rad}(|| R_{est}^T * R_{ref}||_2)`
-        'degree': :math:`\mathrm{Degree}(|| R_{est}^T * R_{ref}||_2)`
+        if metric_type == 'ape'
+            'translation': || t_{est} - t_{ref} ||_2
+            'rotation': || R_{est}^T * R_{ref} - I_3 ||_2
+            'pose':  || T_{est}^{-1} * T_{ref} - I_4 ||_2
+            'radian': :math:`\mathrm{Rad}(|| R_{est}^T * R_{ref}||_2)`
+            'degree': :math:`\mathrm{Degree}(|| R_{est}^T * R_{ref}||_2)`
+        if metric_type == 'rpe':
+            'translation': :math:`|| -{R_{ref}^{rel}}^T * t_{ref}^{rel} + {R_{est}^{rel}}^T * t_{est}^{rel} ||_2`
+            'rotation': :math:`|| {R_{ref}^{rel}}^T * R_{est}^{rel} - I_3 ||_2`
+            'pose': :math:`|| {T_{ref}^{rel}}^{-1} * T_{est}^{rel} - I_4 ||_2`
+            'radian': :math:`\mathrm{Rad}(|| {R_{ref}^{rel}}^T * R_{est}^{rel} ||_2)`
+            'degree': :math:`\mathrm{Degree}(|| {R_{ref}^{rel}}^T * R_{est}^{rel} ||_2)`
     '''
     if metric_type == 'ape':
         if output == 'translation':
@@ -452,15 +461,16 @@ def rpe(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
         etype (``str``, optional):
             The type of pose error. Supported options include:
 
-            'translation': :math:`|| t_{est} - t_{ref} ||_2`
+            'translation': :math:`|| -{R_{ref}^{rel}}^T * t_{ref}^{rel} + {R_{est}^{rel}}^T * t_{est}^{rel} ||_2`
 
-            'rotation': :math:`|| R_{est} - R_{ref} ||_2`
+            'rotation': :math:`|| {R_{ref}^{rel}}^T * R_{est}^{rel} - I_3 ||_2`
 
-            'pose': :math:`|| T_{est} - T_{ref} ||_2`
+            'pose': :math:`|| {T_{ref}^{rel}}^{-1} * T_{est}^{rel} - I_4 ||_2`
 
-            'radian': :math:`||\mathrm{Log}(R_{est} - R_{ref})||_2`
+            'radian': :math:`\mathrm{Rad}(|| {R_{ref}^{rel}}^T * R_{est}^{rel} ||_2)`
 
-            'degree': :math:`\mathrm{Degree}(||Log(R_{est} - R_{ref})||_2)`
+            'degree': :math:`\mathrm{Degree}(|| {R_{ref}^{rel}}^T * R_{est}^{rel} ||_2)`
+            
         diff (``float``, optional):
             The maximum allowed absolute time difference (in seconds)
             for associating poses. Defaults to 0.01.
