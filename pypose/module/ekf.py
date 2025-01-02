@@ -151,17 +151,17 @@ class EKF(nn.Module):
         I = torch.eye(P.shape[-1], device=P.device, dtype=P.dtype)
         A, B = self.model.A, self.model.B
         C, D = self.model.C, self.model.D
-        c1, c2 = self.model.c1, self.model.c2
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
 
-        x = bmv(A, x) + bmv(B, u) + c1        # 1. System transition
-        P = A @ P @ A.mT + Q                  # 2. Covariance predict
+        xm = self.model.state_transition(x, input, dt, t=t)        # 1. System transition
+
+        P = A @ P @ A.mT + B @ Q @ B.mT                  # 2. Covariance predict
         K = P @ C.mT @ pinv(C @ P @ C.mT + R) # 3. Kalman gain
-        e = y - bmv(C, x) - bmv(D, u) - c2    #    predicted observation error
-        x = x + bmv(K, e)                     # 4. Posteriori state
-        P = (I - K @ C) @ P                   # 5. Posteriori covariance
-        return x, P
+        e = obs - bmv(C, state) - bmv(D, input)    #    predicted observation error
+        xp = xm + bmv(K, e)                     # 4. Posteriori state
+        P = (I - K @ C) @ P @ (I - K @ C).mT + K @ R @ K.mT                   # 5. Posteriori covariance
+        return xp, P
 
     @property
     def Q(self):
