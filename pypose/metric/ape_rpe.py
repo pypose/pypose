@@ -11,19 +11,25 @@ class StampedSE3(object):
     def __init__(self, timestamps=None, poses_SE3=None, dtype=torch.float64):
         r"""
         Internal class for represent the trajectory with timestamps.
+        
         Args:
-            timestamps: The timestamps of the trajectory.
-                        Must have same length with poses.
-                    e.g torch.tensor(...) or None
-            poses_SE3: The trajectory poses. Must be SE3
-                    e.g. pypose.SE3(torch.rand(10, 7))
-            dtype: The data type for poses to calculate (default: torch.float64)
-                   The recommended type is torch.float64 or higher
+            timestamps (array-like of ``float`` or ``None``):
+                The timestamps of the trajectory.
+                Must have same length with poses.
+                For example, `torch.tensor(...)` or `None`.
+            poses_SE3 (array-like of ``SE3``):
+                The trajectory poses. Must be SE3.
+                For example, `pypose.SE3(torch.rand(10, 7))`.
+            dtype (`torch.float64` or higher):
+                The data type for poses to calculate.
+                Defaults to torch.float64.
+                
         Returns:
-            None
+            None.
+            
         Error:
-            1. ValueError: The poses have shape problem
-            2. ValueError: The timestamps have shape problem
+            1. ValueError: The poses have shape problem.
+            2. ValueError: The timestamps have shape problem.
         """
         assert (poses_SE3 is not None), {"The pose must be not None"}
         assert (poses_SE3.numel() != 0),  {"The pose must be not empty"}
@@ -104,20 +110,26 @@ class StampedSE3(object):
 def matching_time_indices(stamps_1, stamps_2, max_diff=0.01, offset_2=0.0):
     r"""
     Search for the best matching timestamps of two lists of timestamps.
+    
     Args:
-        stamps_1: torch.tensor
+        stamps_1 (array-like of ``float``):
             First list of timestamps.
-        stamps_2: torch.tensor
-            Second list of timestamps
-        max_diff: float
-            Maximum allowed absolute time difference for associating
-        offset_2: float
-            The align offset for the second timestamps
+            For example, `torch.tensor(...)`.
+        stamps_2 (array-like of ``float``):
+            Second list of timestamps.
+            For example, `torch.tensor(...)`.
+        max_diff (``float``, optional):
+            The maximum allowed absolute time difference (in seconds)
+            for associating poses. Defaults to 0.01.
+        offset_2 (``float``, optional):
+            The aligned offset (in seconds) for the second timestamps.
+            Defaults to 0.0.
+            
     Returns:
-        matching_indices_1: list[int].
-            indices of timestamps_1 that match with timestamps_1
-        matching_indices_2: list[int].
-            indices of timestamps_2 that match with timestamps_2
+        matching_indices_1: ``list[int]``
+            Indices of timestamps_1 that match with timestamps_1.
+        matching_indices_2: ``list[int]``
+            Indices of timestamps_2 that match with timestamps_2.
     """
     stamps_2 += offset_2
     diff_mat = (stamps_1[..., None] - stamps_2[None]).abs()
@@ -133,24 +145,31 @@ def matching_time_indices(stamps_1, stamps_2, max_diff=0.01, offset_2=0.0):
 def associate_traj(ttraj, etraj, max_diff=0.01, offset_2=0.0, threshold=0.3):
     r"""
     Associate two trajectories by matching their timestamps.
+    
     Args:
-        ttraj: StampedSE3
+        ttraj (``StampedSE3``):
             The trajectory for reference.
-        etraj: StampedSE3
+        etraj (``StampedSE3``):
             The trajectory for estimation.
-        max_diff: float
-            Max allowed absolute time difference (s) for associating
-        offset_2: float
-            The aligned offset (s) for the second timestamps.
-        threshold: float
-            The threshold (%) for the matching warning
+        max_diff (``float``, optional):
+            The maximum allowed absolute time difference (in seconds)
+            for associating poses. Defaults to 0.01.
+        offset_2 (``float``, optional):
+            The aligned offset (in seconds) for the second timestamps.
+            Defaults to 0.0.
+        threshold (``float``, optional):
+            The threshold for valid matching pairs. If the ratio of
+            matching pairs is below this threshold, a warning is issued.
+            Defaults to 0.3.
+            
     Returns:
-        etraj_aligned: StampedSE3
-            The aligned estimation trajectory
-        ttraj_aligned: StampedSE3
-            The aligned reference trajectory
+        etraj_aligned: ``StampedSE3``
+            The aligned estimation trajectory.
+        ttraj_aligned: ``StampedSE3``
+            The aligned reference trajectory.
+            
     Warning:
-        The matched stamps are under the threshold
+        The matched stamps are under the threshold.
     """
     snd_longer = len(etraj.timestamps) > len(ttraj.timestamps)
     traj_long = etraj if snd_longer else ttraj
@@ -188,19 +207,25 @@ def associate_traj(ttraj, etraj, max_diff=0.01, offset_2=0.0, threshold=0.3):
 def compute_error(ttraj, etraj, output: str = 'translation', metric_type: str = 'ape'):
     r'''
     Get the error of the pose based on the output type.
+    
     Args:
-        ttraj: StampedSE3
+        ttraj (``StampedSE3``):
             The true (reference) trajectory.
-        etraj: StampedSE3
+        etraj (``StampedSE3``):
             The estimated trajectory.
         output: (``str``, optional):
             The type of pose error.
+            Including: 'translation', 'rotation', 'pose', 'rotation', 'radian', 'degree'.
         metric_type: (``str``, optional):
-            The type of metrics
+            The type of metrics.
+            Including: 'ape', 'rpe'.
+            
     Returns:
-        error: The all errors of the pose
+        error: The all errors of the pose.
+        
     Error:
-        ValueError: The output type is not supported
+        ValueError: The output type is not supported.
+        
     Remarks:
         if metric_type == 'ape'
             'translation': || t_{est} - t_{ref} ||_2
@@ -257,15 +282,18 @@ def compute_error(ttraj, etraj, output: str = 'translation', metric_type: str = 
 def pairs_by_frames(traj, delta, use_all=False):
     r'''
     Get index of pairs in the trajectory by its index distance.
+    
     Args:
-        traj: StampedSE3
-            The trajectory
-        delta: float
-            The delta to select the pair.
-        use_all: bool
-            If True, all pairs will be used for evaluation.
+        traj (``StampedSE3``):
+            The trajectory.
+        delta (``float``):
+            The delta used to select the pair.
+        use_all (``bool``, optional):
+            If True, all associated pairs are used for evaluation.
+            Defaults to False.
+            
     Returns: list
-        id_pairs: list of index pairs
+        id_pairs: list of index pairs.
     '''
     traj_len = traj.num_poses
     delta = int(delta)
@@ -285,17 +313,21 @@ def pairs_by_frames(traj, delta, use_all=False):
 def pairs_by_dist(traj, delta, tol=0.0, use_all=False):
     r'''
     Get index of pairs in the trajectory by its path distance.
+    
     Args:
-        traj: StampedSE3
+        traj (``StampedSE3``):
             The trajectory
-        delta: float
-            The delta to select the pair.
-        tol: float
-            Absolute path tolerance to accept or reject pairs in use_all mode.
-        use_all: bool
-            If True, all pairs will be used for evaluation.
+        delta (``float``):
+            The delta used to select the pair.
+        tol (``float``, optional):
+            The absolute path tolerance for accepting or rejecting pairs in use_all mode.
+            Defaults to 0.0.
+        use_all (``bool``, optional):
+            If True, all associated pairs are used for evaluation.
+            Defaults to False.
+            
     Returns: list
-        id_pairs: list of index pairs
+        id_pairs: list of index pairs.
     '''
     if use_all:
         idx_0 = []
@@ -326,21 +358,27 @@ def pairs_by_dist(traj, delta, tol=0.0, use_all=False):
 
 def pair_id(traj, delta=1.0, associate: str='frame', rtol=0.1, use_all= False):
     r'''
-    Get index of pairs with distance==delta from a trajectory
+    Get index of pairs with distance==delta from a trajectory.
+    
     Args:
         traj (``StampedSE3``):
-            The trajectory
-        delta (``float``):
-            The delta to select the pair.
-        associate (``str``):
-            The type of the association relation between the two trajectory.
-            Including: 'frame', 'distance'.
-        rtol (``float``):
-            Relative tolerance to accept or reject deltas.
-        use_all (``bool``):
-            If True, all pairs will be used for evaluation.
+            The trajectory.
+        delta (``float``, optional):
+            The delta used to select the pair. For example, when
+            `associate='distance'`, it can represent the distance
+            step in meters. Defaults to 1.0.
+        associate (``str``, optional):
+            The method used to associate pairs between the two trajectories.
+            Supported options: 'frame', 'distance'. Defaults to 'frame'.
+        rtol (``float``, optional):
+            The relative tolerance for accepting or rejecting deltas.
+            Defaults to 0.1.
+        use_all (``bool``, optional):
+            If True, all associated pairs are used for evaluation.
+            Defaults to False.
+            
     Returns:
-        list: list of index pairs
+        list: list of index pairs.
     '''
     if associate == 'frame':
         id_pairs = pairs_by_frames(traj, int(delta), use_all)
@@ -416,8 +454,33 @@ def ape(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
             matching pairs is below this threshold, a warning is issued.
             Defaults to 0.3.
 
-    Return:
-        dict: The computed statistics of the APE (Absolute Pose Error).
+    Returns:
+        ``dict``: The computed statistics of the APE (Absolute Pose Error).
+
+    Examples:
+        >>> import torch
+        >>> import pypose as pp
+        >>> tstamp = torch.tensor([1311868163.8696999550, 1311868163.8731000423,
+        ...                        1311868163.8763999939])
+        >>> tpose = pp.SE3([[-0.1357000023, -1.4217000008,  1.4764000177,  0.6452999711,
+        ...                  -0.5497999787,  0.3362999856, -0.4101000130],
+        ...                 [-0.1357000023, -1.4218000174,  1.4764000177,  0.6453999877,
+        ...                  -0.5497000217,  0.3361000121, -0.4101999998],
+        ...                 [-0.1358000040, -1.4219000340,  1.4764000177,  0.6455000043,
+        ...                  -0.5498999953,  0.3357999921, -0.4101000130]])
+        >>> estamp = torch.tensor([1311868164.3631811142, 1311868164.3990259171,
+        ...                        1311868164.4309399128])
+        >>> epose = pp.SE3([[0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000,
+        ...                  0.0000000000, 0.0000000000, 1.0000000000],
+        ...                 [-0.0005019300, 0.0010138600, -0.0020097860, -0.0020761820,
+        ...                  -0.0010706080, -0.0007627490,  0.9999969602],
+        ...                 [0.0004298200, 0.0019603260, -0.0048985220, -0.0043526068,
+        ...                  -0.0036625920, -0.0023494449, 0.9999810457]])
+        >>> pp.metric.ape(tstamp, tpose, estamp, epose)
+        {'max': 2.059025356439517, 'mean': 2.056458484336053,
+         'median': 2.0562316980397806, 'min': 2.054118398528862,
+         'rmse': 2.056459466304423,'sse': 12.687076609659215,
+         'std': 0.002461327487834255}
     '''
     ttraj, etraj = StampedSE3(tstamp, tpose), StampedSE3(estamp, epose)
     ttraj, etraj = associate_traj(ttraj, etraj, diff, offset, thresh)
@@ -509,8 +572,33 @@ def rpe(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
         tpair (``bool``, optional):
             Use true trajectory to compute the pairing indices or not. Defaults to False.
     
-    Return:
-        dict: The computed statistics of the RPE (Relative Pose Error).
+    Returns:
+        ``dict``: The computed statistics of the RPE (Relative Pose Error).
+
+    Examples:
+        >>> import torch
+        >>> import pypose as pp
+        >>> tstamp = torch.tensor([1311868163.8696999550, 1311868163.8731000423,
+        ...                        1311868163.8763999939])
+        >>> tpose = pp.SE3([[-0.1357000023, -1.4217000008,  1.4764000177,  0.6452999711,
+        ...                  -0.5497999787,  0.3362999856, -0.4101000130],
+        ...                 [-0.1357000023, -1.4218000174,  1.4764000177,  0.6453999877,
+        ...                  -0.5497000217,  0.3361000121, -0.4101999998],
+        ...                 [-0.1358000040, -1.4219000340,  1.4764000177,  0.6455000043,
+        ...                  -0.5498999953,  0.3357999921, -0.4101000130]])
+        >>> estamp = torch.tensor([1311868164.3631811142, 1311868164.3990259171,
+        ...                        1311868164.4309399128])
+        >>> epose = pp.SE3([[0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000,
+        ...                  0.0000000000, 0.0000000000, 1.0000000000],
+        ...                 [-0.0005019300, 0.0010138600, -0.0020097860, -0.0020761820,
+        ...                  -0.0010706080, -0.0007627490,  0.9999969602],
+        ...                 [0.0004298200, 0.0019603260, -0.0048985220, -0.0043526068,
+        ...                  -0.0036625920, -0.0023494449, 0.9999810457]])
+        >>> pp.metric.rpe(tstamp, tpose, estamp, epose)
+        {'max': 0.0031794263852397337, 'mean': 0.0027428703211684856,
+         'median': 0.002306314257097237, 'min': 0.002306314257097237,
+         'rmse': 0.0027773942456598218, 'sse': 1.542783759164858e-05,
+         'std': 0.0006173835065457773}
     '''
     ttraj, etraj = StampedSE3(tstamp, tpose), StampedSE3(estamp, epose)
     ttraj, etraj = associate_traj(ttraj, etraj, diff, offset, thresh)
