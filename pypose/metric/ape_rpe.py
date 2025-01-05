@@ -1,7 +1,4 @@
-import warnings
-from typing import TypedDict, Literal
-
-import torch
+import torch, warnings
 from ..function.geometry import svdstf
 from ..lietensor import mat2SO3, SE3, Sim3, identity_Sim3
 from ..lietensor.lietensor import SE3Type, Sim3Type
@@ -11,7 +8,7 @@ class StampedSE3(object):
     def __init__(self, timestamps=None, poses_SE3=None, dtype=torch.float64):
         r"""
         Internal class for represent the trajectory with timestamps.
-        
+
         Args:
             timestamps (array-like of ``float`` or ``None``):
                 The timestamps of the trajectory.
@@ -23,10 +20,10 @@ class StampedSE3(object):
             dtype (`torch.float64` or higher):
                 The data type for poses to calculate.
                 Defaults to torch.float64.
-                
+
         Returns:
             None.
-            
+
         Error:
             1. ValueError: The poses have shape problem.
             2. ValueError: The timestamps have shape problem.
@@ -110,7 +107,7 @@ class StampedSE3(object):
 def matching_time_indices(stamps_1, stamps_2, max_diff=0.01, offset_2=0.0):
     r"""
     Search for the best matching timestamps of two lists of timestamps.
-    
+
     Args:
         stamps_1 (array-like of ``float``):
             First list of timestamps.
@@ -124,7 +121,7 @@ def matching_time_indices(stamps_1, stamps_2, max_diff=0.01, offset_2=0.0):
         offset_2 (``float``, optional):
             The aligned offset (in seconds) for the second timestamps.
             Defaults to 0.0.
-            
+
     Returns:
         matching_indices_1: ``list[int]``
             Indices of timestamps_1 that match with timestamps_1.
@@ -145,7 +142,7 @@ def matching_time_indices(stamps_1, stamps_2, max_diff=0.01, offset_2=0.0):
 def associate_traj(ttraj, etraj, max_diff=0.01, offset_2=0.0, threshold=0.3):
     r"""
     Associate two trajectories by matching their timestamps.
-    
+
     Args:
         ttraj (``StampedSE3``):
             The trajectory for reference.
@@ -161,13 +158,13 @@ def associate_traj(ttraj, etraj, max_diff=0.01, offset_2=0.0, threshold=0.3):
             The threshold for valid matching pairs. If the ratio of
             matching pairs is below this threshold, a warning is issued.
             Defaults to 0.3.
-            
+
     Returns:
         etraj_aligned: ``StampedSE3``
             The aligned estimation trajectory.
         ttraj_aligned: ``StampedSE3``
             The aligned reference trajectory.
-            
+
     Warning:
         The matched stamps are under the threshold.
     """
@@ -204,10 +201,10 @@ def associate_traj(ttraj, etraj, max_diff=0.01, offset_2=0.0, threshold=0.3):
     return ttraj_aligned, etraj_aligned
 
 
-def compute_error(ttraj, etraj, output: str = 'translation', metric_type: str = 'ape'):
+def compute_error(ttraj, etraj, output: str = 'translation', mtype: str = 'ape'):
     r'''
     Get the error of the pose based on the output type.
-    
+
     Args:
         ttraj (``StampedSE3``):
             The true (reference) trajectory.
@@ -216,43 +213,43 @@ def compute_error(ttraj, etraj, output: str = 'translation', metric_type: str = 
         output: (``str``, optional):
             The type of pose error.
             Including: 'translation', 'rotation', 'pose', 'rotation', 'radian', 'degree'.
-        metric_type: (``str``, optional):
+        mtype: (``str``, optional):
             The type of metrics.
             Including: 'ape', 'rpe'.
-            
+
     Returns:
         error: The all errors of the pose.
-        
+
     Error:
         ValueError: The output type is not supported.
-        
+
     Remarks:
-        if metric_type == 'ape'
-            'translation': || t_{est} - t_{ref} ||_2
-            'rotation': || R_{est}^T * R_{ref} - I_3 ||_2
-            'pose':  || T_{est}^{-1} * T_{ref} - I_4 ||_2
-            'radian': :math:`\mathrm{Rad}(|| R_{est}^T * R_{ref}||_2)`
-            'degree': :math:`\mathrm{Degree}(|| R_{est}^T * R_{ref}||_2)`
-        if metric_type == 'rpe':
-            'translation': :math:`|| -{R_{ref}^{rel}}^T * t_{ref}^{rel} + {R_{est}^{rel}}^T * t_{est}^{rel} ||_2`
-            'rotation': :math:`|| {R_{ref}^{rel}}^T * R_{est}^{rel} - I_3 ||_2`
-            'pose': :math:`|| {T_{ref}^{rel}}^{-1} * T_{est}^{rel} - I_4 ||_2`
-            'radian': :math:`\mathrm{Rad}(|| {R_{ref}^{rel}}^T * R_{est}^{rel} ||_2)`
-            'degree': :math:`\mathrm{Degree}(|| {R_{ref}^{rel}}^T * R_{est}^{rel} ||_2)`
+        if mtype == 'ape'
+            'translation': || t_{e} - t_{t} ||_2
+            'rotation': || R_{e}^T * R_{t} - I_3 ||_2
+            'pose':  || T_{e}^{-1} * T_{t} - I_4 ||_2
+            'radian': :math:`\mathrm{Rad}(|| R_{e}^T * R_{t}||_2)`
+            'degree': :math:`\mathrm{Degree}(|| R_{e}^T * R_{t}||_2)`
+        if mtype == 'rpe':
+            'translation': :math:`|| -{R_{t}^{rel}}^T * t_{t}^{rel} + {R_{e}^{rel}}^T * t_{e}^{rel} ||_2`
+            'rotation': :math:`|| {R_{t}^{rel}}^T * R_{e}^{rel} - I_3 ||_2`
+            'pose': :math:`|| {T_{t}^{rel}}^{-1} * T_{e}^{rel} - I_4 ||_2`
+            'radian': :math:`\mathrm{Rad}(|| {R_{t}^{rel}}^T * R_{e}^{rel} ||_2)`
+            'degree': :math:`\mathrm{Degree}(|| {R_{t}^{rel}}^T * R_{e}^{rel} ||_2)`
     '''
-    if metric_type == 'ape':
+    if mtype == 'ape':
         if output == 'translation':
             E = etraj.translation() - ttraj.translation()
         else:
             E = (etraj.poses.Inv() @ ttraj.poses).matrix()
-    elif metric_type == 'rpe':
+    elif mtype == 'rpe':
         E = (ttraj.poses.Inv() @ etraj.poses).matrix()
 
     if output == 'translation':
-        if metric_type == 'ape':
+        if mtype == 'ape':
             error = torch.linalg.norm(E, dim=-1)
-        elif metric_type == 'rpe':
-            error = torch.tensor([torch.linalg.norm(E_i[:3, 3]) for E_i in E])
+        elif mtype == 'rpe':
+            error = E[..., :3, 3].norm(dim=-1)
     elif output == 'rotation':
         I = torch.eye(3, device=E.device, dtype=E.dtype).expand_as(E[:,:3,:3])
         error = torch.linalg.norm((E[:,:3,:3] - I), dim=(-2, -1))
@@ -260,29 +257,28 @@ def compute_error(ttraj, etraj, output: str = 'translation', metric_type: str = 
         I = torch.eye(4, device=E.device, dtype=E.dtype).expand_as(E)
         error = torch.linalg.norm((E - I), dim=(-2, -1))
     elif output == 'radian':
-        error = mat2SO3(E[:,:3,:3] ).euler().norm(dim=-1)
+        error = mat2SO3(E[:,:3,:3], check=False).euler().norm(dim=-1)
     elif output == 'degree':
-        error = mat2SO3(E[:,:3,:3]).euler().norm(dim=-1)
-        error = torch.rad2deg(error)
+        error = mat2SO3(E[:,:3,:3], check=False).euler().rad2deg().norm(dim=-1)
     else:
         raise ValueError(f"Unknown output type: {output}")
 
-    result_dict = {}
-    result_dict['Max']    = torch.max(error.abs()).item()
-    result_dict['Mean']   = torch.mean(error.abs()).item()
-    result_dict['Median'] = torch.median(error.abs()).item()
-    result_dict['Min']    = torch.min(error.abs()).item()
-    result_dict['RMSE']   = torch.sqrt(torch.mean(torch.pow(error, 2))).item()
-    result_dict['SSE']    = torch.sum(torch.pow(error, 2)).item()
-    result_dict['STD']    = torch.std(error.abs()).item()
+    results = {}
+    results['Max']    = torch.max(error.abs()).item()
+    results['Mean']   = torch.mean(error.abs()).item()
+    results['Median'] = torch.median(error.abs()).item()
+    results['Min']    = torch.min(error.abs()).item()
+    results['RMSE']   = torch.sqrt(torch.mean(torch.pow(error, 2))).item()
+    results['SSE']    = torch.sum(torch.pow(error, 2)).item()
+    results['STD']    = torch.std(error.abs()).item()
 
-    return result_dict
+    return results
 
 
 def pairs_by_frames(traj, delta, use_all=False):
     r'''
     Get index of pairs in the trajectory by its index distance.
-    
+
     Args:
         traj (``StampedSE3``):
             The trajectory.
@@ -291,7 +287,7 @@ def pairs_by_frames(traj, delta, use_all=False):
         use_all (``bool``, optional):
             If True, all associated pairs are used for evaluation.
             Defaults to False.
-            
+
     Returns: list
         id_pairs: list of index pairs.
     '''
@@ -313,7 +309,7 @@ def pairs_by_frames(traj, delta, use_all=False):
 def pairs_by_dist(traj, delta, tol=0.0, use_all=False):
     r'''
     Get index of pairs in the trajectory by its path distance.
-    
+
     Args:
         traj (``StampedSE3``):
             The trajectory
@@ -325,7 +321,7 @@ def pairs_by_dist(traj, delta, tol=0.0, use_all=False):
         use_all (``bool``, optional):
             If True, all associated pairs are used for evaluation.
             Defaults to False.
-            
+
     Returns: list
         id_pairs: list of index pairs.
     '''
@@ -359,7 +355,7 @@ def pairs_by_dist(traj, delta, tol=0.0, use_all=False):
 def pair_id(traj, delta=1.0, associate: str='frame', rtol=0.1, use_all= False):
     r'''
     Get index of pairs with distance==delta from a trajectory.
-    
+
     Args:
         traj (``StampedSE3``):
             The trajectory.
@@ -376,7 +372,7 @@ def pair_id(traj, delta=1.0, associate: str='frame', rtol=0.1, use_all= False):
         use_all (``bool``, optional):
             If True, all associated pairs are used for evaluation.
             Defaults to False.
-            
+
     Returns:
         list: list of index pairs.
     '''
@@ -421,15 +417,17 @@ def ape(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
         etype (``str``, optional):
             The type of pose error. Supported options include:
 
-            'translation': :math:`|| t_{est} - t_{ref} ||_2`
+            'translation': :math:`|| t_{e} - t_{t} ||_2`
 
-            'rotation': :math:`|| R_{est}^T * R_{ref} - I_3 ||_2`
+            'rotation': :math:`|| R_{e}^T * R_{t} - I_3 ||_2`
 
-            'pose': :math:`|| T_{est}^{-1} * T_{ref} - I_4 ||_2`
+            'pose': :math:`|| T_{e}^{-1} * T_{t} - I_4 ||_2`
 
-            'radian': :math:`\mathrm{Rad}(|| R_{est}^T * R_{ref}||_2)`
+            'radian': :math:`||\mathrm{Rad}(\mathrm{Euler}(R_{e}^T * R_{t}))||_2`
 
-            'degree': :math:`\mathrm{Degree}(|| R_{est}^T * R_{ref}||_2)`
+            'degree': :math:`||\mathrm{Degree}(\mathrm{Euler}(R_{e}^T * R_{t}))||_2`
+
+            Default: 'translation'
 
         diff (``float``, optional):
             The maximum allowed absolute time difference (in seconds)
@@ -462,25 +460,25 @@ def ape(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
         >>> import pypose as pp
         >>> tstamp = torch.tensor([1311868163.8696999550, 1311868163.8731000423,
         ...                        1311868163.8763999939])
-        >>> tpose = pp.SE3([[-0.1357000023, -1.4217000008,  1.4764000177,  0.6452999711,
-        ...                  -0.5497999787,  0.3362999856, -0.4101000130],
-        ...                 [-0.1357000023, -1.4218000174,  1.4764000177,  0.6453999877,
-        ...                  -0.5497000217,  0.3361000121, -0.4101999998],
-        ...                 [-0.1358000040, -1.4219000340,  1.4764000177,  0.6455000043,
-        ...                  -0.5498999953,  0.3357999921, -0.4101000130]])
+        >>> tpose = pp.SE3([[-0.1357000023, -1.4217000008,  1.4764000177,
+        ...                   0.6452999711, -0.5497999787,  0.3362999856, -0.4101000130],
+        ...                 [-0.1357000023, -1.4218000174,  1.4764000177,
+        ...                   0.6453999877, -0.5497000217,  0.3361000121, -0.4101999998],
+        ...                 [-0.1358000040, -1.4219000340,  1.4764000177,
+        ...                   0.6455000043, -0.5498999953,  0.3357999921, -0.4101000130]])
         >>> estamp = torch.tensor([1311868164.3631811142, 1311868164.3990259171,
         ...                        1311868164.4309399128])
-        >>> epose = pp.SE3([[0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000,
-        ...                  0.0000000000, 0.0000000000, 1.0000000000],
-        ...                 [-0.0005019300, 0.0010138600, -0.0020097860, -0.0020761820,
-        ...                  -0.0010706080, -0.0007627490,  0.9999969602],
-        ...                 [0.0004298200, 0.0019603260, -0.0048985220, -0.0043526068,
-        ...                  -0.0036625920, -0.0023494449, 0.9999810457]])
+        >>> epose = pp.SE3([[0.0000000000, 0.0000000000, 0.0000000000,
+        ...                  0.0000000000, 0.0000000000, 0.0000000000, 1.0000000000],
+        ...                 [-0.0005019300, 0.0010138600, -0.0020097860,
+        ...                  -0.0020761820,-0.0010706080, -0.0007627490, 0.9999969602],
+        ...                 [0.0004298200, 0.0019603260, -0.0048985220,
+        ...                 -0.0043526068,-0.0036625920, -0.0023494449, 0.9999810457]])
         >>> pp.metric.ape(tstamp, tpose, estamp, epose)
-        {'max': 2.059025356439517, 'mean': 2.056458484336053,
-         'median': 2.0562316980397806, 'min': 2.054118398528862,
-         'rmse': 2.056459466304423,'sse': 12.687076609659215,
-         'std': 0.002461327487834255}
+        {'Max': 2.059025356439517, 'Mean': 2.056458484336053,
+         'Median': 2.0562316980397806, 'Min': 2.054118398528862,
+         'RMSE': 2.056459466304423, 'SSE': 12.687076609659215,
+         'STD': 0.002461327487834255}
     '''
     ttraj, etraj = StampedSE3(tstamp, tpose), StampedSE3(estamp, epose)
     ttraj, etraj = associate_traj(ttraj, etraj, diff, offset, thresh)
@@ -496,7 +494,7 @@ def ape(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
 
     etraj.align(trans_mat)
 
-    return compute_error(ttraj, etraj, etype, metric_type = 'ape')
+    return compute_error(ttraj, etraj, etype, mtype = 'ape')
 
 
 def rpe(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 0.01,
@@ -524,16 +522,18 @@ def rpe(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
         etype (``str``, optional):
             The type of pose error. Supported options include:
 
-            'translation': :math:`|| -{R_{ref}^{rel}}^T * t_{ref}^{rel} + {R_{est}^{rel}}^T * t_{est}^{rel} ||_2`
+            'translation': :math:`||{R_{t}^{rel}}^T * t_{t}^{rel} - {R_{e}^{rel}}^T * t_{e}^{rel}||_2`
 
-            'rotation': :math:`|| {R_{ref}^{rel}}^T * R_{est}^{rel} - I_3 ||_2`
+            'rotation': :math:`|| {R_{t}^{rel}}^T * R_{e}^{rel} - I_3 ||_2`
 
-            'pose': :math:`|| {T_{ref}^{rel}}^{-1} * T_{est}^{rel} - I_4 ||_2`
+            'pose': :math:`|| {T_{t}^{rel}}^{-1} * T_{e}^{rel} - I_4 ||_2`
 
-            'radian': :math:`\mathrm{Rad}(|| {R_{ref}^{rel}}^T * R_{est}^{rel} ||_2)`
+            'radian': :math:`||\mathrm{Rad}(\mathrm{Euler}({R_{t}^{rel}}^T * R_{e}^{rel}))||_2`
 
-            'degree': :math:`\mathrm{Degree}(|| {R_{ref}^{rel}}^T * R_{est}^{rel} ||_2)`
-            
+            'degree': :math:`||\mathrm{Degree}(\mathrm{Euler}({R_{t}^{rel}}^T * R_{e}^{rel}))||_2`
+
+            Default: 'translation'
+
         diff (``float``, optional):
             The maximum allowed absolute time difference (in seconds)
             for associating poses. Defaults to 0.01.
@@ -571,7 +571,7 @@ def rpe(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
             Defaults to 0.3.
         tpair (``bool``, optional):
             Use true trajectory to compute the pairing indices or not. Defaults to False.
-    
+
     Returns:
         ``dict``: The computed statistics of the RPE (Relative Pose Error).
 
@@ -580,25 +580,25 @@ def rpe(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
         >>> import pypose as pp
         >>> tstamp = torch.tensor([1311868163.8696999550, 1311868163.8731000423,
         ...                        1311868163.8763999939])
-        >>> tpose = pp.SE3([[-0.1357000023, -1.4217000008,  1.4764000177,  0.6452999711,
-        ...                  -0.5497999787,  0.3362999856, -0.4101000130],
-        ...                 [-0.1357000023, -1.4218000174,  1.4764000177,  0.6453999877,
-        ...                  -0.5497000217,  0.3361000121, -0.4101999998],
-        ...                 [-0.1358000040, -1.4219000340,  1.4764000177,  0.6455000043,
-        ...                  -0.5498999953,  0.3357999921, -0.4101000130]])
+        >>> tpose = pp.SE3([[-0.1357000023, -1.4217000008,  1.4764000177,
+        ...                   0.6452999711, -0.5497999787,  0.3362999856, -0.4101000130],
+        ...                 [-0.1357000023, -1.4218000174,  1.4764000177,
+        ...                    0.6453999877, -0.5497000217,  0.3361000121, -0.4101999998],
+        ...                 [-0.1358000040, -1.4219000340,  1.4764000177,
+        ...                   0.6455000043, -0.5498999953,  0.3357999921, -0.4101000130]])
         >>> estamp = torch.tensor([1311868164.3631811142, 1311868164.3990259171,
         ...                        1311868164.4309399128])
-        >>> epose = pp.SE3([[0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000,
-        ...                  0.0000000000, 0.0000000000, 1.0000000000],
-        ...                 [-0.0005019300, 0.0010138600, -0.0020097860, -0.0020761820,
-        ...                  -0.0010706080, -0.0007627490,  0.9999969602],
-        ...                 [0.0004298200, 0.0019603260, -0.0048985220, -0.0043526068,
-        ...                  -0.0036625920, -0.0023494449, 0.9999810457]])
+        >>> epose = pp.SE3([[0.0000000000, 0.0000000000, 0.0000000000,
+        ...                  0.0000000000, 0.0000000000, 0.0000000000, 1.0000000000],
+        ...                 [-0.0005019300, 0.0010138600, -0.0020097860,
+        ...                  -0.0020761820,-0.0010706080, -0.0007627490, 0.9999969602],
+        ...                 [0.0004298200, 0.0019603260, -0.0048985220,
+        ...                 -0.0043526068, -0.0036625920, -0.0023494449, 0.9999810457]])
         >>> pp.metric.rpe(tstamp, tpose, estamp, epose)
-        {'max': 0.0031794263852397337, 'mean': 0.0027428703211684856,
-         'median': 0.002306314257097237, 'min': 0.002306314257097237,
-         'rmse': 0.0027773942456598218, 'sse': 1.542783759164858e-05,
-         'std': 0.0006173835065457773}
+        {'Max': 0.0031794263852397337, 'Mean': 0.0027428703211684856,
+         'Median': 0.002306314257097237, 'Min': 0.002306314257097237,
+         'RMSE': 0.0027773942456598218, 'SSE': 1.542783759164858e-05,
+         'STD': 0.0006173835065457773}
     '''
     ttraj, etraj = StampedSE3(tstamp, tpose), StampedSE3(estamp, epose)
     ttraj, etraj = associate_traj(ttraj, etraj, diff, offset, thresh)
@@ -621,4 +621,4 @@ def rpe(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
     ttraj_rela = StampedSE3(ttraj[sour_id].timestamps, tpose_rela)
     etraj_rela = StampedSE3(etraj[sour_id].timestamps, epose_rela)
 
-    return compute_error(ttraj_rela, etraj_rela, etype, metric_type = 'rpe')
+    return compute_error(ttraj_rela, etraj_rela, etype, mtype = 'rpe')
