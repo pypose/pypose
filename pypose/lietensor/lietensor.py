@@ -1,10 +1,9 @@
-import collections
-import math, numbers
-import torch, warnings
-from torch import nn, linalg
+import torch
+from torch import nn
+from .basics import vec2skew
+from contextlib import contextmanager
 from .operation import broadcast_inputs
-from .basics import cumops_, cummul_, cumprod_
-from .basics import vec2skew, cumops, cummul, cumprod
+import collections, numbers, warnings, importlib
 from torch.utils._pytree import tree_map, tree_flatten
 from .operation import SO3_Log, SE3_Log, RxSO3_Log, Sim3_Log
 from .operation import so3_Exp, se3_Exp, rxso3_Exp, sim3_Exp
@@ -15,6 +14,7 @@ from .operation import SO3_Act4, SE3_Act4, RxSO3_Act4, Sim3_Act4
 from .operation import SO3_AdjXa, SE3_AdjXa, RxSO3_AdjXa, Sim3_AdjXa
 from .operation import SO3_AdjTXa, SE3_AdjTXa, RxSO3_AdjTXa, Sim3_AdjTXa
 from .operation import so3_Jl_inv, se3_Jl_inv, rxso3_Jl_inv, sim3_Jl_inv
+from ..basics import pm, cumops_, cummul_, cumprod_, cumops, cummul, cumprod
 from torch.nn.modules.utils import _single, _pair, _triple, _quadruple, _ntuple
 
 
@@ -71,7 +71,7 @@ class LieType:
 
     def Inv(self, x):
         if self.on_manifold:
-            return - x
+            return LieTensor(-x, ltype=x.ltype)
         raise NotImplementedError("Instance has no Inv attribute.")
 
     def Act(self, X, p):
@@ -156,8 +156,8 @@ class LieType:
         return cumops(X, dim, ops)
 
     @classmethod
-    def cummul(self, X, dim):
-        return cummul(X, dim)
+    def cummul(self, X, dim, left = True):
+        return cummul(X, dim, left)
 
     @classmethod
     def cumprod(self, X, dim, left = True):
@@ -168,12 +168,12 @@ class LieType:
         return cumops_(X, dim, ops)
 
     @classmethod
-    def cummul_(self, X, dim):
-        return cummul_(X, dim)
+    def cummul_(self, X, dim, left = True):
+        return cummul_(X, dim, left)
 
     @classmethod
-    def cumprod_(self, X, dim):
-        return cumprod_(X, dim)
+    def cumprod_(self, X, dim, left = True):
+        return cumprod_(X, dim, left)
 
 
 class SO3Type(LieType):
@@ -184,7 +184,7 @@ class SO3Type(LieType):
         X = X.tensor() if hasattr(X, 'ltype') else X
         x = SO3_Log.apply(X)
         return LieTensor(x, ltype=so3_type)
-    
+
     def Act(self, X, p):
         assert not self.on_manifold and isinstance(p, torch.Tensor)
         assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
@@ -214,12 +214,12 @@ class SO3Type(LieType):
         if self.on_manifold:
             return LieTensor(torch.mul(X, Y), ltype=SO3_type)
         raise NotImplementedError('Invalid __mul__ operation')
-    
+
     def Inv(self, X):
         X = X.tensor() if hasattr(X, 'ltype') else X
         out = SO3_Inv.apply(X)
         return LieTensor(out, ltype=SO3_type)
-    
+
     def Adj(self, X, a):
         X = X.tensor() if hasattr(X, 'ltype') else X
         a = a.tensor() if hasattr(a, 'ltype') else a
@@ -740,7 +740,8 @@ SO3_type, so3_type = SO3Type(), so3Type()
 SE3_type, se3_type = SE3Type(), se3Type()
 Sim3_type, sim3_type = Sim3Type(), sim3Type()
 RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
-
+liegroup = [SO3_type, SE3_type, Sim3_type, RxSO3_type]
+liealgebra = [so3_type, se3_type, sim3_type, rxso3_type]
 
 class LieTensor(torch.Tensor):
     r""" A sub-class of :obj:`torch.Tensor` to represent Lie Algebra and Lie Group.
@@ -906,10 +907,10 @@ class LieTensor(torch.Tensor):
     def __torch_function__(cls, func, types, args=(), kwargs={}):
         ltypes = (torch.Tensor if t is LieTensor or Parameter else t for t in types)
         data = torch.Tensor.__torch_function__(func, ltypes, args, kwargs)
-        if data is not None and func.__name__ in HANDLED_FUNCTIONS:
+        if data is not None and hasattr(func, '__name__') and func.__name__ in HANDLED_FUNCTIONS:
             args, spec = tree_flatten(args)
             ltype = [arg.ltype for arg in args if isinstance(arg, LieTensor)][0]
-            def warp(t):
+            def wrap(t):
                 if isinstance(t, torch.Tensor) and not isinstance(t, cls):
                     lt = torch.Tensor.as_subclass(t, LieTensor)
                     lt.ltype = ltype
@@ -919,7 +920,7 @@ class LieTensor(torch.Tensor):
                             'go to {}'.format(func, link))
                     return lt
                 return t
-            return tree_map(warp, data)
+            return tree_map(wrap, data)
         return data
 
     @property
@@ -1019,6 +1020,12 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.Mul(self, other)
 
+    def mul(self, other):
+        r'''
+        See :meth:`pypose.mul`
+        '''
+        return self.ltype.Mul(self, other)
+
     def __matmul__(self, other):
         r'''
         See :meth:`pypose.matmul`
@@ -1108,8 +1115,8 @@ class LieTensor(torch.Tensor):
         roll2 = torch.zeros_like(t0)
         flag = t2.abs() < 1. - eps
         yaw1 = torch.atan2(t3, t4)
-        yaw2 = -2 * torch.sign(t2) * torch.atan2(x, w)
-        
+        yaw2 = -2 * pm(t2) * torch.atan2(x, w)
+
         roll = torch.where(flag, roll1, roll2)
         pitch = torch.asin(t2.clamp(-1, 1))
         yaw = torch.where(flag, yaw1, yaw2)
@@ -1146,11 +1153,11 @@ class LieTensor(torch.Tensor):
         """
         return self.ltype.cumops(self, dim, ops)
 
-    def cummul(self, dim):
+    def cummul(self, dim, left = True):
         r"""
         See :func:`pypose.cummul`
         """
-        return self.ltype.cummul(self, dim)
+        return self.ltype.cummul(self, dim, left)
 
     def cumprod(self, dim, left = True):
         r"""
@@ -1164,17 +1171,17 @@ class LieTensor(torch.Tensor):
         """
         return self.ltype.cumops_(self, dim, ops)
 
-    def cummul_(self, dim):
+    def cummul_(self, dim, left = True):
         r"""
         Inplace version of :func:`pypose.cummul`
         """
-        return self.ltype.cummul_(self, dim)
+        return self.ltype.cummul_(self, dim, left)
 
-    def cumprod_(self, dim):
+    def cumprod_(self, dim, left = True):
         r"""
         Inplace version of :func:`pypose.cumprod`
         """
-        return self.ltype.cumprod_(self, dim)
+        return self.ltype.cumprod_(self, dim, left)
 
 
 class Parameter(LieTensor, nn.Parameter):
@@ -1215,3 +1222,36 @@ class Parameter(LieTensor, nn.Parameter):
             result = type(self)(self.clone(memory_format=torch.preserve_format))
             memo[id(self)] = result
             return result
+
+@contextmanager
+def retain_ltype():
+    # save the original PyTorch functions
+    TO_BE_WRAPPED = {
+        torch.autograd.forward_ad.make_dual,
+        torch._functorch.eager_transforms._wrap_tensor_for_grad,
+        torch._functorch.vmap._add_batch_dim,
+    }
+    torch._functorch.vmap._add_batch_dim.__module__ = 'torch._functorch.vmap'
+
+    def wrap_function(func):
+        def wrapper(*args, **kwargs):
+            ltype = args[0].ltype if isinstance(args[0], LieTensor) else None
+            res = func(*args, **kwargs)
+            if ltype is not None:
+                res = torch.Tensor.as_subclass(res, LieTensor)
+                res.ltype = ltype
+            return res
+        return wrapper
+
+    try:
+        # swap the original PyTorch functions with the wrapper
+        for func in TO_BE_WRAPPED:
+            module, name = func.__module__, func.__name__
+            module = importlib.import_module(module)
+            setattr(module, name, wrap_function(func))
+        yield
+    finally:
+        for func in TO_BE_WRAPPED:
+            module, name = func.__module__, func.__name__
+            module = importlib.import_module(module)
+            setattr(module, name, func)

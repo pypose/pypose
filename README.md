@@ -18,8 +18,11 @@ Deep learning has had remarkable success in robotic perception, but its data-cen
 
 ##### [Modules](https://pypose.org/docs/main/modules/)
 
-- [`System`](https://pypose.org/docs/main/generated/pypose.module.System)
-- [`IMUPreintegration`](https://pypose.org/docs/main/generated/pypose.module.IMUPreintegrator/)
+- System: [`LTI`](https://pypose.org/docs/main/generated/pypose.module.LTI), [`LTV`](https://pypose.org/docs/main/generated/pypose.module.LTV), [`NLS`](https://pypose.org/docs/main/generated/pypose.module.NLS)
+- Filter: [`EKF`](https://pypose.org/docs/main/generated/pypose.module.EKF/), [`UKF`](https://pypose.org/docs/main/generated/pypose.module.UKF/), [`PF`](https://pypose.org/docs/main/generated/pypose.module.PF/)
+- PnP Solver: [`EPnP`](https://pypose.org/docs/main/generated/pypose.module.EPnP/)
+- Linear Quadratic Regulator: [`LQR`](https://pypose.org/docs/main/generated/pypose.module.LQR/)
+- IMU Preintegration: [`IMUPreintegrator`](https://pypose.org/docs/main/generated/pypose.module.IMUPreintegrator/)
 - ......
 
 ##### [Second-order Optimizers](https://pypose.org/docs/main/optim/)
@@ -28,7 +31,7 @@ Deep learning has had remarkable success in robotic perception, but its data-cen
 - [`LevenbergMarquardt`](https://pypose.org/docs/main/generated/pypose.optim.LevenbergMarquardt/)
 - ......
 
-Want more features? [Create an issue here](https://github.com/pypose/pypose/issues) to requst new features.
+Want more features? [Create an issue here](https://github.com/pypose/pypose/issues) to request new features.
 
 ##### PyPose is highly efficient and supports parallel computing for Jacobian of Lie group and Lie algebra. See following comparison.
 
@@ -51,10 +54,10 @@ pip install pypose
 
 1. Requirement:
 
-On Ubuntu, MasOS, or Windows, install [PyTorch](https://pytorch.org/), then run:
+On Ubuntu, macOS, or Windows, install [PyTorch](https://pytorch.org/), then run:
 
 ```bash
-pip install -r requirements/main.txt
+pip install -r requirements/runtime.txt
 ```
 
 2. Install locally:
@@ -108,10 +111,11 @@ pytest
 2. This example shows how to estimate batched inverse of transform by a second-order optimizer. Two usage options for a `scheduler` are provided, each of which can work independently.
 
 ```python
+>>> from torch import nn
 >>> import torch, pypose as pp
->>> from pp.optim import LM
->>> from pp.optim.strategy import Constant
->>> from pp.optim.scheduler import StopOnPlateau
+>>> from pypose.optim import LM
+>>> from pypose.optim.strategy import Constant
+>>> from pypose.optim.scheduler import StopOnPlateau
 
 >>> class InvNet(nn.Module):
 
@@ -135,7 +139,7 @@ pytest
 >>> scheduler.optimize(input=input)
 
 >>> # 2nd option, step optimization
->>> while scheduler.continual:
+>>> while scheduler.continual():
         loss = optimizer.step(input)
         scheduler.step(loss)
 
@@ -149,10 +153,21 @@ For more usage, see [Documentation](https://pypose.org/docs). For more applicati
 If you use PyPose, please cite the paper below. You may also [download it here](https://arxiv.org/abs/2209.15428).
 
 ```bibtex
-@article{wang2022pypose,
-  title   = {{PyPose}: A Library for Robot Learning with Physics-based Optimization},
-  author  = {Wang, Chen and Gao, Dasong and Xu, Kuan and Geng, Junyi and Hu, Yaoyu and Qiu, Yuheng and Li, Bowen and Yang, Fan and Moon, Brady and Pandey, Abhinav and Aryan and Xu, Jiahe and Wu, Tianhao and He, Haonan and Huang, Daning and Ren, Zhongqiang and Zhao, Shibo and Fu, Taimeng and Reddy, Pranay and Lin, Xiao and Wang, Wenshan and Shi, Jingnan and Talak, Rajat and Cao, Kun and Du, Yi and Wang, Han and Yu, Huai and Wang, Shanzhao and Chen, Siyu and Kashyap, Ananth  and Bandaru, Rohan and Dantu, Karthik and Wu, Jiajun and Xie, Lihua and Carlone, Luca and Hutter, Marco and Scherer, Sebastian},
-  journal = {arXiv preprint arXiv:2209.15428},
-  year    = {2022}
+@inproceedings{wang2023pypose,
+  title = {{PyPose}: A Library for Robot Learning with Physics-based Optimization},
+  author = {Wang, Chen and Gao, Dasong and Xu, Kuan and Geng, Junyi and Hu, Yaoyu and Qiu, Yuheng and Li, Bowen and Yang, Fan and Moon, Brady and Pandey, Abhinav and Aryan and Xu, Jiahe and Wu, Tianhao and He, Haonan and Huang, Daning and Ren, Zhongqiang and Zhao, Shibo and Fu, Taimeng and Reddy, Pranay and Lin, Xiao and Wang, Wenshan and Shi, Jingnan and Talak, Rajat and Cao, Kun and Du, Yi and Wang, Han and Yu, Huai and Wang, Shanzhao and Chen, Siyu and Kashyap, Ananth  and Bandaru, Rohan and Dantu, Karthik and Wu, Jiajun and Xie, Lihua and Carlone, Luca and Hutter, Marco and Scherer, Sebastian},
+  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2023}
+}
+```
+
+More papers describing PyPose:
+
+```bibtex
+@inproceedings{zhan2023pypose,
+  title = {{PyPose} v0.6: The Imperative Programming Interface for Robotics},
+  author = {Zitong Zhan and Xiangfu Li and Qihang Li and Haonan He and Abhinav Pandey and Haitao Xiao and Yangmengfei Xu and Xiangyu Chen and Kuan Xu and Kun Cao and Zhipeng Zhao and Zihan Wang and Huan Xu and Zihang Fang and Yutian Chen and Wentao Wang and Xu Fang and Yi Du and Tianhao Wu and Xiao Lin and Yuheng Qiu and Fan Yang and Jingnan Shi and Shaoshu Su and Yiren Lu and Taimeng Fu and Karthik Dantu and Jiajun Wu and Lihua Xie and Marco Hutter and Luca Carlone and Sebastian Scherer and Daning Huang and Yaoyu Hu and Junyi Geng and Chen Wang},
+  year = {2023},
+  booktitle = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) Workshop},
 }
 ```
