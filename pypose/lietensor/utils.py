@@ -945,6 +945,34 @@ def randn_RxSO3(*lsize, sigma=1.0, **kwargs):
     return RxSO3_type.randn(*lsize, sigma=sigma, **kwargs)
 
 
+def randn_so2(*lsize, sigma=1.0, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return so2_type.randn(*lsize, sigma=sigma, **kwargs)
+
+
+def randn_SO2(*lsize, sigma=1.0, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return SO2_type.randn(*lsize, sigma=sigma, **kwargs)
+
+
+def randn_se2(*lsize, sigma=1.0, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return se2_type.randn(*lsize, sigma=sigma, **kwargs)
+
+
+def randn_SE2(*lsize, sigma=1.0, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return SE2_type.randn(*lsize, sigma=sigma, **kwargs)
+
+
 def identity_like(liegroup, **kwargs):
     r'''
      Returns identity LieTensor with the same :obj:`lsize` and :obj:`ltype` as the given LieTensor.
