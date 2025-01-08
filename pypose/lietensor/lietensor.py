@@ -18,23 +18,74 @@ from ..basics import pm, cumops_, cummul_, cumprod_, cumops, cummul, cumprod
 from torch.nn.modules.utils import _single, _pair, _triple, _quadruple, _ntuple
 
 
-HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'double',
-                     'to', 'detach', 'view', 'view_as', 'squeeze', 'unsqueeze', 'cat',
-                     'stack', 'split', 'hsplit', 'dsplit', 'vsplit', 'tensor_split',
-                     'chunk', 'concat', 'column_stack', 'dstack', 'vstack', 'hstack',
-                     'index_select', 'masked_select', 'movedim', 'moveaxis', 'narrow',
-                     'permute', 'reshape', 'row_stack', 'scatter', 'scatter_add', 'clone',
-                     'swapaxes', 'swapdims', 'take', 'take_along_dim', 'tile', 'copy',
-                     'transpose', 'unbind', 'gather', 'repeat', 'expand', 'expand_as',
-                     'index_select', 'masked_select', 'index_copy', 'index_copy_',
-                     'select', 'select_scatter', 'index_put','index_put_', 'copy_']
+HANDLED_FUNCTIONS = [
+    "__getitem__",
+    "__setitem__",
+    "cpu",
+    "cuda",
+    "float",
+    "double",
+    "to",
+    "detach",
+    "view",
+    "view_as",
+    "squeeze",
+    "unsqueeze",
+    "cat",
+    "stack",
+    "split",
+    "hsplit",
+    "dsplit",
+    "vsplit",
+    "tensor_split",
+    "chunk",
+    "concat",
+    "column_stack",
+    "dstack",
+    "vstack",
+    "hstack",
+    "index_select",
+    "masked_select",
+    "movedim",
+    "moveaxis",
+    "narrow",
+    "permute",
+    "reshape",
+    "row_stack",
+    "scatter",
+    "scatter_add",
+    "clone",
+    "swapaxes",
+    "swapdims",
+    "take",
+    "take_along_dim",
+    "tile",
+    "copy",
+    "transpose",
+    "unbind",
+    "gather",
+    "repeat",
+    "expand",
+    "expand_as",
+    "index_select",
+    "masked_select",
+    "index_copy",
+    "index_copy_",
+    "select",
+    "select_scatter",
+    "index_put",
+    "index_put_",
+    "copy_",
+]
+
 
 class LieType:
-    '''LieTensor Type Base Class'''
+    """LieTensor Type Base Class"""
+
     def __init__(self, dimension, embedding, manifold):
-        self._dimension = torch.Size([dimension]) # Data dimension
-        self._embedding = torch.Size([embedding]) # Embedding dimension
-        self._manifold  = torch.Size([manifold])  # Manifold dimension
+        self._dimension = torch.Size([dimension])  # Data dimension
+        self._embedding = torch.Size([embedding])  # Embedding dimension
+        self._manifold = torch.Size([manifold])  # Manifold dimension
 
     @property
     def dimension(self):
@@ -56,7 +107,7 @@ class LieType:
         if self.on_manifold:
             other1 = torch.Tensor.as_subclass(input, torch.Tensor)
             other2 = torch.Tensor.as_subclass(other, torch.Tensor)
-            return input.copy_(other1 + other2[..., :self.manifold[0]])
+            return input.copy_(other1 + other2[..., : self.manifold[0]])
         raise NotImplementedError("Instance has no add_ attribute.")
 
     def Log(self, X):
@@ -75,7 +126,7 @@ class LieType:
         raise NotImplementedError("Instance has no Inv attribute.")
 
     def Act(self, X, p):
-        """ action on a points tensor(*, 3[4]) (homogeneous)"""
+        """action on a points tensor(*, 3[4]) (homogeneous)"""
         if not self.on_manifold:
             raise AttributeError("Lie Group has no Act attribute")
         raise NotImplementedError("Instance has no Act attribute.")
@@ -91,13 +142,13 @@ class LieType:
         return a.Exp() * X
 
     def Adj(self, X, a):
-        ''' X * Exp(a) = Exp(Adj) * X '''
+        """X * Exp(a) = Exp(Adj) * X"""
         if not self.on_manifold:
             raise AttributeError("Lie Group has no Adj attribute")
         raise NotImplementedError("Instance has no Adj attribute.")
 
     def AdjT(self, X, a):
-        ''' Exp(a) * X = X * Exp(AdjT) '''
+        """Exp(a) * X = X * Exp(AdjT)"""
         if not self.on_manifold:
             raise AttributeError("Lie Group has no AdjT attribute")
         raise NotImplementedError("Instance has no AdjT attribute.")
@@ -108,24 +159,32 @@ class LieType:
         raise NotImplementedError("Instance has no Jinvp attribute.")
 
     def matrix(self, input):
-        """ To 4x4 matrix """
+        """To 4x4 matrix"""
         X = input.Exp() if self.on_manifold else input
         I = torch.eye(4, dtype=X.dtype, device=X.device)
         I = I.view([1] * (X.dim() - 1) + [4, 4])
-        return X.unsqueeze(-2).Act(I).transpose(-1,-2)
+        return X.unsqueeze(-2).Act(I).transpose(-1, -2)
 
     def rotation(self, input):
         raise NotImplementedError("Rotation is not implemented for the instance.")
 
     def translation(self, input):
         warnings.warn("Instance has no translation. Zero vector(s) is returned.")
-        return torch.zeros(input.lshape + (3,), dtype=input.dtype, device=input.device,
-            requires_grad=input.requires_grad)
+        return torch.zeros(
+            input.lshape + (3,),
+            dtype=input.dtype,
+            device=input.device,
+            requires_grad=input.requires_grad,
+        )
 
     def scale(self, input):
         warnings.warn("Instance has no scale. Scalar one(s) is returned.")
-        return torch.ones(input.lshape + (1,), dtype=input.dtype, device=input.device,
-            requires_grad=input.requires_grad)
+        return torch.ones(
+            input.lshape + (1,),
+            dtype=input.dtype,
+            device=input.device,
+            requires_grad=input.requires_grad,
+        )
 
     @classmethod
     def to_tuple(cls, input):
@@ -156,11 +215,11 @@ class LieType:
         return cumops(X, dim, ops)
 
     @classmethod
-    def cummul(self, X, dim, left = True):
+    def cummul(self, X, dim, left=True):
         return cummul(X, dim, left)
 
     @classmethod
-    def cumprod(self, X, dim, left = True):
+    def cumprod(self, X, dim, left=True):
         return cumprod(X, dim, left)
 
     @classmethod
@@ -168,11 +227,11 @@ class LieType:
         return cumops_(X, dim, ops)
 
     @classmethod
-    def cummul_(self, X, dim, left = True):
+    def cummul_(self, X, dim, left=True):
         return cummul_(X, dim, left)
 
     @classmethod
-    def cumprod_(self, X, dim, left = True):
+    def cumprod_(self, X, dim, left=True):
         return cumprod_(X, dim, left)
 
 
@@ -181,16 +240,16 @@ class SO3Type(LieType):
         super().__init__(4, 4, 3)
 
     def Log(self, X):
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        X = X.tensor() if hasattr(X, "ltype") else X
         x = SO3_Log.apply(X)
         return LieTensor(x, ltype=so3_type)
 
     def Act(self, X, p):
         assert not self.on_manifold and isinstance(p, torch.Tensor)
-        assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        assert p.shape[-1] == 3 or p.shape[-1] == 4, "Invalid Tensor Dimension"
+        X = X.tensor() if hasattr(X, "ltype") else X
         input, out_shape = broadcast_inputs(X, p)
-        if p.shape[-1]==3:
+        if p.shape[-1] == 3:
             out = SO3_Act.apply(*input)
         else:
             out = SO3_Act4.apply(*input)
@@ -199,9 +258,13 @@ class SO3Type(LieType):
 
     def Mul(self, X, Y):
         # Transform on transform
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        if not self.on_manifold and isinstance(Y, LieTensor) and not Y.ltype.on_manifold:
-            Y = Y.tensor() if hasattr(Y, 'ltype') else Y
+        X = X.tensor() if hasattr(X, "ltype") else X
+        if (
+            not self.on_manifold
+            and isinstance(Y, LieTensor)
+            and not Y.ltype.on_manifold
+        ):
+            Y = Y.tensor() if hasattr(Y, "ltype") else Y
             input, out_shape = broadcast_inputs(X, Y)
             out = SO3_Mul.apply(*input)
             dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -213,16 +276,16 @@ class SO3Type(LieType):
         # (scalar or tensor) * manifold
         if self.on_manifold:
             return LieTensor(torch.mul(X, Y), ltype=SO3_type)
-        raise NotImplementedError('Invalid __mul__ operation')
+        raise NotImplementedError("Invalid __mul__ operation")
 
     def Inv(self, X):
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        X = X.tensor() if hasattr(X, "ltype") else X
         out = SO3_Inv.apply(X)
         return LieTensor(out, ltype=SO3_type)
 
     def Adj(self, X, a):
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        a = a.tensor() if hasattr(a, 'ltype') else a
+        X = X.tensor() if hasattr(X, "ltype") else X
+        a = a.tensor() if hasattr(a, "ltype") else a
         input, out_shape = broadcast_inputs(X, a)
         out = SO3_AdjXa.apply(*input)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -230,8 +293,8 @@ class SO3Type(LieType):
         return LieTensor(out, ltype=so3_type)
 
     def AdjT(self, X, a):
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        a = a.tensor() if hasattr(a, 'ltype') else a
+        X = X.tensor() if hasattr(X, "ltype") else X
+        a = a.tensor() if hasattr(a, "ltype") else a
         input, out_shape = broadcast_inputs(X, a)
         out = SO3_AdjTXa.apply(*input)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -239,8 +302,8 @@ class SO3Type(LieType):
         return LieTensor(out, ltype=so3_type)
 
     def Jinvp(self, X, a):
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        a = a.tensor() if hasattr(a, 'ltype') else a
+        X = X.tensor() if hasattr(X, "ltype") else X
+        a = a.tensor() if hasattr(a, "ltype") else a
         (X, a), out_shape = broadcast_inputs(X, a)
         out = (so3_Jl_inv(SO3_Log.apply(X)) @ a.unsqueeze(-1)).squeeze(-1)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -249,8 +312,8 @@ class SO3Type(LieType):
 
     @classmethod
     def identity(cls, *size, **kwargs):
-        data = torch.tensor([0., 0., 0., 1.], **kwargs)
-        return LieTensor(data.repeat(size+(1,)), ltype=SO3_type)
+        data = torch.tensor([0.0, 0.0, 0.0, 1.0], **kwargs)
+        return LieTensor(data.repeat(size + (1,)), ltype=SO3_type)
 
     def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         data = so3_type.Exp(so3_type.randn(*size, sigma=sigma, **kwargs)).detach()
@@ -261,10 +324,10 @@ class SO3Type(LieType):
         return input.copy_(LieTensor(other[..., :3], ltype=so3_type).Exp() * input)
 
     def matrix(self, input):
-        """ To 3x3 matrix """
+        """To 3x3 matrix"""
         I = torch.eye(3, dtype=input.dtype, device=input.device)
         I = I.view([1] * (input.dim() - 1) + [3, 3])
-        return input.unsqueeze(-2).Act(I).transpose(-1,-2)
+        return input.unsqueeze(-2).Act(I).transpose(-1, -2)
 
     def rotation(self, input):
         return input
@@ -286,35 +349,39 @@ class so3Type(LieType):
         super().__init__(3, 4, 3)
 
     def Exp(self, x):
-        x = x.tensor() if hasattr(x, 'ltype') else x
+        x = x.tensor() if hasattr(x, "ltype") else x
         X = so3_Exp.apply(x)
         return LieTensor(X, ltype=SO3_type)
 
     def Mul(self, X, Y):
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        X = X.tensor() if hasattr(X, "ltype") else X
         # (scalar or tensor) * manifold
         if self.on_manifold:
             return LieTensor(torch.mul(X, Y), ltype=so3_type)
-        raise NotImplementedError('Invalid __mul__ operation')
+        raise NotImplementedError("Invalid __mul__ operation")
 
     @classmethod
     def identity(cls, *size, **kwargs):
         return SO3_type.Log(SO3_type.identity(*size, **kwargs))
 
     def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
-        assert isinstance(sigma, numbers.Number), 'Only accepts sigma as a single number'
+        assert isinstance(
+            sigma, numbers.Number
+        ), "Only accepts sigma as a single number"
         size = self.to_tuple(size)
         data = torch.randn(*(size + torch.Size([3])), **kwargs)
         dist = data.norm(dim=-1, keepdim=True)
         theta = sigma * torch.randn(*(size + torch.Size([1])), **kwargs)
-        return LieTensor(data / dist * theta, ltype=so3_type).requires_grad_(requires_grad)
+        return LieTensor(data / dist * theta, ltype=so3_type).requires_grad_(
+            requires_grad
+        )
 
     def matrix(self, input):
-        """ To 3x3 matrix """
+        """To 3x3 matrix"""
         X = input.Exp()
         I = torch.eye(3, dtype=X.dtype, device=X.device)
         I = I.view([1] * (X.dim() - 1) + [3, 3])
-        return X.unsqueeze(-2).Act(I).transpose(-1,-2)
+        return X.unsqueeze(-2).Act(I).transpose(-1, -2)
 
     def rotation(self, input):
         return input.Exp().rotation()
@@ -325,9 +392,13 @@ class so3Type(LieType):
         """
         K = vec2skew(x)
         theta = torch.linalg.norm(x, dim=-1, keepdim=True).unsqueeze(-1)
-        I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.lshape+(3, 3))
-        Jr = I - (1-theta.cos())/theta**2 * K + (theta - theta.sin())/theta**3 * K@K
-        return torch.where(theta>torch.finfo(theta.dtype).eps, Jr, I)
+        I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.lshape + (3, 3))
+        Jr = (
+            I
+            - (1 - theta.cos()) / theta**2 * K
+            + (theta - theta.sin()) / theta**3 * K @ K
+        )
+        return torch.where(theta > torch.finfo(theta.dtype).eps, Jr, I)
 
 
 class SE3Type(LieType):
@@ -335,16 +406,16 @@ class SE3Type(LieType):
         super().__init__(7, 7, 6)
 
     def Log(self, X):
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        X = X.tensor() if hasattr(X, "ltype") else X
         x = SE3_Log.apply(X)
         return LieTensor(x, ltype=se3_type)
 
     def Act(self, X, p):
         assert not self.on_manifold and isinstance(p, torch.Tensor)
-        assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        assert p.shape[-1] == 3 or p.shape[-1] == 4, "Invalid Tensor Dimension"
+        X = X.tensor() if hasattr(X, "ltype") else X
         input, out_shape = broadcast_inputs(X, p)
-        if p.shape[-1]==3:
+        if p.shape[-1] == 3:
             out = SE3_Act.apply(*input)
         else:
             out = SE3_Act4.apply(*input)
@@ -353,9 +424,13 @@ class SE3Type(LieType):
 
     def Mul(self, X, Y):
         # Transform on transform
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        if not self.on_manifold and isinstance(Y, LieTensor) and not Y.ltype.on_manifold:
-            Y = Y.tensor() if hasattr(Y, 'ltype') else Y
+        X = X.tensor() if hasattr(X, "ltype") else X
+        if (
+            not self.on_manifold
+            and isinstance(Y, LieTensor)
+            and not Y.ltype.on_manifold
+        ):
+            Y = Y.tensor() if hasattr(Y, "ltype") else Y
             input, out_shape = broadcast_inputs(X, Y)
             out = SE3_Mul.apply(*input)
             dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -367,10 +442,10 @@ class SE3Type(LieType):
         # (scalar or tensor) * manifold
         if self.on_manifold:
             return LieTensor(torch.mul(X, Y), ltype=SE3_type)
-        raise NotImplementedError('Invalid __mul__ operation')
+        raise NotImplementedError("Invalid __mul__ operation")
 
     def Inv(self, X):
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        X = X.tensor() if hasattr(X, "ltype") else X
         out = SE3_Inv.apply(X)
         return LieTensor(out, ltype=SE3_type)
 
@@ -381,8 +456,8 @@ class SE3Type(LieType):
         return input.tensor()[..., 0:3]
 
     def Adj(self, X, a):
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        a = a.tensor() if hasattr(a, 'ltype') else a
+        X = X.tensor() if hasattr(X, "ltype") else X
+        a = a.tensor() if hasattr(a, "ltype") else a
         input, out_shape = broadcast_inputs(X, a)
         out = SE3_AdjXa.apply(*input)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -390,8 +465,8 @@ class SE3Type(LieType):
         return LieTensor(out, ltype=se3_type)
 
     def AdjT(self, X, a):
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        a = a.tensor() if hasattr(a, 'ltype') else a
+        X = X.tensor() if hasattr(X, "ltype") else X
+        a = a.tensor() if hasattr(a, "ltype") else a
         input, out_shape = broadcast_inputs(X, a)
         out = SE3_AdjTXa.apply(*input)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -399,8 +474,8 @@ class SE3Type(LieType):
         return LieTensor(out, ltype=se3_type)
 
     def Jinvp(self, X, a):
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        a = a.tensor() if hasattr(a, 'ltype') else a
+        X = X.tensor() if hasattr(X, "ltype") else X
+        a = a.tensor() if hasattr(a, "ltype") else a
         (X, a), out_shape = broadcast_inputs(X, a)
         out = (se3_Jl_inv(SE3_Log.apply(X)) @ a.unsqueeze(-1)).squeeze(-1)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -409,8 +484,8 @@ class SE3Type(LieType):
 
     @classmethod
     def identity(cls, *size, **kwargs):
-        data = torch.tensor([0., 0., 0., 0., 0., 0., 1.], **kwargs)
-        return LieTensor(data.repeat(size+(1,)), ltype=SE3_type)
+        data = torch.tensor([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], **kwargs)
+        return LieTensor(data.repeat(size + (1,)), ltype=SE3_type)
 
     def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         data = se3_type.Exp(se3_type.randn(*size, sigma=sigma, **kwargs)).detach()
@@ -426,16 +501,16 @@ class se3Type(LieType):
         super().__init__(6, 7, 6)
 
     def Exp(self, x):
-        x = x.tensor() if hasattr(x, 'ltype') else x
+        x = x.tensor() if hasattr(x, "ltype") else x
         X = se3_Exp.apply(x)
         return LieTensor(X, ltype=SE3_type)
 
     def Mul(self, X, Y):
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        X = X.tensor() if hasattr(X, "ltype") else X
         # (scalar or tensor) * manifold
         if self.on_manifold:
             return LieTensor(torch.mul(X, Y), ltype=se3_type)
-        raise NotImplementedError('Invalid __mul__ operation')
+        raise NotImplementedError("Invalid __mul__ operation")
 
     def rotation(self, input):
         return input.Exp().rotation()
@@ -451,12 +526,12 @@ class se3Type(LieType):
         #  convert different types of inputs to SE3 sigma
         if not isinstance(sigma, collections.abc.Iterable):
             sigma = _quadruple(sigma)
-        elif len(sigma)==2:
+        elif len(sigma) == 2:
             rotation_sigma = _single(sigma[-1])
             translation_sigma = _triple(sigma[0])
             sigma = translation_sigma + rotation_sigma
         else:
-            assert len(sigma)==4, 'Only accepts a tuple of sigma in size 1, 2, or 4.'
+            assert len(sigma) == 4, "Only accepts a tuple of sigma in size 1, 2, or 4."
         size = self.to_tuple(size)
         rotation = so3_type.randn(*size, sigma=sigma[-1], **kwargs).detach().tensor()
         sigma = torch.tensor([sigma[0], sigma[1], sigma[2]], **kwargs)
@@ -470,16 +545,16 @@ class Sim3Type(LieType):
         super().__init__(8, 8, 7)
 
     def Log(self, X):
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        X = X.tensor() if hasattr(X, "ltype") else X
         x = Sim3_Log.apply(X)
         return LieTensor(x, ltype=sim3_type)
 
     def Act(self, X, p):
         assert not self.on_manifold and isinstance(p, torch.Tensor)
-        assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        assert p.shape[-1] == 3 or p.shape[-1] == 4, "Invalid Tensor Dimension"
+        X = X.tensor() if hasattr(X, "ltype") else X
         input, out_shape = broadcast_inputs(X, p)
-        if p.shape[-1]==3:
+        if p.shape[-1] == 3:
             out = Sim3_Act.apply(*input)
         else:
             out = Sim3_Act4.apply(*input)
@@ -488,9 +563,13 @@ class Sim3Type(LieType):
 
     def Mul(self, X, Y):
         # Transform on transform
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        if not self.on_manifold and isinstance(Y, LieTensor) and not Y.ltype.on_manifold:
-            Y = Y.tensor() if hasattr(Y, 'ltype') else Y
+        X = X.tensor() if hasattr(X, "ltype") else X
+        if (
+            not self.on_manifold
+            and isinstance(Y, LieTensor)
+            and not Y.ltype.on_manifold
+        ):
+            Y = Y.tensor() if hasattr(Y, "ltype") else Y
             input, out_shape = broadcast_inputs(X, Y)
             out = Sim3_Mul.apply(*input)
             dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -502,16 +581,16 @@ class Sim3Type(LieType):
         # (scalar or tensor) * manifold
         if self.on_manifold:
             return LieTensor(torch.mul(X, Y), ltype=Sim3_type)
-        raise NotImplementedError('Invalid __mul__ operation')
+        raise NotImplementedError("Invalid __mul__ operation")
 
     def Inv(self, X):
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        X = X.tensor() if hasattr(X, "ltype") else X
         out = Sim3_Inv.apply(X)
         return LieTensor(out, ltype=Sim3_type)
 
     def Adj(self, X, a):
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        a = a.tensor() if hasattr(a, 'ltype') else a
+        X = X.tensor() if hasattr(X, "ltype") else X
+        a = a.tensor() if hasattr(a, "ltype") else a
         input, out_shape = broadcast_inputs(X, a)
         out = Sim3_AdjXa.apply(*input)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -519,8 +598,8 @@ class Sim3Type(LieType):
         return LieTensor(out, ltype=sim3_type)
 
     def AdjT(self, X, a):
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        a = a.tensor() if hasattr(a, 'ltype') else a
+        X = X.tensor() if hasattr(X, "ltype") else X
+        a = a.tensor() if hasattr(a, "ltype") else a
         input, out_shape = broadcast_inputs(X, a)
         out = Sim3_AdjTXa.apply(*input)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -528,8 +607,8 @@ class Sim3Type(LieType):
         return LieTensor(out, ltype=sim3_type)
 
     def Jinvp(self, X, a):
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        a = a.tensor() if hasattr(a, 'ltype') else a
+        X = X.tensor() if hasattr(X, "ltype") else X
+        a = a.tensor() if hasattr(a, "ltype") else a
         (X, a), out_shape = broadcast_inputs(X, a)
         out = (sim3_Jl_inv(Sim3_Log.apply(X)) @ a.unsqueeze(-1)).squeeze(-1)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -547,8 +626,8 @@ class Sim3Type(LieType):
 
     @classmethod
     def identity(cls, *size, **kwargs):
-        data = torch.tensor([0., 0., 0., 0., 0., 0., 1., 1.], **kwargs)
-        return LieTensor(data.repeat(size+(1,)), ltype=Sim3_type)
+        data = torch.tensor([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0], **kwargs)
+        return LieTensor(data.repeat(size + (1,)), ltype=Sim3_type)
 
     def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         data = sim3_type.Exp(sim3_type.randn(*size, sigma=sigma, **kwargs)).detach()
@@ -564,16 +643,16 @@ class sim3Type(LieType):
         super().__init__(7, 8, 7)
 
     def Exp(self, x):
-        x = x.tensor() if hasattr(x, 'ltype') else x
+        x = x.tensor() if hasattr(x, "ltype") else x
         X = sim3_Exp.apply(x)
         return LieTensor(X, ltype=Sim3_type)
 
     def Mul(self, X, Y):
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        X = X.tensor() if hasattr(X, "ltype") else X
         # (scalar or tensor) * manifold
         if self.on_manifold:
             return LieTensor(torch.mul(X, Y), ltype=sim3_type)
-        raise NotImplementedError('Invalid __mul__ operation')
+        raise NotImplementedError("Invalid __mul__ operation")
 
     def rotation(self, input):
         return input.Exp().rotation()
@@ -591,13 +670,13 @@ class sim3Type(LieType):
     def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         if not isinstance(sigma, collections.abc.Iterable):
             sigma = _ntuple(5, "_penta")(sigma)
-        elif len(sigma)==3:
+        elif len(sigma) == 3:
             rotation_sigma = _single(sigma[-2])
             scale_sigma = _single(sigma[-1])
             translation_sigma = _triple(sigma[0])
-            sigma = translation_sigma+rotation_sigma+scale_sigma
+            sigma = translation_sigma + rotation_sigma + scale_sigma
         else:
-            assert len(sigma)==5, 'Only accepts a tuple of sigma in size 1, 3, or 5.'
+            assert len(sigma) == 5, "Only accepts a tuple of sigma in size 1, 3, or 5."
         size = self.to_tuple(size)
         rotation = so3_type.randn(*size, sigma=sigma[-2], **kwargs).detach().tensor()
         scale = sigma[-1] * torch.randn(*(size + torch.Size([1])), **kwargs)
@@ -612,16 +691,16 @@ class RxSO3Type(LieType):
         super().__init__(5, 5, 4)
 
     def Log(self, X):
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        X = X.tensor() if hasattr(X, "ltype") else X
         x = RxSO3_Log.apply(X)
         return LieTensor(x, ltype=rxso3_type)
 
     def Act(self, X, p):
         assert not self.on_manifold and isinstance(p, torch.Tensor)
-        assert p.shape[-1]==3 or p.shape[-1]==4, "Invalid Tensor Dimension"
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        assert p.shape[-1] == 3 or p.shape[-1] == 4, "Invalid Tensor Dimension"
+        X = X.tensor() if hasattr(X, "ltype") else X
         input, out_shape = broadcast_inputs(X, p)
-        if p.shape[-1]==3:
+        if p.shape[-1] == 3:
             out = RxSO3_Act.apply(*input)
         else:
             out = RxSO3_Act4.apply(*input)
@@ -630,9 +709,13 @@ class RxSO3Type(LieType):
 
     def Mul(self, X, Y):
         # Transform on transform
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        if not self.on_manifold and isinstance(Y, LieTensor) and not Y.ltype.on_manifold:
-            Y = Y.tensor() if hasattr(Y, 'ltype') else Y
+        X = X.tensor() if hasattr(X, "ltype") else X
+        if (
+            not self.on_manifold
+            and isinstance(Y, LieTensor)
+            and not Y.ltype.on_manifold
+        ):
+            Y = Y.tensor() if hasattr(Y, "ltype") else Y
             input, out_shape = broadcast_inputs(X, Y)
             out = RxSO3_Mul.apply(*input)
             dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -644,16 +727,16 @@ class RxSO3Type(LieType):
         # (scalar or tensor) * manifold
         if self.on_manifold:
             return LieTensor(torch.mul(X, Y), ltype=RxSO3_type)
-        raise NotImplementedError('Invalid __mul__ operation')
+        raise NotImplementedError("Invalid __mul__ operation")
 
     def Inv(self, X):
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        X = X.tensor() if hasattr(X, "ltype") else X
         out = RxSO3_Inv.apply(X)
         return LieTensor(out, ltype=RxSO3_type)
 
     def Adj(self, X, a):
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        a = a.tensor() if hasattr(a, 'ltype') else a
+        X = X.tensor() if hasattr(X, "ltype") else X
+        a = a.tensor() if hasattr(a, "ltype") else a
         input, out_shape = broadcast_inputs(X, a)
         out = RxSO3_AdjXa.apply(*input)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -661,8 +744,8 @@ class RxSO3Type(LieType):
         return LieTensor(out, ltype=rxso3_type)
 
     def AdjT(self, X, a):
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        a = a.tensor() if hasattr(a, 'ltype') else a
+        X = X.tensor() if hasattr(X, "ltype") else X
+        a = a.tensor() if hasattr(a, "ltype") else a
         input, out_shape = broadcast_inputs(X, a)
         out = RxSO3_AdjTXa.apply(*input)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -670,8 +753,8 @@ class RxSO3Type(LieType):
         return LieTensor(out, ltype=rxso3_type)
 
     def Jinvp(self, X, a):
-        X = X.tensor() if hasattr(X, 'ltype') else X
-        a = a.tensor() if hasattr(a, 'ltype') else a
+        X = X.tensor() if hasattr(X, "ltype") else X
+        a = a.tensor() if hasattr(a, "ltype") else a
         (X, a), out_shape = broadcast_inputs(X, a)
         out = (rxso3_Jl_inv(RxSO3_Log.apply(X)) @ a.unsqueeze(-1)).squeeze(-1)
         dim = -1 if out.nelement() != 0 else X.shape[-1]
@@ -686,8 +769,8 @@ class RxSO3Type(LieType):
 
     @classmethod
     def identity(cls, *size, **kwargs):
-        data = torch.tensor([0., 0., 0., 1., 1.], **kwargs)
-        return LieTensor(data.repeat(size+(1,)), ltype=RxSO3_type)
+        data = torch.tensor([0.0, 0.0, 0.0, 1.0, 1.0], **kwargs)
+        return LieTensor(data.repeat(size + (1,)), ltype=RxSO3_type)
 
     def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         data = rxso3_type.Exp(rxso3_type.randn(*size, sigma=sigma, **kwargs)).detach()
@@ -703,16 +786,16 @@ class rxso3Type(LieType):
         super().__init__(4, 5, 4)
 
     def Exp(self, x):
-        x = x.tensor() if hasattr(x, 'ltype') else x
+        x = x.tensor() if hasattr(x, "ltype") else x
         X = rxso3_Exp.apply(x)
         return LieTensor(X, ltype=RxSO3_type)
 
     def Mul(self, X, Y):
-        X = X.tensor() if hasattr(X, 'ltype') else X
+        X = X.tensor() if hasattr(X, "ltype") else X
         # (scalar or tensor) * manifold
         if self.on_manifold:
             return LieTensor(torch.mul(X, Y), ltype=rxso3_type)
-        raise NotImplementedError('Invalid __mul__ operation')
+        raise NotImplementedError("Invalid __mul__ operation")
 
     def rotation(self, input):
         return input.Exp().rotation()
@@ -728,12 +811,13 @@ class rxso3Type(LieType):
         if not isinstance(sigma, collections.abc.Iterable):
             sigma = _pair(sigma)
         else:
-            assert len(sigma)==2, 'Only accepts a tuple of sigma in size 1 or 2.'
+            assert len(sigma) == 2, "Only accepts a tuple of sigma in size 1 or 2."
         size = self.to_tuple(size)
         rotation = so3_type.randn(*size, sigma=sigma[0], **kwargs).tensor()
         scale = sigma[1] * torch.randn(*(size + torch.Size([1])), **kwargs)
         data = torch.cat([rotation, scale], dim=-1)
         return LieTensor(data, ltype=rxso3_type).requires_grad_(requires_grad)
+
 
 class so2Type(LieType):
     def __init__(self):
@@ -1071,9 +1155,12 @@ RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
 SO2_type, so2_type = SO2Type(), so2Type()
 SE2_type, se2_type = SE2Type(), se2Type()
 
+liegroup = [SO3_type, SE3_type, Sim3_type, RxSO3_type, SO2_type, SE2_type]
+liealgebra = [so3_type, se3_type, sim3_type, rxso3_type, so2_type, se2_type]
+
 
 class LieTensor(torch.Tensor):
-    r""" A sub-class of :obj:`torch.Tensor` to represent Lie Algebra and Lie Group.
+    r"""A sub-class of :obj:`torch.Tensor` to represent Lie Algebra and Lie Group.
 
     Args:
         data (:obj:`Tensor`, or :obj:`list`, or ':obj:`int`...'): A
@@ -1208,13 +1295,17 @@ class LieTensor(torch.Tensor):
         and other data structures, e.g., transformation matrix, Euler angle, etc. The users
         can convert data between Lie Group and Lie algebra with :obj:`Exp` and :obj:`Log`.
     """
-    def __init__(self, *data, ltype:LieType):
-        assert self.shape[-1:] == ltype.dimension, 'The last dimension of a LieTensor has to be ' \
-            'corresponding to their LieType. More details go to {}. If this error happens in an ' \
-            'optimization process, where LieType is not a necessary structure, we suggest to '    \
-            'call .tensor() to convert a LieTensor to Tensor before passing it to an optimizer. ' \
-            'If this still happens, create an issue on GitHub please.'.format(
-            'https://pypose.org/docs/main/generated/pypose.LieTensor')
+
+    def __init__(self, *data, ltype: LieType):
+        assert self.shape[-1:] == ltype.dimension, (
+            "The last dimension of a LieTensor has to be "
+            "corresponding to their LieType. More details go to {}. If this error happens in an "
+            "optimization process, where LieType is not a necessary structure, we suggest to "
+            "call .tensor() to convert a LieTensor to Tensor before passing it to an optimizer. "
+            "If this still happens, create an issue on GitHub please.".format(
+                "https://pypose.org/docs/main/generated/pypose.LieTensor"
+            )
+        )
         self.ltype = ltype
 
     @staticmethod
@@ -1223,9 +1314,12 @@ class LieTensor(torch.Tensor):
         return torch.Tensor.as_subclass(tensor, LieTensor)
 
     def __repr__(self):
-        if hasattr(self, 'ltype'):
-            return self.ltype.__class__.__name__ + \
-                   ' %s:\n'%(self.__class__.__name__) + super().__repr__()
+        if hasattr(self, "ltype"):
+            return (
+                self.ltype.__class__.__name__
+                + " %s:\n" % (self.__class__.__name__)
+                + super().__repr__()
+            )
         else:
             return super().__repr__()
 
@@ -1236,25 +1330,33 @@ class LieTensor(torch.Tensor):
     def __torch_function__(cls, func, types, args=(), kwargs={}):
         ltypes = (torch.Tensor if t is LieTensor or Parameter else t for t in types)
         data = torch.Tensor.__torch_function__(func, ltypes, args, kwargs)
-        if data is not None and hasattr(func, '__name__') and func.__name__ in HANDLED_FUNCTIONS:
+        if (
+            data is not None
+            and hasattr(func, "__name__")
+            and func.__name__ in HANDLED_FUNCTIONS
+        ):
             args, spec = tree_flatten(args)
             ltype = [arg.ltype for arg in args if isinstance(arg, LieTensor)][0]
+
             def wrap(t):
                 if isinstance(t, torch.Tensor) and not isinstance(t, cls):
                     lt = torch.Tensor.as_subclass(t, LieTensor)
                     lt.ltype = ltype
                     if lt.shape[-1:] != lt.ltype.dimension:
-                        link = 'https://pypose.org/docs/main/generated/pypose.LieTensor'
-                        warnings.warn('Tensor Shape Invalid by calling {}, ' \
-                            'go to {}'.format(func, link))
+                        link = "https://pypose.org/docs/main/generated/pypose.LieTensor"
+                        warnings.warn(
+                            "Tensor Shape Invalid by calling {}, "
+                            "go to {}".format(func, link)
+                        )
                     return lt
                 return t
+
             return tree_map(wrap, data)
         return data
 
     @property
     def lshape(self) -> torch.Size:
-        r'''
+        r"""
         LieTensor Shape (shape of torch.Tensor by ignoring the last dimension)
 
         Returns:
@@ -1274,11 +1376,11 @@ class LieTensor(torch.Tensor):
             torch.Size([2, 7])
             >>> x.ltype.dimension
             torch.Size([7])
-        '''
+        """
         return self.shape[:-1]
 
     def lview(self, *shape):
-        r'''
+        r"""
         Returns a new LieTensor with the same data as the self tensor but of a different
         :obj:`lshape`.
 
@@ -1301,137 +1403,137 @@ class LieTensor(torch.Tensor):
             torch.Size([2, 2, 3])
             >>> x.lview(-1).lshape
             torch.Size([4])
-        '''
-        return self.view(*shape+self.ltype.dimension)
+        """
+        return self.view(*shape + self.ltype.dimension)
 
     def Exp(self):
-        r'''
+        r"""
         See :meth:`pypose.Exp`
-        '''
+        """
         return self.ltype.Exp(self)
 
     def Log(self):
-        r'''
+        r"""
         See :meth:`pypose.Log`
-        '''
+        """
         return self.ltype.Log(self)
 
     def Inv(self):
-        r'''
+        r"""
         See :meth:`pypose.Inv`
-        '''
+        """
         return self.ltype.Inv(self)
 
     def Act(self, p):
-        r'''
+        r"""
         See :meth:`pypose.Act`
-        '''
+        """
         return self.ltype.Act(self, p)
 
     def add(self, other, alpha=1):
-        r'''
+        r"""
         See :meth:`pypose.add`
-        '''
-        return self.clone().add_(other = alpha * other)
+        """
+        return self.clone().add_(other=alpha * other)
 
     def add_(self, other, alpha=1):
-        r'''
+        r"""
         See :meth:`pypose.add_`
-        '''
-        return self.ltype.add_(self, other = alpha * other)
+        """
+        return self.ltype.add_(self, other=alpha * other)
 
     def __add__(self, other):
         return self.add(other=other)
 
     def __mul__(self, other):
-        r'''
+        r"""
         See :meth:`pypose.mul`
-        '''
+        """
         return self.ltype.Mul(self, other)
 
     def mul(self, other):
-        r'''
+        r"""
         See :meth:`pypose.mul`
-        '''
+        """
         return self.ltype.Mul(self, other)
 
     def __matmul__(self, other):
-        r'''
+        r"""
         See :meth:`pypose.matmul`
-        '''
+        """
         if isinstance(other, LieTensor):
             return self.ltype.Mul(self, other)
-        else: # Same with: self.ltype.matrix(self) @ other
+        else:  # Same with: self.ltype.matrix(self) @ other
             return self.Act(other)
 
     def Retr(self, a):
-        r'''
+        r"""
         See :meth:`pypose.Retr`
-        '''
+        """
         return self.ltype.Retr(self, a)
 
     def Adj(self, a):
-        r'''
+        r"""
         See :meth:`pypose.Adj`
-        '''
+        """
         return self.ltype.Adj(self, a)
 
     def AdjT(self, a):
-        r'''
+        r"""
         See :meth:`pypose.AdjT`
-        '''
+        """
         return self.ltype.AdjT(self, a)
 
     def Jinvp(self, p):
-        r'''
+        r"""
         See :meth:`pypose.Jinvp`
-        '''
+        """
         return self.ltype.Jinvp(self, p)
 
     def Jr(self):
-        r'''
+        r"""
         See :meth:`pypose.Jr`
-        '''
+        """
         return self.ltype.Jr(self)
 
     def tensor(self) -> torch.Tensor:
-        r'''
+        r"""
         See :meth:`pypose.tensor`
-        '''
+        """
         return torch.Tensor.as_subclass(self, torch.Tensor)
 
     def matrix(self) -> torch.Tensor:
-        r'''
+        r"""
         See :meth:`pypose.matrix`
-        '''
+        """
         return self.ltype.matrix(self)
 
     def translation(self) -> torch.Tensor:
-        r'''
+        r"""
         See :meth:`pypose.translation`
-        '''
+        """
         return self.ltype.translation(self)
 
     def rotation(self):
-        r'''
+        r"""
         See :meth:`pypose.rotation`
-        '''
+        """
         return self.ltype.rotation(self)
 
     def scale(self) -> torch.Tensor:
-        r'''
+        r"""
         See :meth:`pypose.scale`
-        '''
+        """
         return self.ltype.scale(self)
 
     def euler(self, eps=2e-4) -> torch.Tensor:
-        r'''
+        r"""
         See :meth:`pypose.euler`
-        '''
+        """
         data = self.rotation().tensor()
         x, y = data[..., 0], data[..., 1]
         z, w = data[..., 2], data[..., 3]
-        xx, yy, zz, ww = x*x, y*y, z*z, w*w
+        xx, yy, zz, ww = x * x, y * y, z * z, w * w
 
         t0 = 2 * (w * x + y * z)
         t1 = (ww + zz) - (xx + yy)
@@ -1442,7 +1544,7 @@ class LieTensor(torch.Tensor):
         # sigularity when pitch angle ~ +/-pi/2
         roll1 = torch.atan2(t0, t1)
         roll2 = torch.zeros_like(t0)
-        flag = t2.abs() < 1. - eps
+        flag = t2.abs() < 1.0 - eps
         yaw1 = torch.atan2(t3, t4)
         yaw2 = -2 * pm(t2) * torch.atan2(x, w)
 
@@ -1453,7 +1555,7 @@ class LieTensor(torch.Tensor):
         return torch.stack([roll, pitch, yaw], dim=-1)
 
     def identity_(self):
-        r'''
+        r"""
         Inplace set the LieTensor to identity.
 
         Return:
@@ -1473,7 +1575,7 @@ class LieTensor(torch.Tensor):
             SO3Type LieTensor:
             tensor([[0., 0., 0., 1.],
                     [0., 0., 0., 1.]])
-        '''
+        """
         return self.ltype.identity_(self)
 
     def cumops(self, dim, ops):
@@ -1482,13 +1584,13 @@ class LieTensor(torch.Tensor):
         """
         return self.ltype.cumops(self, dim, ops)
 
-    def cummul(self, dim, left = True):
+    def cummul(self, dim, left=True):
         r"""
         See :func:`pypose.cummul`
         """
         return self.ltype.cummul(self, dim, left)
 
-    def cumprod(self, dim, left = True):
+    def cumprod(self, dim, left=True):
         r"""
         See :func:`pypose.cumprod`
         """
@@ -1500,13 +1602,13 @@ class LieTensor(torch.Tensor):
         """
         return self.ltype.cumops_(self, dim, ops)
 
-    def cummul_(self, dim, left = True):
+    def cummul_(self, dim, left=True):
         r"""
         Inplace version of :func:`pypose.cummul`
         """
         return self.ltype.cummul_(self, dim, left)
 
-    def cumprod_(self, dim, left = True):
+    def cumprod_(self, dim, left=True):
         r"""
         Inplace version of :func:`pypose.cumprod`
         """
@@ -1514,7 +1616,7 @@ class LieTensor(torch.Tensor):
 
 
 class Parameter(LieTensor, nn.Parameter):
-    r'''
+    r"""
     A kind of LieTensor that is to be considered a module parameter.
 
     Parameters are of :meth:`LieTensor` and :meth:`torch.nn.Parameter`,
@@ -1535,7 +1637,8 @@ class Parameter(LieTensor, nn.Parameter):
         >>> x.grad
         tensor([[0.8590, 1.4069, 0.6261, 0.0000],
                 [1.2869, 1.0748, 0.5385, 0.0000]])
-    '''
+    """
+
     def __init__(self, data, **kwargs):
         self.ltype = data.ltype
 
@@ -1552,6 +1655,7 @@ class Parameter(LieTensor, nn.Parameter):
             memo[id(self)] = result
             return result
 
+
 @contextmanager
 def retain_ltype():
     # save the original PyTorch functions
@@ -1560,7 +1664,7 @@ def retain_ltype():
         torch._functorch.eager_transforms._wrap_tensor_for_grad,
         torch._functorch.vmap._add_batch_dim,
     }
-    torch._functorch.vmap._add_batch_dim.__module__ = 'torch._functorch.vmap'
+    torch._functorch.vmap._add_batch_dim.__module__ = "torch._functorch.vmap"
 
     def wrap_function(func):
         def wrapper(*args, **kwargs):
@@ -1570,6 +1674,7 @@ def retain_ltype():
                 res = torch.Tensor.as_subclass(res, LieTensor)
                 res.ltype = ltype
             return res
+
         return wrapper
 
     try:

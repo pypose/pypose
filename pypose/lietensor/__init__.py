@@ -12,5 +12,5 @@ from .utils import identity_so2, identity_se2, identity_SO2, identity_SE2
 from .utils import SO3, so3, SE3, se3, Sim3, sim3, RxSO3, rxso3, SO2, so2, SE2, se2
 from .utils import Exp, Log, Inv, Mul, Retr, Act, Adj, AdjT, Jinvp, Jr
 from .basics import vec2skew, add, add_, mul, is_triangular
-from .convert import tensor, translation, rotation, scale, matrix, euler
+from .convert import tensor, translation, rotation, scale, matrix, euler, quat2unit
 from .convert import mat2SO3, mat2SE3, mat2Sim3, mat2RxSO3, from_matrix, matrix, euler2SO3

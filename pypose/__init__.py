@@ -15,7 +15,7 @@ from .lietensor import add, add_, mul, Exp, Log, Inv, Mul, Retr, Act, Adj, AdjT,
 from .lietensor import SO3_type, so3_type, SE3_type, se3_type
 from .lietensor import Sim3_type, sim3_type, RxSO3_type, rxso3_type
 from .lietensor import SO2_type, so2_type, SE2_type, se2_type
-from .lietensor import tensor, translation, rotation, scale, matrix, euler, is_triangular
+from .lietensor import tensor, translation, rotation, scale, matrix, euler, quat2unit, is_triangular
 from .lietensor import mat2SO3, mat2SE3, mat2Sim3, mat2RxSO3, from_matrix, matrix, euler2SO3, vec2skew
 from .lietensor.lietensor import retain_ltype
 from . import func
