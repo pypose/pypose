@@ -1372,6 +1372,33 @@ def identity_RxSO3(*size, **kwargs):
     return RxSO3_type.identity(*size, **kwargs)
 
 
+def identity_so2(*size, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return so2_type.identity(*size, **kwargs)
+
+
+def identity_SO2(*size, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return SO2_type.identity(*size, **kwargs)
+
+
+def identity_se2(*size, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return se2_type.identity(*size, **kwargs)
+
+
+def identity_SE2(*size, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return SE2_type.identity(*size, **kwargs)
+
 def assert_ltype(func):
     @functools.wraps(func)
     def checker(*args, **kwargs):
