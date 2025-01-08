@@ -274,11 +274,19 @@ def randn_like(input, sigma=1.0, **kwargs):
           - :meth:`randn_SO3`
           - :obj:`so3_type`
           - :meth:`randn_so3`
+          - :obj:`SO2_type`
+          - :meth:`randn_SO2`
+          - :obj:`so2_type`
+          - :meth:`randn_so2`
         * - Euclidean Group
           - :obj:`SE3_type`
           - :meth:`randn_SE3`
           - :obj:`se3_type`
           - :meth:`randn_se3`
+          - :obj:`SE2_type`
+          - :meth:`randn_SE2`
+          - :obj:`se2_type`
+          - :meth:`randn_se2`
         * - Similarity Group
           - :obj:`Sim3_type`
           - :meth:`randn_Sim3`
@@ -1478,6 +1486,16 @@ def Exp(input):
           - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times5}`
           - :obj:`RxSO3_type`
+        * - :obj:`so2_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times1}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times2}`
+          - :obj:`SO2_type`
+        * - :obj:`se2_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times4}`
+          - :obj:`SE2_type`
 
     Warning:
         This function :func:`Exp()` is different from :func:`exp()`, which returns
@@ -1594,6 +1612,8 @@ def Exp(input):
 
         .. math::
             C = 1
+
+    * TODO Add examples for so2 and se2
 
     Note:
         The detailed explanation of the above :math:`\mathrm{Exp}`: calculation can be found
@@ -1714,6 +1734,16 @@ def Log(input):
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :obj:`rxso3_type`
+        * - :obj:`SO2_type`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times2}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times1}`
+          - :obj:`so2_type`
+        * - :obj:`SE2_type`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times4}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :obj:`se2_type`
 
     Warning:
         This function :func:`Log()` is different from :func:`log()`, which returns
@@ -1836,6 +1866,8 @@ def Log(input):
 
         .. math::
             C = 1
+
+    * TODO Add examples for SO2 and SE2
 
     Note:
         The :math:`\mathrm{arctan}`-based Logarithm map implementation thanks to the paper:
@@ -1972,6 +2004,26 @@ def Inv(x):
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :obj:`rxso3_type`
+        * - :obj:`SO2_type`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times2}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times2}`
+          - :obj:`SO2_type`
+        * - :obj:`SE2_type`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times4}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times4}`
+          - :obj:`SE2_type`
+        * - :obj:`so2_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times1}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times1}`
+          - :obj:`so2_type`
+        * - :obj:`se2_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :obj:`se2_type`
 
     * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`SO3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`SO3`):
@@ -2018,6 +2070,8 @@ def Inv(x):
 
         .. math::
             \mathbf{y}_i = -\mathbf{x}_i
+
+    * TODO Add examples for so2, SO2, se2 and SE2
 
     Example:
 
@@ -2281,6 +2335,16 @@ def Adj(input, p):
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :obj:`rxso3_type`
+        * - (:obj:`SO2_type`, :obj:`so2_type`)
+          - :math:`(\mathcal{G}\in\mathbb{R}^{*\times2}, \mathcal{g}\in\mathbb{R}^{*\times1})`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times1}`
+          - :obj:`so2_type`
+        * - (:obj:`SE2_type`, :obj:`se2_type`)
+          - :math:`(\mathcal{G}\in\mathbb{R}^{*\times4}, \mathcal{g}\in\mathbb{R}^{*\times3})`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :obj:`se2_type`
 
     Let the input be (:math:`\mathbf{x}`, :math:`\mathbf{p}`), :math:`\mathbf{y}` be the output.
 
@@ -2382,6 +2446,8 @@ def Adj(input, p):
 
         In the case of :math:`\textrm{RxSO3}` group, the adjoint transformation is the same as
         the rotation matrix of the group i.e. the :math:`\textrm{SO3}` part of the group.
+
+    * TODO Add examples for so2, SO2, se2, SE2
 
     Note:
         The adjoint operator is a linear map which moves an element
@@ -2513,6 +2579,16 @@ def Jinvp(input, p):
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :obj:`rxso3_type`
+        * - (:obj:`SO2_type`, :obj:`so2_type`)
+          - :math:`(\mathcal{G}\in\mathbb{R}^{*\times2}, \mathcal{g}\in\mathbb{R}^{*\times1})`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times1}`
+          - :obj:`so2_type`
+        * - (:obj:`SE2_type`, :obj:`se2_type`)
+          - :math:`(\mathcal{G}\in\mathbb{R}^{*\times4}, \mathcal{g}\in\mathbb{R}^{*\times3})`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :obj:`se2_type`
 
     Let the input be (:math:`\mathbf{x}`, :math:`\mathbf{p}`), :math:`\mathbf{y}` be the output.
 
@@ -2654,6 +2730,8 @@ def Jinvp(input, p):
 
         where :math:`\mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i)` is the
         inverse of left Jacobian of the SO3 part of :math:`\mathbf{x}_i`.
+
+    * TODO Add example for so2, SO2, se2 and SE2
 
     Note:
         :math:`\mathrm{Jinvp}` is usually used in the Baker-Campbell-Hausdorff formula
