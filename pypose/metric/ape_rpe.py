@@ -528,7 +528,7 @@ def rpe(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
 
             'pose': :math:`|| {T_{t}^{rel}}^{-1} * T_{e}^{rel} - I_4 ||_2`
 
-            'radian': :math:`|| \mathrm{Log}({R_{t}^{rel}}^T * R_{e}^{rel}) ||_2)`
+            'radian': :math:`|| \mathrm{Log}({R_{t}^{rel}}^T * R_{e}^{rel}) ||_2`
 
             'degree': :math:`\mathrm{Degree}(|| \mathrm{Log}({R_{t}^{rel}}^T * R_{e}^{rel}) ||_2))`
 
