@@ -228,14 +228,14 @@ def compute_error(ttraj, etraj, output: str = 'translation', mtype: str = 'ape')
             'translation': || t_{e} - t_{t} ||_2
             'rotation': || R_{e}^T * R_{t} - I_3 ||_2
             'pose':  || T_{e}^{-1} * T_{t} - I_4 ||_2
-            'radian': :math:`\mathrm{Rad}(|| R_{e}^T * R_{t}||_2)`
-            'degree': :math:`\mathrm{Degree}(|| R_{e}^T * R_{t}||_2)`
+            'radian': :math:`|| \mathrm{Log}(R_{e}^T * R_{t}) ||_2`
+            'degree': :math:`\mathrm{Degree}(|| \mathrm{Log}(R_{e}^T * R_{t}) ||_2)`
         if mtype == 'rpe':
             'translation': :math:`|| -{R_{t}^{rel}}^T * t_{t}^{rel} + {R_{e}^{rel}}^T * t_{e}^{rel} ||_2`
             'rotation': :math:`|| {R_{t}^{rel}}^T * R_{e}^{rel} - I_3 ||_2`
             'pose': :math:`|| {T_{t}^{rel}}^{-1} * T_{e}^{rel} - I_4 ||_2`
-            'radian': :math:`\mathrm{Rad}(|| {R_{t}^{rel}}^T * R_{e}^{rel} ||_2)`
-            'degree': :math:`\mathrm{Degree}(|| {R_{t}^{rel}}^T * R_{e}^{rel} ||_2)`
+            'radian': :math:`|| \mathrm{Log}({R_{t}^{rel}}^T * R_{e}^{rel}) ||_2)`
+            'degree': :math:`\mathrm{Degree}(|| \mathrm{Log}({R_{t}^{rel}}^T * R_{e}^{rel}) ||_2))`
     '''
     if mtype == 'ape':
         if output == 'translation':
@@ -257,9 +257,9 @@ def compute_error(ttraj, etraj, output: str = 'translation', mtype: str = 'ape')
         I = torch.eye(4, device=E.device, dtype=E.dtype).expand_as(E)
         error = torch.linalg.norm((E - I), dim=(-2, -1))
     elif output == 'radian':
-        error = mat2SO3(E[:,:3,:3], check=False).euler().norm(dim=-1)
+        error = mat2SO3(E[:,:3,:3], check=False).Log().norm(dim=-1)
     elif output == 'degree':
-        error = mat2SO3(E[:,:3,:3], check=False).euler().rad2deg().norm(dim=-1)
+        error = mat2SO3(E[:,:3,:3], check=False).Log().norm(dim=-1).rad2deg()
     else:
         raise ValueError(f"Unknown output type: {output}")
 
@@ -423,9 +423,9 @@ def ape(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
 
             'pose': :math:`|| T_{e}^{-1} * T_{t} - I_4 ||_2`
 
-            'radian': :math:`||\mathrm{Rad}(\mathrm{Euler}(R_{e}^T * R_{t}))||_2`
+            'radian': :math:`|| \mathrm{Log}(R_{e}^T * R_{t}) ||_2`
 
-            'degree': :math:`||\mathrm{Degree}(\mathrm{Euler}(R_{e}^T * R_{t}))||_2`
+            'degree': :math:`\mathrm{Degree}(|| \mathrm{Log}(R_{e}^T * R_{t}) ||_2)`
 
             Default: 'translation'
 
@@ -528,9 +528,9 @@ def rpe(tstamp, tpose, estamp, epose, etype: str = "translation", diff: float = 
 
             'pose': :math:`|| {T_{t}^{rel}}^{-1} * T_{e}^{rel} - I_4 ||_2`
 
-            'radian': :math:`||\mathrm{Rad}(\mathrm{Euler}({R_{t}^{rel}}^T * R_{e}^{rel}))||_2`
+            'radian': :math:`|| \mathrm{Log}({R_{t}^{rel}}^T * R_{e}^{rel}) ||_2)`
 
-            'degree': :math:`||\mathrm{Degree}(\mathrm{Euler}({R_{t}^{rel}}^T * R_{e}^{rel}))||_2`
+            'degree': :math:`\mathrm{Degree}(|| \mathrm{Log}({R_{t}^{rel}}^T * R_{e}^{rel}) ||_2))`
 
             Default: 'translation'
 
