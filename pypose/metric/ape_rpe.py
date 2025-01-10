@@ -511,6 +511,7 @@ def rpe(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
             For example, `torch.tensor([...])` or `None`.
         rpose (array-like of ``SE3``):
             The poses of the reference trajectory.
+            Must have the same length as `rstamp`.
             For example, `pypose.SE3(torch.rand(10, 7))`.
         estamp (array-like of ``float`` or ``None``):
             The timestamps of the estimated trajectory.
