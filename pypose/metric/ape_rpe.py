@@ -275,7 +275,7 @@ def compute_error(rtraj, etraj, output: str = 'translation', mtype: str = 'ape')
     return results
 
 
-def pairs_by_frames(traj, delta, use_all=False):
+def pairs_by_frames(traj, delta, all=False):
     r'''
     Get index of pairs in the trajectory by its index distance.
 
@@ -284,7 +284,7 @@ def pairs_by_frames(traj, delta, use_all=False):
             The trajectory.
         delta (``float``):
             The interval step used to select the pair.
-        use_all (``bool``, optional):
+        all (``bool``, optional):
             If True, all associated pairs are used for evaluation.
             Defaults to False.
 
@@ -294,7 +294,7 @@ def pairs_by_frames(traj, delta, use_all=False):
     traj_len = traj.num_poses
     delta = int(delta)
     assert delta >= 1, "delta must >= 1"
-    if use_all:
+    if all:
         ids_1 = torch.arange(traj_len, device=traj.device, dtype=torch.long)
         ids_2 = ids_1 + delta
         id_pairs = (ids_1[ids_2<traj_len].tolist(),
@@ -306,7 +306,7 @@ def pairs_by_frames(traj, delta, use_all=False):
     return id_pairs
 
 
-def pairs_by_dist(traj, delta, tol=0.0, use_all=False):
+def pairs_by_dist(traj, delta, tol=0.0, all=False):
     r'''
     Get index of pairs in the trajectory by its path distance.
 
@@ -316,16 +316,16 @@ def pairs_by_dist(traj, delta, tol=0.0, use_all=False):
         delta (``float``):
             The interval step used to select the pair.
         tol (``float``, optional):
-            The absolute path tolerance for accepting or rejecting pairs in use_all mode.
+            The absolute path tolerance for accepting or rejecting pairs in all mode.
             Defaults to 0.0.
-        use_all (``bool``, optional):
+        all (``bool``, optional):
             If True, all associated pairs are used for evaluation.
             Defaults to False.
 
     Returns: list
         id_pairs: list of index pairs.
     '''
-    if use_all:
+    if all:
         idx_0 = []
         idx_1 = []
         distances = traj.accumulated_distances
@@ -352,7 +352,7 @@ def pairs_by_dist(traj, delta, tol=0.0, use_all=False):
     return id_pairs
 
 
-def pair_id(traj, delta=1.0, associate: str='frame', rtol=0.1, use_all= False):
+def pair_id(traj, delta=1.0, associate: str='frame', rtol=0.1, all= False):
     r'''
     Get index of pairs with distance==delta from a trajectory.
 
@@ -369,7 +369,7 @@ def pair_id(traj, delta=1.0, associate: str='frame', rtol=0.1, use_all= False):
         rtol (``float``, optional):
             The relative tolerance for accepting or rejecting deltas.
             Defaults to 0.1.
-        use_all (``bool``, optional):
+        all (``bool``, optional):
             If True, all associated pairs are used for evaluation.
             Defaults to False.
 
@@ -377,9 +377,9 @@ def pair_id(traj, delta=1.0, associate: str='frame', rtol=0.1, use_all= False):
         list: list of index pairs.
     '''
     if associate == 'frame':
-        id_pairs = pairs_by_frames(traj, int(delta), use_all)
+        id_pairs = pairs_by_frames(traj, int(delta), all)
     elif associate == 'distance':
-        id_pairs = pairs_by_dist(traj, delta, delta * rtol, use_all)
+        id_pairs = pairs_by_dist(traj, delta, delta * rtol, all)
     else:
         raise ValueError(f"unsupported delta unit: {associate}")
 
@@ -500,7 +500,7 @@ def ape(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
 def rpe(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 0.01,
         offset: float = 0.0, align: bool = False, scale: bool = False, nposes: int = -1,
         origin: bool = False, associate: str = 'frame', delta: float = 1.0, rtol: float = 0.1,
-        use_all: bool = False, thresh: float = 0.3, rpair: bool = False):
+        all: bool = False, thresh: float = 0.3, rpair: bool = False):
     r'''
     Compute the Relative Pose Error (RPE) between two trajectories.
 
@@ -564,7 +564,7 @@ def rpe(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
         rtol (``float``, optional):
             The relative tolerance for accepting or rejecting deltas.
             Defaults to 0.1.
-        use_all (``bool``, optional):
+        all (``bool``, optional):
             If True, all associated pairs are used for evaluation.
             Defaults to False.
         thresh (``float``, optional):
@@ -616,7 +616,7 @@ def rpe(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
 
     etraj.align(trans_mat)
 
-    sour_id, tar_id = pair_id((rtraj if rpair else etraj), delta, associate, rtol, use_all)
+    sour_id, tar_id = pair_id((rtraj if rpair else etraj), delta, associate, rtol, all)
 
     rpose_rela = rtraj[sour_id].poses.Inv() @ rtraj[tar_id].poses
     epose_rela = etraj[sour_id].poses.Inv() @ etraj[tar_id].poses
