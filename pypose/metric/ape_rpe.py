@@ -519,6 +519,7 @@ def rpe(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
             For example, `torch.tensor([...])` or `None`.
         epose (array-like of ``SE3``):
             The poses of the estimated trajectory.
+            Must have the same length as `estamp`.
             For example, `pypose.SE3(torch.rand(10, 7))`.
         etype (``str``, optional):
             The type of pose error. Supported options include:
