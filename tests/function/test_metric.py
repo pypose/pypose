@@ -25,10 +25,10 @@ class TestAPERPE:
         download_url(remote + '/fr2_desk_ORB.txt', local)
         tstamp, tpose = self.read_tum_file(local + '/fr2_desk_groundtruth.txt')
         estamp, epose = self.read_tum_file(local + '/fr2_desk_ORB.txt')
-        ape = pp.metric.ape(tstamp, tpose, estamp, epose, thresh=0.4)
+        ape = pp.metric.ape(tstamp, tpose, estamp, epose, thresh=0.4, otype='SSE')
         rpe = pp.metric.rpe(tstamp, tpose, estamp, epose, thresh=0.4)
-
-        print(ape, rpe, sep='\n')
+        assert isinstance(ape, torch.Tensor)
+        assert isinstance(rpe, dict)
 
 
 if __name__=="__main__":

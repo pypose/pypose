@@ -201,7 +201,7 @@ def associate_traj(rtraj, etraj, max_diff=0.01, offset_2=0.0, threshold=0.3):
     return rtraj_aligned, etraj_aligned
 
 
-def compute_error(rtraj, etraj, output: str = 'translation', mtype: str = 'ape'):
+def compute_error(rtraj, etraj, output: str = 'translation', mtype: str = 'ape', otype:str = 'All'):
     r'''
     Get the error of the pose based on the output type.
 
@@ -263,16 +263,29 @@ def compute_error(rtraj, etraj, output: str = 'translation', mtype: str = 'ape')
     else:
         raise ValueError(f"Unknown output type: {output}")
 
+    options = ['All', 'Max', 'Min', 'Mean', 'Median', 'RMSE', 'SSE', 'STD']
+    if otype not in options:
+        raise ValueError(f"Unknown output metric type, select one in {options}")
     results = {}
-    results['Max']    = torch.max(error.abs()).item()
-    results['Mean']   = torch.mean(error.abs()).item()
-    results['Median'] = torch.median(error.abs()).item()
-    results['Min']    = torch.min(error.abs()).item()
-    results['RMSE']   = torch.sqrt(torch.mean(torch.pow(error, 2))).item()
-    results['SSE']    = torch.sum(torch.pow(error, 2)).item()
-    results['STD']    = torch.std(error.abs()).item()
+    if otype == 'Max' or 'All':
+        results['Max'] = torch.max(error.abs())
+    if otype == 'Min' or 'All':
+        results['Min'] = torch.min(error.abs())
+    if otype == 'Mean' or 'All':
+        results['Mean'] = torch.mean(error.abs())
+    if otype == 'Median' or 'All':
+        results['Median'] = torch.median(error.abs())
+    if otype == 'RMSE' or 'All':
+        results['RMSE'] = torch.sqrt(torch.mean(torch.pow(error, 2)))
+    if otype == 'SSE' or 'All':
+        results['SSE'] = torch.sum(torch.pow(error, 2))
+    if otype == 'STD' or 'All':
+        results['STD']  = torch.std(error.abs())
 
-    return results
+    if otype is 'All':
+        return results # return a dict
+    else:
+        return results[otype] # return a tensor
 
 
 def pairs_by_frames(traj, delta, all=False):
@@ -393,7 +406,7 @@ def pair_id(traj, delta=1.0, associate: str='frame', rtol=0.1, all= False):
 
 def ape(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 0.01,
         offset: float = 0.0, align: bool = False, scale: bool = False, nposes: int = -1,
-        origin: bool = False, thresh: float = 0.3):
+        origin: bool = False, thresh: float = 0.3, otype: str = 'All'):
     r'''
     Compute the Absolute Pose Error (APE) between two trajectories.
 
@@ -451,9 +464,30 @@ def ape(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
             The threshold for valid matching pairs. If the ratio of
             matching pairs is below this threshold, a warning is issued.
             Defaults to 0.3.
+        otype (``str``, optional):
+            The output type for the metric. Supported options include:
+
+            'All': All metrics will be computed and returned.
+
+            'Max': The Max error is computed and returned.
+
+            'Min': The Min error is computed and returned.
+
+            'Mean': The Mean error is computed and returned.
+
+            'Median': The Median error is computed and returned.
+
+            'RMSE': The root mean square error (RMSE) is computed and returned.
+
+            'SSE': The sum of square error (SSE) is computed and returned.
+
+            'STD': The standard deviation (STD) is computed and returned.
+
+            Defaults to 'All'.
 
     Returns:
-        ``dict``: The computed statistics of the APE (Absolute Pose Error).
+        ``dict`` or ``Tensor``: The computed statistics of the APE (Absolute Pose Error).
+        The return is a ``dict`` if "otype" is not 'all', otherwise a ``Tensor``.
 
     Examples:
         >>> import torch
@@ -475,10 +509,15 @@ def ape(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
         ...                 [0.0004298200, 0.0019603260, -0.0048985220,
         ...                 -0.0043526068,-0.0036625920, -0.0023494449, 0.9999810457]])
         >>> pp.metric.ape(rstamp, rpose, estamp, epose)
-        {'Max': 2.059025356439517, 'Mean': 2.056458484336053,
-         'Median': 2.0562316980397806, 'Min': 2.054118398528862,
-         'RMSE': 2.056459466304423, 'SSE': 12.687076609659215,
-         'STD': 0.002461327487834255}
+        {'Max': tensor(2.0590, dtype=torch.float64),
+         'Min': tensor(2.0541, dtype=torch.float64),
+         'Mean': tensor(2.0565, dtype=torch.float64),
+         'Median': tensor(2.0562, dtype=torch.float64),
+         'RMSE': tensor(2.0565, dtype=torch.float64),
+         'SSE': tensor(12.6871, dtype=torch.float64),
+         'STD': tensor(0.0025, dtype=torch.float64)}
+        >>> pp.metric.ape(rstamp, rpose, estamp, epose, otype='Mean')
+        tensor(2.0565, dtype=torch.float64)
     '''
     rtraj, etraj = StampedSE3(rstamp, rpose), StampedSE3(estamp, epose)
     rtraj, etraj = associate_traj(rtraj, etraj, diff, offset, thresh)
@@ -494,13 +533,13 @@ def ape(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
 
     etraj.align(trans_mat)
 
-    return compute_error(rtraj, etraj, etype, mtype = 'ape')
+    return compute_error(rtraj, etraj, etype, mtype = 'ape', otype=otype)
 
 
 def rpe(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 0.01,
         offset: float = 0.0, align: bool = False, scale: bool = False, nposes: int = -1,
         origin: bool = False, associate: str = 'frame', delta: float = 1.0, rtol: float = 0.1,
-        all: bool = False, thresh: float = 0.3, rpair: bool = False):
+        all: bool = False, thresh: float = 0.3, rpair: bool = False, otype: str = 'All'):
     r'''
     Compute the Relative Pose Error (RPE) between two trajectories.
 
@@ -573,9 +612,30 @@ def rpe(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
             Defaults to 0.3.
         rpair (``bool``, optional):
             Use reference trajectory to compute the pairing indices or not. Defaults to False.
+        otype (``str``, optional):
+            The output type for the metric. Supported options include:
+
+            'All': All metrics will be computed and returned.
+
+            'Max': The Max error is computed and returned.
+
+            'Min': The Min error is computed and returned.
+
+            'Mean': The Mean error is computed and returned.
+
+            'Median': The Median error is computed and returned.
+
+            'RMSE': The root mean square error (RMSE) is computed and returned.
+
+            'SSE': The sum of square error (SSE) is computed and returned.
+
+            'STD': The standard deviation (STD) is computed and returned.
+
+            Defaults to 'All'.
 
     Returns:
-        ``dict``: The computed statistics of the RPE (Relative Pose Error).
+        ``dict`` or ``Tensor``: The computed statistics of the RPE (Relative Pose Error).
+        The return is a ``dict`` if "otype" is not 'all', otherwise a ``Tensor``.
 
     Examples:
         >>> import torch
@@ -597,10 +657,15 @@ def rpe(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
         ...                 [0.0004298200, 0.0019603260, -0.0048985220,
         ...                 -0.0043526068, -0.0036625920, -0.0023494449, 0.9999810457]])
         >>> pp.metric.rpe(rstamp, rpose, estamp, epose)
-        {'Max': 0.0031794263852397337, 'Mean': 0.0027428703211684856,
-         'Median': 0.002306314257097237, 'Min': 0.002306314257097237,
-         'RMSE': 0.0027773942456598218, 'SSE': 1.542783759164858e-05,
-         'STD': 0.0006173835065457773}
+        {'Max': tensor(0.0032, dtype=torch.float64),
+         'Min': tensor(0.0023, dtype=torch.float64),
+         'Mean': tensor(0.0027, dtype=torch.float64),
+         'Median': tensor(0.0023, dtype=torch.float64),
+         'RMSE': tensor(0.0028, dtype=torch.float64),
+         'SSE': tensor(1.5428e-05, dtype=torch.float64),
+         'STD': tensor(0.0006, dtype=torch.float64)}
+        >>> pp.metric.rpe(rstamp, rpose, estamp, epose, otype='Mean')
+        tensor(0.0027, dtype=torch.float64)
     '''
     rtraj, etraj = StampedSE3(rstamp, rpose), StampedSE3(estamp, epose)
     rtraj, etraj = associate_traj(rtraj, etraj, diff, offset, thresh)
@@ -623,4 +688,4 @@ def rpe(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
     rtraj_rela = StampedSE3(rtraj[sour_id].timestamps, rpose_rela)
     etraj_rela = StampedSE3(etraj[sour_id].timestamps, epose_rela)
 
-    return compute_error(rtraj_rela, etraj_rela, etype, mtype = 'rpe')
+    return compute_error(rtraj_rela, etraj_rela, etype, mtype = 'rpe', otype = otype)
