@@ -1,7 +1,7 @@
 import torch
 from typing import List
-from .. import mat2SE3
 from ..basics import pm
+from .. import mat2SE3, mat2Sim3
 from .checking import is_lietensor
 
 
@@ -312,7 +312,6 @@ def knn(ref, nbr, k=1, ord=2, dim=-1, largest=False, sorted=True):
     dist = torch.linalg.norm(diff, dim=dim, ord=ord)
     return dist.topk(k, dim=dim, largest=largest, sorted=sorted)
 
-
 def svdtf(source, target):
     r'''
     Computes the rigid transformation ( :math:`SE(3)` ) between two sets of associated
@@ -357,6 +356,81 @@ def svdtf(source, target):
     t = ctntarget.mT - R @ ctnsource.mT
     T = torch.cat((R, t), dim=-1)
     return mat2SE3(T, check=False)
+
+
+def svdstf(source: torch.Tensor, target: torch.Tensor, with_scale: bool=True):
+    r'''
+    Compute the affine transformation ( :math:`Sim(3)` ) between two sets of associated
+    point clouds (source and target) using Umeyama alignment.
+
+    Ref: Least-squares estimation of transformation parameters between two point patterns.
+
+    Args:
+        source (``torch.Tensor``): the coordinates of the source point cloud.
+            The shape has to be (..., N, 3).
+        target (``torch.Tensor``): the coordinates of the target point cloud.
+            The shape has to be (..., N, 3).
+        with_scale (``bool``): True: with scale, False: without scale i.e. scale = 1.
+            Default: ``True``.
+
+    Returns:
+        ``LieTensor``: The affine transformation matrix in ``Sim3Type``  that
+        minimizes the mean squared error between the input point sets.
+
+    Warning:
+        The number of points N has to be the same for both point clouds.
+
+    Example:
+        >>> import torch, pypose as pp
+        >>> source = torch.tensor([[0., 0., 0.],
+        ...                     [1., 0., 0.],
+        ...                     [0., 1., 0.]])
+        >>> target = torch.tensor([[1., 1., 1.],
+        ...                     [2., 1., 1.],
+        ...                     [1., 2., 1.]])
+        >>> pp.svdstf(source, target)
+        Sim3Type LieTensor:
+        LieTensor([1., 1., 1., 0., 0., 0., 1., 1.])
+    '''
+    assert source.size(-2) == target.size(-2), {
+        "The number of points N has to be the same for both point clouds."}
+    assert source.size(-1) == 3, {"The source point dim should be 3"}
+    assert target.size(-1) == 3, {"The target point dim should be 3"}
+
+    N, m = source.shape[-2:]
+
+    ctnsource = source.mean(dim=-2, keepdim=True)
+    ctntarget = target.mean(dim=-2, keepdim=True)
+
+    source_ = source - ctnsource
+    target_ = target - ctntarget
+
+    H = target_.transpose(-2, -1) @ source_ / N
+    U, D, V = torch.linalg.svd(H)
+
+    # eq. 43
+    M = torch.eye(m, dtype=U.dtype).expand_as(U).clone()
+    M[...,-1,-1] = torch.sign(torch.det(U @ V))
+
+    # eq. 42
+    if with_scale:
+        var_source = (source_.norm(dim=-1)**2).mean(dim=-1, keepdim=True)
+        scale = torch.sum(torch.diagonal(M, dim1=-1, dim2=-2) * D,
+                          keepdim=True, dim=-1) / var_source
+    else:
+        scale = torch.ones_like(D[...,0:1])
+    scale = scale.unsqueeze(-1)
+
+    # eq. 40
+    R = U @ M @ V
+    # eq. 41
+    t = ctntarget.transpose(-2, -1) - \
+        scale * R @ ctnsource.transpose(-2, -1)
+
+    T = torch.cat((scale * R, t), dim=-1)
+
+    return mat2Sim3(T, check=True)
+
 
 
 def nbr_filter(points, nbr:int, radius:float, pdim:int=None, ord:int=2, return_mask:bool=False):
