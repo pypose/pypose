@@ -577,14 +577,14 @@ def voxel_filter(points: torch.Tensor, voxel: List[float], random:bool = False):
     kwargs = {'device': points.device, 'dtype': points.dtype}
 
     minp = torch.min(points[..., :vdim], dim=-2).values
-    indices = ((points[..., :vdim] - minp) / torch.tensor(voxel)).to(torch.int64)
+    indices = ((points[..., :vdim] - minp) / torch.tensor(voxel, device=points.device)).to(torch.int64)
 
     unique_indices, inverse_indices, counts = torch.unique(
         indices, dim=-2, return_inverse=True, return_counts=True)
     if random:
         sorting_indices = torch.argsort(inverse_indices).squeeze()
         sorted_points = points[sorting_indices, :]
-        _rand = [torch.randint(low=0, high=count.item(), size=(1,)) for count in counts]
+        _rand = [torch.randint(low=0, high=count.item(), size=(1,), device=points.device) for count in counts]
         random_indices = torch.cat(_rand)
         selected_indices = (random_indices + torch.cumsum(counts, dim=0) - counts).squeeze()
         return sorted_points[..., selected_indices, :]
