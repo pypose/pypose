@@ -194,7 +194,7 @@ class SO3Type(LieType):
             out = SO3_Act.apply(*input)
         else:
             out = SO3_Act4.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else p.shape[-1]
         return out.view(out_shape + (dim,))
 
     def Mul(self, X, Y):
@@ -348,7 +348,7 @@ class SE3Type(LieType):
             out = SE3_Act.apply(*input)
         else:
             out = SE3_Act4.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else p.shape[-1]
         return out.view(out_shape + (dim,))
 
     def Mul(self, X, Y):
@@ -483,7 +483,7 @@ class Sim3Type(LieType):
             out = Sim3_Act.apply(*input)
         else:
             out = Sim3_Act4.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else p.shape[-1]
         return out.view(out_shape + (dim,))
 
     def Mul(self, X, Y):
@@ -625,7 +625,7 @@ class RxSO3Type(LieType):
             out = RxSO3_Act.apply(*input)
         else:
             out = RxSO3_Act4.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else p.shape[-1]
         return out.view(out_shape + (dim,))
 
     def Mul(self, X, Y):
