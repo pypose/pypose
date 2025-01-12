@@ -52,12 +52,11 @@ def mat2SO3(mat, check=True, rtol=1e-5, atol=1e-5):
 
         .. math::
             |{\rm det}(\mathbf{R}) - 1| \leq \texttt{atol} + \texttt{rtol}\times 1\\
-            |\mathbf{RR}^{T}-\mathbf{I}|\leq\texttt{atol} + \texttt{rtol}\times\mathbf{I}
+            |\mathbf{RR}^{T} - \mathbf{I}| \leq \texttt{atol} + \texttt{rtol}\times \mathbf{I}
 
-        where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to
-        ``True``, illegal input will raise a ``ValueError``. Otherwise, no data validation
-        is performed. Illegal input will output an irrelevant result, which likely
-        contains ``nan``.
+        where :math:`|\cdot |` is element-wise absolute function. When ``check`` is set to ``True``,
+        illegal input will raise a ``ValueError``. Otherwise, no data validation is performed.
+        Illegal input will output an irrelevant result, which likely contains ``nan``.
 
     Examples:
 
