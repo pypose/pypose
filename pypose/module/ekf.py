@@ -154,11 +154,11 @@ class EKF(nn.Module):
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
 
-        xm = self.model.state_transition(x, input, t=t)        # 1. System transition
+        xm = self.model.state_transition(x, u, t=t)        # 1. System transition
 
         P = A @ P @ A.mT + B @ Q @ B.mT                  # 2. Covariance predict
         K = P @ C.mT @ pinv(C @ P @ C.mT + R) # 3. Kalman gain
-        e = y - bmv(C, x) - bmv(D, input)    #    predicted observation error
+        e = y - bmv(C, x) - bmv(D, u)    #    predicted observation error
         xp = xm + bmv(K, e)                     # 4. Posteriori state
         P = (I - K @ C) @ P @ (I - K @ C).mT + K @ R @ K.mT                   # 5. Posteriori covariance
         return xp, P
