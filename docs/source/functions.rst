@@ -56,7 +56,6 @@ Functions
     chspline
     bspline
     geodesic_loss
-    pose_loss
     random_filter
     voxel_filter
     nbr_filter
