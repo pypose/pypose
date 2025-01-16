@@ -430,17 +430,17 @@ def ape(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
         etype (``str``, optional):
             The type of pose error. Supported options include:
 
-            'translation': :math:`|| t_{e} - t_{r} ||_2`
+            ``'translation'``: :math:`|| t_{e} - t_{r} ||_2`
 
-            'rotation': :math:`|| R_{e}^T * R_{r} - I_3 ||_2`
+            ``'rotation'``: :math:`|| R_{e}^T * R_{r} - I_3 ||_2`
 
-            'pose': :math:`|| T_{e}^{-1} * T_{r} - I_4 ||_2`
+            ``'pose'``: :math:`|| T_{e}^{-1} * T_{r} - I_4 ||_2`
 
-            'radian': :math:`|| \mathrm{Log}(R_{e}^T * R_{r}) ||_2`
+            ``'radian'``: :math:`|| \mathrm{Log}(R_{e}^T * R_{r}) ||_2`
 
-            'degree': :math:`\mathrm{Degree}(|| \mathrm{Log}(R_{e}^T * R_{r}) ||_2)`
+            ``'degree'``: :math:`\mathrm{Degree}(|| \mathrm{Log}(R_{e}^T * R_{r}) ||_2)`
 
-            Default: 'translation'
+            Default: ``'translation'``
 
         diff (``float``, optional):
             The maximum allowed absolute time difference (in seconds)
@@ -467,27 +467,27 @@ def ape(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
         otype (``str``, optional):
             The output type for the metric. Supported options include:
 
-            'All': All metrics will be computed and returned.
+            ``'All'``: All metrics will be computed and returned.
 
-            'Max': The Max error is computed and returned.
+            ``'Max'``: The Max error is computed and returned.
 
-            'Min': The Min error is computed and returned.
+            ``'Min'``: The Min error is computed and returned.
 
-            'Mean': The Mean error is computed and returned.
+            ``'Mean'``: The Mean error is computed and returned.
 
-            'Median': The Median error is computed and returned.
+            ``'Median'``: The Median error is computed and returned.
 
-            'RMSE': The root mean square error (RMSE) is computed and returned.
+            ``'RMSE'``: The root mean square error (RMSE) is computed and returned.
 
-            'SSE': The sum of square error (SSE) is computed and returned.
+            ``'SSE'``: The sum of square error (SSE) is computed and returned.
 
-            'STD': The standard deviation (STD) is computed and returned.
+            ``'STD'``: The standard deviation (STD) is computed and returned.
 
-            Defaults to 'All'.
+            Defaults to ``'All'``.
 
     Returns:
         ``dict`` or ``Tensor``: The computed statistics of the APE (Absolute Pose Error).
-        The return is a ``dict`` if "otype" is not 'all', otherwise a ``Tensor``.
+        The return is a ``dict`` if ``otype`` is not ``'all'``, otherwise a ``Tensor``.
 
     Examples:
         >>> import torch
@@ -563,17 +563,17 @@ def rpe(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
         etype (``str``, optional):
             The type of pose error. Supported options include:
 
-            'translation': :math:`||{R_{r}^{rel}}^T * t_{r}^{rel} - {R_{e}^{rel}}^T * t_{e}^{rel}||_2`
+            ``'translation'``: :math:`||{R_{r}^{rel}}^T * t_{r}^{rel} - {R_{e}^{rel}}^T * t_{e}^{rel}||_2`
 
-            'rotation': :math:`|| {R_{r}^{rel}}^T * R_{e}^{rel} - I_3 ||_2`
+            ``'rotation'``: :math:`|| {R_{r}^{rel}}^T * R_{e}^{rel} - I_3 ||_2`
 
-            'pose': :math:`|| {T_{r}^{rel}}^{-1} * T_{e}^{rel} - I_4 ||_2`
+            ``'pose'``: :math:`|| {T_{r}^{rel}}^{-1} * T_{e}^{rel} - I_4 ||_2`
 
-            'radian': :math:`|| \mathrm{Log}({R_{r}^{rel}}^T * R_{e}^{rel}) ||_2`
+            ``'radian'``: :math:`|| \mathrm{Log}({R_{r}^{rel}}^T * R_{e}^{rel}) ||_2`
 
-            'degree': :math:`\mathrm{Degree}(|| \mathrm{Log}({R_{r}^{rel}}^T * R_{e}^{rel}) ||_2))`
+            ``'degree'``: :math:`\mathrm{Degree}(|| \mathrm{Log}({R_{r}^{rel}}^T * R_{e}^{rel}) ||_2))`
 
-            Default: 'translation'
+            Default: ``'translation'``
 
         diff (``float``, optional):
             The maximum allowed absolute time difference (in seconds)
@@ -615,27 +615,27 @@ def rpe(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
         otype (``str``, optional):
             The output type for the metric. Supported options include:
 
-            'All': All metrics will be computed and returned.
+            ``'All'``: All metrics will be computed and returned.
 
-            'Max': The Max error is computed and returned.
+            ``'Max'``: The Max error is computed and returned.
 
-            'Min': The Min error is computed and returned.
+            ``'Min'``: The Min error is computed and returned.
 
-            'Mean': The Mean error is computed and returned.
+            ``'Mean'``: The Mean error is computed and returned.
 
-            'Median': The Median error is computed and returned.
+            ``'Median'``: The Median error is computed and returned.
 
-            'RMSE': The root mean square error (RMSE) is computed and returned.
+            ``'RMSE'``: The root mean square error (RMSE) is computed and returned.
 
-            'SSE': The sum of square error (SSE) is computed and returned.
+            ``'SSE'``: The sum of square error (SSE) is computed and returned.
 
-            'STD': The standard deviation (STD) is computed and returned.
+            ``'STD'``: The standard deviation (STD) is computed and returned.
 
-            Defaults to 'All'.
+            Defaults to ``'All'``.
 
     Returns:
         ``dict`` or ``Tensor``: The computed statistics of the RPE (Relative Pose Error).
-        The return is a ``dict`` if "otype" is not 'all', otherwise a ``Tensor``.
+        The return is a ``dict`` if ``otype`` is not ``'all'``, otherwise a ``Tensor``.
 
     Examples:
         >>> import torch
