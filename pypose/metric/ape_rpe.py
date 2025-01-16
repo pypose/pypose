@@ -282,7 +282,7 @@ def compute_error(rtraj, etraj, output: str = 'translation', mtype: str = 'ape',
     if otype == 'STD' or 'All':
         results['STD']  = torch.std(error.abs())
 
-    if otype is 'All':
+    if otype == 'All':
         return results # return a dict
     else:
         return results[otype] # return a tensor
