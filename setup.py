@@ -46,7 +46,7 @@ if __name__ == '__main__':
         download_url = 'https://github.com/pypose/pypose',
         license = 'Apache License 2.0',
         license_files = ('LICENSE',),
-        description = 'To connect classic robotics with modern learning methods.',
+        description = 'A library for differentiable robotics.',
         long_description=long_description,
         long_description_content_type='text/markdown',
         python_requires='>=3.6',

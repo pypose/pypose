@@ -52,9 +52,12 @@ Functions
     cumops
     cumops_
     reprojerr
-    knn
     svdtf
     chspline
     bspline
     geodesic_loss
     pose_loss
+    random_filter
+    voxel_filter
+    nbr_filter
+    knn_filter

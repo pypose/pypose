@@ -13,6 +13,7 @@ PyPose Documentation
    convert
    modules
    optim
+   metric
    utils
    testing
 

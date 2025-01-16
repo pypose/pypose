@@ -194,7 +194,7 @@ class SO3Type(LieType):
             out = SO3_Act.apply(*input)
         else:
             out = SO3_Act4.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else p.shape[-1]
         return out.view(out_shape + (dim,))
 
     def Mul(self, X, Y):
@@ -225,7 +225,7 @@ class SO3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         input, out_shape = broadcast_inputs(X, a)
         out = SO3_AdjXa.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else a.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=so3_type)
 
@@ -234,7 +234,7 @@ class SO3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         input, out_shape = broadcast_inputs(X, a)
         out = SO3_AdjTXa.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else a.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=so3_type)
 
@@ -243,7 +243,7 @@ class SO3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         (X, a), out_shape = broadcast_inputs(X, a)
         out = (so3_Jl_inv(SO3_Log.apply(X)) @ a.unsqueeze(-1)).squeeze(-1)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else a.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=so3_type)
 
@@ -348,7 +348,7 @@ class SE3Type(LieType):
             out = SE3_Act.apply(*input)
         else:
             out = SE3_Act4.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else p.shape[-1]
         return out.view(out_shape + (dim,))
 
     def Mul(self, X, Y):
@@ -385,7 +385,7 @@ class SE3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         input, out_shape = broadcast_inputs(X, a)
         out = SE3_AdjXa.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else a.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=se3_type)
 
@@ -394,7 +394,7 @@ class SE3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         input, out_shape = broadcast_inputs(X, a)
         out = SE3_AdjTXa.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else a.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=se3_type)
 
@@ -403,7 +403,7 @@ class SE3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         (X, a), out_shape = broadcast_inputs(X, a)
         out = (se3_Jl_inv(SE3_Log.apply(X)) @ a.unsqueeze(-1)).squeeze(-1)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else a.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=se3_type)
 
@@ -483,7 +483,7 @@ class Sim3Type(LieType):
             out = Sim3_Act.apply(*input)
         else:
             out = Sim3_Act4.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else p.shape[-1]
         return out.view(out_shape + (dim,))
 
     def Mul(self, X, Y):
@@ -514,7 +514,7 @@ class Sim3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         input, out_shape = broadcast_inputs(X, a)
         out = Sim3_AdjXa.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else a.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=sim3_type)
 
@@ -523,7 +523,7 @@ class Sim3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         input, out_shape = broadcast_inputs(X, a)
         out = Sim3_AdjTXa.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else a.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=sim3_type)
 
@@ -532,7 +532,7 @@ class Sim3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         (X, a), out_shape = broadcast_inputs(X, a)
         out = (sim3_Jl_inv(Sim3_Log.apply(X)) @ a.unsqueeze(-1)).squeeze(-1)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else a.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=sim3_type)
 
@@ -625,7 +625,7 @@ class RxSO3Type(LieType):
             out = RxSO3_Act.apply(*input)
         else:
             out = RxSO3_Act4.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else p.shape[-1]
         return out.view(out_shape + (dim,))
 
     def Mul(self, X, Y):
@@ -656,7 +656,7 @@ class RxSO3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         input, out_shape = broadcast_inputs(X, a)
         out = RxSO3_AdjXa.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else a.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=rxso3_type)
 
@@ -665,7 +665,7 @@ class RxSO3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         input, out_shape = broadcast_inputs(X, a)
         out = RxSO3_AdjTXa.apply(*input)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else a.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=rxso3_type)
 
@@ -674,7 +674,7 @@ class RxSO3Type(LieType):
         a = a.tensor() if hasattr(a, 'ltype') else a
         (X, a), out_shape = broadcast_inputs(X, a)
         out = (rxso3_Jl_inv(RxSO3_Log.apply(X)) @ a.unsqueeze(-1)).squeeze(-1)
-        dim = -1 if out.nelement() != 0 else X.shape[-1]
+        dim = -1 if out.nelement() != 0 else a.shape[-1]
         out = out.view(out_shape + (dim,))
         return LieTensor(out, ltype=rxso3_type)
 
@@ -740,7 +740,8 @@ SO3_type, so3_type = SO3Type(), so3Type()
 SE3_type, se3_type = SE3Type(), se3Type()
 Sim3_type, sim3_type = Sim3Type(), sim3Type()
 RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
-
+liegroup = [SO3_type, SE3_type, Sim3_type, RxSO3_type]
+liealgebra = [so3_type, se3_type, sim3_type, rxso3_type]
 
 class LieTensor(torch.Tensor):
     r""" A sub-class of :obj:`torch.Tensor` to represent Lie Algebra and Lie Group.
