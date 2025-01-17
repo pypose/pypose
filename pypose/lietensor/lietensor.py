@@ -163,27 +163,27 @@ class LieType(ABC):
         raise NotImplementedError("Instance has no randn method")
 
     @classmethod
-    def cumops(cls, X, dim, ops):
+    def cumops(cls, X: LieTensor, dim: int, ops):
         return cumops(X, dim, ops)
 
     @classmethod
-    def cummul(cls, X, dim, left = True):
+    def cummul(cls, X: LieTensor, dim: int, left = True) -> LieTensor:
         return cummul(X, dim, left)
 
     @classmethod
-    def cumprod(cls, X, dim, left = True):
+    def cumprod(cls, X: LieTensor, dim: int, left = True) -> LieTensor:
         return cumprod(X, dim, left)
 
     @classmethod
-    def cumops_(cls, X, dim, ops):
+    def cumops_(cls, X: LieTensor, dim: int, ops):
         return cumops_(X, dim, ops)
 
     @classmethod
-    def cummul_(cls, X, dim, left = True):
+    def cummul_(cls, X: LieTensor, dim: int, left = True) -> LieTensor:
         return cummul_(X, dim, left)
 
     @classmethod
-    def cumprod_(cls, X, dim, left = True):
+    def cumprod_(cls, X: LieTensor, dim: int, left = True) -> LieTensor:
         return cumprod_(X, dim, left)
 
 
@@ -979,7 +979,7 @@ class LieTensor(torch.Tensor):
         '''
         return self.shape[:-1]
 
-    def lview(self, *shape):
+    def lview(self, *shape) -> LieTensor:
         r'''
         Returns a new LieTensor with the same data as the self tensor but of a different
         :obj:`lshape`.
@@ -1006,19 +1006,19 @@ class LieTensor(torch.Tensor):
         '''
         return self.view(*shape+self.ltype.dimension)
 
-    def Exp(self):
+    def Exp(self) -> LieTensor:
         r'''
         See :meth:`pypose.Exp`
         '''
         return self.ltype.Exp(self)
 
-    def Log(self):
+    def Log(self) -> LieTensor:
         r'''
         See :meth:`pypose.Log`
         '''
         return self.ltype.Log(self)
 
-    def Inv(self):
+    def Inv(self) -> LieTensor:
         r'''
         See :meth:`pypose.Inv`
         '''
@@ -1066,25 +1066,25 @@ class LieTensor(torch.Tensor):
         else: # Same with: self.ltype.matrix(self) @ other
             return self.Act(other)
 
-    def Retr(self, a):
+    def Retr(self, a: LieTensor) -> LieTensor:
         r'''
         See :meth:`pypose.Retr`
         '''
         return self.ltype.Retr(self, a)
 
-    def Adj(self, a):
+    def Adj(self, a: LieTensor | torch.Tensor) -> LieTensor:
         r'''
         See :meth:`pypose.Adj`
         '''
         return self.ltype.Adj(self, a)
 
-    def AdjT(self, a):
+    def AdjT(self, a: LieTensor | torch.Tensor) -> LieTensor:
         r'''
         See :meth:`pypose.AdjT`
         '''
         return self.ltype.AdjT(self, a)
 
-    def Jinvp(self, p):
+    def Jinvp(self, p: LieTensor | torch.Tensor) -> LieTensor:
         r'''
         See :meth:`pypose.Jinvp`
         '''
@@ -1114,7 +1114,7 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.translation(self)
 
-    def rotation(self):
+    def rotation(self) -> LieTensor:
         r'''
         See :meth:`pypose.rotation`
         '''
@@ -1178,37 +1178,37 @@ class LieTensor(torch.Tensor):
         '''
         return self.ltype.identity_(self)
 
-    def cumops(self, dim, ops):
+    def cumops(self, dim: int, ops):
         r"""
         See :func:`pypose.cumops`
         """
         return self.ltype.cumops(self, dim, ops)
 
-    def cummul(self, dim, left = True):
+    def cummul(self, dim: int, left = True) -> LieTensor:
         r"""
         See :func:`pypose.cummul`
         """
         return self.ltype.cummul(self, dim, left)
 
-    def cumprod(self, dim, left = True):
+    def cumprod(self, dim: int, left = True) -> LieTensor:
         r"""
         See :func:`pypose.cumprod`
         """
         return self.ltype.cumprod(self, dim, left)
 
-    def cumops_(self, dim, ops):
+    def cumops_(self, dim: int, ops):
         r"""
         Inplace version of :func:`pypose.cumops`
         """
         return self.ltype.cumops_(self, dim, ops)
 
-    def cummul_(self, dim, left = True):
+    def cummul_(self, dim: int, left = True) -> LieTensor:
         r"""
         Inplace version of :func:`pypose.cummul`
         """
         return self.ltype.cummul_(self, dim, left)
 
-    def cumprod_(self, dim, left = True):
+    def cumprod_(self, dim: int, left = True) -> LieTensor:
         r"""
         Inplace version of :func:`pypose.cumprod`
         """
