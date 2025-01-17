@@ -123,11 +123,11 @@ class AlmOptimExample:
         inner_optimizer = torch.optim.SGD(InnerNet.parameters(), lr=1e-2, momentum=0.9)
         inner_schd = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
         optimizer = SAL(model=InnerNet,
-                        inner_optimizer=inner_optimizer)
+                        optim=inner_optimizer)
         scheduler = CnstOptSchduler(optimizer, steps=120, inner_scheduler=inner_schd, inner_iter=400, \
                                     object_decrease_tolerance=1e-6, violation_tolerance=1e-6, \
                                     verbose=True)
-        
+
         while scheduler.continual():
             loss = optimizer.step(input)
             scheduler.step(loss)
@@ -146,7 +146,7 @@ class AlmOptimExample:
                 self.pose = pp.Parameter(pp.randn_so3(*dim))
 
             def objective(self, inputs):
-                
+
                 result = (self.pose.Exp() @ inputs).matrix() - torch.eye(3).to(inputs.device)
 
                 return torch.norm(result)
@@ -175,12 +175,12 @@ class AlmOptimExample:
         inner_optimizer = torch.optim.SGD(posnet.parameters(), lr=1e-2, momentum=0.9)
         inner_schd = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
         # optimizer = SAL(model=posnet, inner_scheduler=inner_scheduler, inner_iter=400, penalty_safeguard=1e3)
-        optimizer = SAL(model=posnet, inner_optimizer=inner_optimizer, penalty_safeguard=1e3)
+        optimizer = SAL(model=posnet, optim=inner_optimizer, penalty_safeguard=1e3)
         scheduler = CnstOptSchduler(optimizer, steps=30, inner_scheduler=inner_schd, inner_iter=400, \
                                     object_decrease_tolerance=1e-6, violation_tolerance=1e-6, \
                                     verbose=True)
-        
-        # scheduler 
+
+        # scheduler
         while scheduler.continual():
             loss = optimizer.step(input)
             scheduler.step(loss)

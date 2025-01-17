@@ -200,7 +200,8 @@ class StopOnPlateau(_Scheduler):
             loss = self.optimizer.step(input, target, weight)
             self.step(loss)
 
-class CnstOptSchduler(_Scheduler):
+
+class CnstrScheduler(_Scheduler):
 
     def __init__(self, optimizer, steps, inner_scheduler=None, inner_iter=400, object_decrease_tolerance=1e-6, \
                  violation_tolerance=1e-6, verbose=False):
@@ -224,12 +225,12 @@ class CnstOptSchduler(_Scheduler):
                     '                              '
                     'Violation  {:.6e} --> {:.6e} '
                     '(reduction/violation: {:.4e}).'
-                    .format(self.steps, 
-                            self.optimizer.last_object_value, 
-                            self.optimizer.object_value, 
+                    .format(self.steps,
+                            self.optimizer.last_object_value,
+                            self.optimizer.object_value,
                             (self.optimizer.last_object_value - self.optimizer.object_value) / (self.optimizer.last_object_value + 1e-31),
-                            self.optimizer.last_violation, 
-                            self.optimizer.violation_norm, 
+                            self.optimizer.last_violation,
+                            self.optimizer.violation_norm,
                             (self.optimizer.last_violation - self.optimizer.violation_norm) / (self.optimizer.last_violation + 1e-31)))
 
         self.steps = self.steps + 1

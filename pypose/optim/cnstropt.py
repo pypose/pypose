@@ -22,7 +22,6 @@ class _Unconstrained_Model(nn.Module):
 
     def forward(self, inputs=None, target=None):
 
-
         R, C = self.model(inputs)
         self.lmd = self.lmd if hasattr(self, 'lmd') \
                 else torch.zeros((C.shape[0], ))
@@ -39,19 +38,20 @@ class _Unconstrained_Model(nn.Module):
     #   3. penalty factor(Optional): update_para * penalty factor
 class SAL(_Optimizer):
     '''
-    Stochastic Augmented Lagrangian method for Constraint Optimization.
+    Stochastic Augmented Lagrangian method for Constrained Optimization. This optimizer is
+    used as a higher-level optimizer.
     '''
-    def __init__(self, model, inner_optimizer, penalty_factor=1, penalty_safeguard=1e5, \
+    def __init__(self, model, optim, penalty_factor=1, penalty_safeguard=1e5, \
                        penalty_update_factor=2, decrease_rate=0.9, min=1e-6, max=1e32):
         defaults = {**{'min':min, 'max':max}}
         super().__init__(model.parameters(), defaults=defaults)
         self.model = model
         self.decrease_rate = decrease_rate
-        self.pf_rate =penalty_update_factor
+        self.pf_rate = penalty_update_factor
         self.pf_safeguard = penalty_safeguard
         self.alm_model = _Unconstrained_Model(self.model, penalty_factor=penalty_factor)
         self.inner_iter = 0
-        self.optim = inner_optimizer
+        self.optim = optim
 
     #### f(x) - y = loss_0, f(x) + C(x) - 0 - y
     def step(self, inputs=None):
