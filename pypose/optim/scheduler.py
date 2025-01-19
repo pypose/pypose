@@ -1,5 +1,5 @@
 import torch
-from .optimizer import _Optimizer
+from .scndopt import _Optimizer
 
 
 class _Scheduler(object):
@@ -198,4 +198,46 @@ class StopOnPlateau(_Scheduler):
         '''
         while self.continual():
             loss = self.optimizer.step(input, target, weight)
+            self.step(loss)
+
+
+class CnstrScheduler(_Scheduler):
+
+    def __init__(self, optimizer, steps, scheduler=None, inner_iter=400, object_decrease_tolerance=1e-6, \
+                 violation_tolerance=1e-6, verbose=False):
+        super().__init__(optimizer, steps, verbose)
+        self.optimizer.inner_iter = inner_iter
+        self.object_decrease_tolerance = object_decrease_tolerance
+        self.violation_tolerance = violation_tolerance
+
+    def step(self, loss):
+
+        if self.verbose:
+            print('CnstOptSchduler on step {} '
+                    'Objection Loss {:.6e} --> Loss {:.6e} '
+                    '(reduction/loss: {:.4e}).\n'
+                    '                              '
+                    'Violation  {:.6e} --> {:.6e} '
+                    '(reduction/violation: {:.4e}).'
+                    .format(self.steps, self.optimizer.last, self.optimizer.loss,
+                            (self.optimizer.last - self.optimizer.loss) / (self.optimizer.last + 1e-31),
+                            self.optimizer.min_violate, self.optimizer.violate,
+                            (self.optimizer.min_violate - self.optimizer.violate) / (self.optimizer.min_violate + 1e-31)))
+
+        self.steps = self.steps + 1
+
+        if torch.norm(self.optimizer.last-self.optimizer.loss) <= self.object_decrease_tolerance \
+                    and self.optimizer.violate  <= self.violation_tolerance:
+            self._continual = False
+            if self.verbose:
+                print("CnstOptSchduler: Optimal value found, Quiting..")
+
+        elif self.steps >= self.max_steps:
+            self._continual = False
+            if self.verbose:
+                print("CnstOptSchduler: Maximum steps reached, Quiting..")
+
+    def optimize(self, input, target=None, weight=None):
+        while self.continual():
+            loss = self.optimizer.step(input)
             self.step(loss)

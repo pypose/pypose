@@ -1,5 +1,6 @@
 from . import functional, solver, kernel, corrector, strategy, scheduler
-from .optimizer import GaussNewton
-from .optimizer import GaussNewton as GN
-from .optimizer import LevenbergMarquardt
-from .optimizer import LevenbergMarquardt as LM
+from .scndopt import GaussNewton
+from .scndopt import GaussNewton as GN
+from .scndopt import LevenbergMarquardt
+from .scndopt import LevenbergMarquardt as LM
+from .cnstropt import SAL
