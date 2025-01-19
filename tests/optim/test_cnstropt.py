@@ -26,6 +26,9 @@ class TestOptim:
                 return violation.unsqueeze(0)
 
             def forward(self, inputs):
+                '''
+                Has to output a 2-tuple, including the error of objective and constraint.
+                '''
                 return self.obj(inputs), self.cnstr(inputs)
 
         input = None
@@ -42,7 +45,7 @@ class TestOptim:
             loss = optimizer.step(input)
             scheduler.step(loss)
 
-        print("Lambda*:", optimizer.lagrangeMultiplier)
+        print("Lambda*:", optimizer.alm_model.lmd)
         print("x*:", TensorNet.pose)
 
 

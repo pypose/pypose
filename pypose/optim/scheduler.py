@@ -214,10 +214,11 @@ class CnstrScheduler(_Scheduler):
         self.violation_tolerance = violation_tolerance
 
     def step(self, loss):
-        assert self.optimizer.loss is not None, \
-            'scheduler.step() should be called after optimizer.step()'
+        # assert self.optimizer.loss is not None, \
+            # 'scheduler.step() should be called after optimizer.step()'
         for scheduler in self.schedulers:
             scheduler.step()
+
         if self.verbose:
             print('CnstOptSchduler on step {} '
                     'Objection Loss {:.6e} --> Loss {:.6e} '
