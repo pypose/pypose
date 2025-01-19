@@ -130,7 +130,7 @@ class AlmOptimExample:
             loss = optimizer.step(input)
             scheduler.step(loss)
 
-        print("Lambda*:\n", optimizer.alm_model.lmd)
+        print("Lambda*:\n", optimizer.augmod.lmd)
         print('tau*:', InnerNet.x)
         solver = LQR_Solver()
         tau, mu = solver(A, B, C, T, x0)
@@ -172,7 +172,7 @@ class AlmOptimExample:
         inner_optimizer = torch.optim.SGD(posnet.parameters(), lr=1e-2, momentum=0.9)
         inner_schd = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
         # optimizer = SAL(model=posnet, inner_scheduler=inner_scheduler, inner_iter=400, penalty_safeguard=1e3)
-        optimizer = SAL(model=posnet, optim=inner_optimizer, penalty_safeguard=1e3)
+        optimizer = SAL(model=posnet, optim=inner_optimizer, safeguard=1e3)
         scheduler = CnstrScheduler(optimizer, steps=30, inner_scheduler=inner_schd, inner_iter=400, \
                                     object_decrease_tolerance=1e-6, violation_tolerance=1e-6, \
                                     verbose=True)
@@ -182,7 +182,7 @@ class AlmOptimExample:
             loss = optimizer.step(input)
             scheduler.step(loss)
 
-        print("Lambda:", optimizer.alm_model.lmd)
+        print("Lambda:", optimizer.augmod.lmd)
         print('x axis:', posnet.pose.cpu().detach().numpy())
 
         print('f(x):', posnet.objective(input))

@@ -203,21 +203,14 @@ class StopOnPlateau(_Scheduler):
 
 class CnstrScheduler(_Scheduler):
 
-    def __init__(self, optimizer, steps, inner_scheduler=None, inner_iter=400, object_decrease_tolerance=1e-6, \
+    def __init__(self, optimizer, steps, scheduler=None, inner_iter=400, object_decrease_tolerance=1e-6, \
                  violation_tolerance=1e-6, verbose=False):
         super().__init__(optimizer, steps, verbose)
-
-        self.schedulers = [inner_scheduler] if inner_scheduler and not isinstance(inner_scheduler, list) \
-                                            else inner_scheduler or []
         self.optimizer.inner_iter = inner_iter
         self.object_decrease_tolerance = object_decrease_tolerance
         self.violation_tolerance = violation_tolerance
 
     def step(self, loss):
-        # assert self.optimizer.loss is not None, \
-            # 'scheduler.step() should be called after optimizer.step()'
-        for scheduler in self.schedulers:
-            scheduler.step()
 
         if self.verbose:
             print('CnstOptSchduler on step {} '
@@ -226,18 +219,15 @@ class CnstrScheduler(_Scheduler):
                     '                              '
                     'Violation  {:.6e} --> {:.6e} '
                     '(reduction/violation: {:.4e}).'
-                    .format(self.steps,
-                            self.optimizer.last_object_value,
-                            self.optimizer.object_value,
-                            (self.optimizer.last_object_value - self.optimizer.object_value) / (self.optimizer.last_object_value + 1e-31),
-                            self.optimizer.last_violation,
-                            self.optimizer.violation_norm,
-                            (self.optimizer.last_violation - self.optimizer.violation_norm) / (self.optimizer.last_violation + 1e-31)))
+                    .format(self.steps, self.optimizer.last, self.optimizer.loss,
+                            (self.optimizer.last - self.optimizer.loss) / (self.optimizer.last + 1e-31),
+                            self.optimizer.min_violate, self.optimizer.violate,
+                            (self.optimizer.min_violate - self.optimizer.violate) / (self.optimizer.min_violate + 1e-31)))
 
         self.steps = self.steps + 1
 
-        if torch.norm(self.optimizer.last_object_value-self.optimizer.object_value) <= self.object_decrease_tolerance \
-                    and self.optimizer.violation_norm  <= self.violation_tolerance:
+        if torch.norm(self.optimizer.last-self.optimizer.loss) <= self.object_decrease_tolerance \
+                    and self.optimizer.violate  <= self.violation_tolerance:
             self._continual = False
             if self.verbose:
                 print("CnstOptSchduler: Optimal value found, Quiting..")
