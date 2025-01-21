@@ -1,67 +1,75 @@
+from __future__ import annotations
+
 import torch
 from torch import nn
 from .scndopt import _Optimizer
+from .scheduler import _Scheduler
 
 
-class AugModel(nn.Module):
-    '''
-    Internal Augmented Model class for Stochastic Augumented Largragian Optimization.
-    '''
-    def __init__(self, model, penalty):
-        super().__init__()
-        self.model, self.p = model, penalty
-
-    def update_lmd(self, error):
-        self.lmd += error * self.p
-        return self.lmd
-
-    def update_penalty(self, scale, safeguard):
-        p = self.p * scale
-        self.p = min(p, safeguard)
-
-    def forward(self, inputs=None, target=None):
-        R, C = self.model(inputs)
-        if not hasattr(self, 'lmd'):
-            self.lmd = torch.zeros(C.shape[0], device=C.device, dtype=C.dtype)
-        return R + self.lmd @ C + self.p * C.norm()**2 / 2
-
-############
-    # Update Needed Parameters:
-    #   1. model params: \theta, update with SGD
-    #   2. Lagrangian multiplier: \lambda, \lambda_{t+1} = \lambda_{t} + pf * error_C
-    #   3. penalty factor(Optional): update_para * penalty factor
 class SAL(_Optimizer):
     r'''
     Stochastic Augmented Lagrangian method for Equality Constrained Optimization.
     '''
-    def __init__(self, model, optim, penalty=1, safeguard=1e5, up=2, down=0.9):
-        super().__init__(model.parameters(), defaults={})
-        self.model, self.optim  = model, optim
-        self.safeguard, self.up, self.down = safeguard, up, down
-        self.augmod = AugModel(model, penalty=penalty)
-        self.last = self.min_violate = float('inf')
+    class AugLag(nn.Module):
+        '''
+        Internal Augmented Largragian Model for Equality Constrained Optimization.
+        The input model has to output a 2-tuple, where first element is a scalar denoting
+        the loss, and the second is a vector denoting the a series of equality violations.
+        '''
+        def __init__(self, model, penalty, shield, scale, hedge):
+            super().__init__()
+            self.model, self.lmd, self.penalty, self.shield = model, None, penalty, shield
+            self.scale, self.hedge, self.violate = scale, hedge, float('inf')
 
-    #### f(x) - y = loss_0, f(x) + C(x) - 0 - y
+        def update_params(self, inputs=None, target=None):
+            loss, cnstr = self.model(inputs)
+            violate = cnstr.norm()
+            if violate <= self.violate * self.hedge:
+                self.lmd += cnstr * self.penalty
+                self.violate = violate
+            else:
+                self.penalty = min(self.penalty * self.scale, self.shield)
+            return torch.tensor([loss, violate])
+
+        def forward(self, inputs=None, target=None):
+            R, C = self.model(inputs)
+            if self.lmd is None:
+                self.lmd = torch.zeros(C.shape[0], device=C.device, dtype=C.dtype)
+            return R + self.lmd @ C + self.penalty * C.norm()**2 / 2
+
+    def __init__(self, model, scheduler, steps:int=None,
+                 penalty:float=1, shield:float=1e3, scale:float=2, hedge:float=0.9):
+        super().__init__(model.parameters(), defaults={})
+        assert issubclass(type(scheduler), _Scheduler) or steps is not None, \
+            "SAL config has to be:" \
+            "['scheduler' from torch and 'steps' not None] Or ['scheduler' from pypose]"
+        self.auglag = self.AugLag(model, penalty, shield, scale, hedge)
+        self.scheduler, self.steps = scheduler, steps
+        self.last = self.loss = torch.tensor([float('inf'), float('inf')])
+
     def step(self, inputs=None):
 
         with torch.no_grad():
-            self.last, cnstr = self.model(inputs)
-            self.last_violation = cnstr.norm()
+            if (self.last == float('inf')).all():
+                last, violate = self.auglag.model(inputs)
+                self.last = self.loss = torch.tensor([last, violate.norm()])
 
-        for _ in range(self.inner_iter):
-            self.optim.zero_grad()
-            loss = self.augmod(inputs)
-            loss.backward()
-            self.optim.step()
+        scheduler = self.scheduler()
+        if issubclass(type(scheduler), _Scheduler):
+            # For optim from pypose
+            while scheduler.continual():
+                loss = scheduler.optimizer.step(inputs)
+                scheduler.step(loss)
+        else:
+            # For optim from torch
+            for _ in range(self.steps):
+                scheduler.optimizer.zero_grad()
+                loss = self.auglag(inputs)
+                loss.backward()
+                scheduler.optimizer.step()
 
         with torch.no_grad():
-            self.loss, self.cnstr = self.model(inputs)
-            self.violate = self.cnstr.norm()
+            self.last = self.loss
+            self.loss = self.auglag.update_params(inputs)
 
-            if self.violate <= self.min_violate * self.down:
-                self.augmod.update_lmd(self.cnstr)
-                self.min_violate = self.violate
-            else:
-                self.augmod.update_penalty(self.up, self.safeguard)
-
-        return loss
+        return self.loss

@@ -1,7 +1,9 @@
 from torch import nn
 import torch, pypose as pp
 from pypose.optim import SAL
-from pypose.optim.scheduler import CnstrScheduler
+from pypose.utils import Prepare
+from pypose.optim.scheduler import StopOnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -25,7 +27,7 @@ class LQR_Solver(torch.nn.Module):
 
         dynamics = torch.zeros(n_state * T, n_all * T, device=device)
 
-        dynamics[:n_state,:n_state] = torch.eye(n_state)
+        dynamics[:n_state,:n_state] = torch.eye(n_state, device=device)
         dynamics[n_state:n_state + AB.size(0), :AB.size(1)] = AB
         idx1c = torch.linspace(n_all, n_all * (T - 1), T - 1, dtype=int)
         idx1r = n_state * torch.linspace(1, T - 1, T - 1, dtype=int)
@@ -116,22 +118,20 @@ class AlmOptimExample:
         x0 = torch.randn(n_state, device=device)
 
 
-        InnerNet = TensorModel(T, C, n_all, A, B, x0)
+        model = TensorModel(T, C, n_all, A, B, x0)
         input = None
 
-        inner_optimizer = torch.optim.SGD(InnerNet.parameters(), lr=1e-2, momentum=0.9)
-        inner_schd = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
-        optimizer = SAL(model=InnerNet, optim=inner_optimizer)
-        scheduler = CnstrScheduler(optimizer, steps=120, inner_scheduler=inner_schd, inner_iter=400, \
-                                    object_decrease_tolerance=1e-6, violation_tolerance=1e-6, \
-                                    verbose=True)
+        inopt = torch.optim.SGD(model.parameters(), lr=1e-2, momentum=0.9)
+        # insch = ReduceLROnPlateau(optimizer=inopt, min_lr=1e-2, verbose=True)
+        insch = Prepare(ReduceLROnPlateau, optimizer=inopt, min_lr=1e-2, verbose=True)
+        outopt = SAL(model=model, scheduler=insch, steps=200, penalty=1, shield=1e3, scale=2, hedge=0.9)
+        outsch = StopOnPlateau(outopt, steps=120, patience=10, decreasing=1e-6, verbose=True)
+        while outsch.continual():
+            loss = outopt.step(input)
+            outsch.step(loss)
 
-        while scheduler.continual():
-            loss = optimizer.step(input)
-            scheduler.step(loss)
-
-        print("Lambda*:\n", optimizer.augmod.lmd)
-        print('tau*:', InnerNet.x)
+        print("Lambda*:\n", outopt.auglag.lmd)
+        print('tau*:', model.x)
         solver = LQR_Solver()
         tau, mu = solver(A, B, C, T, x0)
         print('Lambda true:\n', mu)
@@ -168,25 +168,22 @@ class AlmOptimExample:
         quaternion = pp.euler2SO3(euler_angles)
         input = pp.SO3(quaternion)
 
-        posnet = PoseInvConstrained(1)
-        inner_optimizer = torch.optim.SGD(posnet.parameters(), lr=1e-2, momentum=0.9)
-        inner_schd = torch.optim.lr_scheduler.StepLR(optimizer=inner_optimizer, step_size=20, gamma=0.5)
-        # optimizer = SAL(model=posnet, inner_scheduler=inner_scheduler, inner_iter=400, penalty_safeguard=1e3)
-        optimizer = SAL(model=posnet, optim=inner_optimizer, safeguard=1e3)
-        scheduler = CnstrScheduler(optimizer, steps=30, inner_scheduler=inner_schd, inner_iter=400, \
-                                    object_decrease_tolerance=1e-6, violation_tolerance=1e-6, \
-                                    verbose=True)
+        model = PoseInvConstrained(1)
 
-        # scheduler
-        while scheduler.continual():
-            loss = optimizer.step(input)
-            scheduler.step(loss)
+        inopt = torch.optim.SGD(model.parameters(), lr=1e-2, momentum=0.9)
+        # insch = ReduceLROnPlateau(optimizer=inopt, min_lr=1e-2, verbose=True)
+        insch = Prepare(ReduceLROnPlateau, optimizer=inopt, min_lr=1e-2, verbose=True)
+        outopt = SAL(model, scheduler=insch, steps=200, penalty=1, shield=1e3, scale=2, hedge=0.9)
+        outsch = StopOnPlateau(outopt, steps=20, patience=5, decreasing=1e-6, verbose=True)
+        while outsch.continual():
+            loss = outopt.step(input)
+            outsch.step(loss)
 
-        print("Lambda:", optimizer.augmod.lmd)
-        print('x axis:', posnet.pose.cpu().detach().numpy())
+        print("Lambda:", outopt.auglag.lmd)
+        print('x axis:', model.pose.cpu().detach().numpy())
 
-        print('f(x):', posnet.objective(input))
-        print('final violation:', posnet.constrain(input))
+        print('f(x):', model.objective(input))
+        print('final violation:', model.constrain(input))
 
 if __name__ == "__main__":
     alm = AlmOptimExample()
