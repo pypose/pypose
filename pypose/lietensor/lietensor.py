@@ -56,35 +56,35 @@ class LieType(ABC):
     def on_manifold(self) -> bool:
         return self.dimension == self.manifold
 
-    def add_(self, input: LieTensor, other: LieTensor) -> torch.Tensor:
+    def add_(self, input: LieTensor, other: torch.Tensor) -> torch.Tensor:
         if self.on_manifold:
             other1 = torch.Tensor.as_subclass(input, torch.Tensor)
             other2 = torch.Tensor.as_subclass(other, torch.Tensor)
             return input.copy_(other1 + other2[..., :self.manifold[0]])
         raise NotImplementedError("Instance has no add_ attribute.")
 
-    def Log(self, X: LieTensor | torch.Tensor) -> LieTensor:
+    def Log(self, X: LieTensor) -> LieTensor:
         if self.on_manifold:
             raise AttributeError("Lie Algebra has no Log attribute")
         raise NotImplementedError("Instance has no Log attribute.")
 
-    def Exp(self, x: LieTensor | torch.Tensor) -> LieTensor:
+    def Exp(self, x: LieTensor) -> LieTensor:
         if not self.on_manifold:
             raise AttributeError("Lie Group has no Exp attribute")
         raise NotImplementedError("Instance has no Exp attribute.")
 
-    def Inv(self, X: LieTensor | torch.Tensor) -> LieTensor:
+    def Inv(self, X: LieTensor) -> LieTensor:
         if self.on_manifold:
             return LieTensor(-X, ltype=self)
         raise NotImplementedError("Instance has no Inv attribute.")
 
-    def Act(self, X: LieTensor | torch.Tensor, p: torch.Tensor) -> torch.Tensor:
+    def Act(self, X: LieTensor, p: torch.Tensor) -> torch.Tensor:
         """ action on a points tensor(*, 3[4]) (homogeneous)"""
         if not self.on_manifold:
             raise AttributeError("Lie Group has no Act attribute")
         raise NotImplementedError("Instance has no Act attribute.")
 
-    def Mul(self, X: LieTensor | torch.Tensor, Y: LieTensor | torch.Tensor) -> LieTensor:
+    def Mul(self, X: LieTensor, Y: numbers.Number | torch.Tensor | LieTensor) -> LieTensor:
         if not self.on_manifold:
             raise AttributeError("Lie Group has no Mul attribute")
         raise NotImplementedError("Instance has no Mul attribute.")
@@ -94,19 +94,19 @@ class LieType(ABC):
             raise AttributeError("Has no Retr attribute")
         return a.Exp() * X
 
-    def Adj(self, X: LieTensor | torch.Tensor, a: LieTensor | torch.Tensor) -> LieTensor:
+    def Adj(self, X: LieTensor, a: LieTensor) -> LieTensor:
         ''' X * Exp(a) = Exp(Adj) * X '''
         if not self.on_manifold:
             raise AttributeError("Lie Group has no Adj attribute")
         raise NotImplementedError("Instance has no Adj attribute.")
 
-    def AdjT(self, X: LieTensor | torch.Tensor, a: LieTensor | torch.Tensor) -> LieTensor:
+    def AdjT(self, X: LieTensor, a: LieTensor) -> LieTensor:
         ''' Exp(a) * X = X * Exp(AdjT) '''
         if not self.on_manifold:
             raise AttributeError("Lie Group has no AdjT attribute")
         raise NotImplementedError("Instance has no AdjT attribute.")
 
-    def Jinvp(self, X: LieTensor | torch.Tensor, p: LieTensor | torch.Tensor) -> LieTensor:
+    def Jinvp(self, X: LieTensor, p: LieTensor) -> LieTensor:
         if not self.on_manifold:
             raise AttributeError("Lie Group has no Jinvp attribute")
         raise NotImplementedError("Instance has no Jinvp attribute.")
