@@ -56,7 +56,7 @@ class LieType(ABC):
     def on_manifold(self) -> bool:
         return self.dimension == self.manifold
 
-    def add_(self, input: LieTensor, other: torch.Tensor) -> torch.Tensor:
+    def add_(self, input: LieTensor, other: torch.Tensor) -> LieTensor:
         if self.on_manifold:
             other1 = torch.Tensor.as_subclass(input, torch.Tensor)
             other2 = torch.Tensor.as_subclass(other, torch.Tensor)
@@ -84,7 +84,8 @@ class LieType(ABC):
             raise AttributeError("Lie Group has no Act attribute")
         raise NotImplementedError("Instance has no Act attribute.")
 
-    def Mul(self, X: LieTensor, Y: numbers.Number | torch.Tensor | LieTensor) -> LieTensor:
+    def Mul(self, X: LieTensor, Y: numbers.Number | torch.Tensor | LieTensor) \
+        -> torch.Tensor | LieTensor:
         if not self.on_manifold:
             raise AttributeError("Lie Group has no Mul attribute")
         raise NotImplementedError("Instance has no Mul attribute.")
