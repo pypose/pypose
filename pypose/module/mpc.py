@@ -5,7 +5,7 @@ from ..utils.stepper import ReduceToBason
 
 
 class MPC(nn.Module):
-    r'''
+    r"""
     Model Predictive Control (MPC) based on iterative LQR.
 
     Args:
@@ -196,15 +196,18 @@ class MPC(nn.Module):
                       [ 0.1440],
                       [-0.0530],
                       [ 0.1023]]])
-    '''
+    """
+
     def __init__(self, system, Q, p, T, stepper=None):
         super().__init__()
         self.stepper = ReduceToBason(steps=10) if stepper is None else stepper
-        self.stepper.max_steps -= 1 # n-1 loops, 1 loop with gradient
+        self.stepper.max_steps = (
+            self.stepper.max_steps - 1
+        )  # n-1 loops, 1 loop with gradient
         self.lqr = LQR(system, Q, p, T)
 
     def forward(self, dt, x_init, u_init=None, u_lower=None, u_upper=None, du=None):
-        r'''
+        r"""
         Performs MPC for the discrete system.
 
         Args:
@@ -223,9 +226,9 @@ class MPC(nn.Module):
             List of :obj:`Tensor`: A list of tensors including the solved state sequence
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
             associated quadratic costs :math:`\mathbf{c}` over the time horizon.
-        '''
+        """
         x, u = None, u_init
-        best = {'x': x, 'u': u, 'cost': None}
+        best = {"x": x, "u": u, "cost": None}
 
         self.stepper.reset()
         with torch.no_grad():
@@ -233,7 +236,6 @@ class MPC(nn.Module):
                 x, u, cost = self.lqr(x_init, dt, u)
                 self.stepper.step(cost)
 
-                if best['cost'] == None or cost < best['cost']:
-                    best = {'x': x, 'u': u, 'cost': cost}
-
-        return self.lqr(x_init, dt, u_traj=best['u'])
+                if best["cost"] is None or cost < best["cost"]:
+                    best = {"x": x, "u": u, "cost": cost}
+        return self.lqr(x_init, dt, u_traj=best["u"])
