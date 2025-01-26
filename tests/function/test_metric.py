@@ -20,7 +20,7 @@ class TestAPERPE:
 
     def test_aperpe(self):
         local = './tests/function/'
-        remote = 'https://raw.githubusercontent.com/MichaelGrupp/evo/master/test/data/'
+        remote = 'https://github.com/pypose/pypose/releases/download/v0.7.1/'
         download_url(remote + '/fr2_desk_groundtruth.txt', local)
         download_url(remote + '/fr2_desk_ORB.txt', local)
         tstamp, tpose = self.read_tum_file(local + '/fr2_desk_groundtruth.txt')
