@@ -19,7 +19,7 @@ class TestAPERPE:
         return stamp, pose
 
     def test_aperpe(self):
-        local = './tests/data'
+        local = './tests/function/'
         remote = 'https://raw.githubusercontent.com/MichaelGrupp/evo/master/test/data/'
         download_url(remote + '/fr2_desk_groundtruth.txt', local)
         download_url(remote + '/fr2_desk_ORB.txt', local)
