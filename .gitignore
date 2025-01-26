@@ -155,3 +155,5 @@ examples/module/reprojpgo/save/*
 *epnp-test-data.pt*
 *icp-test-data.pt*
 *__MACOSX
+
+/tests/data

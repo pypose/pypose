@@ -22,6 +22,19 @@ class Trivial(torch.nn.Module):
         return out[0] if len(out) == 1 else out
 
 
+class PArgs():
+    r"""
+    Internal args and kwargs typing class.
+    Not supposed to be called by PyPose users.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.args, self.kwargs = args, kwargs
+
+    def __call__(self):
+        return self.args, self.kwargs
+
+
 class RobustModel(nn.Module):
     '''
     Standardize a model for least square problems with an option of square-rooting kernel.
@@ -60,9 +73,12 @@ class RobustModel(nn.Module):
         return self.residuals(output, target)
 
     def model_forward(self, input):
-        if isinstance(input, dict):
+        if isinstance(input, PArgs):
+            args, kwargs = input()
+            return self.model(*args, **kwargs)
+        elif isinstance(input, dict):
             return self.model(**input)
-        if isinstance(input, (tuple, list)):
+        elif isinstance(input, (tuple, list)):
             return self.model(*input)
         else:
             return self.model(input)

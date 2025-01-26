@@ -121,16 +121,17 @@ class AlmOptimExample:
         model = TensorModel(T, C, n_all, A, B, x0)
         input = None
 
-        inopt = torch.optim.SGD(model.parameters(), lr=1e-2, momentum=0.9)
-        # insch = ReduceLROnPlateau(optimizer=inopt, min_lr=1e-2, verbose=True)
-        insch = Prepare(ReduceLROnPlateau, optimizer=inopt, min_lr=1e-2, verbose=True)
-        outopt = SAL(model=model, scheduler=insch, steps=200, penalty=1, shield=1e3, scale=2, hedge=0.9)
+        outopt = SAL(model=model, penalty=1, shield=1e3, scale=2, hedge=0.9)
         outsch = StopOnPlateau(outopt, steps=120, patience=10, decreasing=1e-6, verbose=True)
+
+        inopt = torch.optim.SGD(model.parameters(), lr=1e-2, momentum=0.9)
+        outopt.inner_scheduler(Prepare(ReduceLROnPlateau, optimizer=inopt, min_lr=1e-2), steps=200)
+
         while outsch.continual():
             loss = outopt.step(input)
             outsch.step(loss)
 
-        print("Lambda*:\n", outopt.auglag.lmd)
+        print("Lambda*:\n", outopt.model.lmd)
         print('tau*:', model.x)
         solver = LQR_Solver()
         tau, mu = solver(A, B, C, T, x0)
@@ -170,16 +171,19 @@ class AlmOptimExample:
 
         model = PoseInvConstrained(1)
 
+
+        outopt = SAL(model, penalty=1, shield=1e3, scale=2, hedge=0.9)
+        outsch = StopOnPlateau(outopt, steps=20, patience=5, decreasing=1e-6, verbose=True)
+
         inopt = torch.optim.SGD(model.parameters(), lr=1e-2, momentum=0.9)
         # insch = ReduceLROnPlateau(optimizer=inopt, min_lr=1e-2, verbose=True)
-        insch = Prepare(ReduceLROnPlateau, optimizer=inopt, min_lr=1e-2, verbose=True)
-        outopt = SAL(model, scheduler=insch, steps=200, penalty=1, shield=1e3, scale=2, hedge=0.9)
-        outsch = StopOnPlateau(outopt, steps=20, patience=5, decreasing=1e-6, verbose=True)
+        outopt.inner_scheduler(Prepare(ReduceLROnPlateau, optimizer=inopt, min_lr=1e-2, verbose=True), steps=200)
+
         while outsch.continual():
             loss = outopt.step(input)
             outsch.step(loss)
 
-        print("Lambda:", outopt.auglag.lmd)
+        print("Lambda:", outopt.model.lmd)
         print('x axis:', model.pose.cpu().detach().numpy())
 
         print('f(x):', model.objective(input))

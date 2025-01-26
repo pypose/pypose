@@ -28,7 +28,7 @@ class _Scheduler(object):
 
         # Attach optimizer
         if not isinstance(optimizer, _Optimizer):
-            raise TypeError('{} is not an Optimizer'.format(
+            raise TypeError('{} is not an acceptable Optimizer'.format(
                 type(optimizer).__name__))
 
         self.optimizer, self.verbose = optimizer, verbose
