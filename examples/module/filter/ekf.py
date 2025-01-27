@@ -6,7 +6,7 @@ from bicycle import Bicycle, bicycle_plot
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='EKF Example')
     parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
-    parser.add_argument("--save", type=str, default='./examples/module/filter/save/', 
+    parser.add_argument("--save", type=str, default='./examples/module/filter/save/',
                         help="location of png files to save")
     parser.add_argument('--show', dest='show', action='store_true',
                         help="show plot, default: False")
@@ -30,9 +30,9 @@ if __name__ == "__main__":
     filter = EKF(bicycle, Q, R).to(args.device)
 
     for i in range(T - 1):
-        w = q * torch.randn(N, device=args.device)
+        w = q * torch.randn(M, device=args.device)
         v = r * torch.randn(N, device=args.device)
-        state[i + 1], obs[i] = bicycle(state[i] + w, input[i])  # model measurement
+        state[i + 1], obs[i] = bicycle(state[i], input[i] + w)  # model measurement
         est[i + 1], P[i + 1] = filter(est[i], obs[i] + v, input[i], P[i])
 
     bicycle_plot('EKF', state, est, P, save=args.save, show=args.show)
