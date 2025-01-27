@@ -3,7 +3,7 @@ from .. import LieTensor
 
 
 def bvv(lvec, rvec, *, out=None):
-    r'''
+    r"""
     Performs batched vector-vector product, which results in matrices.
 
     Args:
@@ -22,7 +22,7 @@ def bvv(lvec, rvec, *, out=None):
         >>> out = pp.bvv(lvec, rvec)
         >>> out.shape
         torch.Size([2, 2, 3, 2])
-    '''
+    """
     lvec = lvec.tensor() if isinstance(lvec, LieTensor) else lvec
     rvec = rvec.tensor() if isinstance(rvec, LieTensor) else rvec
     lvec, rvec = lvec.unsqueeze(-1), rvec.unsqueeze(-1)
@@ -30,7 +30,7 @@ def bvv(lvec, rvec, *, out=None):
 
 
 def bmv(mat, vec, *, out=None):
-    r'''
+    r"""
     Performs batched matrix-vector product.
 
     Args:
@@ -53,16 +53,21 @@ def bmv(mat, vec, *, out=None):
         >>> out = pp.bmv(matrix, vec)
         >>> out.shape
         torch.Size([2, 2, 3])
-    '''
-    assert mat.ndim >= 2 and vec.ndim >= 1, 'Input arguments invalid'
-    assert mat.shape[-1] == vec.shape[-1], 'matrix-vector shape invalid'
-    mat = mat.tensor() if isinstance(mat, LieTensor) else mat
-    vec = vec.tensor() if isinstance(vec, LieTensor) else vec
-    return torch.matmul(mat, vec.unsqueeze(-1), out=out).squeeze_(-1)
+    """
+    assert mat.ndim >= 2 and vec.ndim >= 1, "Input arguments invalid"
+    assert mat.shape[-1] == vec.shape[-1], "matrix-vector shape invalid"
+    # mat = mat.tensor() if isinstance(mat, LieTensor) else mat
+    # vec = vec.tensor() if isinstance(vec, LieTensor) else vec
+    mat_clone = mat.clone()
+    vec_clone = vec.clone()
+    mat_clone = mat_clone.tensor() if isinstance(mat, LieTensor) else mat_clone
+    vec_clone = vec_clone.tensor() if isinstance(vec, LieTensor) else vec_clone
+
+    return torch.matmul(mat_clone, vec_clone.unsqueeze(-1), out=out).squeeze(-1)
 
 
 def bvmv(lvec, mat, rvec):
-    r'''
+    r"""
     Performs batched vector-matrix-vector product.
 
     .. math::
@@ -100,11 +105,21 @@ def bvmv(lvec, mat, rvec):
         >>> out = pp.bvmv(v1, mat, v2)
         >>> out.shape
         torch.Size([2, 2])
-    '''
-    assert mat.ndim >= 2 and lvec.ndim >= 1 and rvec.ndim >= 1, 'Shape invalid'
+    """
+    assert mat.ndim >= 2 and lvec.ndim >= 1 and rvec.ndim >= 1, "Shape invalid"
     assert lvec.shape[-1] == mat.shape[-2] and mat.shape[-1] == rvec.shape[-1]
-    lvec = lvec.tensor() if isinstance(lvec, LieTensor) else lvec
-    mat = mat.tensor() if isinstance(mat, LieTensor) else mat
-    rvec = rvec.tensor() if isinstance(rvec, LieTensor) else rvec
-    lvec, rvec = lvec.unsqueeze(-1), rvec.unsqueeze(-1)
-    return torch.atleast_1d((lvec.mT @ mat @ rvec).squeeze_(-1).squeeze_(-1))
+    lvec_clone = lvec.clone()
+    mat_clone = mat.clone()
+    rvec_clone = rvec.clone()
+    lvec_clone = (
+        lvec_clone.tensor() if isinstance(lvec_clone, LieTensor) else lvec_clone
+    )
+    mat_clone = mat_clone.tensor() if isinstance(mat_clone, LieTensor) else mat_clone
+    rvec_clone = (
+        rvec_clone.tensor() if isinstance(rvec_clone, LieTensor) else rvec_clone
+    )
+
+    lvec_clone, rvec_clone = lvec_clone.unsqueeze(-1), rvec_clone.unsqueeze(-1)
+    return torch.atleast_1d(
+        (lvec_clone.mT @ mat_clone @ rvec_clone).squeeze(-1).squeeze(-1)
+    )

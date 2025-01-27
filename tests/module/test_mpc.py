@@ -3,24 +3,66 @@ import torch, pypose as pp
 
 class TestMPC:
 
-    def test_ilqr_cartpole(self, device='cpu'):
+    def test_ilqr_cartpole(self, device="cpu"):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # The reference data
-        x_ref = torch.tensor([
-            [[ 0.0000000000e+00,  0.0000000000e+00, 3.1415927410e+00,  0.0000000000e+00],
-             [ 0.0000000000e+00,  7.8299985034e-05, 3.1415927410e+00,  3.9145703340e-05],
-             [ 7.8299984807e-07, -1.5641693607e-04, 3.1415932178e+00, -7.8217039117e-05],
-             [-7.8116948998e-07, -3.8382178172e-04, 3.1415925025e+00, -1.9194713968e-04],
-             [-4.6193872549e-06, -7.2401645593e-04, 3.1415905952e+00, -3.6203706986e-04],
-             [-1.1859551705e-05, -7.6239358168e-04, 3.1415870189e+00, -3.8112464244e-04]]],
-            device=device)
+        x_ref = torch.tensor(
+            [
+                [
+                    [
+                        0.0000000000e00,
+                        0.0000000000e00,
+                        3.1415927410e00,
+                        0.0000000000e00,
+                    ],
+                    [
+                        0.0000000000e00,
+                        7.8299985034e-05,
+                        3.1415927410e00,
+                        3.9145703340e-05,
+                    ],
+                    [
+                        7.8299984807e-07,
+                        -1.5641693607e-04,
+                        3.1415932178e00,
+                        -7.8217039117e-05,
+                    ],
+                    [
+                        -7.8116948998e-07,
+                        -3.8382178172e-04,
+                        3.1415925025e00,
+                        -1.9194713968e-04,
+                    ],
+                    [
+                        -4.6193872549e-06,
+                        -7.2401645593e-04,
+                        3.1415905952e00,
+                        -3.6203706986e-04,
+                    ],
+                    [
+                        -1.1859551705e-05,
+                        -7.6239358168e-04,
+                        3.1415870189e00,
+                        -3.8112464244e-04,
+                    ],
+                ]
+            ],
+            device=device,
+        )
 
-        u_ref = torch.tensor([[[1.7618140578269958e-01],
-                              [-5.2810668945312500e-01],
-                              [-5.1161938905715942e-01],
-                              [-7.6544916629791260e-01],
-                              [-8.6499989032745361e-02]]],device=device)
+        u_ref = torch.tensor(
+            [
+                [
+                    [1.7618140578269958e-01],
+                    [-5.2810668945312500e-01],
+                    [-5.1161938905715942e-01],
+                    [-7.6544916629791260e-01],
+                    [-8.6499989032745361e-02],
+                ]
+            ],
+            device=device,
+        )
 
         class CartPole(pp.module.NLS):
             def __init__(self, dt, length, cartmass, polemass, gravity):
@@ -34,17 +76,36 @@ class TestMPC:
                 self.totalMass = self.cartmass + self.polemass
 
             def state_transition(self, state, input, t=None):
-                x, xDot, theta, thetaDot = state.squeeze()
-                force = input.squeeze()
-                costheta = torch.cos(theta)
-                sintheta = torch.sin(theta)
+                if state.requires_grad:
+                    print("state requires grad")
+                # x, xDot, theta, thetaDot = state.squeeze()
+                # force = input.squeeze()
+                # costheta = torch.cos(theta)
+                # sintheta = torch.sin(theta)
+                costheta = torch.cos(state[..., 2])
+                sintheta = torch.sin(state[..., 2])
 
-                temp = (force + self.poleml * thetaDot**2 * sintheta) / self.totalMass
-                thetaAcc = (self.gravity * sintheta - costheta * temp) / \
-                    (self.length * (4 / 3 - self.polemass * costheta**2 / self.totalMass))
+                # temp = (force + self.poleml * thetaDot**2 * sintheta) / self.totalMass
+                temp = (
+                    input + self.poleml * state[..., 3] ** 2 * sintheta
+                ) / self.totalMass
+                thetaAcc = (self.gravity * sintheta - costheta * temp) / (
+                    self.length * (4 / 3 - self.polemass * costheta**2 / self.totalMass)
+                )
+
                 xAcc = temp - self.poleml * thetaAcc * costheta / self.totalMass
-                _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
-                return (state.squeeze() + torch.mul(_dstate, self.tau)).unsqueeze(0)
+                # _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
+                _dstate = torch.stack(
+                    (
+                        state[..., 1],
+                        xAcc.squeeze(1),
+                        state[..., 3],
+                        thetaAcc.squeeze(1),
+                    ),
+                    dim=-1,
+                )
+                # return (state.squeeze() + torch.mul(_dstate, self.tau)).unsqueeze(0)
+                return state + torch.mul(_dstate, self.tau)
 
             def observation(self, state, input, t=None):
                 return state
@@ -59,14 +120,19 @@ class TestMPC:
         n_state, n_ctrl = 4, 1
 
         Q = torch.tile(torch.eye(n_state + n_ctrl, device=device), (n_batch, T, 1, 1))
-        p = torch.tensor([
-            [[-0.8156,  0.5950,  2.4234, -0.7989, -0.1750],
-            [-0.3609, -1.4080, -0.8199, -0.8010,  0.5285],
-            [ 0.4752,  1.2613,  1.1394, -0.7973,  0.5124],
-            [-1.2204, -0.4849, -1.1381, -0.9851,  0.7658],
-            [ 0.1382, -1.0695, -1.2191,  0.5620,  0.0865]]],
-            device=device)
-        time  = torch.arange(0, T, device=device) * dt
+        p = torch.tensor(
+            [
+                [
+                    [-0.8156, 0.5950, 2.4234, -0.7989, -0.1750],
+                    [-0.3609, -1.4080, -0.8199, -0.8010, 0.5285],
+                    [0.4752, 1.2613, 1.1394, -0.7973, 0.5124],
+                    [-1.2204, -0.4849, -1.1381, -0.9851, 0.7658],
+                    [0.1382, -1.0695, -1.2191, 0.5620, 0.0865],
+                ]
+            ],
+            device=device,
+        )
+        time = torch.arange(0, T, device=device) * dt
         current_u = torch.sin(time).unsqueeze(1).unsqueeze(0)
 
         x_init = torch.tensor([[0, 0, torch.pi, 0]], device=device)
@@ -80,7 +146,7 @@ class TestMPC:
         torch.testing.assert_close(u_ref, u, atol=1e-5, rtol=1e-3)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test = TestMPC()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     test.test_ilqr_cartpole(device)

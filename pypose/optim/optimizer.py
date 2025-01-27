@@ -14,6 +14,7 @@ class Trivial(torch.nn.Module):
     A trivial module. Get anything, return anything.
     Not supposed to be called by PyPose users.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__()
 
@@ -23,11 +24,12 @@ class Trivial(torch.nn.Module):
 
 
 class RobustModel(nn.Module):
-    '''
+    """
     Standardize a model for least square problems with an option of square-rooting kernel.
     Then model regression becomes minimizing the output of the standardized model.
     This class is used during optimization but is not designed to expose to PyPose users.
-    '''
+    """
+
     def __init__(self, model, kernel=None, auto=False):
         super().__init__()
         self.model = model
@@ -35,14 +37,16 @@ class RobustModel(nn.Module):
 
     def flatten_row_jacobian(self, J, params_values):
         if isinstance(J, (tuple, list)):
-            J = torch.cat([j.reshape(-1, p.numel()) for j, p in zip(J, params_values)], 1)
+            J = torch.cat(
+                [j.reshape(-1, p.numel()) for j, p in zip(J, params_values)], 1
+            )
         return J
 
     def normalize_RWJ(self, R, weight, J):
         weight_diag = None
         if weight is not None:
             weight = weight if isinstance(weight, (tuple, list)) else [weight]
-            assert len(R)==len(weight)
+            assert len(R) == len(weight)
             weight_diag = []
             for w, r in zip(weight, R):
                 ni = r.numel() * w.shape[-1] / w.numel()
@@ -73,36 +77,41 @@ class RobustModel(nn.Module):
     def residuals(self, outputs, targets):
         if isinstance(outputs, (tuple, list)):
             targets = [None] * len(outputs) if targets is None else targets
-            return tuple([self.residual(out, targets[i]) for i, out in enumerate(outputs)])
+            return tuple(
+                [self.residual(out, targets[i]) for i, out in enumerate(outputs)]
+            )
         return tuple([self.residual(outputs, targets)])
 
     def loss(self, input, target):
         output = self.model_forward(input)
         residuals = self.residuals(output, target)
         if len(self.kernel) > 1:
-            residuals = [k(r.square().sum(-1)).sum() for k, r in zip(self.kernel, residuals)]
+            residuals = [
+                k(r.square().sum(-1)).sum() for k, r in zip(self.kernel, residuals)
+            ]
         else:
             residuals = [self.kernel[0](r.square().sum(-1)).sum() for r in residuals]
         return sum(residuals)
 
 
 class _Optimizer(Optimizer):
-    r'''
+    r"""
     Base class for all second order optimizers.
-    '''
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def update_parameter(self, params, step):
-        r'''
+        r"""
         params will be updated by calling this function
-        '''
+        """
         steps = step.split([p.numel() for p in params if p.requires_grad])
         [p.add_(d.view(p.shape)) for p, d in zip(params, steps) if p.requires_grad]
 
 
 class GaussNewton(_Optimizer):
-    r'''
+    r"""
     The Gauss-Newton (GN) algorithm solving non-linear least squares problems. This implementation
     is for optimizing the model parameters to approximate the target, which can be a
     Tensor/LieTensor or a tuple of Tensors/LieTensors.
@@ -196,26 +205,40 @@ class GaussNewton(_Optimizer):
         advisable. Therefore, only solvers with pseudo inversion (inverting non-square matrices)
         such as :meth:`solver.PINV` and :meth:`solver.LSTSQ` are available.
         More details are in Eq. (5) of the paper "`Robust Bundle Adjustment Revisited`_".
-    '''
-    def __init__(self, model, solver=None, kernel=None, corrector=None, weight=None, vectorize=True):
+    """
+
+    def __init__(
+        self,
+        model,
+        solver=None,
+        kernel=None,
+        corrector=None,
+        weight=None,
+        vectorize=True,
+    ):
         super().__init__(model.parameters(), defaults={})
-        self.jackwargs = {'vectorize': vectorize}
+        self.jackwargs = {"vectorize": vectorize}
         self.solver = PINV() if solver is None else solver
         self.weight = weight
         if kernel is not None:
             kernel = [kernel] if not isinstance(kernel, (tuple, list)) else kernel
             kernel = [k if k is not None else Trivial() for k in kernel]
-            self.corrector = [FastTriggs(k) for k in kernel] if corrector is None else corrector
+            self.corrector = (
+                [FastTriggs(k) for k in kernel] if corrector is None else corrector
+            )
         else:
             self.corrector = [Trivial()] if corrector is None else corrector
-        self.corrector = [self.corrector] if not isinstance(self.corrector, (tuple, list)) else self.corrector
+        self.corrector = (
+            [self.corrector]
+            if not isinstance(self.corrector, (tuple, list))
+            else self.corrector
+        )
         self.corrector = [c if c is not None else Trivial() for c in self.corrector]
         self.model = RobustModel(model, kernel)
 
-
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
-        r'''
+        r"""
         Performs a single optimization step.
 
         Args:
@@ -268,29 +291,35 @@ class GaussNewton(_Optimizer):
             Pose Inversion error: 0.0002673 @ 2 it
             Pose Inversion error: 0.0000005 @ 3 it
             Early Stopping with error: 5.21540641784668e-07
-        '''
+        """
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
             R = list(self.model(input, target))
-            J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
+            J = modjac(
+                self.model, input=(input, target), flatten=False, **self.jackwargs
+            )
             params = dict(self.model.named_parameters())
             params_values = tuple(params.values())
             J = [self.model.flatten_row_jacobian(Jr, params_values) for Jr in J]
             for i in range(len(R)):
-                R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
-                    else self.corrector[i](R = R[i], J = J[i])
+                R[i], J[i] = (
+                    self.corrector[0](R=R[i], J=J[i])
+                    if len(self.corrector) == 1
+                    else self.corrector[i](R=R[i], J=J[i])
+                )
             R, weight, J = self.model.normalize_RWJ(R, weight, J)
             A, b = (J, -R) if weight is None else (weight @ J, -weight @ R)
-            D = self.solver(A = A, b = b.view(-1, 1))
-            self.last = self.loss if hasattr(self, 'loss') \
-                        else self.model.loss(input, target)
-            self.update_parameter(params = pg['params'], step = D)
+            D = self.solver(A=A, b=b.view(-1, 1))
+            self.last = (
+                self.loss if hasattr(self, "loss") else self.model.loss(input, target)
+            )
+            self.update_parameter(params=pg["params"], step=D)
             self.loss = self.model.loss(input, target)
         return self.loss
 
 
 class LevenbergMarquardt(_Optimizer):
-    r'''
+    r"""
     The Levenberg-Marquardt (LM) algorithm solving non-linear least squares problems. It
     is also known as the damped least squares (DLS) method. This implementation is for
     optimizing the model parameters to approximate the target, which can be a
@@ -398,32 +427,49 @@ class LevenbergMarquardt(_Optimizer):
         1, even if the model residual is a scalar. If the model output only has one dimension,
         the model Jacobian will be a row vector, instead of a matrix, which loses sample-level
         structural information, although computing Jacobian vector is faster.**
-    '''
-    def __init__(self, model, solver=None, strategy=None, kernel=None, corrector=None, \
-                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True):
+    """
+
+    def __init__(
+        self,
+        model,
+        solver=None,
+        strategy=None,
+        kernel=None,
+        corrector=None,
+        weight=None,
+        reject=16,
+        min=1e-6,
+        max=1e32,
+        vectorize=True,
+    ):
         assert min > 0, ValueError("min value has to be positive: {}".format(min))
         assert max > 0, ValueError("max value has to be positive: {}".format(max))
         self.strategy = TrustRegion() if strategy is None else strategy
-        defaults = {**{'min':min, 'max':max}, **self.strategy.defaults}
+        defaults = {**{"min": min, "max": max}, **self.strategy.defaults}
         super().__init__(model.parameters(), defaults=defaults)
-        self.jackwargs = {'vectorize': vectorize}
+        self.jackwargs = {"vectorize": vectorize}
         self.solver = Cholesky() if solver is None else solver
         self.reject, self.reject_count = reject, 0
         self.weight = weight
         if kernel is not None:
             kernel = [kernel] if not isinstance(kernel, (tuple, list)) else kernel
             kernel = [k if k is not None else Trivial() for k in kernel]
-            self.corrector = [FastTriggs(k) for k in kernel] if corrector is None else corrector
+            self.corrector = (
+                [FastTriggs(k) for k in kernel] if corrector is None else corrector
+            )
         else:
             self.corrector = [Trivial()] if corrector is None else corrector
-        self.corrector = [self.corrector] if not isinstance(self.corrector, (tuple, list)) else self.corrector
+        self.corrector = (
+            [self.corrector]
+            if not isinstance(self.corrector, (tuple, list))
+            else self.corrector
+        )
         self.corrector = [c if c is not None else Trivial() for c in self.corrector]
         self.model = RobustModel(model, kernel)
 
-
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
-        r'''
+        r"""
         Performs a single optimization step.
 
         Args:
@@ -488,36 +534,46 @@ class LevenbergMarquardt(_Optimizer):
             More practical examples, e.g., pose graph optimization (PGO), can be found at
             `examples/module/pgo
             <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.
-        '''
+        """
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
             R = list(self.model(input, target))
-            J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
+            J = modjac(
+                self.model, input=(input, target), flatten=False, **self.jackwargs
+            )
             params = dict(self.model.named_parameters())
             params_values = tuple(params.values())
             J = [self.model.flatten_row_jacobian(Jr, params_values) for Jr in J]
             for i in range(len(R)):
-                R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
-                    else self.corrector[i](R = R[i], J = J[i])
+                R[i], J[i] = (
+                    self.corrector[0](R=R[i], J=J[i])
+                    if len(self.corrector) == 1
+                    else self.corrector[i](R=R[i], J=J[i])
+                )
             R, weight, J = self.model.normalize_RWJ(R, weight, J)
 
-            self.last = self.loss = self.loss if hasattr(self, 'loss') \
-                                    else self.model.loss(input, target)
+            self.last = self.loss = (
+                self.loss if hasattr(self, "loss") else self.model.loss(input, target)
+            )
             J_T = J.T @ weight if weight is not None else J.T
             A, self.reject_count = J_T @ J, 0
-            A.diagonal().clamp_(pg['min'], pg['max'])
+            A.diagonal().clamp_(pg["min"], pg["max"])
             while self.last <= self.loss:
-                A.diagonal().add_(A.diagonal() * pg['damping'])
+                A.diagonal().add_(A.diagonal() * pg["damping"])
                 try:
-                    D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
+                    D = self.solver(A=A, b=-J_T @ R.view(-1, 1))
                 except Exception as e:
                     print(e, "\nLinear solver failed. Breaking optimization step...")
                     break
-                self.update_parameter(pg['params'], D)
+                self.update_parameter(pg["params"], D)
                 self.loss = self.model.loss(input, target)
-                self.strategy.update(pg, last=self.last, loss=self.loss, J=J, D=D, R=R.view(-1, 1))
-                if self.last < self.loss and self.reject_count < self.reject: # reject step
-                    self.update_parameter(params = pg['params'], step = -D)
+                self.strategy.update(
+                    pg, last=self.last, loss=self.loss, J=J, D=D, R=R.view(-1, 1)
+                )
+                if (
+                    self.last < self.loss and self.reject_count < self.reject
+                ):  # reject step
+                    self.update_parameter(params=pg["params"], step=-D)
                     self.loss, self.reject_count = self.last, self.reject_count + 1
                 else:
                     break

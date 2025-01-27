@@ -7,7 +7,7 @@ from torch.linalg import pinv, lstsq, cholesky_ex, vecdot
 
 
 class PINV(nn.Module):
-    r'''The batched linear solver with pseudo inversion.
+    r"""The batched linear solver with pseudo inversion.
 
     .. math::
         \mathbf{A}_i \bm{x}_i = \mathbf{b}_i,
@@ -49,26 +49,26 @@ class PINV(nn.Module):
                 [[-0.3472],
                  [ 1.1191],
                  [ 0.3301]]])
-    '''
+    """
+
     def __init__(self, atol=None, rtol=None, hermitian=False):
         super().__init__()
         self.atol, self.rtol, self.hermitian = atol, rtol, hermitian
 
     def forward(self, A: Tensor, b: Tensor) -> Tensor:
-        '''
+        """
         Args:
             A (Tensor): the input batched tensor.
             b (Tensor): the batched tensor on the right hand side.
 
         Return:
             Tensor: the solved batched tensor.
-        '''
+        """
         return pinv(A, atol=self.atol, rtol=self.rtol, hermitian=self.hermitian) @ b
 
 
-
 class LSTSQ(nn.Module):
-    r'''The batched linear solver with fast pseudo inversion.
+    r"""The batched linear solver with fast pseudo inversion.
 
     .. math::
         \mathbf{A}_i \bm{x}_i = \mathbf{b}_i,
@@ -131,28 +131,30 @@ class LSTSQ(nn.Module):
                 [[ 3.1639],
                  [-0.5379],
                  [-1.2872]]])
-    '''
+    """
+
     def __init__(self, rcond=None, driver=None):
         super().__init__()
         self.rcond, self.driver = rcond, driver
 
     def forward(self, A: Tensor, b: Tensor) -> Tensor:
-        '''
+        """
         Args:
             A (Tensor): the input batched tensor.
             b (Tensor): the batched tensor on the right hand side.
 
         Return:
             Tensor: the solved batched tensor.
-        '''
+        """
         self.out = lstsq(A, b, rcond=self.rcond, driver=self.driver)
-        assert not torch.any(torch.isnan(self.out.solution)), \
-            'Linear Solver Failed Using LSTSQ. Using PINV() instead'
+        assert not torch.any(
+            torch.isnan(self.out.solution)
+        ), "Linear Solver Failed Using LSTSQ. Using PINV() instead"
         return self.out.solution
 
 
 class Cholesky(nn.Module):
-    r'''The batched linear solver with Cholesky decomposition.
+    r"""The batched linear solver with Cholesky decomposition.
 
     .. math::
         \mathbf{A}_i \bm{x}_i = \mathbf{b}_i,
@@ -195,28 +197,30 @@ class Cholesky(nn.Module):
                 [[0.4575],
                  [1.3725],
                  [2.6797]]])
-    '''
+    """
+
     def __init__(self, upper=False):
         super().__init__()
         self.upper = upper
 
     def forward(self, A: Tensor, b: Tensor) -> Tensor:
-        '''
+        """
         Args:
             A (Tensor): the input batched tensor.
             b (Tensor): the batched tensor on the right hand side.
 
         Return:
             Tensor: the solved batched tensor.
-        '''
+        """
         L, info = cholesky_ex(A, upper=self.upper)
-        assert not torch.any(torch.isnan(L)), \
-            'Cholesky decomposition failed. Check your matrix (may not be positive-definite)'
+        assert not torch.any(
+            torch.isnan(L)
+        ), "Cholesky decomposition failed. Check your matrix (may not be positive-definite)"
         return b.cholesky_solve(L, upper=self.upper)
 
 
 class CG(nn.Module):
-    r'''The batched linear solver with conjugate gradient method.
+    r"""The batched linear solver with conjugate gradient method.
 
     .. math::
         \mathbf{A}_i \bm{x}_i = \mathbf{b}_i,
@@ -267,14 +271,20 @@ class CG(nn.Module):
         >>> x = solver(A, b)
         tensor([-4.4052e-05,  5.0003e-01])
 
-    '''
+    """
+
     def __init__(self, maxiter=None, tol=1e-5):
         super().__init__()
         self.maxiter, self.tol = maxiter, tol
 
-    def forward(self, A: Tensor, b: Tensor, x: Optional[Tensor]=None,
-                M: Optional[Tensor]=None) -> Tensor:
-        '''
+    def forward(
+        self,
+        A: Tensor,
+        b: Tensor,
+        x: Optional[Tensor] = None,
+        M: Optional[Tensor] = None,
+    ) -> Tensor:
+        """
         Args:
             A (Tensor): the input tensor. It is assumed to be a symmetric
                 positive-definite matrix. Layout is allowed to be COO, CSR, BSR, or dense.
@@ -287,12 +297,13 @@ class CG(nn.Module):
 
         Return:
             Tensor: the solved tensor. Layout is the same as the layout of b.
-        '''
+        """
         if A.ndim == b.ndim:
             b = b.squeeze(-1)
         else:
-            assert A.ndim == b.ndim + 1, \
-                'The number of dimensions of A and b must differ by 1'
+            assert (
+                A.ndim == b.ndim + 1
+            ), "The number of dimensions of A and b must differ by 1"
         if x is None:
             x = torch.zeros_like(b)
         bnrm2 = torch.linalg.norm(b, dim=-1)
@@ -323,11 +334,13 @@ class CG(nn.Module):
 
             q = bmv(A, p)
             alpha = rho_cur / vecdot(p, q)
-            x += alpha.unsqueeze(-1)*p
-            r -= alpha.unsqueeze(-1)*q
+            x = x + alpha.unsqueeze(-1) * p
+            r = r - alpha.unsqueeze(-1) * q
             rho_prev = rho_cur
 
-        assert not hasnan(x), 'Conjugate Gradient Solver Failed. \
-            Check your matrix (may not be Symmetric Positive Definite)'
+        assert not hasnan(
+            x
+        ), "Conjugate Gradient Solver Failed. \
+            Check your matrix (may not be Symmetric Positive Definite)"
 
         return x

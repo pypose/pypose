@@ -6,7 +6,7 @@ from torch.linalg import cholesky, vecdot
 
 
 class LQR(nn.Module):
-    r'''
+    r"""
     Linear Quadratic Regulator (LQR) with Dynamic Programming.
 
     Args:
@@ -258,7 +258,8 @@ class LQR(nn.Module):
                      [ 0.0436,  0.5782,  1.0127],
                      [-0.3017, -0.2897,  0.7251],
                      [-0.0728,  0.7290, -0.3117]]])
-    '''
+    """
+
     def __init__(self, system, Q, p, T):
         super().__init__()
         self.system = system
@@ -279,10 +280,10 @@ class LQR(nn.Module):
         assert self.Q.ndim == 4 or self.p.ndim == 3, "Shape not compatible."
         assert self.Q.device == self.p.device, "Device not compatible."
         assert self.Q.dtype == self.p.dtype, "Tensor data type not compatible."
-        self.dargs = {'dtype': self.p.dtype, 'device': self.p.device}
+        self.dargs = {"dtype": self.p.dtype, "device": self.p.device}
 
     def forward(self, x_init, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
-        r'''
+        r"""
         Performs LQR for the discrete system.
 
         Args:
@@ -302,12 +303,33 @@ class LQR(nn.Module):
             List of :obj:`Tensor`: A list of tensors including the solved state sequence
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
             associated quadratic costs :math:`\mathbf{c}` over the time horizon.
-        '''
+        """
         K, k = self.lqr_backward(x_init, dt, u_traj, u_lower, u_upper, du)
         x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
         return x, u, cost
 
-    def lqr_backward(self, x_init, dt, u_traj=None, u_lower=None, u_upper=None, du=None):
+    def lqr_backward(
+        self, x_init, dt, u_traj=None, u_lower=None, u_upper=None, du=None
+    ):
+        """
+        Performs the backward recursion of the LQR algorithm.
+
+        Args:
+            x_init (:obj:`Tensor`): The initial state of the system.
+            dt (:obj:`int`): The interval (:math:`\delta t`) between two time steps.
+            u_traj (:obj:`Tensor`, optinal): The current inputs of the system along a
+                trajectory. Default: ``None``.
+            u_lower (:obj:`Tensor`, optinal): The lower bounds on the controls.
+                Default: ``None``.
+            u_upper (:obj:`Tensor`, optinal): The upper bounds on the controls.
+                Default: ``None``.
+            du (:obj:`int`, optinal): The amount each component of the controls
+                is allowed to change in each LQR iteration. Default: ``None``.
+
+        Returns:
+            Tuple of :obj:`Tensor`: A tuple of tensors including the feedback gain
+            :math:`\mathbf{K}` and the feedforward term :math:`\mathbf{k}`.
+        """
 
         ns, nsc = x_init.size(-1), self.p.size(-1)
         nc = nsc - ns
@@ -324,33 +346,57 @@ class LQR(nn.Module):
         K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
 
-        xut = torch.cat((self.x_traj[...,:self.T,:], self.u_traj), dim=-1)
+        V = torch.zeros(self.n_batch + (self.T, nsc, nsc), **self.dargs)
+        v = torch.zeros(self.n_batch + (self.T, nsc), **self.dargs)
+
+        xut = torch.cat((self.x_traj[..., : self.T, :], self.u_traj), dim=-1)
         p = bmv(self.Q, xut) + self.p
 
-        for t in range(self.T-1, -1, -1):
+        for t in range(self.T - 1, -1, -1):
             if t == self.T - 1:
-                Qt = self.Q[...,t,:,:]
-                qt = p[...,t,:]
+                Qt = self.Q[..., t, :, :]
+                qt = p[..., t, :]
             else:
-                self.system.set_refpoint(state=self.x_traj[...,t,:],
-                                         input=self.u_traj[...,t,:],
-                                         t=torch.tensor(t*dt))
-                A = self.system.A.squeeze(-2)
-                B = self.system.B.squeeze(-2)
+                self.system.set_refpoint(
+                    state=self.x_traj[..., t, :],
+                    input=self.u_traj[..., t, :],
+                    t=torch.tensor(
+                        t * dt, device=self.x_traj.device, dtype=self.x_traj.dtype
+                    ),
+                )
+                A = self.system.A
+                B = self.system.B
+                if A.ndim == 4:
+                    A = torch.stack([A[i, :, i, :] for i in range(A.shape[0])])
+                    B = torch.stack([B[i, :, i, :] for i in range(B.shape[0])])
+
                 F = torch.cat((A, B), dim=-1)
-                Qt = self.Q[...,t,:,:] + F.mT @ V @ F
-                qt = p[...,t,:] + bmv(F.mT, v)
+                Qt = self.Q[..., t, :, :] + F.mT @ V @ F
+                qt = p[..., t, :] + bmv(F.mT, v)
 
-            Qxx, Qxu = Qt[..., :ns, :ns], Qt[..., :ns, ns:]
-            Qux, Quu = Qt[..., ns:, :ns], Qt[..., ns:, ns:]
-            qx, qu = qt[..., :ns], qt[..., ns:]
+            Qt_, qt_ = Qt.clone(), qt.clone()
 
-            L = cholesky(Quu)
-            K[...,t,:,:] = Kt = -torch.cholesky_solve(Qux, L)
-            k[...,t,:] = kt = -torch.cholesky_solve(qu.unsqueeze(-1), L).squeeze(-1)
+            Qxx, Qxu = Qt_[..., :ns, :ns], Qt_[..., :ns, ns:]
+            Qux, Quu = Qt_[..., ns:, :ns], Qt_[..., ns:, ns:]
+            qx, qu = qt_[..., :ns], qt_[..., ns:]
 
-            V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
-            v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
+            qu_ = qu.clone()
+            qx_ = qx.clone()
+            Quu_ = Quu.clone()
+            Qux_ = Qux.clone()
+            Qxu_ = Qxu.clone()
+            Qxx_ = Qxx.clone()
+
+            # TODO check the 2 different implementations
+
+            L = cholesky(Quu_)
+            Kt = -torch.cholesky_solve(Qux_, L)
+            K[..., t, :, :] = Kt
+            kt = -torch.cholesky_solve(qu.unsqueeze(-1), L).squeeze(-1)
+            k[..., t, :] = kt
+
+            V = Qxx_ + Qxu_ @ Kt + Kt.mT @ Qux_ + Kt.mT @ Quu_ @ Kt
+            v = qx_ + bmv(Qxu_, kt) + bmv(Kt.mT, qu_) + bmv(Kt.mT @ Quu_, kt)
 
         return K, k
 
@@ -365,16 +411,22 @@ class LQR(nn.Module):
         u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
         delta_u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
         cost = torch.zeros(self.n_batch, **self.dargs)
-        x = torch.zeros(self.n_batch + (self.T+1, ns), **self.dargs)
+        x = torch.zeros(self.n_batch + (self.T + 1, ns), **self.dargs)
         xt = x[..., 0, :] = x_init
 
+        self.system.systime = 0
+
         for t in range(self.T):
-            Kt, kt = K[...,t,:,:], k[...,t,:]
-            delta_xt = xt - self.x_traj[...,t,:]
+            Kt, kt = K[..., t, :, :], k[..., t, :]
+            delta_xt = xt - self.x_traj[..., t, :]
             delta_u[..., t, :] = bmv(Kt, delta_xt) + kt
-            u[...,t,:] = ut = delta_u[..., t, :] + self.u_traj[...,t,:]
+            u[..., t, :] = ut = delta_u[..., t, :] + self.u_traj[..., t, :]
             xut = torch.cat((xt, ut), dim=-1)
-            x[...,t+1,:] = xt = self.system(xt, ut)[0]
-            cost += 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + vecdot(xut, self.p[...,t,:])
+            x[..., t + 1, :] = xt = self.system(xt, ut)[0]
+            cost = (
+                cost
+                + 0.5 * bvmv(xut, self.Q[..., t, :, :], xut)
+                + vecdot(xut, self.p[..., t, :])
+            )
 
         return x, u, cost
