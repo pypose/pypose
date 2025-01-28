@@ -26,6 +26,7 @@ from . import module
 from . import optim
 from . import testing
 from . import metric
+from .module.loss import geodesic_loss
 
 min_torch = '2.0'
 assert version.parse(min_torch) <= version.parse(torch.__version__), \

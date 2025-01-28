@@ -19,8 +19,8 @@ class TestAPERPE:
         return stamp, pose
 
     def test_aperpe(self):
-        local = './tests/data'
-        remote = 'https://raw.githubusercontent.com/MichaelGrupp/evo/master/test/data/'
+        local = './tests/function/'
+        remote = 'https://github.com/pypose/pypose/releases/download/v0.7.1/'
         download_url(remote + '/fr2_desk_groundtruth.txt', local)
         download_url(remote + '/fr2_desk_ORB.txt', local)
         tstamp, tpose = self.read_tum_file(local + '/fr2_desk_groundtruth.txt')

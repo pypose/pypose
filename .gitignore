@@ -154,4 +154,6 @@ examples/module/mpc/save/*
 examples/module/reprojpgo/save/*
 *epnp-test-data.pt*
 *icp-test-data.pt*
+*fr2_desk_groundtruth.txt*
+*fr2_desk_ORB.txt*
 *__MACOSX
