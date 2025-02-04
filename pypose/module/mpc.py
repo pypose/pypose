@@ -197,11 +197,26 @@ class MPC(nn.Module):
                       [-0.0530],
                       [ 0.1023]]])
     '''
+
+    '''
     def __init__(self, system, Q, p, T, stepper=None):
         super().__init__()
         self.stepper = ReduceToBason(steps=10) if stepper is None else stepper
         self.stepper.max_steps -= 1 # n-1 loops, 1 loop with gradient
         self.lqr = LQR(system, Q, p, T)
+        '''
+
+    def __init__(self, system, Q, p, T, stepper=None):
+        super().__init__()
+        self.stepper = ReduceToBason(steps=10) if stepper is None else stepper
+
+        if isinstance(self.stepper.max_steps, torch.Tensor):
+            self.stepper.max_steps = self.stepper.max_steps - 1
+        else:
+            self.stepper.max_steps -= 1
+
+        self.lqr = LQR(system, Q, p, T)
+
 
     def forward(self, dt, x_init, u_init=None, u_lower=None, u_upper=None, du=None):
         r'''
@@ -224,6 +239,7 @@ class MPC(nn.Module):
             :math:`\mathbf{x}`, the solved input sequence :math:`\mathbf{u}`, and the
             associated quadratic costs :math:`\mathbf{c}` over the time horizon.
         '''
+        '''
         x, u = None, u_init
         best = {'x': x, 'u': u, 'cost': None}
 
@@ -237,3 +253,23 @@ class MPC(nn.Module):
                     best = {'x': x, 'u': u, 'cost': cost}
 
         return self.lqr(x_init, dt, u_traj=best['u'])
+        '''
+
+        x, u = None, u_init
+        best = {'x': None, 'u': None, 'cost': None}
+
+        self.stepper.reset()
+        with torch.no_grad():
+            while self.stepper.continual():
+                x, u, cost = self.lqr(x_init, dt, u)
+
+                self.stepper.step(cost)
+
+                if best['cost'] is None or cost < best['cost']:
+                    best = {
+                        'x': x.clone() if x is not None else None,
+                        'u': u.clone() if u is not None else None,
+                        'cost': cost.item()  
+                    }
+
+        return self.lqr(x_init, dt, u_traj=best['u'].clone() if best['u'] is not None else None)

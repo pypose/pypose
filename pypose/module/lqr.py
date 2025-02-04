@@ -1,3 +1,4 @@
+import copy
 import torch
 from torch import nn
 from .. import bmv, bvmv
@@ -267,10 +268,12 @@ class LQR(nn.Module):
         self.u_traj = None
 
         if self.Q.ndim == 3:
-            self.Q = torch.tile(self.Q.unsqueeze(-3), (1, self.T, 1, 1))
+            #self.Q = torch.tile(self.Q.unsqueeze(-3), (1, self.T, 1, 1))
+            self.Q = torch.tile(self.Q.unsqueeze(-3), (1, self.T, 1, 1)).clone()
 
         if self.p.ndim == 2:
             self.p = torch.tile(self.p.unsqueeze(-2), (1, self.T, 1))
+            #self.p = torch.tile(self.p.unsqueeze(-2), (1, self.T, 1)).clone()
 
         self.n_batch = self.p.shape[:-2]
 
@@ -307,19 +310,26 @@ class LQR(nn.Module):
         x, u, cost = self.lqr_forward(x_init, K, k, u_lower, u_upper, du)
         return x, u, cost
 
+    '''
     def lqr_backward(self, x_init, dt, u_traj=None, u_lower=None, u_upper=None, du=None):
+
+        torch.autograd.set_detect_anomaly(True)
 
         ns, nsc = x_init.size(-1), self.p.size(-1)
         nc = nsc - ns
 
         if u_traj is None:
-            self.u_traj = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
+            #self.u_traj = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
+            torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
         else:
-            self.u_traj = u_traj
+            #self.u_traj = u_traj
+            self.u_traj = u_traj.clone().detach()
 
         self.x_traj = x_init.unsqueeze(-2).repeat((1, self.T, 1))
 
-        self.x_traj = runsys(self.system, self.T, self.x_traj, self.u_traj)
+        #self.x_traj = runsys(self.system, self.T, self.x_traj, self.u_traj)
+
+        self.x_traj = runsys(self.system, self.T, self.x_traj.clone(), self.u_traj.clone())
 
         K = torch.zeros(self.n_batch + (self.T, nc, ns), **self.dargs)
         k = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
@@ -329,15 +339,18 @@ class LQR(nn.Module):
 
         for t in range(self.T-1, -1, -1):
             if t == self.T - 1:
-                Qt = self.Q[...,t,:,:]
-                qt = p[...,t,:]
+                #Qt = self.Q[...,t,:,:]
+                #qt = p[...,t,:]
+                Qt = self.Q[..., t, :, :].clone()
+                qt = p[..., t, :].clone()
             else:
                 self.system.set_refpoint(state=self.x_traj[...,t,:],
                                          input=self.u_traj[...,t,:],
                                          t=torch.tensor(t*dt))
                 A = self.system.A.squeeze(-2)
                 B = self.system.B.squeeze(-2)
-                F = torch.cat((A, B), dim=-1)
+                #F = torch.cat((A, B), dim=-1)
+                F = torch.cat((A, B), dim=-1).clone()
                 Qt = self.Q[...,t,:,:] + F.mT @ V @ F
                 qt = p[...,t,:] + bmv(F.mT, v)
 
@@ -346,14 +359,75 @@ class LQR(nn.Module):
             qx, qu = qt[..., :ns], qt[..., ns:]
 
             L = cholesky(Quu)
-            K[...,t,:,:] = Kt = -torch.cholesky_solve(Qux, L)
-            k[...,t,:] = kt = -torch.cholesky_solve(qu.unsqueeze(-1), L).squeeze(-1)
+            #K[...,t,:,:] = Kt = -torch.cholesky_solve(Qux, L)
+            #k[...,t,:] = kt = -torch.cholesky_solve(qu.unsqueeze(-1), L).squeeze(-1)
+            K[..., t, :, :] = Kt = -torch.cholesky_solve(Qux.clone(), L)
+            k[..., t, :] = kt = -torch.cholesky_solve(qu.clone().unsqueeze(-1), L).squeeze(-1)
 
             V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
             v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
 
         return K, k
+        '''
 
+    def lqr_backward(self, x_init, dt, u_traj=None, u_lower=None, u_upper=None, du=None):
+        ns, nsc = x_init.size(-1), self.p.size(-1)
+        nc = nsc - ns
+
+        if u_traj is None:
+            self.u_traj = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
+        else:
+            self.u_traj = u_traj.clone().detach()
+
+        self.x_traj = x_init.unsqueeze(-2).repeat((1, self.T, 1))
+        self.x_traj = runsys(self.system, self.T, self.x_traj.clone(), self.u_traj.clone())
+
+        xut = torch.cat((self.x_traj[..., :self.T, :], self.u_traj), dim=-1)
+        p = bmv(self.Q, xut) + self.p
+
+        K_list = []
+        k_list = []
+
+        V, v = None, None
+
+        for t in range(self.T - 1, -1, -1):
+            if t == self.T - 1:
+                Qt = self.Q[..., t, :, :].clone()
+                qt = p[..., t, :].clone()
+            else:
+
+                self.system.set_refpoint(
+                    state=self.x_traj[..., t, :],
+                    input=self.u_traj[..., t, :],
+                    t=torch.tensor(t * dt)
+                )
+                A = self.system.A.clone().squeeze(-2)
+                B = self.system.B.clone().squeeze(-2)
+                F = torch.cat((A, B), dim=-1).clone()
+
+                Qt = self.Q[..., t, :, :].clone() + F.mT @ V @ F
+                qt = p[..., t, :].clone() + bmv(F.mT, v)
+
+            Qxx, Qxu = Qt[..., :ns, :ns].copy(), Qt[..., :ns, ns:].copy()
+            Qux, Quu = Qt[..., ns:, :ns].copy(), Qt[..., ns:, ns:].copy()
+            qx, qu = qt[..., :ns].copy(), qt[..., ns:].copy()
+
+            L = cholesky(Quu)
+            Kt = -torch.cholesky_solve(Qux.clone(), L)
+            kt = -torch.cholesky_solve(qu.clone().unsqueeze(-1), L).squeeze(-1)
+
+            K_list.insert(0, Kt)
+            k_list.insert(0, kt)
+
+            V = Qxx.clone() + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
+            v = qx.clone() + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
+
+        K = torch.stack(K_list, dim=-2)
+        k = torch.stack(k_list, dim=-2)
+
+        return K, k
+
+    '''
     def lqr_forward(self, x_init, K, k, u_lower=None, u_upper=None, du=None):
 
         assert x_init.device == K.device == k.device
@@ -362,19 +436,81 @@ class LQR(nn.Module):
 
         ns, nc = self.x_traj.size(-1), self.u_traj.size(-1)
 
-        u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
-        delta_u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
-        cost = torch.zeros(self.n_batch, **self.dargs)
-        x = torch.zeros(self.n_batch + (self.T+1, ns), **self.dargs)
-        xt = x[..., 0, :] = x_init
+        #u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
+        #delta_u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
+        #cost = torch.zeros(self.n_batch, **self.dargs)
+        #x = torch.zeros(self.n_batch + (self.T+1, ns), **self.dargs)
+
+        u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs).clone()
+        delta_u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs).clone()
+        cost = torch.zeros(self.n_batch, **self.dargs).clone()
+        x = torch.zeros(self.n_batch + (self.T + 1, ns), **self.dargs).clone()
+
+        #xt = x[..., 0, :] = x_init
+        x[..., 0, :] = x_init.clone()
+        xt = x[..., 0, :]
 
         for t in range(self.T):
-            Kt, kt = K[...,t,:,:], k[...,t,:]
-            delta_xt = xt - self.x_traj[...,t,:]
+            #Kt, kt = K[...,t,:,:], k[...,t,:]
+            Kt = K[..., t, :, :].clone()
+            kt = k[..., t, :].clone()
+            #delta_xt = xt - self.x_traj[...,t,:]
+            delta_xt = xt - self.x_traj[..., t, :].clone()
             delta_u[..., t, :] = bmv(Kt, delta_xt) + kt
-            u[...,t,:] = ut = delta_u[..., t, :] + self.u_traj[...,t,:]
-            xut = torch.cat((xt, ut), dim=-1)
-            x[...,t+1,:] = xt = self.system(xt, ut)[0]
+            #u[...,t,:] = ut = delta_u[..., t, :] + self.u_traj[...,t,:]
+            #xut = torch.cat((xt, ut), dim=-1)
+            u_t = delta_u[..., t, :] + self.u_traj[..., t, :].clone()
+            u[..., t, :] = u_t.clone()
+            xut = torch.cat((xt, u_t), dim=-1).clone()
+            #x[...,t+1,:] = xt = self.system(xt, ut)[0]
+            x_next = self.system(xt, u_t)[0].clone()
+            x[..., t + 1, :] = x_next.clone()
+            xt = x_next.clone()
             cost += 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + vecdot(xut, self.p[...,t,:])
+
+        #return x, u, cost
+        return x.clone(), u.clone(), cost.clone()
+        '''
+
+    def lqr_forward(self, x_init, K, k, u_lower=None, u_upper=None, du=None):
+        assert x_init.device == K.device == k.device
+        assert x_init.dtype == K.dtype == k.dtype
+        assert x_init.ndim == 2, "Shape not compatible."
+
+        ns, nc = self.x_traj.size(-1), self.u_traj.size(-1)
+
+        x_list = [x_init.clone()]
+        u_list = []
+        delta_u_list = []
+        cost_list = []
+
+        xt = x_init.clone()
+
+        for t in range(self.T):
+            Kt = K[..., t, :, :].clone()
+            kt = k[..., t, :].clone()
+
+            delta_xt = xt - self.x_traj[..., t, :].clone()
+
+            delta_ut = bmv(Kt, delta_xt) + kt
+            delta_u_list.append(delta_ut)
+
+            u_t = delta_ut + self.u_traj[..., t, :].clone()
+            u_list.append(u_t)
+
+            xut = torch.cat((xt, u_t), dim=-1).clone()
+
+            xt_next = self.system(xt, u_t)[0].clone()
+            x_list.append(xt_next)
+
+            cost_t = 0.5 * bvmv(xut, self.Q[..., t, :, :], xut) + vecdot(xut, self.p[..., t, :])
+            cost_list.append(cost_t)
+
+            xt = xt_next.clone()
+
+        x = torch.stack(x_list, dim=-2)
+        u = torch.stack(u_list, dim=-2)
+        delta_u = torch.stack(delta_u_list, dim=-2)
+        cost = torch.stack(cost_list, dim=-1).sum(dim=-1)
 
         return x, u, cost
