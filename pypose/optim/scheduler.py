@@ -1,5 +1,5 @@
 import torch
-from .optimizer import _Optimizer
+from .scndopt import _Optimizer
 
 
 class _Scheduler(object):
@@ -28,7 +28,7 @@ class _Scheduler(object):
 
         # Attach optimizer
         if not isinstance(optimizer, _Optimizer):
-            raise TypeError('{} is not an Optimizer'.format(
+            raise TypeError('{} is not an acceptable Optimizer'.format(
                 type(optimizer).__name__))
 
         self.optimizer, self.verbose = optimizer, verbose
@@ -128,10 +128,11 @@ class StopOnPlateau(_Scheduler):
             'scheduler.step() should be called after optimizer.step()'
 
         if self.verbose:
-            print('StopOnPlateau on step {} Loss {:.6e} --> Loss {:.6e} '\
-                  '(reduction/loss: {:.4e}).'.format(self.steps, self.optimizer.last,
-                  self.optimizer.loss, (self.optimizer.last - self.optimizer.loss) /\
-                  (self.optimizer.last + 1e-31)))
+            print('StopOnPlateau on step {} Loss {} --> Loss {} '\
+                  '(reduction/loss: {}).'.format(self.steps,
+                  self.optimizer.last.tolist(), self.optimizer.loss.tolist(),
+                  ((self.optimizer.last - self.optimizer.loss) /
+                   (self.optimizer.last + 1e-31)).tolist()))
 
         self.steps = self.steps + 1
 
@@ -140,7 +141,7 @@ class StopOnPlateau(_Scheduler):
             if self.verbose:
                 print("StopOnPlateau: Maximum steps reached, Quiting..")
 
-        if (self.optimizer.last - self.optimizer.loss) < self.decreasing:
+        if torch.all((self.optimizer.last - self.optimizer.loss) < self.decreasing):
             self.patience_count = self.patience_count + 1
         else:
             self.patience_count = 0
