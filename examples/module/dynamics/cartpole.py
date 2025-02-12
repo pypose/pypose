@@ -14,24 +14,47 @@ class CartPole(pp.module.NLS):
         self.polemassLength = self.polemass * self.length
         self.totalMass = self.cartmass + self.polemass
 
-    def state_transition(self, state, input, t = None):
-        x, xDot, theta, thetaDot = state
-        force = input.squeeze()
-        costheta = theta.cos()
-        sintheta = theta.sin()
+    def state_transition(self, state, input, t=None):
+        """
+        Vectorized state transition function for batch operations.
 
-        temp = (force + self.polemassLength * thetaDot**2 * sintheta) / self.totalMass
+        Parameters:
+            state (torch.Tensor): Tensor of shape (batch_size, 4)
+            representing the state [x, xDot, theta, thetaDot].
+            input (torch.Tensor): Tensor of shape (batch_size, 1)
+              representing the input force.
+            t (torch.Tensor or None): Optional time variable
+            (not used in this implementation).
 
-        thetaAcc = (self.gravity * sintheta - costheta * temp) / \
-            (self.length * (4.0 / 3.0 - self.polemass * costheta**2 / self.totalMass))
-    
+        Returns:
+            torch.Tensor: Tensor of shape (batch_size, 4) representing the next state.
+        """
+        state_ = state.clone()
+        input_ = input.clone()
+
+        costheta = torch.cos(state_[..., 2:3])
+        sintheta = torch.sin(state_[..., 2:3])
+
+        temp = (
+            input_ + self.polemassLength * state_[..., 3:4] ** 2 * sintheta
+        ) / self.totalMass
+        thetaAcc = (self.gravity * sintheta - costheta * temp) / (
+            self.length * (4 / 3 - self.polemass * costheta**2 / self.totalMass)
+        )
+
         xAcc = temp - self.polemassLength * thetaAcc * costheta / self.totalMass
+        _dstate = torch.cat(
+            (
+                state_[..., 1:2],
+                xAcc,
+                state_[..., 3:4],
+                thetaAcc,
+            ),
+            dim=-1,
+        )
+        return state_ + _dstate * torch.tensor(self.tau, device=state_.device)
 
-        _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
-
-        return state + _dstate * self.tau
-
-    def observation(self, state, input, t = None):
+    def observation(self, state, input, t=None):
         return state
 
 
@@ -45,26 +68,32 @@ def subPlot(ax, x, y, xlabel=None, ylabel=None):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='Cartpole Example')
-    parser.add_argument("--device", type=str, default='cpu', help="cuda or cpu")
-    parser.add_argument("--save", type=str, default='./examples/module/dynamics/save/', 
-                        help="location of png files to save")
-    parser.add_argument('--show', dest='show', action='store_true',
-                        help="show plot, default: False")
+    parser = argparse.ArgumentParser(description="Cartpole Example")
+    parser.add_argument("--device", type=str, default="cpu", help="cuda or cpu")
+    parser.add_argument(
+        "--save",
+        type=str,
+        default="./examples/module/dynamics/save/",
+        help="location of png files to save",
+    )
+    parser.add_argument(
+        "--show", dest="show", action="store_true", help="show plot, default: False"
+    )
     parser.set_defaults(show=False)
-    args = parser.parse_args(); print(args)
+    args = parser.parse_args()
+    print(args)
     os.makedirs(os.path.join(args.save), exist_ok=True)
 
     # Create parameters for cart pole trajectory
-    dt = 0.01   # Delta t
-    len = 1.5   # Length of pole
-    m_cart = 20 # Mass of cart
-    m_pole = 10 # Mass of pole
-    g = 9.81    # Accerleration due to gravity
-    N = 1000    # Number of time steps
+    dt = 0.01  # Delta t
+    len = 1.5  # Length of pole
+    m_cart = 20  # Mass of cart
+    m_pole = 10  # Mass of pole
+    g = 9.81  # Accerleration due to gravity
+    N = 1000  # Number of time steps
 
     # Time and input
-    time  = torch.arange(0, N, device=args.device) * dt
+    time = torch.arange(0, N, device=args.device) * dt
     input = torch.sin(time)
     state = torch.zeros(N, 4, dtype=float, device=args.device)
     state[0] = torch.tensor([0, 0, math.pi, 0], dtype=float, device=args.device)
@@ -75,19 +104,19 @@ if __name__ == "__main__":
         state[i + 1], _ = model(state[i], input[i])
 
     # Jacobian computation - Find jacobians at the last step
-    model.set_refpoint(state=state[-1,:], input=input[-1], t=time[-1])
-    vars = ['A', 'B', 'C', 'D', 'c1', 'c2']
+    model.set_refpoint(state=state[-1, :], input=input[-1], t=time[-1])
+    vars = ["A", "B", "C", "D", "c1", "c2"]
     [print(v, getattr(model, v)) for v in vars]
 
     # Create time plots to show dynamics
     f, ax = plt.subplots(nrows=4, sharex=True)
     x, xdot, theta, thetadot = state.T
-    subPlot(ax[0], time, x, ylabel='X')
-    subPlot(ax[1], time, xdot, ylabel='X dot')
-    subPlot(ax[2], time, theta, ylabel='Theta')
-    subPlot(ax[3], time, thetadot, ylabel='Theta dot', xlabel='Time')
+    subPlot(ax[0], time, x, ylabel="X")
+    subPlot(ax[1], time, xdot, ylabel="X dot")
+    subPlot(ax[2], time, theta, ylabel="Theta")
+    subPlot(ax[3], time, thetadot, ylabel="Theta dot", xlabel="Time")
 
-    figure = os.path.join(args.save + 'cartpole.png')
+    figure = os.path.join(args.save + "cartpole.png")
     plt.savefig(figure)
     print("Saved to", figure)
 
