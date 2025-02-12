@@ -9,9 +9,9 @@ class TestAPERPE:
         trans = np.loadtxt(file_path, comments='#', delimiter=' ', usecols=(1, 2, 3))
         rot = np.loadtxt(file_path, comments='#', delimiter=' ', usecols=(4, 5, 6, 7))
 
-        stamp = torch.from_numpy(stamp)
-        rot_q = torch.from_numpy(rot).float()
-        trans = torch.from_numpy(trans).float()
+        stamp = torch.tensor(stamp, dtype=torch.float32)
+        rot_q = torch.tensor(rot, dtype=torch.float32)
+        trans = torch.tensor(trans, dtype=torch.float32)
 
         pose_torch = torch.cat((trans, rot_q), dim=-1)
         pose = pp.SE3(pose_torch)
