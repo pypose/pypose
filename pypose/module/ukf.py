@@ -15,6 +15,11 @@ class UKF(EKF):
             Ignored if provided during each iteration. Default: ``None``
         R (:obj:`Tensor`, optional): The covariance matrices of system observation noise.
             Ignored if provided during each iteration. Default: ``None``
+        msqrt (:obj:`Function`, optional): The method for computing the square root of matrices.
+            Use ``torch.linalg.cholesky`` if not provided. Default: ``None``
+        correct_PD_eps (:obj:`Float`, optional): The eps used in positive definite correction of the state covariance matrices P.
+            If provided a small positive number, P will be projected to be positive definite by clamping its smaller eigenvalues to eps.
+            If provided a negative number, no correction will be made. Default: ``-1``
 
     A non-linear system can be described as
 
@@ -127,26 +132,28 @@ class UKF(EKF):
 
         3. Prepare data
 
-        >>> T, N = 5, 2 # steps, state dim
-        >>> states = torch.zeros(T, N)
-        >>> inputs = torch.randn(T, N)
-        >>> observ = torch.zeros(T, N)
+        >>> B, T, N = 3, 5, 2 # batchsize, steps, state dim
+        >>> states = torch.zeros(B, T, N)
+        >>> inputs = torch.randn(B, T, N)
+        >>> observ = torch.zeros(B, T, N)
         >>> # std of transition, observation, and estimation
         >>> q, r, p = 0.1, 0.1, 10
-        >>> Q = torch.eye(N) * q**2
-        >>> R = torch.eye(N) * r**2
-        >>> P = torch.eye(N).repeat(T, 1, 1) * p**2
-        >>> estim = torch.randn(T, N) * p
+        >>> Q = torch.eye(N).repeat(B, 1, 1) * q**2
+        >>> R = torch.eye(N).repeat(B, 1, 1) * r**2
+        >>> P = torch.eye(N).repeat(B, T, 1, 1) * p**2
+        >>> estim = torch.randn(B, T, N) * p
 
         4. Perform UKF prediction. Note that estimation error becomes smaller with more steps.
 
         >>> for i in range(T - 1):
-        ...     w = q * torch.randn(N) # transition noise
-        ...     v = r * torch.randn(N) # observation noise
-        ...     states[i+1], observ[i] = model(states[i] + w, inputs[i])
-        ...     estim[i+1], P[i+1] = ukf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
+        ...     w = q * torch.randn(B, N) # transition noise
+        ...     v = r * torch.randn(B, N) # observation noise
+        ...     states[:, i+1], observ[:, i] = model(states[:, i] + w, inputs[:, i])
+        ...     estim[:, i+1], P[:, i+1] = ukf(estim[:, i], observ[:, i] + v, inputs[:, i], P[:, i], Q, R)
         ... print('Est error:', (states - estim).norm(dim=-1))
-        Est error: tensor([8.8161, 9.0322, 5.4756, 2.2453, 0.9141])
+        Est error: tensor([[19.2216,  0.9972,  0.7375,  0.8644,  0.9604],
+                           [16.6286,  2.1883,  1.7114,  0.8491,  1.2250],
+                           [10.5133,  2.1080,  1.9851,  0.5087,  1.3921]])
 
     Note:
         Implementation is based on Section 14.3 of this book
@@ -156,9 +163,10 @@ class UKF(EKF):
           Cleveland State University, 2006
     '''
 
-    def __init__(self, model, Q=None, R=None, msqrt=None):
+    def __init__(self, model, Q=None, R=None, msqrt=None, correct_PD_eps=-1):
         super().__init__(model, Q, R)
         self.msqrt = torch.linalg.cholesky if msqrt is None else msqrt
+        self.correct_PD_eps = correct_PD_eps
 
     def forward(self, x, y, u, P, Q=None, R=None, t=None, k=None):
         r'''
@@ -187,13 +195,15 @@ class UKF(EKF):
 
         xs, w = self.sigma_weight_points(x, P, k)
         xs = self.model.state_transition(xs, u, t)
-        xe = (w * xs).sum(dim=-2)
+        xe = (w * xs).sum(dim=0)
         ex = xe - xs
         P = self.compute_cov(ex, ex, w, Q)
+        if self.correct_PD_eps >= 0:
+            P = self.project_to_positive_definite(P)
 
         xs, w = self.sigma_weight_points(xe, P, k)
         ys = self.model.observation(xs, u, t)
-        ye = (w * ys).sum(dim=-2)
+        ye = (w * ys).sum(dim=0)
         ey = ye - ys
         Py = self.compute_cov(ey, ey, w, R)
 
@@ -201,6 +211,8 @@ class UKF(EKF):
         K = Pxy @ pinv(Py)
         x = xe + bmv(K, y - ye)
         P = P - K @ Py @ K.mT
+        if self.correct_PD_eps >= 0:
+            P = self.project_to_positive_definite(P)
 
         return x, P
 
@@ -217,15 +229,21 @@ class UKF(EKF):
             tuple of :obj:`Tensor`: sigma points and their weights
         '''
         assert x.size(-1) == P.size(-1) == P.size(-2), 'Invalid shape'
-        n, xe = x.size(-1), x.unsqueeze(-2)
-        xr = self.msqrt((n + k) * P)
+        n, xe = x.size(-1), x.unsqueeze(0)
+        xr = self.msqrt((n + k) * P).transpose(0, -2)
         we = torch.full(xe.shape[:-1], k / (n + k), dtype=x.dtype, device=x.device)
         wr = torch.full(xr.shape[:-1], 1 / (2 * (n + k)), dtype=x.dtype, device=x.device)
-        p = torch.cat((xe, xe + xr, xe - xr), dim=-2)
-        w = torch.cat((we, wr, wr), dim=-1)
+        p = torch.cat((xe, xe + xr, xe - xr), dim=0)
+        w = torch.cat((we, wr, wr), dim=0)
         return p, w.unsqueeze(-1)
 
     def compute_cov(self, a, b, w, Q=0):
         '''Compute covariance of two set of variables.'''
         a, b = a.unsqueeze(-1), b.unsqueeze(-1)
-        return Q + (w.unsqueeze(-1) * a @ b.mT).sum(dim=-3)
+        return Q + (w.unsqueeze(-1) * a @ b.mT).sum(dim=0)
+
+    def project_to_positive_definite(self, A):
+        '''Project matrix to positive definite by clamping its eigenvalues to positive.'''
+        eigenvalues, eigenvectors = torch.linalg.eigh(A)
+        eigenvalues = torch.clamp(eigenvalues, min=self.correct_PD_eps)
+        return (eigenvectors @ torch.diag_embed(eigenvalues)) @ eigenvectors.mT
