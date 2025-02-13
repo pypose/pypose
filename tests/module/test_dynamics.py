@@ -1,6 +1,7 @@
 import math
 import pypose as pp
 import torch as torch
+from pypose.module.dynamics import sysmat
 
 
 def test_dynamics_cartpole():
@@ -45,8 +46,11 @@ def test_dynamics_cartpole():
             self._totalMass = self._cartmass + self._polemass
 
         def state_transition(self, state, input, t=None):
-            x, xDot, theta, thetaDot = state
-            force = input.squeeze()
+            x = state[..., 0]
+            xDot = state[..., 1]
+            theta = state[..., 2]
+            thetaDot = state[..., 3]
+            force = input[..., 0]
             costheta = torch.cos(theta)
             sintheta = torch.sin(theta)
 
@@ -58,8 +62,7 @@ def test_dynamics_cartpole():
             )
             xAcc = temp - self._polemassLength * thetaAcc * costheta / self._totalMass
 
-            _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc))
-
+            _dstate = torch.stack((xDot, xAcc, thetaDot, thetaAcc), dim=-1)
             return state + torch.mul(_dstate, self._tau)
 
         def observation(self, state, input, t=None):
@@ -88,12 +91,15 @@ def test_dynamics_cartpole():
     jacob_state, jacob_input = state_all[-1], input[-1]
     cartPoleSolver.set_refpoint(state=jacob_state, input=jacob_input.unsqueeze(0), t=time[-1])
 
-    assert torch.allclose(A_ref, cartPoleSolver.A)
-    assert torch.allclose(B_ref, cartPoleSolver.B)
-    assert torch.allclose(C_ref, cartPoleSolver.C)
-    assert torch.allclose(D_ref, cartPoleSolver.D)
-    assert torch.allclose(c1_ref, cartPoleSolver.c1)
-    assert torch.allclose(c2_ref, cartPoleSolver.c2)
+    A,B,C,D = sysmat(cartPoleSolver,jacob_state, jacob_input.unsqueeze(0), time[-1], "ABCD")
+    c1 = cartPoleSolver.c1(jacob_state, jacob_input.unsqueeze(0), time[-1])
+    c2 = cartPoleSolver.c2(jacob_state, jacob_input.unsqueeze(0), time[-1])
+    assert torch.allclose(A_ref, A)
+    assert torch.allclose(B_ref, B)
+    assert torch.allclose(C_ref, C)
+    assert torch.allclose(D_ref, D)
+    assert torch.allclose(c1_ref, c1)
+    assert torch.allclose(c2_ref, c2)
 
 
 def test_dynamics_floquet():
@@ -142,10 +148,16 @@ def test_dynamics_floquet():
         def state_transition(self, state, input, t):
             cc = torch.cos(2*math.pi*t/100)
             ss = torch.sin(2*math.pi*t/100)
-            A = torch.tensor([[   1., cc/10],
-                            [cc/10,    1.]], device=device)
-            B = torch.tensor([[ss],
+
+            A = torch.tensor([[   1., 0],
+                            [0,    1.]], device=device)
+            A[0,1]=cc/10
+            A[1,0]=cc/10
+
+            B = torch.tensor([[0],
                             [1.]], device=device)
+            B[0,0]=ss
+
             return state.matmul(A) + B.matmul(input)
 
         def observation(self, state, input, t):
@@ -163,7 +175,7 @@ def test_dynamics_floquet():
     obser_all = torch.zeros(N, 2, device=device)
 
     for i in range(N):
-        state_all[i + 1], obser_all[i] = solver(state_all[i], input[i])
+        state_all[i + 1], obser_all[i] = solver(state_all[i], input[i], time[i])
 
     assert torch.allclose(state_all, state_ref, atol=1e-5)
     assert torch.allclose(obser_all, obser_ref)
@@ -187,22 +199,27 @@ def test_dynamics_floquet():
     # Note for c1, the values are supposed to be zero, but due to numerical
     # errors the values can be ~ 1e-7, and hence we increase the atol
     # Same story below
-    solver.set_refpoint()
-    assert torch.allclose(A0_N, solver.A)
-    assert torch.allclose(B0_N, solver.B)
-    assert torch.allclose(C0, solver.C)
-    assert torch.allclose(D0, solver.D)
-    assert torch.allclose(c1, solver.c1, atol=1e-6)
-    assert torch.allclose(c2_N, solver.c2)
+    A,B,C,D = sysmat(solver,state_all[-1], input[-2:-1], time[-1], "ABCD")
+    c1 = solver.c1(state_all[-1], input[-2:-1], time[-1])
+    c2 = solver.c2(state_all[-1], input[-2:-1], time[-1])
+    assert torch.allclose(A0_N, A)
+    assert torch.allclose(B0_N, B)
+    assert torch.allclose(C0, C)
+    assert torch.allclose(D0, D)
+    assert torch.allclose(c1, c1, atol=1e-6)
+    assert torch.allclose(c2_N, c2)
 
     # Jacobian computation - at the step idx
-    solver.set_refpoint(state=state_all[idx], input=input[idx], t=time[idx])
-    assert torch.allclose(A0_i, solver.A)
-    assert torch.allclose(B0_i, solver.B)
-    assert torch.allclose(C0, solver.C)
-    assert torch.allclose(D0, solver.D)
-    assert torch.allclose(c1, solver.c1, atol=1e-6)
-    assert torch.allclose(c2_i, solver.c2)
+    idx=5
+    A,B,C,D = sysmat(solver,state_all[idx], input[idx-1:idx], time[idx], "ABCD")
+    c1 = solver.c1(state_all[idx], input[idx-1:idx], time[idx])
+    c2 = solver.c2(state_all[idx], input[idx-1:idx], time[idx])
+    assert torch.allclose(A0_i, A)
+    assert torch.allclose(B0_i, B)
+    assert torch.allclose(C0, C)
+    assert torch.allclose(D0, D)
+    assert torch.allclose(c1, c1, atol=1e-6)
+    assert torch.allclose(c2_i, c2)
 
 
 def test_dynamics_lti():
@@ -222,7 +239,7 @@ def test_dynamics_lti():
     input = torch.randn(N, 1, p)
     """
 
-    # The most general case that all parameters are in the batch. 
+    # The most general case that all parameters are in the batch.
     # The user could change the corresponding values according to the actual physical system and directions above.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -236,7 +253,7 @@ def test_dynamics_lti():
     input_1 = torch.randn(5, 2, device=device)
 
     lti_1 = pp.module.LTI(A_1, B_1, C_1, D_1, c1_1, c2_1).to(device)
-  
+
     # The user can implement this line to print each parameter for comparison.
 
     z_1, y_1 = lti_1(state_1,input_1)

@@ -127,27 +127,24 @@ class TestLQR:
                                [-1.05, -1.36,  0.43,  0.80]], device=device)
 
         class MyLTV(pp.module.LTV):
+            def __init__(self):
+                super().__init__()
 
-            def __init__(self, A, B, C, D):
-                super().__init__(A, B, C, D)
+            def A(self, t):
+                return A[...,t,:,:]
 
-            @property
-            def A(self):
-                return self._A[...,self._t,:,:]
+            def B(self, t):
+                return B[...,t,:,:]
 
-            @property
-            def B(self):
-                return self._B[...,self._t,:,:]
+            def C(self, t):
+                return C[...,t,:,:]
 
-            @property
-            def C(self):
-                return self._C[...,self._t,:,:]
+            def D(self, t):
+                return D[...,t,:,:]
 
-            @property
-            def D(self):
-                return self._D[...,self._t,:,:]
+        ltv = MyLTV().to(device)
+        ltv.A
 
-        ltv = MyLTV(A, B, C, D).to(device)
         lqr  = pp.module.LQR(ltv, Q, p, T).to(device)
         x, u, cost = lqr(x_init)
 
