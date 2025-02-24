@@ -19,7 +19,7 @@ class CartPole(pp.module.NLS):
             self.totalMass = self.cartmass + self.polemass
 
         def state_transition(self, state, input, t=None):
-            x, xDot, theta, thetaDot = state.squeeze()
+            x, xDot, theta, thetaDot = state.clone().squeeze()
             force = input.squeeze()
             costheta = torch.cos(theta)
             sintheta = torch.sin(theta)
