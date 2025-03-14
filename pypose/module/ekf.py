@@ -158,7 +158,7 @@ class EKF(nn.Module):
 
         P = A @ P @ A.mT + Q                 # 2. Covariance predict
         K = P @ C.mT @ pinv(C @ P @ C.mT + R) # 3. Kalman gain
-        e = y - bmv(C, x) - bmv(D, u)    #    predicted observation error
+        e = y - self.model.observation(x, u, t=t)    #    predicted observation error
         xp = xm + bmv(K, e)                     # 4. Posteriori state
         P = (I - K @ C) @ P                   # 5. Posteriori covariance
         return xp, P
