@@ -59,7 +59,7 @@ class EKF(nn.Module):
 
         .. math::
             \mathbf{x}^{+} = \mathbf{x}^{-} + \mathbf{K} (\mathbf{y} -
-                        \mathbf{C}\mathbf{x}^{-} - \mathbf{D}\mathbf{u} - \mathbf{c}_2)
+                        \mathbf{h}(\mathbf{x}^{-}, \mathbf{u}))
 
     5. Posteriori Covariance Estimation
 
