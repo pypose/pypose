@@ -4,6 +4,8 @@ from .lietensor import SE3_type, se3_type
 from .lietensor import SO3_type, so3_type
 from .lietensor import Sim3_type, sim3_type
 from .lietensor import RxSO3_type, rxso3_type
+from .lietensor import SO2_type, so2_type
+from .lietensor import SE2_type, se2_type
 
 
 def _LieTensor_wrapper_add_docstr(wrapper: functools.partial, embedding_doc):
@@ -223,6 +225,34 @@ sim3 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=sim3_typ
         tensor([0., 0., 0., 0., 0., 0., 1.])
     ''')
 
+so2 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=so2_type),
+    r'''Internally, so2 LieTensors are stored by a single angle:
+
+    TODO
+
+    Examples:
+        >>> pp.so2(torch.randn(2, 1))
+        so2Type LieTensor:
+        tensor([[ 0.1477],
+                [ 0.2251]])
+        >>> pp.so2([1])
+        sim3Type LieTensor:
+        tensor([1.])
+    ''')
+
+
+SO2 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=SO2_type),
+    r''' TODO
+    ''')
+
+se2 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=se2_type),
+    r''' TODO
+    ''')
+
+SE2 = _LieTensor_wrapper_add_docstr(functools.partial(LieTensor, ltype=SE2_type),
+    r''' TODO
+    ''')
+
 def randn_like(input, sigma=1.0, **kwargs):
     r'''
     Returns a LieTensor with the same size as input that is filled with random
@@ -244,11 +274,19 @@ def randn_like(input, sigma=1.0, **kwargs):
           - :meth:`randn_SO3`
           - :obj:`so3_type`
           - :meth:`randn_so3`
+          - :obj:`SO2_type`
+          - :meth:`randn_SO2`
+          - :obj:`so2_type`
+          - :meth:`randn_so2`
         * - Euclidean Group
           - :obj:`SE3_type`
           - :meth:`randn_SE3`
           - :obj:`se3_type`
           - :meth:`randn_se3`
+          - :obj:`SE2_type`
+          - :meth:`randn_SE2`
+          - :obj:`se2_type`
+          - :meth:`randn_se2`
         * - Similarity Group
           - :obj:`Sim3_type`
           - :meth:`randn_Sim3`
@@ -915,6 +953,34 @@ def randn_RxSO3(*lsize, sigma=1.0, **kwargs):
     return RxSO3_type.randn(*lsize, sigma=sigma, **kwargs)
 
 
+def randn_so2(*lsize, sigma=1.0, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return so2_type.randn(*lsize, sigma=sigma, **kwargs)
+
+
+def randn_SO2(*lsize, sigma=1.0, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return SO2_type.randn(*lsize, sigma=sigma, **kwargs)
+
+
+def randn_se2(*lsize, sigma=1.0, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return se2_type.randn(*lsize, sigma=sigma, **kwargs)
+
+
+def randn_SE2(*lsize, sigma=1.0, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return SE2_type.randn(*lsize, sigma=sigma, **kwargs)
+
+
 def identity_like(liegroup, **kwargs):
     r'''
      Returns identity LieTensor with the same :obj:`lsize` and :obj:`ltype` as the given LieTensor.
@@ -1342,6 +1408,33 @@ def identity_RxSO3(*size, **kwargs):
     return RxSO3_type.identity(*size, **kwargs)
 
 
+def identity_so2(*size, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return so2_type.identity(*size, **kwargs)
+
+
+def identity_SO2(*size, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return SO2_type.identity(*size, **kwargs)
+
+
+def identity_se2(*size, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return se2_type.identity(*size, **kwargs)
+
+
+def identity_SE2(*size, **kwargs):
+    r'''
+    TODO Add documentation
+    '''
+    return SE2_type.identity(*size, **kwargs)
+
 def assert_ltype(func):
     @functools.wraps(func)
     def checker(*args, **kwargs):
@@ -1393,6 +1486,16 @@ def Exp(input):
           - :math:`\mapsto`
           - :math:`\mathcal{G}\in\mathbb{R}^{*\times5}`
           - :obj:`RxSO3_type`
+        * - :obj:`so2_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times1}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times2}`
+          - :obj:`SO2_type`
+        * - :obj:`se2_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times4}`
+          - :obj:`SE2_type`
 
     Warning:
         This function :func:`Exp()` is different from :func:`exp()`, which returns
@@ -1509,6 +1612,8 @@ def Exp(input):
 
         .. math::
             C = 1
+
+    * TODO Add examples for so2 and se2
 
     Note:
         The detailed explanation of the above :math:`\mathrm{Exp}`: calculation can be found
@@ -1629,6 +1734,16 @@ def Log(input):
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :obj:`rxso3_type`
+        * - :obj:`SO2_type`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times2}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times1}`
+          - :obj:`so2_type`
+        * - :obj:`SE2_type`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times4}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :obj:`se2_type`
 
     Warning:
         This function :func:`Log()` is different from :func:`log()`, which returns
@@ -1751,6 +1866,8 @@ def Log(input):
 
         .. math::
             C = 1
+
+    * TODO Add examples for SO2 and SE2
 
     Note:
         The :math:`\mathrm{arctan}`-based Logarithm map implementation thanks to the paper:
@@ -1887,6 +2004,26 @@ def Inv(x):
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :obj:`rxso3_type`
+        * - :obj:`SO2_type`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times2}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times2}`
+          - :obj:`SO2_type`
+        * - :obj:`SE2_type`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times4}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{G}\in\mathbb{R}^{*\times4}`
+          - :obj:`SE2_type`
+        * - :obj:`so2_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times1}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times1}`
+          - :obj:`so2_type`
+        * - :obj:`se2_type`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :obj:`se2_type`
 
     * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`SO3_type`
       (input :math:`\mathbf{x}` is an instance of :meth:`SO3`):
@@ -1933,6 +2070,8 @@ def Inv(x):
 
         .. math::
             \mathbf{y}_i = -\mathbf{x}_i
+
+    * TODO Add examples for so2, SO2, se2 and SE2
 
     Example:
 
@@ -2196,6 +2335,16 @@ def Adj(input, p):
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :obj:`rxso3_type`
+        * - (:obj:`SO2_type`, :obj:`so2_type`)
+          - :math:`(\mathcal{G}\in\mathbb{R}^{*\times2}, \mathcal{g}\in\mathbb{R}^{*\times1})`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times1}`
+          - :obj:`so2_type`
+        * - (:obj:`SE2_type`, :obj:`se2_type`)
+          - :math:`(\mathcal{G}\in\mathbb{R}^{*\times4}, \mathcal{g}\in\mathbb{R}^{*\times3})`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :obj:`se2_type`
 
     Let the input be (:math:`\mathbf{x}`, :math:`\mathbf{p}`), :math:`\mathbf{y}` be the output.
 
@@ -2297,6 +2446,8 @@ def Adj(input, p):
 
         In the case of :math:`\textrm{RxSO3}` group, the adjoint transformation is the same as
         the rotation matrix of the group i.e. the :math:`\textrm{SO3}` part of the group.
+
+    * TODO Add examples for so2, SO2, se2, SE2
 
     Note:
         The adjoint operator is a linear map which moves an element
@@ -2428,6 +2579,16 @@ def Jinvp(input, p):
           - :math:`\mapsto`
           - :math:`\mathcal{g}\in\mathbb{R}^{*\times4}`
           - :obj:`rxso3_type`
+        * - (:obj:`SO2_type`, :obj:`so2_type`)
+          - :math:`(\mathcal{G}\in\mathbb{R}^{*\times2}, \mathcal{g}\in\mathbb{R}^{*\times1})`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times1}`
+          - :obj:`so2_type`
+        * - (:obj:`SE2_type`, :obj:`se2_type`)
+          - :math:`(\mathcal{G}\in\mathbb{R}^{*\times4}, \mathcal{g}\in\mathbb{R}^{*\times3})`
+          - :math:`\mapsto`
+          - :math:`\mathcal{g}\in\mathbb{R}^{*\times3}`
+          - :obj:`se2_type`
 
     Let the input be (:math:`\mathbf{x}`, :math:`\mathbf{p}`), :math:`\mathbf{y}` be the output.
 
@@ -2569,6 +2730,8 @@ def Jinvp(input, p):
 
         where :math:`\mathbf{J}_i^{-1}(\boldsymbol{\Phi}_i)` is the
         inverse of left Jacobian of the SO3 part of :math:`\mathbf{x}_i`.
+
+    * TODO Add example for so2, SO2, se2 and SE2
 
     Note:
         :math:`\mathrm{Jinvp}` is usually used in the Baker-Campbell-Hausdorff formula
