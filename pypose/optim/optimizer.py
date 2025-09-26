@@ -7,7 +7,19 @@ from torch.optim import Optimizer
 from .solver import PINV, Cholesky
 from torch.linalg import cholesky_ex
 from .corrector import FastTriggs
+import math
+import warnings
+from functools import partial
+import pypose as pp
 
+try:
+    from bae.autograd.graph import backward, construct_sbt
+    from bae.autograd.function import TrackingTensor
+    from bae.sparse.py_ops import diagonal_op_
+    from bae.sparse.spgemm import CuSparse
+    BAE_AVAILABLE = True
+except ImportError:
+    BAE_AVAILABLE = False
 
 class Trivial(torch.nn.Module):
     r"""
@@ -288,6 +300,44 @@ class GaussNewton(_Optimizer):
             self.loss = self.model.loss(input, target)
         return self.loss
 
+if BAE_AVAILABLE:
+    def jacobian(output, params):
+        assert output.optrace[id(output)][0] == 'map', "The last operation in compute graph being indexing transform is not meaningful"
+        backward(output)
+        res = []
+        for param in params:
+            if hasattr(param, 'jactrace'):
+                if getattr(param, 'trim_SE3_grad', False):
+                    if isinstance(param.jactrace, tuple):
+                        values = param.jactrace[1]
+                    elif isinstance(param.jactrace, torch.Tensor) and param.jactrace.layout == torch.sparse_bsr:
+                        values = param.jactrace.values()
+                    else:
+                        values = param.jactrace
+
+                    if values.shape[-1] == 7:
+                        values = values[..., :6]
+                    else:
+                        values = torch.cat([values[..., :6], values[..., 7:]], dim=-1)
+
+                    if isinstance(param.jactrace, tuple):
+                        param.jactrace = (param.jactrace[0], values)
+                    elif isinstance(param.jactrace, torch.Tensor) and param.jactrace.layout == torch.sparse_bsr:
+                        param.jactrace = torch.sparse_bsr_tensor(
+                            col_indices=param.jactrace.col_indices(),
+                            crow_indices=param.jactrace.crow_indices(),
+                            values=values,
+                            size=(param.jactrace.shape[0], param.shape[0] * values.shape[-1]),
+                            device=param.device,
+                        )
+                    else:
+                        param.jactrace = values
+                if type(param.jactrace) is tuple:
+                    param.jactrace = construct_sbt(param.jactrace[1], param.shape[0], param.jactrace[0], type=torch.sparse_bsr)
+                res.append(param.jactrace)
+                delattr(param, 'jactrace')
+
+        return res
 
 class LevenbergMarquardt(_Optimizer):
     r'''
@@ -368,6 +418,7 @@ class LevenbergMarquardt(_Optimizer):
             gradient of each scalar in output with respect to the model parameters will be
             computed in parallel with ``"reverse-mode"``. More details go to
             :meth:`pypose.optim.functional.modjac`. Default: ``True``.
+        sparse (bool, optional): use sparse solver or not. Default: ``False``.
 
     Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`, :meth:`solver.Cholesky`.
 
@@ -400,12 +451,20 @@ class LevenbergMarquardt(_Optimizer):
         structural information, although computing Jacobian vector is faster.**
     '''
     def __init__(self, model, solver=None, strategy=None, kernel=None, corrector=None, \
-                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True):
+                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True, sparse=False):
         assert min > 0, ValueError("min value has to be positive: {}".format(min))
         assert max > 0, ValueError("max value has to be positive: {}".format(max))
         self.strategy = TrustRegion() if strategy is None else strategy
         defaults = {**{'min':min, 'max':max}, **self.strategy.defaults}
         super().__init__(model.parameters(), defaults=defaults)
+
+        self.sparse = sparse
+        if self.sparse:
+            if not BAE_AVAILABLE:
+                raise ImportError("Please install bae to use sparse mode."
+                                  "pip install git+https://github.com/zitongzhan/bae.git")
+            self.mm = CuSparse()
+
         self.jackwargs = {'vectorize': vectorize}
         self.solver = Cholesky() if solver is None else solver
         self.reject, self.reject_count = reject, 0
@@ -420,6 +479,26 @@ class LevenbergMarquardt(_Optimizer):
         self.corrector = [c if c is not None else Trivial() for c in self.corrector]
         self.model = RobustModel(model, kernel)
 
+    def update_parameter(self, params, step):
+        if getattr(self, 'sparse', False):
+            numels = []
+            for param in params:
+                if param.requires_grad:
+                    if getattr(param, 'trim_SE3_grad', False):
+                        numels.append(math.prod(param.shape[:-1]) * (param.shape[-1] - 1))
+                    else:
+                        numels.append(param.numel())
+            steps = step.split(numels)
+            for (param, d) in zip(params, steps):
+                if param.requires_grad:
+                    if getattr(param, 'trim_SE3_grad', False):
+                        param[..., :7] = pp.SE3(param[..., :7]).add_(pp.se3(d.view(param.shape[0], -1)[..., :6]))
+                        if param.shape[-1] > 7:
+                            param[:, 7:] += d.view(param.shape[0], -1)[:, 6:]
+                    else:
+                        param.add_(d.view(param.shape))
+        else:
+            super().update_parameter(params, step)
 
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
@@ -489,6 +568,12 @@ class LevenbergMarquardt(_Optimizer):
             `examples/module/pgo
             <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.
         '''
+        if self.sparse:
+            return self._step_sparse(input, target, weight)
+        else:
+            return self._step_dense(input, target, weight)
+
+    def _step_dense(self, input, target=None, weight=None):
         for pg in self.param_groups:
             weight = self.weight if weight is None else weight
             R = list(self.model(input, target))
@@ -518,6 +603,51 @@ class LevenbergMarquardt(_Optimizer):
                 self.strategy.update(pg, last=self.last, loss=self.loss, J=J, D=D, R=R.view(-1, 1))
                 if self.last < self.loss and self.reject_count < self.reject: # reject step
                     self.update_parameter(params = pg['params'], step = -D)
+                    self.loss, self.reject_count = self.last, self.reject_count + 1
+                else:
+                    break
+        return self.loss
+
+    def _step_sparse(self, input, target=None, weight=None):
+        # Note: sparse mode currently assumes a single residual and does not support weights.
+        for pg in self.param_groups:
+            # weight is not used in sparse mode for now.
+            # weight = self.weight if weight is None else weight
+
+            R = self.model(input, target)
+            if isinstance(R, (tuple, list)):
+                if len(R) > 1:
+                    warnings.warn("Sparse mode only supports a single residual. Using the first one.")
+                R = R[0]
+
+            J = jacobian(R, pg['params'])
+            if isinstance(R, TrackingTensor):
+                R = R.tensor()
+            J = torch.cat([j.to_sparse_coo() for j in J], dim=-1)
+
+            self.last = self.loss = self.loss if hasattr(self, 'loss') else self.model.loss(input, target)
+            J_T = J.mT
+            self.reject_count = 0
+            J_T = J_T.to_sparse_csr()
+            J = J.to_sparse_csr()
+            A = self.mm(J_T, J)
+
+            diagonal_op_(A, op=partial(torch.clamp_, min=pg['min'], max=pg['max']))
+
+            while self.last <= self.loss:
+                diagonal_op_(A, op=partial(torch.mul, other=1+pg['damping']))
+                try:
+                    D = self.solver(A, -J_T @ R.view(-1, 1))
+                    D = D[:, None]
+                except Exception as e:
+                    print(e, "\nLinear solver failed. Breaking optimization step...")
+                    break
+                self.update_parameter(pg['params'], D)
+                self.loss = self.model.loss(input, target)
+                print("Loss:", self.loss, "Last Loss:", self.last, "Reject Count:", self.reject_count, "Damping:", pg['damping'])
+                self.strategy.update(pg, last=self.last, loss=self.loss, J=J, D=D, R=R.view(-1, 1))
+                if self.last < self.loss and self.reject_count < self.reject:  # reject step
+                    self.update_parameter(params=pg['params'], step=-D)
                     self.loss, self.reject_count = self.last, self.reject_count + 1
                 else:
                     break
