@@ -55,7 +55,7 @@ class RobustModel(nn.Module):
         J = torch.cat(J) if isinstance(J, (tuple, list)) else J
         return torch.cat(R), weight_diag, J
 
-    def forward(self, input, target):
+    def forward(self, input, target=None):
         output = self.model_forward(input)
         return self.residuals(output, target)
 
