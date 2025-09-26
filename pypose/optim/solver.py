@@ -1,8 +1,7 @@
-import torch
-from .. import hasnan
+import torch, warnings
 from typing import Optional
 from torch import Tensor, nn
-from ..function.linalg import bmv
+from functools import partial
 from torch.linalg import pinv, lstsq, cholesky_ex, vecdot
 
 
@@ -288,46 +287,49 @@ class CG(nn.Module):
         Return:
             Tensor: the solved tensor. Layout is the same as the layout of b.
         '''
-        if A.ndim == b.ndim:
-            b = b.squeeze(-1)
+        if A.ndim == b.ndim + 1:
+            b = b.unsqueeze(-1)
         else:
-            assert A.ndim == b.ndim + 1, \
-                'The number of dimensions of A and b must differ by 1'
+            assert A.ndim == b.ndim, \
+                'The number of dimensions of A and b must be the same or one more than b'
         if x is None:
             x = torch.zeros_like(b)
-        bnrm2 = torch.linalg.norm(b, dim=-1)
+        bnrm2 = torch.linalg.norm(b, dim=0)
         if (bnrm2 == 0).all():
             return b
         atol = self.tol * bnrm2
-        n = b.shape[-1]
+        n = b.shape[-2]
 
         if self.maxiter is None:
             maxiter = n * 10
         else:
             maxiter = self.maxiter
-        r = b - bmv(A, x) if x.any() else b.clone()
+        r = b - A @ x if x.any() else b.clone()
         rho_prev, p = None, None
 
+        q = torch.empty_like(b)
+        if M is not None:
+            z = torch.empty_like(b)
+        else:
+            z = r.clone()
+
         for iteration in range(maxiter):
-            if (torch.linalg.norm(r, dim=-1) < atol).all():
+            if (torch.linalg.norm(r, dim=0) < atol).all():
                 return x
 
-            z = bmv(M, r) if M is not None else r
-            rho_cur = vecdot(r, z)
+            if M is not None:
+                torch.matmul(M, r, out=z)
+            rho_cur = torch.matmul(r.mT, z)
             if iteration > 0:
                 beta = rho_cur / rho_prev
-                p = p * beta.unsqueeze(-1) + z
+                p.mul_(beta).add_(z)
             else:  # First spin
-                p = torch.empty_like(r)
-                p[:] = z[:]
+                p = z.clone()
 
-            q = bmv(A, p)
-            alpha = rho_cur / vecdot(p, q)
-            x += alpha.unsqueeze(-1)*p
-            r -= alpha.unsqueeze(-1)*q
+            torch.matmul(A, p, out=q)
+            alpha = rho_cur / torch.matmul(p.mT, q)
+            x += alpha * p
+            r -= alpha * q
             rho_prev = rho_cur
-
-        assert not hasnan(x), 'Conjugate Gradient Solver Failed. \
-            Check your matrix (may not be Symmetric Positive Definite)'
 
         return x
