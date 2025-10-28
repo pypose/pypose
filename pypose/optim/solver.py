@@ -319,6 +319,9 @@ class CG(nn.Module):
 
             if M is not None:
                 torch.matmul(M, r, out=z)
+            else:
+                z = r
+
             rho_cur = torch.matmul(r.mT, z)
             if iteration > 0:
                 beta = rho_cur / rho_prev
