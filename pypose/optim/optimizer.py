@@ -610,6 +610,7 @@ class LevenbergMarquardt(_Optimizer):
 
     def _step_sparse(self, input, target=None, weight=None):
         # Note: sparse mode currently assumes a single residual and does not support weights.
+        assert weight is None, "Weight is not supported in sparse mode for now."
         for pg in self.param_groups:
             # weight is not used in sparse mode for now.
             # weight = self.weight if weight is None else weight
@@ -644,7 +645,6 @@ class LevenbergMarquardt(_Optimizer):
                     break
                 self.update_parameter(pg['params'], D)
                 self.loss = self.model.loss(input, target)
-                print("Loss:", self.loss, "Last Loss:", self.last, "Reject Count:", self.reject_count, "Damping:", pg['damping'])
                 self.strategy.update(pg, last=self.last, loss=self.loss, J=J, D=D, R=R.view(-1, 1))
                 if self.last < self.loss and self.reject_count < self.reject:  # reject step
                     self.update_parameter(params=pg['params'], step=-D)
