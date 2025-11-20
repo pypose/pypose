@@ -1,6 +1,7 @@
 import torch
 import pytest
 import pypose as pp
+from pypose.sparse import bsr_mm_triton, bsr_output_to_dense_numpy
 
 def random_compressed(pshape, bshape, mode, zero_prob=0.):
     #generate coo
@@ -23,6 +24,53 @@ def random_compressed(pshape, bshape, mode, zero_prob=0.):
         dummy_csc = dummy.to_sparse_csc()
         crowi, coli = dummy_csc.ccol_indices(), dummy_csc.row_indices()
         return torch.sparse_bsc_tensor(crowi, coli, values, (m, p), dtype=values.dtype)
+
+def test_triton_bsr_mm():
+    for run_idx in range(20):
+        pshape = torch.Size([4, 4])
+        bshape = torch.Size([2, 2])
+        A_bsr = random_compressed(pshape, bshape, 'bsr', zero_prob=0.3)
+        B_bsr = random_compressed(pshape, bshape, 'bsr', zero_prob=0.3)
+
+        A_dense = A_bsr.to_dense().to(torch.float32).cuda()
+        B_dense = B_bsr.to_dense().to(torch.float32).cuda()
+        C_dense_reference = A_dense @ B_dense
+
+        A_offsets = A_bsr.crow_indices().to(torch.int32).cuda()
+        A_cols = A_bsr.col_indices().to(torch.int32).cuda()
+        A_vals = A_bsr.values().to(torch.float32).cuda()
+
+        B_offsets = B_bsr.crow_indices().to(torch.int32).cuda()
+        B_cols = B_bsr.col_indices().to(torch.int32).cuda()
+        B_vals = B_bsr.values().to(torch.float32).cuda()
+
+        A_block_rows = A_vals.shape[1]
+        A_block_cols = A_vals.shape[2]
+        B_block_cols = B_vals.shape[2]
+
+        C_offsets, C_cols, C_vals = bsr_mm_triton(
+            A_offsets, A_cols, A_vals,
+            B_offsets, B_cols, B_vals,
+            A_bsr.shape[0] // A_block_rows,
+            A_bsr.shape[1] // A_block_cols,
+            B_bsr.shape[1] // B_block_cols,
+        )
+
+        C_dense_triton = bsr_output_to_dense_numpy(
+            C_offsets.cpu().numpy(),
+            C_cols.cpu().numpy(),
+            C_vals.cpu().numpy(),
+            A_bsr.shape[0] // A_block_rows,
+            B_bsr.shape[1] // B_block_cols,
+            A_block_rows,
+            B_block_cols,
+        )
+
+        C_dense_triton = torch.from_numpy(C_dense_triton).cuda()
+        torch.testing.assert_close(C_dense_triton, C_dense_reference, rtol=1e-4, atol=1e-4)
+        print(f"Test for {run_idx+1} of 20 passed ")
+
+    print("All 20 Triton BSR Muiltiplication tests passed")
 
 
 class TestBSR:
@@ -84,3 +132,4 @@ if __name__ == '__main__':
         bsr @ bsr.mT
     end = time.perf_counter()
     print(end - start)
+    test_triton_bsr_mm()
