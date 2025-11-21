@@ -31,19 +31,15 @@ def test_triton_bsr_mm():
         bshape = torch.Size([2, 2])
         A_bsr = random_compressed(pshape, bshape, 'bsr', zero_prob=0.3)
         B_bsr = random_compressed(pshape, bshape, 'bsr', zero_prob=0.3)
-
         A_dense = A_bsr.to_dense().to(torch.float32).cuda()
         B_dense = B_bsr.to_dense().to(torch.float32).cuda()
         C_dense_reference = A_dense @ B_dense
-
         A_offsets = A_bsr.crow_indices().to(torch.int32).cuda()
         A_cols = A_bsr.col_indices().to(torch.int32).cuda()
         A_vals = A_bsr.values().to(torch.float32).cuda()
-
         B_offsets = B_bsr.crow_indices().to(torch.int32).cuda()
         B_cols = B_bsr.col_indices().to(torch.int32).cuda()
         B_vals = B_bsr.values().to(torch.float32).cuda()
-
         A_block_rows = A_vals.shape[1]
         A_block_cols = A_vals.shape[2]
         B_block_cols = B_vals.shape[2]
