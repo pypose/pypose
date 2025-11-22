@@ -1,109 +1,115 @@
 import torch
 import numpy as np
-import triton
-import triton.language as tl
 import random
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-@triton.jit
-def bsr_mm_numeric_kernel(
-    A_offsets_ptr, A_columns_ptr, A_values_ptr,
-    B_offsets_ptr, B_columns_ptr, B_values_ptr,
-    C_offsets_ptr, C_columns_ptr, C_values_ptr,
-    A_block_row_num: tl.constexpr, A_block_col_num: tl.constexpr, B_block_col_num: tl.constexpr,
-    A_block_row_num_pow2: tl.constexpr, A_block_col_num_pow2: tl.constexpr, B_block_col_num_pow2: tl.constexpr,
-    C_block_row_num: tl.constexpr,
-    DTYPE: tl.constexpr,
-):
-    r'''
-    Performs block–sparse row (BSR) matrix multiplication on the GPU.
+try:
+    import triton
+    import triton.language as tl
+    HAS_TRITON = True
+except Exception:
+    triton = None
+    tl = None
+    HAS_TRITON = False
 
-    This kernel computes the numeric result of
+if HAS_TRITON:
+    @triton.jit
+    def bsr_mm_numeric_kernel(
+        A_offsets_ptr, A_columns_ptr, A_values_ptr,
+        B_offsets_ptr, B_columns_ptr, B_values_ptr,
+        C_offsets_ptr, C_columns_ptr, C_values_ptr,
+        A_block_row_num: tl.constexpr, A_block_col_num: tl.constexpr, B_block_col_num: tl.constexpr,
+        A_block_row_num_pow2: tl.constexpr, A_block_col_num_pow2: tl.constexpr, B_block_col_num_pow2: tl.constexpr,
+        C_block_row_num: tl.constexpr,
+        DTYPE: tl.constexpr,
+    ):
+        r'''
+        Performs block–sparse row (BSR) matrix multiplication on the GPU.
 
-        C = A @ B
+        This kernel computes the numeric result of C = A @ B
 
-    where A, B, and C are stored in BSR format. Each kernel instance
-    (identified by tl.program_id(0)) is responsible for computing one
-    block row of C.
+        where A, B, and C are stored in BSR format. Each kernel instance
+        (identified by tl.program_id(0)) is responsible for computing one
+        block row of C.
 
-    Args:
-        A_offsets_ptr: pointer to row offsets (crow_indices) of A in BSR format
-        A_columns_ptr: pointer to column indices (col_indices) of A in BSR format
-        A_values_ptr: pointer to block values of A, flattened to 1D
-        B_offsets_ptr: pointer to row offsets (crow_indices) of B in BSR format
-        B_columns_ptr: pointer to column indices (col_indices) of B in BSR format
-        B_values_ptr: pointer to block values of B, flattened to 1D
-        C_offsets_ptr: pointer to row offsets of C (pre-computed structure)
-        C_columns_ptr: pointer to column indices of C (pre-computed structure)
-        C_values_ptr: pointer to block values of C, flattened to 1D (output buffer)
-        A_block_row_num: number of rows in each block of A (block height)
-        A_block_col_num: number of columns in each block of A (and rows of B)
-        B_block_col_num: number of columns in each block of B (block width)
-        A_block_row_num_pow2: next power-of-two ≥ A_block_row_num, used for tiling
-        A_block_col_num_pow2: next power-of-two ≥ A_block_col_num
-        B_block_col_num_pow2: next power-of-two ≥ B_block_col_num
-        C_block_row_num: number of block rows in C (and A)
-        DTYPE: Triton dtype used for computation (e.g. tl.float32)
+        Args:
+            A_offsets_ptr: pointer to row offsets (crow_indices) of A in BSR format
+            A_columns_ptr: pointer to column indices (col_indices) of A in BSR format
+            A_values_ptr: pointer to block values of A, flattened to 1D
+            B_offsets_ptr: pointer to row offsets (crow_indices) of B in BSR format
+            B_columns_ptr: pointer to column indices (col_indices) of B in BSR format
+            B_values_ptr: pointer to block values of B, flattened to 1D
+            C_offsets_ptr: pointer to row offsets of C (pre-computed structure)
+            C_columns_ptr: pointer to column indices of C (pre-computed structure)
+            C_values_ptr: pointer to block values of C, flattened to 1D (output buffer)
+            A_block_row_num: number of rows in each block of A (block height)
+            A_block_col_num: number of columns in each block of A (and rows of B)
+            B_block_col_num: number of columns in each block of B (block width)
+            A_block_row_num_pow2: next power-of-two ≥ A_block_row_num, used for tiling
+            A_block_col_num_pow2: next power-of-two ≥ A_block_col_num
+            B_block_col_num_pow2: next power-of-two ≥ B_block_col_num
+            C_block_row_num: number of block rows in C (and A)
+            DTYPE: Triton dtype used for computation (e.g. tl.float32)
 
-    Returns:
-        None. The kernel does not return a value; it writes all results in-place
-        into C_values_ptr.
-    '''
+        Returns:
+            None. The kernel does not return a value; it writes all results in-place
+            into C_values_ptr.
+        '''
 
-    program_id_m = tl.program_id(0)
-    i = program_id_m
+        program_id_m = tl.program_id(0)
+        i = program_id_m
 
-    if i >= C_block_row_num:
-        return
+        if i >= C_block_row_num:
+            return
 
-    C_row_start_idx = tl.load(C_offsets_ptr + i)
-    C_row_end_idx = tl.load(C_offsets_ptr + i + 1)
-    A_row_start_idx = tl.load(A_offsets_ptr + i)
-    A_row_end_idx = tl.load(A_offsets_ptr + i + 1)
+        C_row_start_idx = tl.load(C_offsets_ptr + i)
+        C_row_end_idx = tl.load(C_offsets_ptr + i + 1)
+        A_row_start_idx = tl.load(A_offsets_ptr + i)
+        A_row_end_idx = tl.load(A_offsets_ptr + i + 1)
 
-    A_block_row_indices = tl.arange(0, A_block_row_num_pow2)
-    A_block_col_indices = tl.arange(0, A_block_col_num_pow2)
-    A_block_offsets = A_block_row_indices[:, None] * A_block_col_num + A_block_col_indices[None, :]
-    A_mask = (A_block_row_indices[:, None] < A_block_row_num) & (A_block_col_indices[None, :] < A_block_col_num)
+        A_block_row_indices = tl.arange(0, A_block_row_num_pow2)
+        A_block_col_indices = tl.arange(0, A_block_col_num_pow2)
+        A_block_offsets = A_block_row_indices[:, None] * A_block_col_num + A_block_col_indices[None, :]
+        A_mask = (A_block_row_indices[:, None] < A_block_row_num) & (A_block_col_indices[None, :] < A_block_col_num)
 
-    B_block_row_indices = tl.arange(0, A_block_col_num_pow2)
-    B_block_col_indices = tl.arange(0, B_block_col_num_pow2)
-    B_block_offsets = B_block_row_indices[:, None] * B_block_col_num + B_block_col_indices[None, :]
-    B_mask = (B_block_row_indices[:, None] < A_block_col_num) & (B_block_col_indices[None, :] < B_block_col_num)
+        B_block_row_indices = tl.arange(0, A_block_col_num_pow2)
+        B_block_col_indices = tl.arange(0, B_block_col_num_pow2)
+        B_block_offsets = B_block_row_indices[:, None] * B_block_col_num + B_block_col_indices[None, :]
+        B_mask = (B_block_row_indices[:, None] < A_block_col_num) & (B_block_col_indices[None, :] < B_block_col_num)
 
-    C_block_row_indices = tl.arange(0, A_block_row_num_pow2)
-    C_block_col_indices = tl.arange(0, B_block_col_num_pow2)
-    C_block_offsets = C_block_row_indices[:, None] * B_block_col_num + C_block_col_indices[None, :]
-    C_mask = (C_block_row_indices[:, None] < A_block_row_num) & (C_block_col_indices[None, :] < B_block_col_num)
+        C_block_row_indices = tl.arange(0, A_block_row_num_pow2)
+        C_block_col_indices = tl.arange(0, B_block_col_num_pow2)
+        C_block_offsets = C_block_row_indices[:, None] * B_block_col_num + C_block_col_indices[None, :]
+        C_mask = (C_block_row_indices[:, None] < A_block_row_num) & (C_block_col_indices[None, :] < B_block_col_num)
 
-    A_block_size = A_block_row_num * A_block_col_num
-    B_block_size = A_block_col_num * B_block_col_num
-    C_block_size = A_block_row_num * B_block_col_num
+        A_block_size = A_block_row_num * A_block_col_num
+        B_block_size = A_block_col_num * B_block_col_num
+        C_block_size = A_block_row_num * B_block_col_num
 
-    for z_idx in range(C_row_start_idx, C_row_end_idx):
-        j = tl.load(C_columns_ptr + z_idx)
-        accumulation = tl.zeros((A_block_row_num_pow2, B_block_col_num_pow2), dtype=DTYPE)
+        for z_idx in range(C_row_start_idx, C_row_end_idx):
+            j = tl.load(C_columns_ptr + z_idx)
+            accumulation = tl.zeros((A_block_row_num_pow2, B_block_col_num_pow2), dtype=DTYPE)
 
-        for ka_idx in range(A_row_start_idx, A_row_end_idx):
-            k = tl.load(A_columns_ptr + ka_idx)
-            B_row_start_idx = tl.load(B_offsets_ptr + k)
-            B_row_end_idx = tl.load(B_offsets_ptr + k + 1)
+            for ka_idx in range(A_row_start_idx, A_row_end_idx):
+                k = tl.load(A_columns_ptr + ka_idx)
+                B_row_start_idx = tl.load(B_offsets_ptr + k)
+                B_row_end_idx = tl.load(B_offsets_ptr + k + 1)
 
-            for kb_idx in range(B_row_start_idx, B_row_end_idx):
-                B_col = tl.load(B_columns_ptr + kb_idx)
+                for kb_idx in range(B_row_start_idx, B_row_end_idx):
+                    B_col = tl.load(B_columns_ptr + kb_idx)
 
-                if B_col == j:
-                    A_ik_ptr = A_values_ptr + (ka_idx * A_block_size) + A_block_offsets
-                    A_ik = tl.load(A_ik_ptr, mask=A_mask, other=0.0)
+                    if B_col == j:
+                        A_ik_ptr = A_values_ptr + (ka_idx * A_block_size) + A_block_offsets
+                        A_ik = tl.load(A_ik_ptr, mask=A_mask, other=0.0)
 
-                    B_kj_ptr = B_values_ptr + (kb_idx * B_block_size) + B_block_offsets
-                    B_kj = tl.load(B_kj_ptr, mask=B_mask, other=0.0)
+                        B_kj_ptr = B_values_ptr + (kb_idx * B_block_size) + B_block_offsets
+                        B_kj = tl.load(B_kj_ptr, mask=B_mask, other=0.0)
 
-                    accumulation += tl.dot(A_ik, B_kj, allow_tf32=False)
+                        accumulation += tl.dot(A_ik, B_kj, allow_tf32=False)
 
-        C_ij_ptr = C_values_ptr + (z_idx * C_block_size) + C_block_offsets
-        tl.store(C_ij_ptr, accumulation, mask=C_mask)
+            C_ij_ptr = C_values_ptr + (z_idx * C_block_size) + C_block_offsets
+            tl.store(C_ij_ptr, accumulation, mask=C_mask)
 
 def bsr_mm_outcome_structure(
     A_offsets, A_cols,
@@ -202,7 +208,10 @@ def bsr_mm_triton(
     C_columns: 1D int tensor, col_indices of C, shape [C_all_block_nums]
     C_vals: 3D tensor, shape [C_all_block_nums, A_block_row_num, B_block_col_num]. Block values of the result C in BSR format.
     '''
-
+    if not HAS_TRITON:
+        raise RuntimeError("This operation requires Triton and CUDA support.")
+    if not torch.cuda.is_available() or torch.version.cuda is None:
+        raise RuntimeError("CUDA-enabled PyTorch is required.")
 
     device = A_offsets.device
     dtype = A_vals.dtype

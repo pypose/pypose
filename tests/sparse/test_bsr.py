@@ -3,6 +3,12 @@ import pytest
 import pypose as pp
 from pypose.sparse import bsr_mm_triton, bsr_output_to_dense_numpy
 
+try:
+    import triton
+    HAS_TRITON = True
+except Exception:
+    HAS_TRITON = False
+
 def random_compressed(pshape, bshape, mode, zero_prob=0.):
     #generate coo
     proxy = torch.randn(pshape) > 0.5
@@ -25,6 +31,10 @@ def random_compressed(pshape, bshape, mode, zero_prob=0.):
         crowi, coli = dummy_csc.ccol_indices(), dummy_csc.row_indices()
         return torch.sparse_bsc_tensor(crowi, coli, values, (m, p), dtype=values.dtype)
 
+@pytest.mark.skipif(
+    (not HAS_TRITON) or (not torch.cuda.is_available()) or (torch.version.cuda is None),
+    reason="Triton BSR tests require Triton and CUDA-enabled PyTorch."
+)
 def test_triton_bsr_mm():
     for run_idx in range(20):
         pshape = torch.Size([4, 4])
@@ -67,7 +77,6 @@ def test_triton_bsr_mm():
         print(f"Test for {run_idx+1} of 20 passed ")
 
     print("All 20 Triton BSR Muiltiplication tests passed")
-
 
 class TestBSR:
     @pytest.mark.parametrize('zero_prob', [0., 0.7, 1.0])
@@ -113,6 +122,11 @@ class TestBSR:
 
 
 if __name__ == '__main__':
+    if HAS_TRITON and torch.cuda.is_available() and (torch.version.cuda is not None):
+        test_triton_bsr_mm()
+    else:
+        print("Triton BSR test requires Triton and CUDA-enabled PyTorch.")
+
     TestBSR.test_universal(None, torch.matmul, torch.matmul, ['bsr', 'bsc'], 'mT', 2, 0.7)
 
     crow_indices = torch.tensor([0, 2, 4])
@@ -128,4 +142,3 @@ if __name__ == '__main__':
         bsr @ bsr.mT
     end = time.perf_counter()
     print(end - start)
-    test_triton_bsr_mm()
