@@ -9,6 +9,7 @@ try:
 except Exception:
     HAS_TRITON = False
 
+
 def random_compressed(pshape, bshape, mode, zero_prob=0.):
     #generate coo
     proxy = torch.randn(pshape) > 0.5

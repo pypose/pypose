@@ -4,16 +4,25 @@ import random
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-try:
-    import triton
-    import triton.language as tl
-    HAS_TRITON = True
-except Exception:
-    triton = None
-    tl = None
-    HAS_TRITON = False
+def _load_triton():
+    try:
+        import triton
+        import triton.language as tl
+        return triton, tl
+    except Exception:
+        return None, None
 
-if HAS_TRITON:
+
+def _get_bsr_mm_kernel():
+    """
+    Returns (triton, tl, kernel) if Triton is available,
+    otherwise (None, None, None).
+    """
+    triton, tl = _load_triton()
+
+    if triton is None:
+        return None, None, None
+
     @triton.jit
     def bsr_mm_numeric_kernel(
         A_offsets_ptr, A_columns_ptr, A_values_ptr,
@@ -110,6 +119,9 @@ if HAS_TRITON:
 
             C_ij_ptr = C_values_ptr + (z_idx * C_block_size) + C_block_offsets
             tl.store(C_ij_ptr, accumulation, mask=C_mask)
+
+    return triton, tl, bsr_mm_numeric_kernel
+
 
 def bsr_mm_outcome_structure(
     A_offsets, A_cols,
@@ -208,9 +220,13 @@ def bsr_mm_triton(
     C_columns: 1D int tensor, col_indices of C, shape [C_all_block_nums]
     C_vals: 3D tensor, shape [C_all_block_nums, A_block_row_num, B_block_col_num]. Block values of the result C in BSR format.
     '''
-    if not HAS_TRITON:
-        raise RuntimeError("This operation requires Triton and CUDA support.")
-    if not torch.cuda.is_available() or torch.version.cuda is None:
+
+    triton, tl, kernel = _get_bsr_mm_kernel()
+
+    if (triton is None) or (tl is None) or (kernel is None):
+        raise RuntimeError("Triton with CUDA support is required for bsr_mm_triton.")
+
+    if (not torch.cuda.is_available()) or (torch.version.cuda is None):
         raise RuntimeError("CUDA-enabled PyTorch is required.")
 
     device = A_offsets.device
@@ -233,7 +249,7 @@ def bsr_mm_triton(
     A_block_col_num_pow2 = max(16, triton.next_power_of_2(A_block_col_num))
     B_block_col_num_pow2 = max(16, triton.next_power_of_2(B_block_col_num))
 
-    bsr_mm_numeric_kernel[grid_dimension](
+    kernel[grid_dimension](
         A_offsets, A_cols, A_vals_flat,
         B_offsets, B_cols, B_vals_flat,
         C_offsets, C_columns, C_vals_flat,
