@@ -77,7 +77,7 @@ def test_triton_bsr_mm():
         torch.testing.assert_close(C_dense_triton, C_dense_reference, rtol=1e-4, atol=1e-4)
         print(f"Test for {run_idx+1} of 20 passed ")
 
-    print("All 20 Triton BSR Muiltiplication tests passed")
+    print("All 20 Triton BSR Multiplication tests passed")
 
 class TestBSR:
     @pytest.mark.parametrize('zero_prob', [0., 0.7, 1.0])
