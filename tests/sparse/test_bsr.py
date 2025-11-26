@@ -28,6 +28,7 @@ def random_compressed(pshape, bshape, mode, zero_prob=0.):
         crowi, coli = dummy_csc.ccol_indices(), dummy_csc.row_indices()
         return torch.sparse_bsc_tensor(crowi, coli, values, (m, p), dtype=values.dtype)
 
+
 @pytest.mark.skipif(
     not (torch.cuda.is_available() or TRITON_INTERPRET),
     reason="Triton BSR tests require Triton and CUDA-enabled PyTorch."
