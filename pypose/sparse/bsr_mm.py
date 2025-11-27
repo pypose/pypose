@@ -1,5 +1,5 @@
 import torch
-import numpy as np
+# import numpy as np
 import random
 import os
 
@@ -300,21 +300,45 @@ def bsr_output_to_dense_numpy(offsets_np, cols_np, vals_np, C_block_row_num, C_b
     A fully reconstructed dense NumPy array representing the BSR matrix.
     '''
 
+    # total_rows = C_block_row_num * C_block_row_size
+    # total_cols = C_block_col_num * C_block_col_size
+    # dense = np.zeros((total_rows, total_cols), dtype=np.float32)
+
+    # for i in range(C_block_row_num):
+    #     start = offsets_np[i]
+    #     end = offsets_np[i + 1]
+
+    #     for val_idx in range(start, end):
+    #         j = cols_np[val_idx]
+    #         val_block = vals_np[val_idx]
+
+    #         r0, r1 = i * C_block_row_size, (i + 1) * C_block_row_size
+    #         c0, c1 = j * C_block_col_size, (j + 1) * C_block_col_size
+
+    #         dense[r0:r1, c0:c1] = val_block
+
+    # return dense
+
+    offsets = torch.as_tensor(offsets_np, device=device)
+    cols = torch.as_tensor(cols_np, device=device)
+    vals = torch.as_tensor(vals_np, device=device)
+
     total_rows = C_block_row_num * C_block_row_size
     total_cols = C_block_col_num * C_block_col_size
-    dense = np.zeros((total_rows, total_cols), dtype=np.float32)
+
+    dense = torch.zeros((total_rows, total_cols), dtype=torch.float32)
 
     for i in range(C_block_row_num):
-        start = offsets_np[i]
-        end = offsets_np[i + 1]
+        start = int(offsets[i].item())
+        end   = int(offsets[i + 1].item())
 
         for val_idx in range(start, end):
-            j = cols_np[val_idx]
-            val_block = vals_np[val_idx]
+            j = int(cols[val_idx].item())
+            block = vals[val_idx]
 
             r0, r1 = i * C_block_row_size, (i + 1) * C_block_row_size
             c0, c1 = j * C_block_col_size, (j + 1) * C_block_col_size
 
-            dense[r0:r1, c0:c1] = val_block
+            dense[r0:r1, c0:c1] = block
 
     return dense
