@@ -124,8 +124,8 @@ jobs:
     docker:
       - image: cimg/python:<< parameters.python_version >>
     resource_class: small
-    environment:
-      TRITON_INTERPRET: "1"
+    # environment:
+      # TRITON_INTERPRET: "1"
     steps:
       - setup_env
       - checkout
