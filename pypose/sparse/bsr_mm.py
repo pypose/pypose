@@ -1,7 +1,9 @@
 import torch
 import numpy as np
 import random
+import os
 
+TRITON_INTERPRET = os.getenv("TRITON_INTERPRET", "0") == "1"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def _load_triton():
@@ -226,8 +228,8 @@ def bsr_mm_triton(
     if (triton is None) or (tl is None) or (kernel is None):
         raise RuntimeError("Triton with CUDA support is required for bsr_mm_triton.")
 
-    if (not torch.cuda.is_available()) or (torch.version.cuda is None):
-        raise RuntimeError("CUDA-enabled PyTorch is required.")
+    if ((not torch.cuda.is_available()) or (torch.version.cuda is None)) and not TRITON_INTERPRET:
+        raise RuntimeError("CUDA-enabled PyTorch is required, or set TRITON_INTERPRET=1 to run in Triton interpreter (CPU) mode.")
 
     device = A_offsets.device
     dtype = A_vals.dtype
