@@ -21,6 +21,7 @@ build_binary_params: &build_binary_params
       type: string
       default: ""
   environment:
+    TRITON_INTERPRET: "1"
     DOCKER_IMAGE: << parameters.docker_image >>
     CUDA_VERSION: << parameters.cuda_version >>
     CUDNN_VERSION: << parameters.cudnn_version >>

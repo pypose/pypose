@@ -2,9 +2,7 @@ import os
 import torch
 import pytest
 import pypose as pp
-# from pypose.sparse import bsr_mm_triton, bsr_output_to_dense_numpy
-
-# TRITON_INTERPRET = os.getenv("TRITON_INTERPRET", "0") == "1"
+from pypose.sparse import bsr_mm_triton, bsr_output_to_dense_numpy
 
 def random_compressed(pshape, bshape, mode, zero_prob=0.):
     #generate coo
@@ -29,57 +27,54 @@ def random_compressed(pshape, bshape, mode, zero_prob=0.):
         return torch.sparse_bsc_tensor(crowi, coli, values, (m, p), dtype=values.dtype)
 
 
-# @pytest.mark.skipif(
-#     not (torch.cuda.is_available() or TRITON_INTERPRET),
-#     reason="Triton BSR tests require Triton and CUDA-enabled PyTorch."
-# )
-# def test_triton_bsr_mm():
-#     if TRITON_INTERPRET and not torch.cuda.is_available():
-#         device = "cpu"
-#     else:
-#         device = "cuda"
+def test_triton_bsr_mm():
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
 
-#     for run_idx in range(20):
-#         pshape = torch.Size([4, 4])
-#         bshape = torch.Size([2, 2])
-#         A_bsr = random_compressed(pshape, bshape, 'bsr', zero_prob=0.3)
-#         B_bsr = random_compressed(pshape, bshape, 'bsr', zero_prob=0.3)
-#         A_dense = A_bsr.to_dense().to(torch.float32).to(device)
-#         B_dense = B_bsr.to_dense().to(torch.float32).to(device)
-#         C_dense_reference = A_dense @ B_dense
-#         A_offsets = A_bsr.crow_indices().to(torch.int32).to(device)
-#         A_cols = A_bsr.col_indices().to(torch.int32).to(device)
-#         A_vals = A_bsr.values().to(torch.float32).to(device)
-#         B_offsets = B_bsr.crow_indices().to(torch.int32).to(device)
-#         B_cols = B_bsr.col_indices().to(torch.int32).to(device)
-#         B_vals = B_bsr.values().to(torch.float32).to(device)
-#         A_block_rows = A_vals.shape[1]
-#         A_block_cols = A_vals.shape[2]
-#         B_block_cols = B_vals.shape[2]
+    for run_idx in range(20):
+        pshape = torch.Size([4, 4])
+        bshape = torch.Size([2, 2])
+        A_bsr = random_compressed(pshape, bshape, 'bsr', zero_prob=0.3)
+        B_bsr = random_compressed(pshape, bshape, 'bsr', zero_prob=0.3)
+        A_dense = A_bsr.to_dense().to(torch.float32).to(device)
+        B_dense = B_bsr.to_dense().to(torch.float32).to(device)
+        C_dense_reference = A_dense @ B_dense
+        A_offsets = A_bsr.crow_indices().to(torch.int32).to(device)
+        A_cols = A_bsr.col_indices().to(torch.int32).to(device)
+        A_vals = A_bsr.values().to(torch.float32).to(device)
+        B_offsets = B_bsr.crow_indices().to(torch.int32).to(device)
+        B_cols = B_bsr.col_indices().to(torch.int32).to(device)
+        B_vals = B_bsr.values().to(torch.float32).to(device)
+        A_block_rows = A_vals.shape[1]
+        A_block_cols = A_vals.shape[2]
+        B_block_cols = B_vals.shape[2]
 
-#         C_offsets, C_cols, C_vals = bsr_mm_triton(
-#             A_offsets, A_cols, A_vals,
-#             B_offsets, B_cols, B_vals,
-#             A_bsr.shape[0] // A_block_rows,
-#             A_bsr.shape[1] // A_block_cols,
-#             B_bsr.shape[1] // B_block_cols,
-#         )
+        C_offsets, C_cols, C_vals = bsr_mm_triton(
+            A_offsets, A_cols, A_vals,
+            B_offsets, B_cols, B_vals,
+            A_bsr.shape[0] // A_block_rows,
+            A_bsr.shape[1] // A_block_cols,
+            B_bsr.shape[1] // B_block_cols,
+        )
 
-#         C_dense_triton = bsr_output_to_dense_numpy(
-#             C_offsets.cpu().numpy(),
-#             C_cols.cpu().numpy(),
-#             C_vals.cpu().numpy(),
-#             A_bsr.shape[0] // A_block_rows,
-#             B_bsr.shape[1] // B_block_cols,
-#             A_block_rows,
-#             B_block_cols,
-#         )
+        C_dense_triton = bsr_output_to_dense_numpy(
+            C_offsets,
+            C_cols,
+            C_vals,
+            A_bsr.shape[0] // A_block_rows,
+            B_bsr.shape[1] // B_block_cols,
+            A_block_rows,
+            B_block_cols,
+        )
 
-#         C_dense_triton = torch.from_numpy(C_dense_triton).to(device)
-#         torch.testing.assert_close(C_dense_triton, C_dense_reference, rtol=1e-4, atol=1e-4)
-#         print(f"Test for {run_idx+1} of 20 passed ")
+        C_dense_triton = C_dense_triton.to(device)
+        torch.testing.assert_close(C_dense_triton, C_dense_reference, rtol=1e-4, atol=1e-4)
+        print(f"Test for {run_idx + 1} of 20 passed ")
 
-#     print("All 20 Triton BSR Multiplication tests passed")
+    print("All 20 Triton BSR Multiplication tests passed")
+
 
 class TestBSR:
     @pytest.mark.parametrize('zero_prob', [0., 0.7, 1.0])
@@ -125,11 +120,7 @@ class TestBSR:
 
 
 if __name__ == '__main__':
-    # if torch.cuda.is_available() or TRITON_INTERPRET:
-    #     test_triton_bsr_mm()
-    # else:
-    #     print("Triton BSR test requires CUDA or TRITON_INTERPRET=1.")
-
+    test_triton_bsr_mm()
     TestBSR.test_universal(None, torch.matmul, torch.matmul, ['bsr', 'bsc'], 'mT', 2, 0.7)
 
     crow_indices = torch.tensor([0, 2, 4])
