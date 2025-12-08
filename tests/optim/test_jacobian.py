@@ -147,6 +147,10 @@ class TestJacobian:
         J = pp.optim.functional.modjac(invnet, input=inputs, **jackwargs)
         assert not pp.hasnan(J)
 
+    def test_infer_mode_modjac(self):
+        with torch.inference_mode():
+            self.test_modjac()
+
     def test_lietensor_jacfwd(self):
         pose = pp.randn_SE3(1).to(device)
         points = torch.randn(1, 3).to(device)
