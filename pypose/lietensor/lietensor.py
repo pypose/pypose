@@ -88,7 +88,7 @@ class LieType(ABC):
     @overload
     def Mul(self, X: LieTensor, Y: Number | LieTensor) -> LieTensor: ...
     @overload
-    def Mul(self, X: LieTensor, Y: Tensor) -> Tensor: ...
+    def Mul(self, X: LieTensor, Y: Tensor) -> Tensor | LieTensor: ...
 
     def Mul(self, X: LieTensor, Y: Number | Tensor | LieTensor) -> Tensor | LieTensor:
         if not self.on_manifold:
@@ -1063,7 +1063,12 @@ class LieTensor(Tensor):
         '''
         return self.ltype.Mul(self, other)
 
-    def __matmul__(self, other):
+    @overload
+    def __matmul__(self, other: LieTensor) -> LieTensor: ...
+    @overload
+    def __matmul__(self, other: Tensor) -> Tensor: ...
+
+    def __matmul__(self, other: Tensor):
         r'''
         See :meth:`pypose.matmul`
         '''
