@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from numbers import Number
+from typing import overload
 from torch import nn, Tensor
 from .basics import vec2skew
 import torch, warnings, importlib
@@ -83,6 +84,11 @@ class LieType(ABC):
         if not self.on_manifold:
             raise AttributeError("Lie Group has no Act attribute")
         raise NotImplementedError("Instance has no Act attribute.")
+
+    @overload
+    def Mul(self, X: LieTensor, Y: Number | LieTensor) -> LieTensor: ...
+    @overload
+    def Mul(self, X: LieTensor, Y: Tensor) -> Tensor: ...
 
     def Mul(self, X: LieTensor, Y: Number | Tensor | LieTensor) -> Tensor | LieTensor:
         if not self.on_manifold:
