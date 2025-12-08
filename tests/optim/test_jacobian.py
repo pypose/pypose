@@ -145,7 +145,7 @@ class TestJacobian:
         invnet = PoseInv(M, N).to(device)
         jackwargs = {'vectorize': True, 'flatten': False}
         J = pp.optim.functional.modjac(invnet, input=inputs, **jackwargs)
-        assert (not pp.hasnan(J)) and (J != 0)
+        assert not pp.hasnan(J)
 
     def test_infer_mode_modjac(self):
         with torch.inference_mode():

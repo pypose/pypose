@@ -84,8 +84,8 @@ class FastTriggs(nn.Module):
             function is not supposed to be directly called by PyPose users. It will be called
             internally by optimizers such as :meth:`pypose.optim.GN` and :meth:`pypose.optim.LM`.
         '''
-        assert not torch.is_inference_mode_enabled(), "FastTriggs modifier does not work"\
-            " in torch.inference_mode."
+        assert not torch.is_inference_mode_enabled(), \
+            "FastTriggs modifier does not work in torch.inference_mode."
 
         x = R.square().sum(-1, keepdim=True)
         with torch.enable_grad():
