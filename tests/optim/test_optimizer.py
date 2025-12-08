@@ -150,6 +150,18 @@ class TestOptim:
 
         assert idx < 9, "Optimization requires too many steps."
 
+    def test_optim_with_kernel_inference_mode(self):
+        try:
+            with torch.inference_mode():
+                self.test_optim_with_kernel()
+        except AssertionError as e:
+            if str(e) != "FastTriggs modifier does not work in torch.inference_mode.":
+                raise e from None
+
+    def test_optim_with_kernel_no_grad(self):
+        with torch.no_grad():
+            self.test_optim_with_kernel()
+
     def test_optim_strategy_constant(self):
 
         class PoseInv(nn.Module):
