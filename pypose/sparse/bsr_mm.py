@@ -134,7 +134,6 @@ def bsr_mm_outcome_structure(
     each output block (i, j) should be written.
     '''
 
-    device = A_offsets.device
     A_offsets_cpu = A_offsets.cpu()
     A_cols_cpu = A_cols.cpu()
     B_offsets_cpu = B_offsets.cpu()
@@ -201,7 +200,6 @@ def bsr_mm_triton(
     C_vals: 3D tensor, shape [C_all_block_nums, A_block_row_num, B_block_col_num]. Block values of the result C in BSR format.
     '''
 
-    device = A_offsets.device
     dtype = A_vals.dtype
     A_block_row_num, A_block_col_num = A_vals.shape[1], A_vals.shape[2]
     B_block_col_num = B_vals.shape[2]
