@@ -46,7 +46,7 @@ if __name__ == '__main__':
         download_url = 'https://github.com/pypose/pypose',
         license = 'Apache License 2.0',
         license_files = ('LICENSE',),
-        description = 'A library for differentiable robotics.',
+        description = 'A library for differentiable robotics on manifolds.',
         long_description=long_description,
         long_description_content_type='text/markdown',
         python_requires='>=3.6',
@@ -88,5 +88,6 @@ if __name__ == '__main__':
             'Programming Language :: Python :: 3.9',
             'Programming Language :: Python :: 3.10',
             'Programming Language :: Python :: 3.11',
+            'Programming Language :: Python :: 3.12',
         ],
     )
