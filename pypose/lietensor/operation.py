@@ -301,6 +301,99 @@ def Sim3_Act4_Jacobian(p):
     return J
 
 
+def so2_V(theta):
+    I = torch.eye(2, device=theta.device, dtype=theta.dtype).expand(
+        theta.shape[:-1] + (2, 2)
+    )
+    skewI = vec2skew(torch.ones(theta.shape[:-1] + (1,)))
+    theta_ = theta.unsqueeze(-1)  # Add last dimensions to have ..., 1, 1
+    theta2_ = theta_**2
+
+    idx = theta_ > torch.finfo(theta_.dtype).eps
+
+    # Reference: https://github.com/brentyi/jaxlie/blob/84babf5c04ba6287cdec250ab1eed2f6d0a53988/jaxlie/_se2.py#L146
+    coef1 = torch.zeros_like(theta_, requires_grad=False)
+    coef1[idx] = theta_[idx].sin() / theta_[idx]  # Normal
+    coef1[~idx] = 1.0 - theta2_[~idx] / 6.0
+
+    coef2 = torch.zeros_like(theta_, requires_grad=False)
+    coef2[idx] = (1 - theta_[idx].cos()) / theta_[idx]  # Normal
+    coef2[~idx] = 0.5 * theta_[~idx] - theta_[~idx] * theta2_[~idx] / 24.0
+
+    return coef1 * I + coef2 * skewI
+
+
+def se2_Jl(x):
+    theta = x[..., 2:]
+    # rho_1 = x[..., 0:1]
+    # rho_2 = x[..., 1:2]
+
+    J3x3 = torch.eye(3, device=theta.device, dtype=theta.dtype).expand(
+        theta.shape[:-1] + (3, 3)
+    )
+
+    V = so2_V(x[..., 2:])
+    # V_inv = torch.linalg.pinv(V)
+
+    J3x3[..., :2, :2] = V
+
+    idx = theta > torch.finfo(theta.dtype).eps
+
+    coef1 = torch.zeros_like(theta, requires_grad=False)
+    coef1[idx] = (1 - theta[idx].sin()) / theta[idx]
+
+    coef2 = torch.zeros_like(theta, requires_grad=False)
+    coef2[idx] = (theta[idx].cos() - 1) / theta[idx] ** 2
+
+    # # TODO For small theta
+    assert all(idx.flatten())
+    coef1[~idx] = 0.0
+    coef2[~idx] = 0.0
+
+    I = torch.eye(2, device=theta.device, dtype=theta.dtype).expand(
+        theta.shape[:-1] + (2, 2)
+    )
+    skewI = vec2skew(torch.ones(theta.shape[:-1] + (1,)))
+
+    unknown_matrix = coef1 * I + coef2 * skewI
+
+    J3x3[..., :2, 2] = (unknown_matrix @ x[..., :2].unsqueeze(-1)).squeeze(-1)
+
+    # Following micro lie theory convention
+    # theta = x[..., 2:]
+    # rho_1 = x[..., 0:1]
+    # rho_2 = x[..., 1:2]
+    # # Could this be pulled out? (see above)
+    # J3x3[idx, 0, 2] = (
+    #     theta[idx] * rho_1[idx]
+    #     + rho_2[idx]
+    #     - rho_2[idx] * theta[idx].cos()
+    #     - rho_1 * theta[idx].sin()
+    # ) / theta2[idx]
+    # J3x3[idx, 1, 2] = (
+    #     -rho_1[idx]
+    #     + theta[idx] * rho_2[idx]
+    #     + rho_1[idx] * theta[idx].cos()
+    #     - rho_2[idx] * theta[idx].sin()
+    # ) / theta2[idx]
+
+    return J3x3
+
+
+def se2_Jl_inv(x):
+    return torch.linalg.pinv(se2_Jl(x))
+    raise NotImplementedError()
+
+    Jl_inv_3x3, Q = so3_Jl_inv(x[..., 3:]), calcQ(x)
+    Jl_inv_6x6 = torch.zeros(
+        (x.shape[:-1] + (6, 6)), device=x.device, dtype=x.dtype, requires_grad=False
+    )
+    Jl_inv_6x6[..., :3, :3] = Jl_inv_3x3
+    Jl_inv_6x6[..., :3, 3:] = -Jl_inv_3x3 @ Q @ Jl_inv_3x3
+    Jl_inv_6x6[..., 3:, 3:] = Jl_inv_3x3
+    return Jl_inv_6x6
+
+
 class SO3_Log(torch.autograd.Function):
     generate_vmap_rule = True
 
@@ -1123,3 +1216,276 @@ def broadcast_inputs(x, y):
     x = x.expand(shape+(x.shape[-1],)).reshape(-1,x.shape[-1]).contiguous()
     y = y.expand(shape+(y.shape[-1],)).reshape(-1,y.shape[-1]).contiguous()
     return (x, y), tuple(out_shape)
+
+
+class so2_Exp(torch.autograd.Function):
+    generate_vmap_rule = True
+
+    @staticmethod
+    def forward(input):
+        torch.cos(input)
+        return torch.cat([torch.cos(input), torch.sin(input)], -1)
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        (input,) = inputs
+        ctx.save_for_backward(
+            input,
+        )
+        return
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        (input,) = ctx.saved_tensors
+        Jl = so2_Jl(input)
+        grad_input = grad_output[..., :-1].unsqueeze(-2) @ Jl
+        return grad_input.squeeze(-2)
+
+
+def so2_Jl(x):
+    return torch.ones(*x.shape[:-1] + (1, 1))
+
+
+def so2_Jl_inv(x):
+    return torch.ones(*x.shape[:-1] + (1, 1))  # The inverse of (1) is (1) ..
+
+
+# SO2
+
+
+class SO2_Act(torch.autograd.Function):
+    generate_vmap_rule = True
+
+    @staticmethod
+    def forward(X, p):
+        negate = torch.ones_like(p, requires_grad=False)
+        negate[..., 1] = -negate[..., 1]
+        Xcos, Xsin = X[..., :1], X[..., 1:]
+        cos_p = Xcos * p
+        sin_p = Xsin * p
+        out = cos_p + torch.flip(
+            sin_p * negate, (-1,)
+        )  # First applies negative to y dimensions and then flips to have it in the first one
+        return out
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        X, p = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        raise NotImplementedError()
+        X, out = ctx.saved_tensors
+        dq = grad_output.unsqueeze(-2)
+        m = SO3_Matrix(X)
+        zero = torch.zeros(X.shape[:-1] + (1,), device=X.device, dtype=X.dtype)
+        X_grad = dq @ SO3_Act_Jacobian(out)
+        p_grad = dq @ m[..., :3, :3]
+        return torch.cat((X_grad.squeeze(-2), zero), dim=-1), p_grad.squeeze(-2)
+
+
+class SO2_Act3(torch.autograd.Function):
+    generate_vmap_rule = True
+
+    @staticmethod
+    def forward(X, p):
+        out = torch.cat((SO2_Act.apply(X, p[..., :2]), p[..., 2:]), dim=-1)
+        return out
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        X, p = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        raise NotImplementedError()
+        X, out = ctx.saved_tensors
+        dq = grad_output.unsqueeze(-2)
+        m = SO3_Matrix(X)
+        zero = torch.zeros(X.shape[:-1] + (1,), device=X.device, dtype=X.dtype)
+        X_grad = dq @ SO3_Act_Jacobian(out)
+        p_grad = dq @ m[..., :3, :3]
+        return torch.cat((X_grad.squeeze(-2), zero), dim=-1), p_grad.squeeze(-2)
+
+
+class SO2_Log(torch.autograd.Function):
+    generate_vmap_rule = True
+
+    @staticmethod
+    def forward(input):
+        return torch.atan2(input[..., 1], input[..., 0]).unsqueeze(
+            -1
+        )  # add last dimension again
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        ctx.save_for_backward(
+            output,
+        )
+        return
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        (output,) = ctx.saved_tensors
+        Jl_inv = so2_Jl_inv(output)
+        grad = (grad_output.unsqueeze(-2) @ Jl_inv).squeeze(-2)
+        zero = torch.zeros(
+            output.shape[:-1] + (1,), device=output.device, dtype=output.dtype
+        )
+        return torch.cat((grad, zero), dim=-1)
+
+
+def SO2_Adj(X):
+    raise NotImplementedError()
+    I3x3 = torch.eye(3, device=X.device, dtype=X.dtype).expand(X.shape[:-1] + (3, 3))
+    Xv, Xw = X[..., :3], X[..., 3:]
+    Xw_3x3 = Xw.unsqueeze(-1) * I3x3
+    return (
+        2.0 * Xw.unsqueeze(-1) * (Xw_3x3 + vec2skew(Xv))
+        - I3x3
+        + 2.0 * Xv.unsqueeze(-1) * Xv.unsqueeze(-2)
+    )
+
+
+def SO2_Matrix(X):
+    raise NotImplementedError()
+    return SO3_Adj(X)
+
+
+def SO2_Act_Jacobian(p):
+    raise NotImplementedError()
+    return vec2skew(-p)
+
+
+def SO2_Matrix4x4(X):
+    raise NotImplementedError()
+    T = torch.eye(4, device=X.device, dtype=X.dtype, requires_grad=False).repeat(
+        X.shape[:-1] + (1, 1)
+    )
+    T[..., :3, :3] = SO3_Matrix(X)
+    return T
+
+
+def SO2_Act4_Jacobian(p):
+    raise NotImplementedError()
+    J = torch.zeros(
+        (p.shape[:-1] + (4, 3)), device=p.device, dtype=p.dtype, requires_grad=False
+    )
+    J[..., :3, :3] = SO3_Act_Jacobian(p[..., :3])
+    return J
+
+
+class se2_Exp(torch.autograd.Function):
+    generate_vmap_rule = True
+
+    @staticmethod
+    def forward(input):
+        t = (so2_V(input[..., 2:]) @ input[..., :2].unsqueeze(-1)).squeeze(-1)
+        r = so2_Exp.apply(input[..., 2:])
+        return torch.cat([t, r], -1)
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        (input,) = inputs
+        ctx.save_for_backward(
+            input,
+        )
+        return
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        (input,) = ctx.saved_tensors
+        Jl = se2_Jl(input)
+        grad_input = grad_output[..., :-1].unsqueeze(-2) @ Jl
+        return grad_input.squeeze(-2)
+
+
+class SE2_Act(torch.autograd.Function):
+    generate_vmap_rule = True
+
+    @staticmethod
+    def forward(X, p):
+        out = X[..., :2] + SO2_Act.apply(X[..., 2:], p)
+        return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, p = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        raise NotImplementedError()
+        X, out = ctx.saved_tensors
+        dq = grad_output.unsqueeze(-2)
+        m = SE3_Matrix(X)
+        zero = torch.zeros(X.shape[:-1] + (1,), device=X.device, dtype=X.dtype)
+        X_grad = dq @ SE3_Act_Jacobian(out)
+        p_grad = dq @ m[..., :3, :3]
+        return torch.cat((X_grad.squeeze(-2), zero), dim=-1), p_grad.squeeze(-2)
+
+
+class SE2_Act3(torch.autograd.Function):
+    generate_vmap_rule = True
+
+    @staticmethod
+    def forward(X, p):
+        # x y cos sin
+        t = SO2_Act.apply(X[..., 2:], p[..., :2]) + X[..., :2] * p[..., 2:]
+        out = torch.cat((t, p[..., 2:]), dim=-1)
+        return out
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, p = inputs
+        out = output
+        ctx.save_for_backward(X, out)
+        return
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        raise NotImplementedError()
+        X, out = ctx.saved_tensors
+        dq = grad_output.unsqueeze(-2)
+        zero = torch.zeros(X.shape[:-1] + (1,), device=X.device, dtype=X.dtype)
+        X_grad = dq @ SE3_Act4_Jacobian(out)
+        p_grad = dq @ SE3_Matrix4x4(X)
+        return torch.cat((X_grad.squeeze(-2), zero), dim=-1), p_grad.squeeze(-2)
+
+
+class SE2_Log(torch.autograd.Function):
+    generate_vmap_rule = True
+
+    @staticmethod
+    def forward(input):
+        # x y cos sin
+        theta = SO2_Log.apply(input[..., 2:])
+        V_inv = torch.linalg.pinv(so2_V(theta))  # Could be implemented directly?
+        tau = (V_inv @ input[..., :2].unsqueeze(-1)).squeeze(-1)
+        output = torch.cat([tau, theta], -1)
+        return output
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        ctx.save_for_backward(
+            output,
+        )
+        return
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        (output,) = ctx.saved_tensors
+        Jl_inv = se2_Jl_inv(output)
+        grad = (grad_output.unsqueeze(-2) @ Jl_inv).squeeze(-2)
+        zero = torch.zeros(
+            output.shape[:-1] + (1,), device=output.device, dtype=output.dtype
+        )
+        return torch.cat((grad, zero), dim=-1)
