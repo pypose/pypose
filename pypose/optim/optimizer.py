@@ -13,13 +13,14 @@ from functools import partial
 import pypose as pp
 
 try:
-    from bae.autograd.graph import backward, construct_sbt
+    from bae.optim.optimizer import jacobian as _bae_jacobian
     from bae.autograd.function import TrackingTensor
     from bae.sparse.py_ops import diagonal_op_
     from bae.sparse.spgemm import CuSparse
     BAE_AVAILABLE = True
 except ImportError:
     BAE_AVAILABLE = False
+    _bae_jacobian = None
 
 class Trivial(torch.nn.Module):
     r"""
@@ -299,45 +300,6 @@ class GaussNewton(_Optimizer):
             self.update_parameter(params = pg['params'], step = D)
             self.loss = self.model.loss(input, target)
         return self.loss
-
-if BAE_AVAILABLE:
-    def jacobian(output, params):
-        assert output.optrace[id(output)][0] == 'map', "The last operation in compute graph being indexing transform is not meaningful"
-        backward(output)
-        res = []
-        for param in params:
-            if hasattr(param, 'jactrace'):
-                if getattr(param, 'trim_SE3_grad', False):
-                    if isinstance(param.jactrace, tuple):
-                        values = param.jactrace[1]
-                    elif isinstance(param.jactrace, torch.Tensor) and param.jactrace.layout == torch.sparse_bsr:
-                        values = param.jactrace.values()
-                    else:
-                        values = param.jactrace
-
-                    if values.shape[-1] == 7:
-                        values = values[..., :6]
-                    else:
-                        values = torch.cat([values[..., :6], values[..., 7:]], dim=-1)
-
-                    if isinstance(param.jactrace, tuple):
-                        param.jactrace = (param.jactrace[0], values)
-                    elif isinstance(param.jactrace, torch.Tensor) and param.jactrace.layout == torch.sparse_bsr:
-                        param.jactrace = torch.sparse_bsr_tensor(
-                            col_indices=param.jactrace.col_indices(),
-                            crow_indices=param.jactrace.crow_indices(),
-                            values=values,
-                            size=(param.jactrace.shape[0], param.shape[0] * values.shape[-1]),
-                            device=param.device,
-                        )
-                    else:
-                        param.jactrace = values
-                if type(param.jactrace) is tuple:
-                    param.jactrace = construct_sbt(param.jactrace[1], param.shape[0], param.jactrace[0], type=torch.sparse_bsr)
-                res.append(param.jactrace)
-                delattr(param, 'jactrace')
-
-        return res
 
 class LevenbergMarquardt(_Optimizer):
     r'''
@@ -621,7 +583,7 @@ class LevenbergMarquardt(_Optimizer):
                     warnings.warn("Sparse mode only supports a single residual. Using the first one.")
                 R = R[0]
 
-            J = jacobian(R, pg['params'])
+            J = _bae_jacobian(R, pg['params'])
             if isinstance(R, TrackingTensor):
                 R = R.tensor()
             J = torch.cat([j.to_sparse_coo() for j in J], dim=-1)
