@@ -530,33 +530,48 @@ class LevenbergMarquardt(_Optimizer):
             `examples/module/pgo
             <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.
         '''
-        if self.sparse:
-            return self._step_sparse(input, target, weight)
-        else:
-            return self._step_dense(input, target, weight)
-
-    def _step_dense(self, input, target=None, weight=None):
         for pg in self.param_groups:
-            weight = self.weight if weight is None else weight
-            R = list(self.model(input, target))
-            J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
-            params = dict(self.model.named_parameters())
-            params_values = tuple(params.values())
-            J = [self.model.flatten_row_jacobian(Jr, params_values) for Jr in J]
-            for i in range(len(R)):
-                R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
-                    else self.corrector[i](R = R[i], J = J[i])
-            R, weight, J = self.model.normalize_RWJ(R, weight, J)
+            if self.sparse:
+                assert weight is None, "Weight is not supported in sparse mode for now."
+                R = self.model(input, target)
+                if isinstance(R, (tuple, list)):
+                    if len(R) > 1:
+                        warnings.warn("Sparse mode only supports a single residual. Using the first one.")
+                    R = R[0]
+
+                J = _bae_jacobian(R, pg['params'])
+                if isinstance(R, TrackingTensor):
+                    R = R.tensor()
+                J = torch.cat([j.to_sparse_coo() for j in J], dim=-1).to_sparse_csr()
+                J_T = J.mT.to_sparse_csr()
+                A = self.mm(J_T, J)
+                diagonal_op_(A, op=partial(torch.clamp_, min=pg['min'], max=pg['max']))
+            else:
+                weight = self.weight if weight is None else weight
+                R = list(self.model(input, target))
+                J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
+                params = dict(self.model.named_parameters())
+                params_values = tuple(params.values())
+                J = [self.model.flatten_row_jacobian(Jr, params_values) for Jr in J]
+                for i in range(len(R)):
+                    R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
+                        else self.corrector[i](R = R[i], J = J[i])
+                R, weight, J = self.model.normalize_RWJ(R, weight, J)
+                J_T = J.T @ weight if weight is not None else J.T
+                A = J_T @ J
+                A.diagonal().clamp_(pg['min'], pg['max'])
 
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target)
-            J_T = J.T @ weight if weight is not None else J.T
-            A, self.reject_count = J_T @ J, 0
-            A.diagonal().clamp_(pg['min'], pg['max'])
+            self.reject_count = 0
             while self.last <= self.loss:
-                A.diagonal().add_(A.diagonal() * pg['damping'])
+                if self.sparse:
+                    diagonal_op_(A, op=partial(torch.mul, other=1 + pg['damping']))
+                else:
+                    A.diagonal().add_(A.diagonal() * pg['damping'])
                 try:
                     D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
+                    D = D[:, None] if self.sparse else D
                 except Exception as e:
                     print(e, "\nLinear solver failed. Breaking optimization step...")
                     break
@@ -565,51 +580,6 @@ class LevenbergMarquardt(_Optimizer):
                 self.strategy.update(pg, last=self.last, loss=self.loss, J=J, D=D, R=R.view(-1, 1))
                 if self.last < self.loss and self.reject_count < self.reject: # reject step
                     self.update_parameter(params = pg['params'], step = -D)
-                    self.loss, self.reject_count = self.last, self.reject_count + 1
-                else:
-                    break
-        return self.loss
-
-    def _step_sparse(self, input, target=None, weight=None):
-        # Note: sparse mode currently assumes a single residual and does not support weights.
-        assert weight is None, "Weight is not supported in sparse mode for now."
-        for pg in self.param_groups:
-            # weight is not used in sparse mode for now.
-            # weight = self.weight if weight is None else weight
-
-            R = self.model(input, target)
-            if isinstance(R, (tuple, list)):
-                if len(R) > 1:
-                    warnings.warn("Sparse mode only supports a single residual. Using the first one.")
-                R = R[0]
-
-            J = _bae_jacobian(R, pg['params'])
-            if isinstance(R, TrackingTensor):
-                R = R.tensor()
-            J = torch.cat([j.to_sparse_coo() for j in J], dim=-1)
-
-            self.last = self.loss = self.loss if hasattr(self, 'loss') else self.model.loss(input, target)
-            J_T = J.mT
-            self.reject_count = 0
-            J_T = J_T.to_sparse_csr()
-            J = J.to_sparse_csr()
-            A = self.mm(J_T, J)
-
-            diagonal_op_(A, op=partial(torch.clamp_, min=pg['min'], max=pg['max']))
-
-            while self.last <= self.loss:
-                diagonal_op_(A, op=partial(torch.mul, other=1+pg['damping']))
-                try:
-                    D = self.solver(A, -J_T @ R.view(-1, 1))
-                    D = D[:, None]
-                except Exception as e:
-                    print(e, "\nLinear solver failed. Breaking optimization step...")
-                    break
-                self.update_parameter(pg['params'], D)
-                self.loss = self.model.loss(input, target)
-                self.strategy.update(pg, last=self.last, loss=self.loss, J=J, D=D, R=R.view(-1, 1))
-                if self.last < self.loss and self.reject_count < self.reject:  # reject step
-                    self.update_parameter(params=pg['params'], step=-D)
                     self.loss, self.reject_count = self.last, self.reject_count + 1
                 else:
                     break
