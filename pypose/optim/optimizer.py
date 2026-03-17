@@ -13,7 +13,7 @@ from functools import partial
 import pypose as pp
 
 try:
-    from bae.optim.optimizer import jacobian as _bae_jacobian
+    from bae.autograd.graph import jacobian as _bae_jacobian
     from bae.autograd.function import TrackingTensor
     from bae.sparse.py_ops import diagonal_op_
     from bae.sparse.spgemm import CuSparse
