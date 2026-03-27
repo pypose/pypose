@@ -571,7 +571,6 @@ class LevenbergMarquardt(_Optimizer):
                     A.diagonal().add_(A.diagonal() * pg['damping'])
                 try:
                     D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
-                    D = D[:, None] if self.sparse else D
                 except Exception as e:
                     print(e, "\nLinear solver failed. Breaking optimization step...")
                     break
