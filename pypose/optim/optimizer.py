@@ -380,9 +380,12 @@ class LevenbergMarquardt(_Optimizer):
             gradient of each scalar in output with respect to the model parameters will be
             computed in parallel with ``"reverse-mode"``. More details go to
             :meth:`pypose.optim.functional.modjac`. Default: ``True``.
-        sparse (bool, optional): use sparse solver or not. Default: ``False``.
+        sparse (bool, optional): if ``True``, use the sparse LM path based on sparse Jacobians
+            and sparse normal equations. This mode currently requires ``bae``, is intended to be
+            used with sparse linear solvers such as :meth:`solver.CG`. Default: ``False``.
 
-    Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`, :meth:`solver.Cholesky`.
+    Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`; :meth:`solver.Cholesky`;
+    :meth:`solver.CG`.
 
     Available kernels: :meth:`kernel.Huber`; :meth:`kernel.PseudoHuber`; :meth:`kernel.Cauchy`.
 
@@ -390,6 +393,16 @@ class LevenbergMarquardt(_Optimizer):
 
     Available strategies: :meth:`strategy.Constant`; :meth:`strategy.Adaptive`;
     :meth:`strategy.TrustRegion`;
+
+    Note:
+        Setting ``sparse=True`` enables the sparse Jacobian / sparse LM backend.
+        It should be used when the underlying optimization problem exhibits a large, structured
+        sparse Jacobian, where each residual depends only on a small subset of parameters.
+        Please cite the following paper implementing the sparse LM backend:
+
+        * Zitong Zhan, Huan Xu, Zihang Fang, Xinpeng Wei, Yaoyu Hu, Chen Wang,
+          `Bundle Adjustment in the Eager Mode <https://arxiv.org/abs/2409.12190>`_,
+          arXiv preprint arXiv:2409.12190, 2024.
 
     Warning:
         The output of model :math:`\bm{f}(\bm{\theta},\bm{x}_i)` and target :math:`\bm{y}_i`
@@ -473,7 +486,8 @@ class LevenbergMarquardt(_Optimizer):
                 If not given, the squared model output is minimized. Defaults: ``None``.
             weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
                 the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
-                the length must be equal to the number of residuals. Default: ``None``.
+                the length must be equal to the number of residuals. This argument is currently not
+                supported when ``sparse=True``. Default: ``None``.
 
         Return:
             Tensor: the minimized model loss.
@@ -493,6 +507,10 @@ class LevenbergMarquardt(_Optimizer):
             `SGD <https://pytorch.org/docs/stable/generated/torch.optim.SGD.html>`_, where the
             model error has to be a scalar, the output of model :math:`\bm{f}` can be a
             Tensor/LieTensor or a tuple of Tensors/LieTensors.
+
+        Note:
+            When ``sparse=True``, only a single residual tensor is currently supported. If the
+            model returns multiple residuals, only the first one is used.
 
         Example:
             Optimizing a simple module to **approximate pose inversion**.
