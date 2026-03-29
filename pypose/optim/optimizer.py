@@ -13,14 +13,13 @@ from functools import partial
 import pypose as pp
 
 try:
-    from bae.autograd.graph import jacobian as _bae_jacobian
+    from bae.autograd.graph import jacobian
     from bae.autograd.function import TrackingTensor
     from bae.sparse.py_ops import diagonal_op_
-    from bae.sparse.spgemm import CuSparse
     BAE_AVAILABLE = True
 except ImportError:
     BAE_AVAILABLE = False
-    _bae_jacobian = None
+    jacobian = None
 
 class Trivial(torch.nn.Module):
     r"""
@@ -438,7 +437,6 @@ class LevenbergMarquardt(_Optimizer):
             if not BAE_AVAILABLE:
                 raise ImportError("Please install bae to use sparse mode."
                                   "pip install git+https://github.com/zitongzhan/bae.git")
-            self.mm = CuSparse()
 
         self.jackwargs = {'vectorize': vectorize}
         self.solver = Cholesky() if solver is None else solver
@@ -557,12 +555,12 @@ class LevenbergMarquardt(_Optimizer):
                         warnings.warn("Sparse mode only supports a single residual. Using the first one.")
                     R = R[0]
 
-                J = _bae_jacobian(R, pg['params'])
+                J = jacobian(R, pg['params'])
                 if isinstance(R, TrackingTensor):
                     R = R.tensor()
                 J = torch.cat([j.to_sparse_coo() for j in J], dim=-1).to_sparse_csr()
                 J_T = J.mT.to_sparse_csr()
-                A = self.mm(J_T, J)
+                A = J_T @ J
                 diagonal_op_(A, op=partial(torch.clamp_, min=pg['min'], max=pg['max']))
             else:
                 weight = self.weight if weight is None else weight
