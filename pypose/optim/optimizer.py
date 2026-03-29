@@ -541,6 +541,41 @@ class LevenbergMarquardt(_Optimizer):
             Pose Inversion error: 0.0000004 @ 3 it
             Early Stopping with error: 4.443569991963159e-07
 
+            Optimizing a simple module with **sparse LM** (requires ``bae`` and CUDA).
+
+            Here, ``TrackingTensor`` wraps the parameter tensor so ``bae`` can trace
+            tensor dependencies and assemble sparse Jacobians for the sparse LM backend.
+
+            >>> from bae.autograd.function import TrackingTensor
+            >>> device = torch.device("cuda")
+            >>>
+            >>> class SparseIdentity(nn.Module):
+            ...     def __init__(self, x0):
+            ...         super().__init__()
+            ...         self.x = nn.Parameter(TrackingTensor(x0))
+            ...
+            ...     def forward(self):
+            ...         return self.x
+            ...
+            >>> target = torch.tensor([[1.0], [2.0]], dtype=torch.float64, device=device)
+            >>> sparse_id = SparseIdentity(target + 0.1).to(device)
+            >>> strategy = pp.optim.strategy.Constant(damping=1e-6)
+            >>> optimizer = pp.optim.LM(
+            ...     sparse_id,
+            ...     solver=pp.optim.solver.CG(),
+            ...     strategy=strategy,
+            ...     sparse=True)
+            ...
+            >>> for idx in range(3):
+            ...     loss = optimizer.step(input=(), target=target)
+            ...     print('Sparse LM loss %.7f @ %d it'%(loss, idx))
+            ...     if loss < 1e-5:
+            ...         print('Early Stopping with loss:', loss.item())
+            ...         break
+            ...
+            Sparse LM loss 0.0000000 @ 0 it
+            Early Stopping with loss: 1.9999959966527992e-14
+
         Note:
             More practical examples, e.g., pose graph optimization (PGO), can be found at
             `examples/module/pgo
