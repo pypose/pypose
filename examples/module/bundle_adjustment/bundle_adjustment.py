@@ -1,3 +1,8 @@
+"""
+This file is adapted from:
+https://github.com/sair-lab/bae/blob/release/ba_example.py
+"""
+
 import argparse
 from io import BytesIO
 from pathlib import Path
@@ -240,10 +245,7 @@ def main():
     problem = get_problem(
         problem_name=args.problem,
         dataset=args.dataset,
-        cache_dir=args.cache_dir,
-        use_quat=True,
-        loader_source=args.loader_source,
-        refresh_loader=args.refresh_remote_loader,
+        cache_dir=args.cache_dir
     )
     print(f"Loaded {problem['problem_name']} from {args.dataset}")
 

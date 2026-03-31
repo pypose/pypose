@@ -22,17 +22,23 @@ Sparse LM currently requires CUDA.
 python examples/module/bundle_adjustment/bundle_adjustment.py
 ```
 
-Or reuse BAE's BAL loader code directly from GitHub:
-
-```bash
-python examples/module/bundle_adjustment/bundle_adjustment.py \
-  --loader-source bae
-```
 
 ## Notes
 
 - The optimizer configuration is intentionally hard-coded to match the BAE example:
   `TrustRegion(up=2.0, down=0.5**4)`, `PCG(tol=1e-4, maxiter=250)`, `reject=30`, `20` iterations, and optimized intrinsics.
-- `--loader-source local` is the default. It downloads the BAL problem file and parses it with a local helper in this example.
-- `--loader-source bae` is an opt-in mode that fetches `bal_loader.py` and `bal_io.py` from the BAE `release` branch at runtime and imports them from a local cache.
 - The example saves its GIF and final PNG to `./examples/module/bundle_adjustment/save/`.
+
+---
+
+If you use the bundle adjustment, please cite the following paper.
+
+```bibtex
+@article{zhan2024bundle,
+  title = {Bundle Adjustment in the Eager Mode},
+  author = {Zhan, Zitong and Xu, Huan and Fang, Zihang and Wei, Xinpeng and Hu, Yaoyu and Wang, Chen},
+  journal = {arXiv preprint arXiv:2409.12190},
+  year = {2024},
+  url = {https://arxiv.org/abs/2409.12190}
+}
+```

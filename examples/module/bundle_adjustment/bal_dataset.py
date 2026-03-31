@@ -1,8 +1,11 @@
+"""
+This file is adapted from:
+https://github.com/sair-lab/bae/blob/release/datapipes/bal_loader.py
+"""
+
 import bz2
-import importlib
 import os
 import shutil
-import sys
 import urllib.request
 from pathlib import Path
 
@@ -10,7 +13,6 @@ import torch
 
 DTYPE = torch.float64
 DATA_URL = "https://grail.cs.washington.edu/projects/bal/"
-BAE_DATAPIPES_URL = "https://raw.githubusercontent.com/sair-lab/bae/release/datapipes/"
 ALL_DATASETS = ("ladybug", "trafalgar", "dubrovnik", "venice", "final")
 
 
@@ -125,50 +127,9 @@ def read_bal_data(path, use_quat=True):
     }
 
 
-def _ensure_remote_bae_loader(cache_dir, refresh=False):
-    package_root = cache_dir / "_remote_bae_datapipes"
-    package_root.mkdir(parents=True, exist_ok=True)
-    init_path = package_root / "__init__.py"
-    if not init_path.exists():
-        init_path.write_text("", encoding="utf-8")
-
-    for filename in ("bal_io.py", "bal_loader.py"):
-        destination = package_root / filename
-        if refresh or not destination.exists():
-            _download_url(
-                f"{BAE_DATAPIPES_URL}{filename}",
-                destination,
-                user_agent="pypose-bae-loader/1.0",
-            )
-
-    cache_path = str(cache_dir)
-    if cache_path not in sys.path:
-        sys.path.insert(0, cache_path)
-
-    package_name = "_remote_bae_datapipes"
-    module_name = f"{package_name}.bal_loader"
-    if refresh:
-        sys.modules.pop(module_name, None)
-        sys.modules.pop(package_name, None)
-    importlib.invalidate_caches()
-    return importlib.import_module(module_name)
-
-
-def get_problem(problem_name, dataset, cache_dir="bal_data", use_quat=True, loader_source="local", refresh_loader=False):
+def get_problem(problem_name, dataset, cache_dir="bal_data"):
     _validate_dataset(dataset)
     cache_dir = Path(cache_dir)
 
-    if loader_source == "local":
-        path = _ensure_problem_available(dataset, problem_name, cache_dir)
-        return read_bal_data(path, use_quat=use_quat)
-
-    if loader_source == "bae":
-        remote_loader = _ensure_remote_bae_loader(cache_dir / "_loader_cache", refresh=refresh_loader)
-        return remote_loader.get_problem(
-            problem_name=problem_name,
-            dataset=dataset,
-            cache_dir=str(cache_dir),
-            use_quat=use_quat,
-        )
-
-    raise ValueError(f"loader_source must be 'local' or 'bae', got {loader_source!r}")
+    path = _ensure_problem_available(dataset, problem_name, cache_dir)
+    return read_bal_data(path)
