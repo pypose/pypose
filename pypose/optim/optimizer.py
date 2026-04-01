@@ -541,43 +541,64 @@ class LevenbergMarquardt(_Optimizer):
             Pose Inversion error: 0.0000004 @ 3 it
             Early Stopping with error: 4.443569991963159e-07
 
-            Optimizing a simple module with **sparse LM** (requires ``bae`` and CUDA).
+            Optimizing a tiny **pose graph** with **sparse LM** (requires ``bae`` and CUDA).
 
-            Here, ``TrackingTensor`` wraps the parameter tensor so ``bae`` can trace
-            tensor dependencies and assemble sparse Jacobians for the sparse LM backend.
+            Here, ``map_transform`` marks the relative-pose residual so ``bae`` can assemble
+            sparse Jacobians for the sparse LM backend. The root pose is fixed, and the
+            remaining poses are optimized only from relative-pose edge errors.
 
-            >>> from bae.autograd.function import TrackingTensor
+            >>> from bae.autograd.function import TrackingTensor, map_transform
+            >>> torch.manual_seed(0)
             >>> device = torch.device("cuda")
+            >>> dtype = torch.float64
             >>>
-            >>> class SparseIdentity(nn.Module):
-            ...     def __init__(self, x0):
+            >>> @map_transform
+            ... def edge_error(node1, node2, relpose):
+            ...     return (pp.SE3(relpose).Inv() @ pp.SE3(node1).Inv() @ pp.SE3(node2)).Log().tensor()
+            ...
+            >>> class PoseGraph(nn.Module):
+            ...     def __init__(self, root, nodes):
             ...         super().__init__()
-            ...         self.x = nn.Parameter(TrackingTensor(x0))
+            ...         self.register_buffer('root', root.tensor())
+            ...         self.nodes = nn.Parameter(TrackingTensor(nodes.tensor()))
+            ...         self.nodes.trim_SE3_grad = True
             ...
-            ...     def forward(self):
-            ...         return self.x
+            ...     def forward(self, edges, relposes):
+            ...         nodes = torch.cat((self.root, self.nodes), dim=0)
+            ...         return edge_error(
+            ...             nodes[edges[:, 0]],
+            ...             nodes[edges[:, 1]],
+            ...             relposes.tensor())
             ...
-            >>> target = torch.tensor([[1.0], [2.0]], dtype=torch.float64, device=device)
-            >>> sparse_id = SparseIdentity(target + 0.1).to(device)
-            >>> strategy = pp.optim.strategy.Constant(damping=1e-6)
+            >>> gt_nodes = pp.SE3(torch.tensor([
+            ...     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            ...     [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            ...     [2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            ... ], device=device, dtype=dtype))
+            >>> edges = torch.tensor([[0, 1], [1, 2]], device=device)
+            >>> relposes = gt_nodes[edges[:, 0]].Inv() @ gt_nodes[edges[:, 1]]
+            >>> init = gt_nodes[1:] * pp.randn_SE3(2, sigma=0.1, device=device, dtype=dtype)
+            >>> graph = PoseGraph(gt_nodes[:1], init).to(device)
+            >>> strategy = pp.optim.strategy.Constant(damping=1e-4)
             >>> optimizer = pp.optim.LM(
-            ...     sparse_id,
+            ...     graph,
             ...     solver=pp.optim.solver.CG(),
             ...     strategy=strategy,
             ...     sparse=True)
             ...
-            >>> for idx in range(3):
-            ...     loss = optimizer.step(input=(), target=target)
-            ...     print('Sparse LM loss %.7f @ %d it'%(loss, idx))
+            >>> for idx in range(5):
+            ...     loss = optimizer.step(input=(edges, relposes))
+            ...     print('Sparse chain PGO loss %.7f @ %d it'%(loss, idx))
             ...     if loss < 1e-5:
             ...         print('Early Stopping with loss:', loss.item())
             ...         break
             ...
-            Sparse LM loss 0.0000000 @ 0 it
-            Early Stopping with loss: 1.9999959966527992e-14
+            Sparse chain PGO loss 0.0265935 @ 0 it
+            Sparse chain PGO loss 0.0000001 @ 1 it
+            Early Stopping with loss: 6.876693949595198e-08
 
         Note:
-            More practical examples, e.g., pose graph optimization (PGO), can be found at
+            Larger PGO examples can be found at
             `examples/module/pgo
             <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.
         '''
