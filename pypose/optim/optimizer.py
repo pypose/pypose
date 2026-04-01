@@ -567,7 +567,7 @@ class LevenbergMarquardt(_Optimizer):
             assemble sparse Jacobians for sparse LM. The root pose is fixed, and the remaining
             poses are optimized only from relative-pose edge errors.
 
-            >>> from pypose.autograd.function import TrackingTensor, map_transform
+            >>> from pypose.autograd.function import Track, map_transform
             >>> torch.manual_seed(0)
             >>> device = torch.device("cuda")
             >>> dtype = torch.float64
@@ -580,7 +580,7 @@ class LevenbergMarquardt(_Optimizer):
             ...     def __init__(self, root, nodes):
             ...         super().__init__()
             ...         self.register_buffer('root', root.tensor())
-            ...         self.nodes = nn.Parameter(TrackingTensor(nodes.tensor()))
+            ...         self.nodes = nn.Parameter(Track(nodes.tensor()))
             ...         self.nodes.trim_SE3_grad = True
             ...
             ...     def forward(self, edges, relposes):

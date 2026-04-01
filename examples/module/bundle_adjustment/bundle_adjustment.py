@@ -14,7 +14,7 @@ import torch.nn as nn
 from PIL import Image
 
 import pypose as pp
-from pypose.autograd.function import TrackingTensor, map_transform
+from pypose.autograd.function import Track, map_transform
 from pypose.optim.solver import PCG
 
 from bal_dataset import get_problem
@@ -53,9 +53,9 @@ class Residual(nn.Module):
 
     def __init__(self, camera_params, points):
         super().__init__()
-        self.pose = nn.Parameter(TrackingTensor(camera_params))
+        self.pose = nn.Parameter(Track(camera_params))
         self.pose.trim_SE3_grad = True
-        self.points = nn.Parameter(TrackingTensor(points))
+        self.points = nn.Parameter(Track(points))
 
     def forward(self, observes, cidx, pidx):
         return project(self.points[pidx], self.pose[cidx]) - observes

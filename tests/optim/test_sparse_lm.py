@@ -1,9 +1,10 @@
 import pytest
 import torch
 import pypose as pp
+import pypose.autograd.function as ppaf
 from torch import nn
 import pypose.optim.solver as ppos
-from pypose.autograd.function import TrackingTensor, map_transform
+from pypose.autograd.function import Track, map_transform
 
 
 @map_transform
@@ -14,7 +15,7 @@ def edge_error(node1, node2, relpose):
 class _SparseIdentityModel(nn.Module):
     def __init__(self, x0):
         super().__init__()
-        self.x = nn.Parameter(TrackingTensor(x0))
+        self.x = nn.Parameter(Track(x0))
 
     def forward(self):
         return self.x
@@ -24,7 +25,7 @@ class _SparseChainPGO(nn.Module):
     def __init__(self, root, nodes):
         super().__init__()
         self.register_buffer("root", root.tensor())
-        self.nodes = nn.Parameter(TrackingTensor(nodes.tensor()))
+        self.nodes = nn.Parameter(Track(nodes.tensor()))
         self.nodes.trim_SE3_grad = True
 
     def forward(self, edges, relposes):
@@ -37,6 +38,9 @@ class _SparseChainPGO(nn.Module):
 
 
 class TestSparseLM:
+    def test_track_alias(self):
+        assert Track is ppaf.TrackingTensor
+
     def test_sparse_lm_runs_and_converges(self):
         if not torch.cuda.is_available():
             pytest.skip("sparse LM backend requires CUDA")

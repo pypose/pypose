@@ -4,17 +4,25 @@ from functools import wraps
 from .. import _format_sparse_backend_error, _load_optional_backend_attr
 
 
-def _missing_tracking_tensor():
-    class TrackingTensor(torch.Tensor):
+def _missing_track():
+    class Track(torch.Tensor):
         r"""Placeholder for the optional sparse backend tracking tensor."""
 
         @staticmethod
         def __new__(cls, data, *args, **kwargs):
             raise ImportError(
-                _format_sparse_backend_error("pypose.autograd.function.TrackingTensor")
+                _format_sparse_backend_error("pypose.autograd.function.Track")
             )
 
-    return TrackingTensor
+    return Track
+
+
+def _load_track_aliases():
+    value, _ = _load_optional_backend_attr("bae.autograd.function", "TrackingTensor")
+    value = _missing_track() if value is None else value
+    globals()["Track"] = value
+    globals()["TrackingTensor"] = value
+    return value
 
 
 def _missing_map_transform():
@@ -31,11 +39,8 @@ def _missing_map_transform():
 
 
 def __getattr__(name):
-    if name == "TrackingTensor":
-        value, _ = _load_optional_backend_attr("bae.autograd.function", name)
-        value = _missing_tracking_tensor() if value is None else value
-        globals()[name] = value
-        return value
+    if name in {"Track", "TrackingTensor"}:
+        return _load_track_aliases()
     if name == "map_transform":
         value, _ = _load_optional_backend_attr("bae.autograd.function", name)
         value = _missing_map_transform() if value is None else value
@@ -45,7 +50,7 @@ def __getattr__(name):
 
 
 def __dir__():
-    return sorted(set(globals()) | {"TrackingTensor", "map_transform"})
+    return sorted(set(globals()) | {"Track", "TrackingTensor", "map_transform"})
 
 
-__all__ = ["TrackingTensor", "map_transform"]
+__all__ = ["Track", "TrackingTensor", "map_transform"]
