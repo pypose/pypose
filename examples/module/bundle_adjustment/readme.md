@@ -26,7 +26,8 @@ python examples/module/bundle_adjustment/bundle_adjustment.py
 ## Notes
 
 - The optimizer configuration is intentionally hard-coded to match the BAE example:
-  `TrustRegion(up=2.0, down=0.5**4)`, `PCG(tol=1e-4, maxiter=250)`, `reject=30`, `20` iterations, and optimized intrinsics.
+  `TrustRegion(up=2.0, down=0.5**4)`, `pp.optim.solver.PCG(tol=1e-4, maxiter=250)`,
+  `reject=30`, `20` iterations, and optimized intrinsics.
 - The example saves its GIF and final PNG to `./examples/module/bundle_adjustment/save/`.
 
 ---

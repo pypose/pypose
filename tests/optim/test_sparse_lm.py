@@ -3,28 +3,16 @@ import torch
 import pypose as pp
 from torch import nn
 import pypose.optim.solver as ppos
-
-from pypose.optim.optimizer import BAE_AVAILABLE
-
-
-def _get_sparse_tools():
-    try:
-        from bae.autograd.function import TrackingTensor, map_transform
-    except Exception:
-        return None, None
-    return TrackingTensor, map_transform
+from pypose.autograd.function import TrackingTensor, map_transform
 
 
-def _make_sparse_edge_error(map_transform):
-    @map_transform
-    def edge_error(node1, node2, relpose):
-        return (pp.SE3(relpose).Inv() @ pp.SE3(node1).Inv() @ pp.SE3(node2)).Log().tensor()
-
-    return edge_error
+@map_transform
+def edge_error(node1, node2, relpose):
+    return (pp.SE3(relpose).Inv() @ pp.SE3(node1).Inv() @ pp.SE3(node2)).Log().tensor()
 
 
 class _SparseIdentityModel(nn.Module):
-    def __init__(self, x0, TrackingTensor):
+    def __init__(self, x0):
         super().__init__()
         self.x = nn.Parameter(TrackingTensor(x0))
 
@@ -33,16 +21,15 @@ class _SparseIdentityModel(nn.Module):
 
 
 class _SparseChainPGO(nn.Module):
-    def __init__(self, root, nodes, TrackingTensor, edge_error):
+    def __init__(self, root, nodes):
         super().__init__()
         self.register_buffer("root", root.tensor())
         self.nodes = nn.Parameter(TrackingTensor(nodes.tensor()))
         self.nodes.trim_SE3_grad = True
-        self.edge_error = edge_error
 
     def forward(self, edges, relposes):
         nodes = torch.cat((self.root, self.nodes), dim=0)
-        return self.edge_error(
+        return edge_error(
             nodes[edges[:, 0]],
             nodes[edges[:, 1]],
             relposes.tensor(),
@@ -51,12 +38,6 @@ class _SparseChainPGO(nn.Module):
 
 class TestSparseLM:
     def test_sparse_lm_runs_and_converges(self):
-        if not BAE_AVAILABLE:
-            pytest.skip("sparse LM backend unavailable (pypose.optim.optimizer.BAE_AVAILABLE is False)")
-
-        TrackingTensor, _ = _get_sparse_tools()
-        if TrackingTensor is None:
-            pytest.skip("bae is required for sparse LM (TrackingTensor unavailable)")
         if not torch.cuda.is_available():
             pytest.skip("sparse LM backend requires CUDA")
 
@@ -67,12 +48,17 @@ class TestSparseLM:
         x_true = torch.randn(8, 1, device=device, dtype=dtype)
         x0 = x_true + 0.1 * torch.randn_like(x_true)
 
-        model = _SparseIdentityModel(x0, TrackingTensor).to(device)
-        target = x_true
-
-        strategy = pp.optim.strategy.Constant(damping=1e-6)
         try:
-            optimizer = pp.optim.LM(model, solver=ppos.CG(), strategy=strategy, sparse=True)
+            model = _SparseIdentityModel(x0).to(device)
+            optimizer = pp.optim.LM(
+                model,
+                solver=ppos.PCG(),
+                strategy=pp.optim.strategy.Constant(damping=1e-6),
+                sparse=True,
+            )
+            target = x_true
+        except ImportError as e:
+            pytest.skip(f"sparse LM backend unavailable on this machine: {e}")
         except Exception as e:
             msg = str(e).lower()
             if "cuda" in msg or "cusparse" in msg:
@@ -96,12 +82,6 @@ class TestSparseLM:
         torch.testing.assert_close(model.x.tensor(), x_true, rtol=1e-4, atol=1e-4)
 
     def test_sparse_lm_chain_pgo_runs_and_converges(self):
-        if not BAE_AVAILABLE:
-            pytest.skip("sparse LM backend unavailable (pypose.optim.optimizer.BAE_AVAILABLE is False)")
-
-        TrackingTensor, map_transform = _get_sparse_tools()
-        if TrackingTensor is None or map_transform is None:
-            pytest.skip("bae is required for sparse LM (TrackingTensor/map_transform unavailable)")
         if not torch.cuda.is_available():
             pytest.skip("sparse LM backend requires CUDA")
 
@@ -109,7 +89,6 @@ class TestSparseLM:
         device = torch.device("cuda")
         dtype = torch.float64
 
-        edge_error = _make_sparse_edge_error(map_transform)
         gt_nodes = pp.SE3(
             torch.tensor(
                 [
@@ -125,11 +104,16 @@ class TestSparseLM:
         relposes = gt_nodes[edges[:, 0]].Inv() @ gt_nodes[edges[:, 1]]
         init = gt_nodes[1:] * pp.randn_SE3(2, sigma=0.1, device=device, dtype=dtype)
 
-        model = _SparseChainPGO(gt_nodes[:1], init, TrackingTensor, edge_error).to(device)
-        strategy = pp.optim.strategy.Constant(damping=1e-4)
-
         try:
-            optimizer = pp.optim.LM(model, solver=ppos.CG(), strategy=strategy, sparse=True)
+            model = _SparseChainPGO(gt_nodes[:1], init).to(device)
+            optimizer = pp.optim.LM(
+                model,
+                solver=ppos.PCG(),
+                strategy=pp.optim.strategy.Constant(damping=1e-4),
+                sparse=True,
+            )
+        except ImportError as e:
+            pytest.skip(f"sparse LM backend unavailable on this machine: {e}")
         except Exception as e:
             msg = str(e).lower()
             if "cuda" in msg or "cusparse" in msg:

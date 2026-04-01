@@ -11,15 +11,35 @@ import math
 import warnings
 from functools import partial
 import pypose as pp
+from .. import _require_backend_attr
 
-try:
-    from bae.autograd.graph import jacobian
-    from bae.autograd.function import TrackingTensor
-    from bae.sparse.py_ops import diagonal_op_
-    BAE_AVAILABLE = True
-except ImportError:
-    BAE_AVAILABLE = False
-    jacobian = None
+jacobian = None
+diagonal_op_ = None
+
+
+def _is_tracking_tensor(value):
+    TrackingTensor = _require_backend_attr(
+        "bae.autograd.function",
+        "TrackingTensor",
+        "pypose.optim.LM(..., sparse=True)",
+    )
+    return isinstance(value, TrackingTensor)
+
+
+def _load_sparse_backend_globals():
+    global jacobian, diagonal_op_
+    if jacobian is None:
+        jacobian = _require_backend_attr(
+            "bae.autograd.graph",
+            "jacobian",
+            "pypose.optim.LM(..., sparse=True)",
+        )
+    if diagonal_op_ is None:
+        diagonal_op_ = _require_backend_attr(
+            "bae.sparse.py_ops",
+            "diagonal_op_",
+            "pypose.optim.LM(..., sparse=True)",
+        )
 
 class Trivial(torch.nn.Module):
     r"""
@@ -380,11 +400,12 @@ class LevenbergMarquardt(_Optimizer):
             computed in parallel with ``"reverse-mode"``. More details go to
             :meth:`pypose.optim.functional.modjac`. Default: ``True``.
         sparse (bool, optional): if ``True``, use the sparse LM path based on sparse Jacobians
-            and sparse normal equations. This mode currently requires ``bae``, is intended to be
-            used with sparse linear solvers such as :meth:`solver.CG`. Default: ``False``.
+            and sparse normal equations. This mode requires the optional sparse backend `bae`
+            and is intended to be used with sparse linear solvers such as :meth:`solver.CG`.
+            Default: ``False``.
 
     Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`; :meth:`solver.Cholesky`;
-    :meth:`solver.CG`.
+    :meth:`solver.CG`; :meth:`solver.PCG`.
 
     Available kernels: :meth:`kernel.Huber`; :meth:`kernel.PseudoHuber`; :meth:`kernel.Cauchy`.
 
@@ -434,9 +455,7 @@ class LevenbergMarquardt(_Optimizer):
 
         self.sparse = sparse
         if self.sparse:
-            if not BAE_AVAILABLE:
-                raise ImportError("Please install bae to use sparse mode."
-                                  "pip install git+https://github.com/zitongzhan/bae.git")
+            _load_sparse_backend_globals()
 
         self.jackwargs = {'vectorize': vectorize}
         self.solver = Cholesky() if solver is None else solver
@@ -541,13 +560,14 @@ class LevenbergMarquardt(_Optimizer):
             Pose Inversion error: 0.0000004 @ 3 it
             Early Stopping with error: 4.443569991963159e-07
 
-            Optimizing a tiny **pose graph** with **sparse LM** (requires ``bae`` and CUDA).
+            Optimizing a tiny **pose graph** with **sparse LM** (requires the optional sparse
+            backend `bae` and CUDA).
 
-            Here, ``map_transform`` marks the relative-pose residual so ``bae`` can assemble
-            sparse Jacobians for the sparse LM backend. The root pose is fixed, and the
-            remaining poses are optimized only from relative-pose edge errors.
+            Here, ``map_transform`` marks the relative-pose residual so the sparse backend can
+            assemble sparse Jacobians for sparse LM. The root pose is fixed, and the remaining
+            poses are optimized only from relative-pose edge errors.
 
-            >>> from bae.autograd.function import TrackingTensor, map_transform
+            >>> from pypose.autograd.function import TrackingTensor, map_transform
             >>> torch.manual_seed(0)
             >>> device = torch.device("cuda")
             >>> dtype = torch.float64
@@ -582,7 +602,7 @@ class LevenbergMarquardt(_Optimizer):
             >>> strategy = pp.optim.strategy.Constant(damping=1e-4)
             >>> optimizer = pp.optim.LM(
             ...     graph,
-            ...     solver=pp.optim.solver.CG(),
+            ...     solver=pp.optim.solver.PCG(),
             ...     strategy=strategy,
             ...     sparse=True)
             ...
@@ -612,7 +632,7 @@ class LevenbergMarquardt(_Optimizer):
                     R = R[0]
 
                 J = jacobian(R, pg['params'])
-                if isinstance(R, TrackingTensor):
+                if _is_tracking_tensor(R):
                     R = R.tensor()
                 J = torch.cat([j.to_sparse_coo() for j in J], dim=-1).to_sparse_csr()
                 J_T = J.mT.to_sparse_csr()

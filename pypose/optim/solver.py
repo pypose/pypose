@@ -4,6 +4,8 @@ from torch import Tensor, nn
 from functools import partial
 from torch.linalg import pinv, lstsq, cholesky_ex, vecdot
 
+from .. import _format_sparse_backend_error, _load_optional_backend_attr
+
 
 class PINV(nn.Module):
     r'''The batched linear solver with pseudo inversion.
@@ -336,3 +338,34 @@ class CG(nn.Module):
             rho_prev = rho_cur
 
         return x
+
+
+def _missing_pcg():
+    class PCG(CG):
+        r"""Placeholder for the optional sparse backend preconditioned CG solver."""
+
+        def __init__(self, maxiter=None, tol=1e-5):
+            super().__init__(maxiter=maxiter, tol=tol)
+            raise ImportError(_format_sparse_backend_error("pypose.optim.solver.PCG"))
+
+        def forward(self, A: Tensor, b: Tensor, x: Optional[Tensor]=None,
+                    M: Optional[Tensor]=None) -> Tensor:
+            raise ImportError(_format_sparse_backend_error("pypose.optim.solver.PCG"))
+
+    return PCG
+
+
+def __getattr__(name):
+    if name == "PCG":
+        value, _ = _load_optional_backend_attr("bae.utils.pysolvers", name)
+        value = _missing_pcg() if value is None else value
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(set(globals()) | {"PCG"})
+
+
+__all__ = ["PINV", "LSTSQ", "Cholesky", "CG", "PCG"]

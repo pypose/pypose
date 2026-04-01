@@ -14,20 +14,10 @@ import torch.nn as nn
 from PIL import Image
 
 import pypose as pp
+from pypose.autograd.function import TrackingTensor, map_transform
+from pypose.optim.solver import PCG
 
 from bal_dataset import get_problem
-
-try:
-    from bae.autograd.function import TrackingTensor, map_transform
-    from bae.utils.pysolvers import PCG
-except ImportError as exc:
-    TrackingTensor = None
-    _BAE_IMPORT_ERROR = exc
-
-    def map_transform(function):
-        return function
-else:
-    _BAE_IMPORT_ERROR = None
 
 
 TARGET_DATASET = "trafalgar"
@@ -39,13 +29,7 @@ CG_TOL = 1e-4
 CG_MAXITER = 250
 REJECT_STEPS = 30
 
-
 def _require_sparse_dependencies(device):
-    if TrackingTensor is None:
-        raise ImportError(
-            "Sparse LM requires bae. Install it with "
-            "'pip install git+https://github.com/zitongzhan/bae.git'."
-        ) from _BAE_IMPORT_ERROR
     if not torch.cuda.is_available():
         raise RuntimeError("Sparse LM currently requires CUDA, but no CUDA is available.")
     if device.type != "cuda":
@@ -233,8 +217,6 @@ def main():
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--cache-dir", default="./examples/module/bundle_adjustment/data")
     parser.add_argument("--save-dir", default="./examples/module/bundle_adjustment/save")
-    parser.add_argument("--loader-source", choices=("local", "bae"), default="local")
-    parser.add_argument("--refresh-remote-loader", action="store_true")
     parser.add_argument("--plot-max-points", type=int, default=8000)
     parser.add_argument("--gif-duration-ms", type=int, default=300)
     args = parser.parse_args()
