@@ -4,7 +4,8 @@ An example of running bundle adjustment with `pp.optim.LM(..., sparse=True)` on 
 
 The default configuration uses the `trafalgar` `problem-257-65132-pre` dataset and writes:
 
-- a per-iteration GIF showing the initial reconstruction on the left and the current reconstruction on the right
+- an initial PNG snapshot before optimization
+- one PNG per LM iteration
 - a final PNG snapshot of the optimized point cloud plus camera centers
 
 ## Requirements
@@ -28,7 +29,7 @@ python examples/module/bundle_adjustment/bundle_adjustment.py
 - The optimizer configuration is intentionally hard-coded to match the BAE example:
   `TrustRegion(up=2.0, down=0.5**4)`, `pp.optim.solver.PCG(tol=1e-4, maxiter=250)`,
   `reject=30`, `20` iterations, and optimized intrinsics.
-- The example saves its GIF and final PNG to `./examples/module/bundle_adjustment/save/`.
+- The example saves its PNG snapshots to `./examples/module/bundle_adjustment/save/`.
 
 ---
 

@@ -10,6 +10,7 @@ import urllib.request
 from pathlib import Path
 
 import torch
+import pypose as pp
 
 DTYPE = torch.float64
 DATA_URL = "https://grail.cs.washington.edu/projects/bal/"
@@ -86,6 +87,12 @@ def _rotvec_to_quat_xyzw(rotvec):
     return torch.cat((xyz, cos_half), dim=-1)
 
 
+def _split_camera_params(camera_params):
+    camera_pose = pp.SE3(camera_params[:, :7].clone())
+    camera_intrinsics = camera_params[:, 7:].clone()
+    return camera_pose, camera_intrinsics
+
+
 def read_bal_data(path, use_quat=True):
     with open(path, "r", encoding="utf-8") as file:
         n_cameras, n_points, n_observations = map(int, file.readline().split())
@@ -122,8 +129,8 @@ def read_bal_data(path, use_quat=True):
         "camera_params": camera_params,
         "points_3d": points_3d,
         "points_2d": points_2d,
-        "camera_index_of_observations": camera_index,
-        "point_index_of_observations": point_index,
+        "camera_index": camera_index,
+        "point_index": point_index,
     }
 
 
@@ -132,4 +139,8 @@ def get_problem(problem_name, dataset, cache_dir="bal_data"):
     cache_dir = Path(cache_dir)
 
     path = _ensure_problem_available(dataset, problem_name, cache_dir)
-    return read_bal_data(path)
+    problem = read_bal_data(path)
+    camera_pose, camera_intrinsics = _split_camera_params(problem["camera_params"])
+    problem["camera_pose"] = camera_pose
+    problem["camera_intrinsics"] = camera_intrinsics
+    return problem

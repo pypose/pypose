@@ -158,3 +158,4 @@ examples/module/reprojpgo/save/*
 *fr2_desk_ORB.txt*
 *__MACOSX
 examples/module/bundle_adjustment/save/*
+examples/module/bundle_adjustment/data/*
