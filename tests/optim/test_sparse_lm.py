@@ -9,7 +9,7 @@ from pypose.autograd.function import Track, map_transform
 
 @map_transform
 def edge_error(node1, node2, relpose):
-    return (pp.SE3(relpose).Inv() @ pp.SE3(node1).Inv() @ pp.SE3(node2)).Log().tensor()
+    return (relpose.Inv() @ node1.Inv() @ node2).Log().tensor()
 
 
 class _SparseIdentityModel(nn.Module):
@@ -24,16 +24,15 @@ class _SparseIdentityModel(nn.Module):
 class _SparseChainPGO(nn.Module):
     def __init__(self, root, nodes):
         super().__init__()
-        self.register_buffer("root", root.tensor())
-        self.nodes = nn.Parameter(Track(nodes.tensor()))
-        self.nodes.trim_SE3_grad = True
+        self.register_buffer("root", root)
+        self.nodes = nn.Parameter(Track(nodes))
 
     def forward(self, edges, relposes):
         nodes = torch.cat((self.root, self.nodes), dim=0)
         return edge_error(
             nodes[edges[:, 0]],
             nodes[edges[:, 1]],
-            relposes.tensor(),
+            relposes,
         )
 
 

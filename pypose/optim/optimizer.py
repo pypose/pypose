@@ -7,7 +7,6 @@ from torch.optim import Optimizer
 from .solver import PINV, Cholesky
 from torch.linalg import cholesky_ex
 from .corrector import FastTriggs
-import math
 import warnings
 from functools import partial
 import pypose as pp
@@ -40,6 +39,16 @@ def _load_sparse_backend_globals():
             "diagonal_op_",
             "pypose.optim.LM(..., sparse=True)",
         )
+
+
+def _parameter_update_shape(param):
+    if param.ndim == 0:
+        return param.shape
+    if isinstance(param, pp.LieTensor):
+        return torch.Size((*param.shape[:-1], int(param.ltype.manifold[0])))
+    if getattr(param, 'trim_SE3_grad', False):
+        return torch.Size((*param.shape[:-1], param.shape[-1] - 1))
+    return param.shape
 
 class Trivial(torch.nn.Module):
     r"""
@@ -476,19 +485,19 @@ class LevenbergMarquardt(_Optimizer):
             numels = []
             for param in params:
                 if param.requires_grad:
-                    if getattr(param, 'trim_SE3_grad', False):
-                        numels.append(math.prod(param.shape[:-1]) * (param.shape[-1] - 1))
-                    else:
-                        numels.append(param.numel())
+                    numels.append(_parameter_update_shape(param).numel())
             steps = step.split(numels)
             for (param, d) in zip(params, steps):
                 if param.requires_grad:
-                    if getattr(param, 'trim_SE3_grad', False):
-                        param[..., :7] = pp.SE3(param[..., :7]).add_(pp.se3(d.view(param.shape[0], -1)[..., :6]))
+                    step_view = d.view(_parameter_update_shape(param))
+                    if isinstance(param, pp.LieTensor):
+                        param.add_(step_view)
+                    elif getattr(param, 'trim_SE3_grad', False):
+                        param[..., :7] = pp.SE3(param[..., :7]).add_(pp.se3(step_view[..., :6]))
                         if param.shape[-1] > 7:
-                            param[:, 7:] += d.view(param.shape[0], -1)[:, 6:]
+                            param[:, 7:] += step_view[..., 6:]
                     else:
-                        param.add_(d.view(param.shape))
+                        param.add_(step_view)
         else:
             super().update_parameter(params, step)
 

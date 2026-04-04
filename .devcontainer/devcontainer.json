@@ -43,7 +43,6 @@
 			"extensions": [
 				"ms-python.python",
 				"GitHub.codespaces",
-				"GitHub.copilot"
 			]
 		}
 	}
