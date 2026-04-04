@@ -46,8 +46,6 @@ def _parameter_update_shape(param):
         return param.shape
     if isinstance(param, pp.LieTensor):
         return torch.Size((*param.shape[:-1], int(param.ltype.manifold[0])))
-    if getattr(param, 'trim_SE3_grad', False):
-        return torch.Size((*param.shape[:-1], param.shape[-1] - 1))
     return param.shape
 
 class Trivial(torch.nn.Module):
@@ -489,15 +487,7 @@ class LevenbergMarquardt(_Optimizer):
             steps = step.split(numels)
             for (param, d) in zip(params, steps):
                 if param.requires_grad:
-                    step_view = d.view(_parameter_update_shape(param))
-                    if isinstance(param, pp.LieTensor):
-                        param.add_(step_view)
-                    elif getattr(param, 'trim_SE3_grad', False):
-                        param[..., :7] = pp.SE3(param[..., :7]).add_(pp.se3(step_view[..., :6]))
-                        if param.shape[-1] > 7:
-                            param[:, 7:] += step_view[..., 6:]
-                    else:
-                        param.add_(step_view)
+                    param.add_(d.view(_parameter_update_shape(param)))
         else:
             super().update_parameter(params, step)
 
@@ -583,21 +573,17 @@ class LevenbergMarquardt(_Optimizer):
             >>>
             >>> @map_transform
             ... def edge_error(node1, node2, relpose):
-            ...     return (pp.SE3(relpose).Inv() @ pp.SE3(node1).Inv() @ pp.SE3(node2)).Log().tensor()
+            ...     return (relpose.Inv() @ node1.Inv() @ node2).Log().tensor()
             ...
             >>> class PoseGraph(nn.Module):
             ...     def __init__(self, root, nodes):
             ...         super().__init__()
-            ...         self.register_buffer('root', root.tensor())
-            ...         self.nodes = nn.Parameter(Track(nodes.tensor()))
-            ...         self.nodes.trim_SE3_grad = True
+            ...         self.register_buffer('root', root)
+            ...         self.nodes = nn.Parameter(Track(nodes))
             ...
             ...     def forward(self, edges, relposes):
             ...         nodes = torch.cat((self.root, self.nodes), dim=0)
-            ...         return edge_error(
-            ...             nodes[edges[:, 0]],
-            ...             nodes[edges[:, 1]],
-            ...             relposes.tensor())
+            ...         return edge_error(nodes[edges[:, 0]], nodes[edges[:, 1]], relposes)
             ...
             >>> gt_nodes = pp.SE3(torch.tensor([
             ...     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
@@ -626,10 +612,6 @@ class LevenbergMarquardt(_Optimizer):
             Sparse chain PGO loss 0.0000001 @ 1 it
             Early Stopping with loss: 6.876693949595198e-08
 
-        Note:
-            Larger PGO examples can be found at
-            `examples/module/pgo
-            <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.
         '''
         for pg in self.param_groups:
             if self.sparse:
