@@ -4,10 +4,10 @@ import pypose as pp
 import pypose.autograd.function as ppaf
 from torch import nn
 import pypose.optim.solver as ppos
-from pypose.autograd.function import Track, map_transform
+from pypose.autograd.function import Track, parallel_for_sparse_jacobian
 
 
-@map_transform
+@parallel_for_sparse_jacobian
 def edge_error(node1, node2, relpose):
     return (relpose.Inv() @ node1.Inv() @ node2).Log().tensor()
 

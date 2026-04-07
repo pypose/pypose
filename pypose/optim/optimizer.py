@@ -562,16 +562,20 @@ class LevenbergMarquardt(_Optimizer):
             Optimizing a tiny **pose graph** with **sparse LM** (requires the optional sparse
             backend `bae` and CUDA).
 
-            Here, ``map_transform`` marks the relative-pose residual so the sparse backend can
-            assemble sparse Jacobians for sparse LM. The root pose is fixed, and the remaining
-            poses are optimized only from relative-pose edge errors.
+            Here, ``parallel_for_sparse_jacobian`` marks the relative-pose residual so the
+            sparse backend can assemble sparse Jacobians for sparse LM. Use it on factorwise
+            residual functions that take batch inputs and return one residual block per
+            batch item. When you call the function normally, it behaves the same as before;
+            the decorator only helps the sparse backend build sparse Jacobians.
+            In the example, the root pose is fixed, and the remaining poses are optimized
+            only from relative-pose edge errors.
 
-            >>> from pypose.autograd.function import Track, map_transform
+            >>> from pypose.autograd.function import Track, parallel_for_sparse_jacobian
             >>> torch.manual_seed(0)
             >>> device = torch.device("cuda")
             >>> dtype = torch.float64
             >>>
-            >>> @map_transform
+            >>> @parallel_for_sparse_jacobian
             ... def edge_error(node1, node2, relpose):
             ...     return (relpose.Inv() @ node1.Inv() @ node2).Log().tensor()
             ...

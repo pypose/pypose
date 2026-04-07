@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 
 import pypose as pp
-from pypose.autograd.function import Track, map_transform
+from pypose.autograd.function import Track, parallel_for_sparse_jacobian
 from pypose.optim.solver import PCG
 
 from ba_visualization import save_bundle_adjustment_visualization
@@ -26,7 +26,7 @@ CG_MAXITER = 250
 REJECT_STEPS = 30
 
 
-@map_transform
+@parallel_for_sparse_jacobian
 def project(points, camera_pose, intrinsics):
     camera_points = camera_pose.Act(points)
     normalized = -camera_points[..., :2] / camera_points[..., [2]]

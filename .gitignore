@@ -159,3 +159,4 @@ examples/module/reprojpgo/save/*
 *__MACOSX
 examples/module/bundle_adjustment/save/*
 examples/module/bundle_adjustment/data/*
+.deb
