@@ -1,6 +1,9 @@
 Autograd
 ========
 
-.. currentmodule:: pypose.autograd.function
+.. currentmodule:: pypose
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
 
-.. autofunction:: parallel_for_sparse_jacobian
+   autograd.function.parallel_for_sparse_jacobian
