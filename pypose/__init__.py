@@ -6,13 +6,15 @@ from packaging import version
 from ._version import __version__
 
 _BAE_VERSION = "0.2"
-_BAE_INSTALL_COMMAND = "pip install git+https://github.com/zitongzhan/bae.git"
+_BAE_INSTALL_COMMAND = "pip install git+https://github.com/sair-lab/bae.git" + f"@{_BAE_VERSION}"
 
 
 def _format_sparse_backend_error(feature):
     return (
-        f"{feature} requires the optional bae backend. "
-        f"Install it with '{_BAE_INSTALL_COMMAND}'."
+        f"PyPose requires bae=={_BAE_VERSION} when "
+        f"the optional backend is used. \n"
+        f"Recommend running:\n "
+        f"   {_BAE_INSTALL_COMMAND}"
     )
 
 
@@ -26,8 +28,8 @@ def _ensure_sparse_backend_version():
         raise ImportError(
             f"PyPose requires bae=={_BAE_VERSION} when "
             f"the optional backend is installed, but found "
-            f"bae=={installed_version}. Install it with "
-            f"'{_BAE_INSTALL_COMMAND}'."
+            f"bae=={installed_version}. \n Recommend running:\n "
+            f"   {_BAE_INSTALL_COMMAND}"
         )
 
 
