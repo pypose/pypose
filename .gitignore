@@ -157,6 +157,6 @@ examples/module/reprojpgo/save/*
 *fr2_desk_groundtruth.txt*
 *fr2_desk_ORB.txt*
 *__MACOSX
-examples/module/bundle_adjustment/save/*
-examples/module/bundle_adjustment/data/*
+examples/module/ba/save/*
+examples/module/ba/data/*
 .deb
