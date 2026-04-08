@@ -27,15 +27,15 @@ output tensor is the batch dimension.
           # returns: (N, 6)
           return (relpose.Inv() @ node1.Inv() @ node2).Log().tensor()
 
-   Here, each row of ``residual`` is the error for one pose-graph edge, computed
-   only from the matching rows of ``node1``, ``node2``, and ``relpose``.
+   Here, each output is the error for one pose-graph edge, computed
+   only from the matching input of ``node1``, ``node2``, and ``relpose``.
 
 .. warning::
 
    Similar to `torch.vmap <https://docs.pytorch.org/docs/stable/generated/torch.vmap.html>`_,
    it should not be used for functions that mix information across rows, such as
-   batch reductions, global statistics, or any computation where one residual
-   depends on multiple rows of the input.
+   batch reductions, global statistics, or any computation where one output in the batch
+   depends on multiple input batch samples.
 
 .. note::
 
