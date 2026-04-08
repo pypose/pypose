@@ -23,7 +23,7 @@ output tensor is the batch dimension.
 
       @parallel_for_sparse_jacobian
       def edge_error(node1, node2, relpose):
-          # node1: (N, 7), node2: (N, 7), relpose: (N, 7)
+          # node1: pp.SE3 (N, 7), node2: pp.SE3 (N, 7), relpose: pp.SE3 (N, 7)
           # returns: (N, 6)
           return (relpose.Inv() @ node1.Inv() @ node2).Log().tensor()
 
