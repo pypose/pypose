@@ -7,7 +7,46 @@ from torch.optim import Optimizer
 from .solver import PINV, Cholesky
 from torch.linalg import cholesky_ex
 from .corrector import FastTriggs
+import warnings
+from functools import partial
+import pypose as pp
+from .. import _require_backend_attr
 
+jacobian = None
+diagonal_op_ = None
+
+
+def _is_tracking_tensor(value):
+    TrackingTensor = _require_backend_attr(
+        "bae.autograd.function",
+        "TrackingTensor",
+        "pypose.optim.LM(..., sparse=True)",
+    )
+    return isinstance(value, TrackingTensor)
+
+
+def _load_sparse_backend_globals():
+    global jacobian, diagonal_op_
+    if jacobian is None:
+        jacobian = _require_backend_attr(
+            "bae.autograd.graph",
+            "jacobian",
+            "pypose.optim.LM(..., sparse=True)",
+        )
+    if diagonal_op_ is None:
+        diagonal_op_ = _require_backend_attr(
+            "bae.sparse.py_ops",
+            "diagonal_op_",
+            "pypose.optim.LM(..., sparse=True)",
+        )
+
+
+def _parameter_update_shape(param):
+    if param.ndim == 0:
+        return param.shape
+    if isinstance(param, pp.LieTensor):
+        return torch.Size((*param.shape[:-1], int(param.ltype.manifold[0])))
+    return param.shape
 
 class Trivial(torch.nn.Module):
     r"""
@@ -55,7 +94,7 @@ class RobustModel(nn.Module):
         J = torch.cat(J) if isinstance(J, (tuple, list)) else J
         return torch.cat(R), weight_diag, J
 
-    def forward(self, input, target):
+    def forward(self, input, target=None):
         output = self.model_forward(input)
         return self.residuals(output, target)
 
@@ -288,7 +327,6 @@ class GaussNewton(_Optimizer):
             self.loss = self.model.loss(input, target)
         return self.loss
 
-
 class LevenbergMarquardt(_Optimizer):
     r'''
     The Levenberg-Marquardt (LM) algorithm solving non-linear least squares problems. It
@@ -368,8 +406,13 @@ class LevenbergMarquardt(_Optimizer):
             gradient of each scalar in output with respect to the model parameters will be
             computed in parallel with ``"reverse-mode"``. More details go to
             :meth:`pypose.optim.functional.modjac`. Default: ``True``.
+        sparse (bool, optional): if ``True``, use the sparse LM path based on sparse Jacobians
+            and sparse normal equations. This mode requires the optional sparse backend `bae`
+            and is intended to be used with sparse linear solvers such as :meth:`solver.CG`.
+            Default: ``False``.
 
-    Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`, :meth:`solver.Cholesky`.
+    Available solvers: :meth:`solver.PINV`; :meth:`solver.LSTSQ`; :meth:`solver.Cholesky`;
+    :meth:`solver.CG`; :meth:`solver.PCG`.
 
     Available kernels: :meth:`kernel.Huber`; :meth:`kernel.PseudoHuber`; :meth:`kernel.Cauchy`.
 
@@ -377,6 +420,16 @@ class LevenbergMarquardt(_Optimizer):
 
     Available strategies: :meth:`strategy.Constant`; :meth:`strategy.Adaptive`;
     :meth:`strategy.TrustRegion`;
+
+    Note:
+        Setting ``sparse=True`` enables the sparse Jacobian / sparse LM backend.
+        It should be used when the underlying optimization problem exhibits a large, structured
+        sparse Jacobian, where each residual depends only on a small subset of parameters.
+        Please cite the following paper implementing the sparse LM backend:
+
+        * Zitong Zhan, Huan Xu, Zihang Fang, Xinpeng Wei, Yaoyu Hu, Chen Wang,
+          `Bundle Adjustment in the Eager Mode <https://arxiv.org/abs/2409.12190>`_,
+          arXiv preprint arXiv:2409.12190, 2024.
 
     Warning:
         The output of model :math:`\bm{f}(\bm{\theta},\bm{x}_i)` and target :math:`\bm{y}_i`
@@ -400,12 +453,17 @@ class LevenbergMarquardt(_Optimizer):
         structural information, although computing Jacobian vector is faster.**
     '''
     def __init__(self, model, solver=None, strategy=None, kernel=None, corrector=None, \
-                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True):
+                       weight=None, reject=16, min=1e-6, max=1e32, vectorize=True, sparse=False):
         assert min > 0, ValueError("min value has to be positive: {}".format(min))
         assert max > 0, ValueError("max value has to be positive: {}".format(max))
         self.strategy = TrustRegion() if strategy is None else strategy
         defaults = {**{'min':min, 'max':max}, **self.strategy.defaults}
         super().__init__(model.parameters(), defaults=defaults)
+
+        self.sparse = sparse
+        if self.sparse:
+            _load_sparse_backend_globals()
+
         self.jackwargs = {'vectorize': vectorize}
         self.solver = Cholesky() if solver is None else solver
         self.reject, self.reject_count = reject, 0
@@ -420,6 +478,18 @@ class LevenbergMarquardt(_Optimizer):
         self.corrector = [c if c is not None else Trivial() for c in self.corrector]
         self.model = RobustModel(model, kernel)
 
+    def update_parameter(self, params, step):
+        if getattr(self, 'sparse', False):
+            numels = []
+            for param in params:
+                if param.requires_grad:
+                    numels.append(_parameter_update_shape(param).numel())
+            steps = step.split(numels)
+            for (param, d) in zip(params, steps):
+                if param.requires_grad:
+                    param.add_(d.view(_parameter_update_shape(param)))
+        else:
+            super().update_parameter(params, step)
 
     @torch.no_grad()
     def step(self, input, target=None, weight=None):
@@ -432,7 +502,8 @@ class LevenbergMarquardt(_Optimizer):
                 If not given, the squared model output is minimized. Defaults: ``None``.
             weight (:obj:`Tensor`, or :obj:`list`, optional): the square positive definite matrix defining
                 the weight of model residual. If a :obj:`list`, the element must be :obj:`Tensor` and
-                the length must be equal to the number of residuals. Default: ``None``.
+                the length must be equal to the number of residuals. This argument is currently not
+                supported when ``sparse=True``. Default: ``None``.
 
         Return:
             Tensor: the minimized model loss.
@@ -452,6 +523,10 @@ class LevenbergMarquardt(_Optimizer):
             `SGD <https://pytorch.org/docs/stable/generated/torch.optim.SGD.html>`_, where the
             model error has to be a scalar, the output of model :math:`\bm{f}` can be a
             Tensor/LieTensor or a tuple of Tensors/LieTensors.
+
+        Note:
+            When ``sparse=True``, only a single residual tensor is currently supported. If the
+            model returns multiple residuals, only the first one is used.
 
         Example:
             Optimizing a simple module to **approximate pose inversion**.
@@ -484,30 +559,103 @@ class LevenbergMarquardt(_Optimizer):
             Pose Inversion error: 0.0000004 @ 3 it
             Early Stopping with error: 4.443569991963159e-07
 
-        Note:
-            More practical examples, e.g., pose graph optimization (PGO), can be found at
-            `examples/module/pgo
-            <https://github.com/pypose/pypose/tree/main/examples/module/pgo>`_.
+            Optimizing a tiny **pose graph** with **sparse LM** (requires the optional sparse
+            backend `bae` and CUDA).
+
+            Here, ``parallel_for_sparse_jacobian`` marks the relative-pose residual so the
+            sparse backend can assemble sparse Jacobians for sparse LM. Use it on factorwise
+            residual functions that take batch inputs and return one residual block per
+            batch item. When you call the function normally, it behaves the same as before;
+            the decorator only helps the sparse backend build sparse Jacobians.
+            In the example, the root pose is fixed, and the remaining poses are optimized
+            only from relative-pose edge errors.
+
+            >>> from pypose.autograd.function import Track, parallel_for_sparse_jacobian
+            >>> torch.manual_seed(0)
+            >>> device = torch.device("cuda")
+            >>> dtype = torch.float64
+            >>>
+            >>> @parallel_for_sparse_jacobian
+            ... def edge_error(node1, node2, relpose):
+            ...     return (relpose.Inv() @ node1.Inv() @ node2).Log().tensor()
+            ...
+            >>> class PoseGraph(nn.Module):
+            ...     def __init__(self, root, nodes):
+            ...         super().__init__()
+            ...         self.register_buffer('root', root)
+            ...         self.nodes = nn.Parameter(Track(nodes))
+            ...
+            ...     def forward(self, edges, relposes):
+            ...         nodes = torch.cat((self.root, self.nodes), dim=0)
+            ...         return edge_error(nodes[edges[:, 0]], nodes[edges[:, 1]], relposes)
+            ...
+            >>> gt_nodes = pp.SE3(torch.tensor([
+            ...     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            ...     [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            ...     [2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            ... ], device=device, dtype=dtype))
+            >>> edges = torch.tensor([[0, 1], [1, 2]], device=device)
+            >>> relposes = gt_nodes[edges[:, 0]].Inv() @ gt_nodes[edges[:, 1]]
+            >>> init = gt_nodes[1:] * pp.randn_SE3(2, sigma=0.1, device=device, dtype=dtype)
+            >>> graph = PoseGraph(gt_nodes[:1], init).to(device)
+            >>> strategy = pp.optim.strategy.Constant(damping=1e-4)
+            >>> optimizer = pp.optim.LM(
+            ...     graph,
+            ...     solver=pp.optim.solver.PCG(),
+            ...     strategy=strategy,
+            ...     sparse=True)
+            ...
+            >>> for idx in range(5):
+            ...     loss = optimizer.step(input=(edges, relposes))
+            ...     print('Sparse chain PGO loss %.7f @ %d it'%(loss, idx))
+            ...     if loss < 1e-5:
+            ...         print('Early Stopping with loss:', loss.item())
+            ...         break
+            ...
+            Sparse chain PGO loss 0.0265935 @ 0 it
+            Sparse chain PGO loss 0.0000001 @ 1 it
+            Early Stopping with loss: 6.876693949595198e-08
+
         '''
         for pg in self.param_groups:
-            weight = self.weight if weight is None else weight
-            R = list(self.model(input, target))
-            J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
-            params = dict(self.model.named_parameters())
-            params_values = tuple(params.values())
-            J = [self.model.flatten_row_jacobian(Jr, params_values) for Jr in J]
-            for i in range(len(R)):
-                R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
-                    else self.corrector[i](R = R[i], J = J[i])
-            R, weight, J = self.model.normalize_RWJ(R, weight, J)
+            if self.sparse:
+                assert weight is None, "Weight is not supported in sparse mode for now."
+                R = self.model(input, target)
+                if isinstance(R, (tuple, list)):
+                    if len(R) > 1:
+                        warnings.warn("Sparse mode only supports a single residual. Using the first one.")
+                    R = R[0]
+
+                J = jacobian(R, pg['params'])
+                if _is_tracking_tensor(R):
+                    R = R.tensor()
+                J = torch.cat([j.to_sparse_coo() for j in J], dim=-1).to_sparse_csr()
+                J_T = J.mT.to_sparse_csr()
+                A = J_T @ J
+                diagonal_op_(A, op=partial(torch.clamp_, min=pg['min'], max=pg['max']))
+            else:
+                weight = self.weight if weight is None else weight
+                R = list(self.model(input, target))
+                J = modjac(self.model, input=(input, target), flatten=False, **self.jackwargs)
+                params = dict(self.model.named_parameters())
+                params_values = tuple(params.values())
+                J = [self.model.flatten_row_jacobian(Jr, params_values) for Jr in J]
+                for i in range(len(R)):
+                    R[i], J[i] = self.corrector[0](R = R[i], J = J[i]) if len(self.corrector) ==1 \
+                        else self.corrector[i](R = R[i], J = J[i])
+                R, weight, J = self.model.normalize_RWJ(R, weight, J)
+                J_T = J.T @ weight if weight is not None else J.T
+                A = J_T @ J
+                A.diagonal().clamp_(pg['min'], pg['max'])
 
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target)
-            J_T = J.T @ weight if weight is not None else J.T
-            A, self.reject_count = J_T @ J, 0
-            A.diagonal().clamp_(pg['min'], pg['max'])
+            self.reject_count = 0
             while self.last <= self.loss:
-                A.diagonal().add_(A.diagonal() * pg['damping'])
+                if self.sparse:
+                    diagonal_op_(A, op=partial(torch.mul, other=1 + pg['damping']))
+                else:
+                    A.diagonal().add_(A.diagonal() * pg['damping'])
                 try:
                     D = self.solver(A = A, b = -J_T @ R.view(-1, 1))
                 except Exception as e:
