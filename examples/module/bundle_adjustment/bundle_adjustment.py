@@ -95,7 +95,7 @@ def main():
     model = Residual(
         camera_pose=problem["camera_pose"],
         camera_intrinsics=problem["camera_intrinsics"],
-        points=problem["points_3d"].clone(),
+        points=problem["points_3d"],
     ).to(device)
 
     strategy = pp.optim.strategy.TrustRegion(up=2.0, down=0.5 ** 4)
@@ -126,9 +126,7 @@ def main():
 
     for step in range(NUM_STEPS):
         optimizer.step(input)
-        if device.type == "cuda":
-            torch.cuda.synchronize(device)
-        save_bundle_adjustment_visualization(
+        loss = save_bundle_adjustment_visualization(
             model.pose,
             model.intrinsics,
             model.points,
@@ -140,7 +138,7 @@ def main():
             title_prefix,
             f"Iteration {step:02d}",
         )
-        print(f"Iteration {step:02d}")
+        print(f"Iteration {step:02d}, loss: {loss:.6f}")
 
     final_loss = save_bundle_adjustment_visualization(
         model.pose,
