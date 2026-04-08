@@ -66,8 +66,8 @@ def main():
         help="BAL problem name, with or without .txt/.bz2",
     )
     parser.add_argument("--device", default="cuda")
-    parser.add_argument("--cache-dir", default="./examples/module/bundle_adjustment/data")
-    parser.add_argument("--save-dir", default="./examples/module/bundle_adjustment/save")
+    parser.add_argument("--cache-dir", default="./examples/module/ba/data")
+    parser.add_argument("--save-dir", default="./examples/module/ba/save")
     parser.add_argument("--plot-max-points", type=int, default=8000)
     args = parser.parse_args()
 

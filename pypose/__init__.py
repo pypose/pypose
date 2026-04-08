@@ -1,18 +1,34 @@
 from functools import lru_cache
+from importlib.metadata import PackageNotFoundError, version as get_version
 from importlib import import_module
 from packaging import version
 
 from ._version import __version__
 
-_SPARSE_BACKEND_NAME = "bae"
-_SPARSE_BACKEND_INSTALL_COMMAND = "pip install git+https://github.com/zitongzhan/bae.git"
+_BAE_VERSION = "0.2"
+_BAE_INSTALL_COMMAND = "pip install git+https://github.com/zitongzhan/bae.git"
 
 
 def _format_sparse_backend_error(feature):
     return (
-        f"{feature} requires the optional {_SPARSE_BACKEND_NAME} backend. "
-        f"Install it with '{_SPARSE_BACKEND_INSTALL_COMMAND}'."
+        f"{feature} requires the optional bae backend. "
+        f"Install it with '{_BAE_INSTALL_COMMAND}'."
     )
+
+
+def _ensure_sparse_backend_version():
+    try:
+        installed_version = get_version("bae")
+    except PackageNotFoundError:
+        return
+
+    if version.parse(installed_version) != version.parse(_BAE_VERSION):
+        raise ImportError(
+            f"PyPose requires bae=={_BAE_VERSION} when "
+            f"the optional backend is installed, but found "
+            f"bae=={installed_version}. Install it with "
+            f"'{_BAE_INSTALL_COMMAND}'."
+        )
 
 
 @lru_cache(maxsize=None)
@@ -29,6 +45,9 @@ def _require_backend_attr(module_name, attr_name, feature):
     if attr is None:
         raise ImportError(_format_sparse_backend_error(feature)) from exc
     return attr
+
+
+_ensure_sparse_backend_version()
 
 from .lietensor import LieTensor, Parameter, SO3, so3, SE3, se3, Sim3, sim3, RxSO3, rxso3
 from .lietensor import randn_like, randn_SE3, randn_SO3, randn_so3, randn_se3
