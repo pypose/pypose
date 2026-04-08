@@ -1,5 +1,5 @@
-Sparse Jacobian Helpers
-=======================
+Autograd
+========
 
 .. currentmodule:: pypose.autograd.function
 
