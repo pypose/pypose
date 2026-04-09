@@ -62,6 +62,7 @@ def _load_tracking_tensor():
     value, _ = _load_optional_backend_attr("bae.autograd.function", "TrackingTensor")
     value = _missing_tracking_tensor() if value is None else value
     globals()["TrackingTensor"] = value
+    globals()["TT"] = value
     return value
 
 
@@ -84,7 +85,7 @@ def _missing_parallel_for_sparse_jacobian():
 
 
 def __getattr__(name):
-    if name == "TrackingTensor":
+    if name in {"TT", "TrackingTensor"}:
         return _load_tracking_tensor()
     if name == "parallel_for_sparse_jacobian":
         value, _ = _load_optional_backend_attr("bae.autograd.function", "map_transform")
@@ -96,7 +97,7 @@ def __getattr__(name):
 
 
 def __dir__():
-    return sorted(set(globals()) | {"TrackingTensor", "parallel_for_sparse_jacobian"})
+    return sorted(set(globals()) | {"TT", "TrackingTensor", "parallel_for_sparse_jacobian"})
 
 
-__all__ = ["TrackingTensor", "parallel_for_sparse_jacobian"]
+__all__ = ["TT", "TrackingTensor", "parallel_for_sparse_jacobian"]

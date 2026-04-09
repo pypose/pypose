@@ -570,7 +570,7 @@ class LevenbergMarquardt(_Optimizer):
             In the example, the root pose is fixed, and the remaining poses are optimized
             only from relative-pose edge errors.
 
-            >>> from pypose.autograd.function import TrackingTensor as TT, parallel_for_sparse_jacobian
+            >>> from pypose.autograd.function import TT, parallel_for_sparse_jacobian
             >>> torch.manual_seed(0)
             >>> device = torch.device("cuda")
             >>> dtype = torch.float64

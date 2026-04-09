@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 
 import pypose as pp
-from pypose.autograd.function import TrackingTensor as TT, parallel_for_sparse_jacobian
+from pypose.autograd.function import TT, parallel_for_sparse_jacobian
 from pypose.optim.solver import PCG
 
 from ba_visualization import save_bundle_adjustment_visualization
