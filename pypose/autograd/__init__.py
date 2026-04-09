@@ -1,4 +1,7 @@
 from . import function
 
-__all__ = ["function"]
+TT = function.TT
+TrackingTensor = function.TrackingTensor
+parallel_for_sparse_jacobian = function.parallel_for_sparse_jacobian
 
+__all__ = ["TT", "TrackingTensor", "parallel_for_sparse_jacobian", "function"]

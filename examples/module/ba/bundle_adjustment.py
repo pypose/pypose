@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 
 import pypose as pp
-from pypose.autograd.function import Track, parallel_for_sparse_jacobian
+from pypose.autograd.function import TT, parallel_for_sparse_jacobian
 from pypose.optim.solver import PCG
 
 from ba_visualization import save_bundle_adjustment_visualization
@@ -43,12 +43,12 @@ class Residual(nn.Module):
 
     def __init__(self, camera_pose, camera_intrinsics, points):
         super().__init__()
-        self.pose = nn.Parameter(Track(camera_pose))
+        self.pose = nn.Parameter(TT(camera_pose))
         if OPTIMIZE_INTRINSICS:
-            self.intrinsics = nn.Parameter(Track(camera_intrinsics))
+            self.intrinsics = nn.Parameter(TT(camera_intrinsics))
         else:
             self.register_buffer("intrinsics", camera_intrinsics)
-        self.points = nn.Parameter(Track(points))
+        self.points = nn.Parameter(TT(points))
 
     def forward(self, observes, cidx, pidx):
         return project(self.points[pidx], self.pose[cidx], self.intrinsics[cidx]) - observes
