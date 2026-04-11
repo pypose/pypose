@@ -74,9 +74,9 @@ when the optimization model is instantiated.
    Here, ``self.table`` is an optimizable parameter;
    the ``[idx]`` operation is applied on ``self.table``, and the result is
    concatenated with ``ones``. :class:`TrackingTensor` lets the sparse backend remember
-   that indexing pattern and the concatenation with ``ones``.
-   Since ``ones`` is not being optimized and its Jacobian is not needed,
-   it does not need to be wrapped with :class:`TrackingTensor`.
+   that indexing pattern,  the concatenation with ``ones``, and ``- target`` subtraction.
+   Since ``ones`` and ``target`` are not being optimized and their Jacobians are not needed,
+   they do not need to be wrapped with :class:`TrackingTensor`.
 
 .. warning::
 
