@@ -44,6 +44,49 @@ output tensor is the batch dimension.
 
 """
 
+_TRACKING_TENSOR_DOC = r"""
+:class:`TrackingTensor` is a tensor (or LieTensor) wrapper used by PyPose's optional
+sparse backend. It tracks all operations performed on the tensor, allowing the system to
+correctly build sparse Jacobians with the proper structure.
+
+Use it for any parameter that needs to be optimized with the sparse backend, ideally
+when the optimization model is instantiated.
+
+.. admonition:: Example
+
+   .. code-block:: python
+
+      class Model(nn.Module):
+          def __init__(self, table):
+              super().__init__()
+              self.table = nn.Parameter(TrackingTensor(table))
+
+          def forward(self, target, idx):
+              selected = self.table[idx]
+              ones = torch.ones_like(selected)
+              features = torch.cat([selected, ones], dim=-1)
+              return features - target
+
+   Here, ``self.table`` is an optimizable parameter;
+   the ``[idx]`` operation is applied on ``self.table``, and the result is
+   concatenated with ``ones``. :class:`TrackingTensor` lets the sparse backend remember
+   that indexing pattern and then the concatenation with ``ones``.
+   Since ``ones`` is not being optimized and its Jacobian is not needed,
+   it does not need to be wrapped with :class:`TrackingTensor`.
+
+.. warning::
+
+   Wrap the original batched tensor before performing any operation.
+   If you use a regular tensor or LieTensor instead,
+   the sparse backend will not recover the Jacobian for the tensor.
+
+.. note::
+
+   :class:`TrackingTensor` does not change numerical results. It only adds
+   tracing information for sparse Jacobian construction.
+
+"""
+
 
 def _missing_tracking_tensor():
     class TrackingTensor(torch.Tensor):
@@ -55,12 +98,14 @@ def _missing_tracking_tensor():
                 _format_sparse_backend_error("pypose.autograd.function.TrackingTensor")
             )
 
+    TrackingTensor.__doc__ = _TRACKING_TENSOR_DOC
     return TrackingTensor
 
 
 def _load_tracking_tensor():
     value, _ = _load_optional_backend_attr("bae.autograd.function", "TrackingTensor")
     value = _missing_tracking_tensor() if value is None else value
+    value.__doc__ = _TRACKING_TENSOR_DOC
     globals()["TrackingTensor"] = value
     globals()["TT"] = value
     return value
