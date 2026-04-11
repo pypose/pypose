@@ -71,12 +71,14 @@ when the optimization model is instantiated.
               features = torch.cat([selected, ones], dim=-1)
               return features - target
 
-   Here, ``self.table`` is an optimizable parameter;
-   the ``[idx]`` operation is applied on ``self.table``, and the result is
-   concatenated with ``ones``. :class:`TrackingTensor` lets the sparse backend remember
-   that indexing pattern,  the concatenation with ``ones``, and ``- target`` subtraction.
-   Since ``ones`` and ``target`` are not being optimized and their Jacobians are not needed,
-   they do not need to be wrapped with :class:`TrackingTensor`.
+   Here, ``self.table`` is the parameter being optimized.
+   In ``forward``, the model first selects batch entries from ``self.table`` using ``idx``,
+   then concatenates the result with ``ones``, and finally subtracts ``target``.
+   ``TrackingTensor`` records this chain of operations
+   so the sparse backend knows how the output depends on ``self.table``.
+   ``ones`` and ``target`` do not need to be wrapped in ``TrackingTensor``
+   because they are fixed values, not optimization variables,
+   so their Jacobians are unnecessary.
 
 .. warning::
 
