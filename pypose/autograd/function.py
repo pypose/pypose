@@ -45,16 +45,20 @@ output tensor is the batch dimension.
 """
 
 _TRACKING_TENSOR_DOC = r"""
-:class:`TrackingTensor` is a tensor (or LieTensor) wrapper used by PyPose's optional
-sparse backend. It tracks all operations performed on the tensor, allowing the system to
-correctly build sparse Jacobians with the proper structure.
+:class:`TrackingTensor` wraps a tensor (or LieTensor) and
+tracks all operations performed on the tensor,
+allowing PyPose's sparse backend to build correctly structured sparse Jacobians.
 
-Use it for any parameter that needs to be optimized with the sparse backend, ideally
+Use it for any parameter that needs to be optimized with the sparse backend,
 when the optimization model is instantiated.
 
 .. admonition:: Example
 
    .. code-block:: python
+
+      import torch
+      from torch import nn
+      from pypose.autograd.function import TrackingTensor
 
       class Model(nn.Module):
           def __init__(self, table):
@@ -70,7 +74,7 @@ when the optimization model is instantiated.
    Here, ``self.table`` is an optimizable parameter;
    the ``[idx]`` operation is applied on ``self.table``, and the result is
    concatenated with ``ones``. :class:`TrackingTensor` lets the sparse backend remember
-   that indexing pattern and then the concatenation with ``ones``.
+   that indexing pattern and the concatenation with ``ones``.
    Since ``ones`` is not being optimized and its Jacobian is not needed,
    it does not need to be wrapped with :class:`TrackingTensor`.
 
