@@ -109,6 +109,7 @@ def _missing_tracking_tensor():
 def _load_tracking_tensor():
     value, _ = _load_optional_backend_attr("bae.autograd.function", "TrackingTensor")
     value = _missing_tracking_tensor() if value is None else value
+    value.__module__ = "pypose.autograd"
     value.__doc__ = _TRACKING_TENSOR_DOC
     globals()["TrackingTensor"] = value
     globals()["TT"] = value
