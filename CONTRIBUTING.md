@@ -135,7 +135,11 @@ cd docs
 make html
 ```
 
-2. Then open the generated HTML page: `docs/build/html/index.html`.
+2. Then open the generated HTML page: `docs/build/html/index.html`. Launch an http server in workspace directory if using ssh:
+
+```bash
+python3 -m http.server 8000 --bind 0.0.0.0 --directory docs/build/html
+```
 
 3. To clean and rebuild the doc:
 ```bash
