@@ -44,6 +44,70 @@ output tensor is the batch dimension.
 
 """
 
+_TRACKING_TENSOR_DOC = r"""
+:class:`TrackingTensor` (alias :class:`TT`) wraps a :class:`torch.Tensor` or
+:class:`pypose.LieTensor` and tracks all operations performed on the tensor,
+allowing PyPose's sparse backend to build structured sparse Jacobians.
+
+Use it together with :func:`pypose.autograd.function.parallel_for_sparse_jacobian`
+(alias :func:`psjac`) for any :class:`pypose.Parameter` that needs to be optimized with
+the sparse backend, when the optimization model is instantiated.
+
+.. note::
+    Recommend to use alias :class:`TT` and :func:`psjac` for brevity.
+
+.. warning::
+
+   Wrap the original batched tensor before performing any operation.
+   If you use a regular tensor or LieTensor instead,
+   the sparse backend will not recover the Jacobian for the tensor.
+
+.. note::
+
+   :class:`TrackingTensor` does not change numerical results. It only adds
+   tracing information for sparse Jacobian construction.
+
+.. admonition:: Example
+
+   Below, ``self.poses`` and ``self.points_3d`` are the optimization variables
+   in a bundle-adjustment model.
+   ``TrackingTensor`` records the indexing and reprojection operations
+   so the sparse backend knows how each entry in the output depends on these variables.
+   This includes tracing :func:`psjac` functions as well,
+   so the dependency through ``project`` is preserved.
+   ``observations``, ``camera_indices``, and ``point_indices``
+   do not need to be wrapped in ``TrackingTensor`` because they are fixed inputs,
+   not optimization variables.
+
+   .. code-block:: python
+
+    import pypose as pp
+    from torch import nn
+    from pypose.autograd.function import TT, psjac
+
+    class Reproj(nn.Module):
+        def __init__(self, poses, points_3d):
+            # self.points_3d: tensor (P, 3), self.poses: pp.SE3 (C, 7)
+            super().__init__()
+            self.poses = nn.Parameter(TT(poses))
+            self.points_3d = nn.Parameter(TT(points_3d))
+
+        @psjac
+        def project(points, poses):
+            # points: tensor (N, 3), poses: pp.SE3 (N, 7)
+            # returns: (N, 2)
+            points = poses.Act(points)
+            return -points[..., :2] / points[..., 2].unsqueeze(-1)
+
+        def forward(self, observations, camera_indices, point_indices):
+            # observations: tensor (N, 2), camera_indices: (N,), point_indices: (N,)
+            poses = self.poses[camera_indices]
+            points = self.points_3d[point_indices]
+            points_proj = Reproj.project(points, poses)
+            return points_proj - observations
+
+"""
+
 
 def _missing_tracking_tensor():
     class TrackingTensor(torch.Tensor):
@@ -55,12 +119,15 @@ def _missing_tracking_tensor():
                 _format_sparse_backend_error("pypose.autograd.function.TrackingTensor")
             )
 
+    TrackingTensor.__doc__ = _TRACKING_TENSOR_DOC
     return TrackingTensor
 
 
 def _load_tracking_tensor():
     value, _ = _load_optional_backend_attr("bae.autograd.function", "TrackingTensor")
     value = _missing_tracking_tensor() if value is None else value
+    value.__module__ = "pypose.autograd"
+    value.__doc__ = _TRACKING_TENSOR_DOC
     globals()["TrackingTensor"] = value
     globals()["TT"] = value
     return value
@@ -87,17 +154,18 @@ def _missing_parallel_for_sparse_jacobian():
 def __getattr__(name):
     if name in {"TT", "TrackingTensor"}:
         return _load_tracking_tensor()
-    if name == "parallel_for_sparse_jacobian":
+    if name in {"parallel_for_sparse_jacobian", "psjac"}:
         value, _ = _load_optional_backend_attr("bae.autograd.function", "map_transform")
         value = _missing_parallel_for_sparse_jacobian() if value is None else value
         value.__doc__ = _PARALLEL_FOR_SPARSE_JACOBIAN_DOC
-        globals()[name] = value
-        return value
+        globals()["parallel_for_sparse_jacobian"] = value
+        globals()["psjac"] = value
+        return globals()[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def __dir__():
-    return sorted(set(globals()) | {"TT", "TrackingTensor", "parallel_for_sparse_jacobian"})
+    return sorted(set(globals()) | {"TT", "TrackingTensor", "parallel_for_sparse_jacobian", "psjac"})
 
 
-__all__ = ["TT", "TrackingTensor", "parallel_for_sparse_jacobian"]
+__all__ = ["TT", "TrackingTensor", "parallel_for_sparse_jacobian", "psjac"]
