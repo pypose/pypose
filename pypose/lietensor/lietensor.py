@@ -1227,35 +1227,91 @@ class LieTensor(Tensor):
 
 
 class Parameter(LieTensor, nn.Parameter):
-    r'''
-    A kind of LieTensor that is to be considered a module parameter.
+    r"""
+    :class:`Parameter` wraps a :class:`torch.Tensor` or :class:`pypose.LieTensor`.
+    When setting `sjac=True`, it tracks all operations performed on the tensor,
+    allowing PyPose's sparse backend to build structured sparse Jacobians.
 
-    Parameters are of :meth:`LieTensor` and :meth:`torch.nn.Parameter`,
-    that have a very special property when used with Modules: when
-    they are assigned as Module attributes they are automatically
-    added to the list of its parameters, and will appear, e.g., in
-    :meth:`parameters()` iterator.
+    Use `sjac=True` together with :func:`pypose.autograd.function.parallel_for_sparse_jacobian`
+    (alias :func:`psjac`) for any :class:`pypose.Parameter` that needs to be optimized with
+    the sparse backend, when the optimization model is instantiated.
 
     Args:
-        data (LieTensor): parameter LieTensor.
+        data (Tensor or LieTensor): parameter data.
         requires_grad (bool, optional): if the parameter requires
             gradient. Default: ``True``
+        sjac (bool, optional): if ``True``, sparse Jacobian tracing is enabled.
+            Default: ``False``
 
-    Examples:
-        >>> import torch, pypose as pp
-        >>> x = pp.Parameter(pp.randn_SO3(2))
-        >>> x.Log().sum().backward()
-        >>> x.grad
-        tensor([[0.8590, 1.4069, 0.6261, 0.0000],
-                [1.2869, 1.0748, 0.5385, 0.0000]])
-    '''
-    def __init__(self, data, **kwargs):
-        self.ltype = data.ltype
+    .. note::
+        Recommend to use alias :func:`psjac` for brevity.
 
-    def __new__(cls, data=None, requires_grad=True):
+    .. warning::
+
+    Wrap the original batched tensor before performing any operation.
+    If you use a regular tensor or LieTensor instead,
+    the sparse backend will not recover the Jacobian for the tensor.
+
+    .. note::
+
+    :class:`Parameter` does not change numerical results. It only adds
+    tracing information for sparse Jacobian construction when setting `sjac=True`.
+
+    .. admonition:: Example
+
+    Below, ``self.poses`` and ``self.points_3d`` are the optimization variables
+    in a bundle-adjustment model.
+    ``pp.Parameter(..., sjac=True)`` records the indexing and reprojection operations
+    so the sparse backend knows how each entry in the output depends on these variables.
+    This includes tracing :func:`psjac` functions as well,
+    so the dependency through ``project`` is preserved.
+    ``observations``, ``camera_indices``, and ``point_indices``
+    do not need to be wrapped in ``Parameter`` because they are fixed inputs,
+    not optimization variables.
+
+    .. code-block:: python
+
+        import pypose as pp
+        from torch import nn
+        from pypose.autograd.function import TT, psjac
+
+        class Reproj(nn.Module):
+            def __init__(self, poses, points_3d):
+                # self.points_3d: tensor (P, 3), self.poses: pp.SE3 (C, 7)
+                super().__init__()
+                self.poses = pp.Parameter(poses, sjac=True)
+                self.points_3d = pp.Parameter(points_3d, sjac=True)
+
+            @psjac
+            def project(points, poses):
+                # points: tensor (N, 3), poses: pp.SE3 (N, 7)
+                # returns: (N, 2)
+                points = poses.Act(points)
+                return -points[..., :2] / points[..., 2].unsqueeze(-1)
+
+            def forward(self, observations, camera_indices, point_indices):
+                # observations: tensor (N, 2), camera_indices: (N,), point_indices: (N,)
+                poses = self.poses[camera_indices]
+                points = self.points_3d[point_indices]
+                points_proj = Reproj.project(points, poses)
+                return points_proj - observations
+
+    """
+
+    def __init__(self, data=None, requires_grad=True, sjac=False):
+        if hasattr(data, 'ltype'):
+            self.ltype = data.ltype
+
+    def __new__(cls, data=None, requires_grad=True, sjac=False):
         if data is None:
             data = torch.tensor([])
-        return LieTensor._make_subclass(cls, data, requires_grad)
+        if sjac:
+            from ..autograd import TT
+            data = TT(data)
+            return nn.Parameter(data, requires_grad)
+        if isinstance(data, LieTensor):
+            return LieTensor._make_subclass(cls, data, requires_grad)
+        return nn.Parameter(data, requires_grad)
 
     def __deepcopy__(self, memo):
         if id(self) in memo:

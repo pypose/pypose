@@ -118,6 +118,37 @@ def test_lietensor():
 
     J = pp.Jinvp(X, a)
 
+
+def test_parameter_dispatch(monkeypatch):
+    tensor = torch.randn(2, 3)
+    param = pp.Parameter(tensor, requires_grad=False)
+    assert type(param) is nn.Parameter
+    assert not isinstance(param, pp.LieTensor)
+    assert not hasattr(param, 'ltype')
+    torch.testing.assert_close(param.detach(), tensor)
+
+    lie = pp.randn_SE3(2)
+    lie_param = pp.Parameter(lie, requires_grad=False)
+    assert isinstance(lie_param, pp.Parameter)
+    assert isinstance(lie_param, pp.LieTensor)
+    assert lie_param.ltype is lie.ltype
+    torch.testing.assert_close(lie_param.detach(), lie.detach())
+
+    calls = []
+
+    def fake_tt(data):
+        calls.append(data)
+        return pp.randn_SE3(2) if isinstance(data, pp.LieTensor) else data + 1
+
+    monkeypatch.setattr(pp.autograd, "TT", fake_tt)
+    sjac_param = pp.Parameter(torch.zeros(2, 3), sjac=True, requires_grad=False)
+    assert type(sjac_param) is nn.Parameter
+    assert len(calls) == 1
+    torch.testing.assert_close(sjac_param.detach(), torch.ones(2, 3))
+
+    sjac_lie_param = pp.Parameter(pp.randn_SE3(2), sjac=True, requires_grad=False)
+    assert not isinstance(sjac_lie_param, pp.Parameter)
+
     S = pp.randn_Sim3(4)
     S.Log().Exp()
 

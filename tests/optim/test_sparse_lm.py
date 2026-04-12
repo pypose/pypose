@@ -15,7 +15,7 @@ def edge_error(node1, node2, relpose):
 class _SparseIdentityModel(nn.Module):
     def __init__(self, x0):
         super().__init__()
-        self.x = nn.Parameter(TT(x0))
+        self.x = pp.Parameter(x0, sjac=True)
 
     def forward(self):
         return self.x
@@ -25,7 +25,7 @@ class _SparseChainPGO(nn.Module):
     def __init__(self, root, nodes):
         super().__init__()
         self.register_buffer("root", root)
-        self.nodes = nn.Parameter(TT(nodes))
+        self.nodes = pp.Parameter(nodes, sjac=True)
 
     def forward(self, edges, relposes):
         nodes = torch.cat((self.root, self.nodes), dim=0)
