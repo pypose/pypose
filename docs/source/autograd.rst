@@ -6,6 +6,12 @@ Autograd
    :toctree: generated
    :nosignatures:
 
-   :template: autosummary/class-no-inherit.rst
+   :template: autosummary/function.rst
    autograd.function.parallel_for_sparse_jacobian
-   autograd.function.psjac
+
+.. toctree::
+   :hidden:
+
+   generated/pypose.autograd.function.psjac
+
+:doc:`autograd.function.psjac <generated/pypose.autograd.function.psjac>`

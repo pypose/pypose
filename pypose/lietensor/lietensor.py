@@ -1255,53 +1255,53 @@ class Parameter(LieTensor, nn.Parameter):
 
     .. warning::
 
-    Wrap the original batched tensor before performing any operation.
-    If you use a regular tensor or LieTensor instead,
-    the sparse backend will not recover the Jacobian for the tensor.
+        Wrap the original batched tensor before performing any operation.
+        If you use a regular tensor or LieTensor instead,
+        the sparse backend will not recover the Jacobian for the tensor.
 
     .. note::
 
-    :class:`Parameter` does not change numerical results. It only adds
-    tracing information for sparse Jacobian construction when setting `sjac=True`.
+        :class:`Parameter` does not change numerical results. It only adds
+        tracing information for sparse Jacobian construction when setting `sjac=True`.
 
     .. admonition:: Example
 
-    Below, ``self.poses`` and ``self.points_3d`` are the optimization variables
-    in a bundle-adjustment model.
-    ``pp.Parameter(..., sjac=True)`` records the indexing and reprojection operations
-    so the sparse backend knows how each entry in the output depends on these variables.
-    This includes tracing :func:`psjac` functions as well,
-    so the dependency through ``project`` is preserved.
-    ``observations``, ``camera_indices``, and ``point_indices``
-    do not need to be wrapped in ``Parameter`` because they are fixed inputs,
-    not optimization variables.
+        Below, ``self.poses`` and ``self.points_3d`` are the optimization variables
+        in a bundle-adjustment model.
+        ``pp.Parameter(..., sjac=True)`` records the indexing and reprojection operations
+        so the sparse backend knows how each entry in the output depends on these variables.
+        This includes tracing :func:`psjac` functions as well,
+        so the dependency through ``project`` is preserved.
+        ``observations``, ``camera_indices``, and ``point_indices``
+        do not need to be wrapped in ``Parameter`` because they are fixed inputs,
+        not optimization variables.
 
-    .. code-block:: python
+        .. code-block:: python
 
-        import pypose as pp
-        from torch import nn
-        from pypose.autograd.function import psjac
+            import pypose as pp
+            from torch import nn
+            from pypose.autograd.function import psjac
 
-        class Reproj(nn.Module):
-            def __init__(self, poses, points_3d):
-                # self.points_3d: tensor (P, 3), self.poses: pp.SE3 (C, 7)
-                super().__init__()
-                self.poses = pp.Parameter(poses, sjac=True)
-                self.points_3d = pp.Parameter(points_3d, sjac=True)
+            class Reproj(nn.Module):
+                def __init__(self, poses, points_3d):
+                    # self.points_3d: tensor (P, 3), self.poses: pp.SE3 (C, 7)
+                    super().__init__()
+                    self.poses = pp.Parameter(poses, sjac=True)
+                    self.points_3d = pp.Parameter(points_3d, sjac=True)
 
-            @psjac
-            def project(points, poses):
-                # points: tensor (N, 3), poses: pp.SE3 (N, 7)
-                # returns: (N, 2)
-                points = poses.Act(points)
-                return -points[..., :2] / points[..., 2].unsqueeze(-1)
+                @psjac
+                def project(points, poses):
+                    # points: tensor (N, 3), poses: pp.SE3 (N, 7)
+                    # returns: (N, 2)
+                    points = poses.Act(points)
+                    return -points[..., :2] / points[..., 2].unsqueeze(-1)
 
-            def forward(self, observations, camera_indices, point_indices):
-                # observations: tensor (N, 2), camera_indices: (N,), point_indices: (N,)
-                poses = self.poses[camera_indices]
-                points = self.points_3d[point_indices]
-                points_proj = Reproj.project(points, poses)
-                return points_proj - observations
+                def forward(self, observations, camera_indices, point_indices):
+                    # observations: tensor (N, 2), camera_indices: (N,), point_indices: (N,)
+                    poses = self.poses[camera_indices]
+                    points = self.points_3d[point_indices]
+                    points_proj = Reproj.project(points, poses)
+                    return points_proj - observations
 
     """
 

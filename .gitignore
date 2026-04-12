@@ -129,7 +129,8 @@ dmypy.json
 .pyre/
 
 # sphinx
-docs/source/generated
+docs/source/generated/*
+!docs/source/generated/pypose.autograd.function.psjac.rst
 
 # Operating system
 .DS_Store
