@@ -5,8 +5,8 @@ from .. import _format_sparse_backend_error, _load_optional_backend_attr
 
 
 _PARALLEL_FOR_SPARSE_JACOBIAN_DOC = r"""
-The :func:`parallel_for_sparse_jacobian` decorator allows PyPose's optional
-sparse backend to trace and assemble sparse Jacobians more efficiently. It
+The :func:`parallel_for_sparse_jacobian` (alias :func:`psjac`) decorator allows PyPose's
+optional sparse backend to trace and assemble sparse Jacobians more efficiently. It
 wraps a batched function whose batch samples are independent, so the function
 can be treated as a parallel computation along the batch dimension during
 sparse Jacobian construction. Here, the leading dimension of each input and
@@ -17,18 +17,22 @@ output tensor is the batch dimension.
    This decorator is required by sparse
    :class:`pypose.optim.LevenbergMarquardt` with ``sparse=True``.
 
+.. note::
+    See runable example for
+    `bundle adjustment <https://github.com/pypose/pypose/tree/main/examples/module/ba>`_.
+
 .. admonition:: Example
 
    .. code-block:: python
 
-      @parallel_for_sparse_jacobian
-      def edge_error(node1, node2, relpose):
-          # node1: pp.SE3 (N, 7), node2: pp.SE3 (N, 7), relpose: pp.SE3 (N, 7)
+      @psjac
+      def edge_error(node1, node2, relative):
+          # node1: pp.SE3 (N, 7), node2: pp.SE3 (N, 7), relative: pp.SE3 (N, 7)
           # returns: (N, 6)
-          return (relpose.Inv() @ node1.Inv() @ node2).Log().tensor()
+          return (relative.Inv() @ node1.Inv() @ node2).Log().tensor()
 
    Here, each output is the error for one pose-graph edge, computed
-   only from the matching input of ``node1``, ``node2``, and ``relpose``.
+   only from the matching input of ``node1``, ``node2``, and ``relative``.
 
 .. warning::
 

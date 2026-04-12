@@ -431,6 +431,10 @@ class LevenbergMarquardt(_Optimizer):
           `Bundle Adjustment in the Eager Mode <https://arxiv.org/abs/2409.12190>`_,
           arXiv preprint arXiv:2409.12190, 2024.
 
+        Check a `full and clean runable example
+        <https://github.com/pypose/pypose/tree/main/examples/module/ba>`_ with
+        ``sparse=True`` for bundle adjustment.
+
     Warning:
         The output of model :math:`\bm{f}(\bm{\theta},\bm{x}_i)` and target :math:`\bm{y}_i`
         can be any shape, while their **last dimension** :math:`d` is always taken as the
