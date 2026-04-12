@@ -1251,7 +1251,7 @@ class Parameter(LieTensor, nn.Parameter):
     the sparse backend, when the optimization model is instantiated.
 
     .. note::
-        Recommend to use alias :func:`psjac` for brevity.
+        Recommend to use alias :func:`pypose.autograd.function.psjac` for brevity.
 
     .. warning::
 
