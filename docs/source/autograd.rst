@@ -7,6 +7,4 @@ Autograd
    :nosignatures:
 
    :template: autosummary/class-no-inherit.rst
-   autograd.TrackingTensor
-   autograd.TT
    autograd.function.parallel_for_sparse_jacobian

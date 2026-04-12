@@ -140,7 +140,7 @@ def test_parameter_dispatch(monkeypatch):
         calls.append(data)
         return pp.randn_SE3(2) if isinstance(data, pp.LieTensor) else data + 1
 
-    monkeypatch.setattr(pp.autograd, "TT", fake_tt)
+    monkeypatch.setattr("pypose._require_backend_attr", lambda *args: fake_tt)
     sjac_param = pp.Parameter(torch.zeros(2, 3), sjac=True, requires_grad=False)
     assert type(sjac_param) is nn.Parameter
     assert len(calls) == 1

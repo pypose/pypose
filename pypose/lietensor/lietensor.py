@@ -1273,7 +1273,7 @@ class Parameter(LieTensor, nn.Parameter):
 
         import pypose as pp
         from torch import nn
-        from pypose.autograd.function import TT, psjac
+        from pypose.autograd.function import psjac
 
         class Reproj(nn.Module):
             def __init__(self, poses, points_3d):
@@ -1306,8 +1306,13 @@ class Parameter(LieTensor, nn.Parameter):
         if data is None:
             data = torch.tensor([])
         if sjac:
-            from ..autograd import TT
-            data = TT(data)
+            from .. import _require_backend_attr
+            TrackingTensor = _require_backend_attr(
+                "bae.autograd.function",
+                "TrackingTensor",
+                "pypose.Parameter(..., sjac=True)",
+            )
+            data = TrackingTensor(data)
             return nn.Parameter(data, requires_grad)
         if isinstance(data, LieTensor):
             return LieTensor._make_subclass(cls, data, requires_grad)

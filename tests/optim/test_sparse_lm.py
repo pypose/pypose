@@ -4,7 +4,7 @@ import pypose as pp
 import pypose.autograd.function as ppaf
 from torch import nn
 import pypose.optim.solver as ppos
-from pypose.autograd.function import TT, parallel_for_sparse_jacobian
+from pypose.autograd.function import parallel_for_sparse_jacobian, psjac
 
 
 @parallel_for_sparse_jacobian
@@ -37,9 +37,9 @@ class _SparseChainPGO(nn.Module):
 
 
 class TestSparseLM:
-    def test_tracking_tensor_export(self):
-        assert TT is ppaf.TrackingTensor
-        assert TT is ppaf.TT
+    def test_psjac_export(self):
+        assert psjac is parallel_for_sparse_jacobian
+        assert psjac is ppaf.psjac
 
     def test_sparse_lm_runs_and_converges(self):
         if not torch.cuda.is_available():

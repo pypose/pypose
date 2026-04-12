@@ -44,31 +44,6 @@ output tensor is the batch dimension.
 
 """
 
-
-def _missing_tracking_tensor():
-    class TrackingTensor(torch.Tensor):
-        r"""Placeholder for the optional sparse backend tracking tensor."""
-
-        @staticmethod
-        def __new__(cls, data, *args, **kwargs):
-            raise ImportError(
-                _format_sparse_backend_error("pypose.autograd.function.TrackingTensor")
-            )
-
-    TrackingTensor.__doc__ = _TRACKING_TENSOR_DOC
-    return TrackingTensor
-
-
-def _load_tracking_tensor():
-    value, _ = _load_optional_backend_attr("bae.autograd.function", "TrackingTensor")
-    value = _missing_tracking_tensor() if value is None else value
-    value.__module__ = "pypose.autograd"
-    value.__doc__ = _TRACKING_TENSOR_DOC
-    globals()["TrackingTensor"] = value
-    globals()["TT"] = value
-    return value
-
-
 def _missing_parallel_for_sparse_jacobian():
     def parallel_for_sparse_jacobian(function):
         _ = function
@@ -88,8 +63,6 @@ def _missing_parallel_for_sparse_jacobian():
 
 
 def __getattr__(name):
-    if name in {"TT", "TrackingTensor"}:
-        return _load_tracking_tensor()
     if name in {"parallel_for_sparse_jacobian", "psjac"}:
         value, _ = _load_optional_backend_attr("bae.autograd.function", "map_transform")
         value = _missing_parallel_for_sparse_jacobian() if value is None else value
@@ -101,7 +74,7 @@ def __getattr__(name):
 
 
 def __dir__():
-    return sorted(set(globals()) | {"TT", "TrackingTensor", "parallel_for_sparse_jacobian", "psjac"})
+    return sorted(set(globals()) | {"parallel_for_sparse_jacobian", "psjac"})
 
 
-__all__ = ["TT", "TrackingTensor", "parallel_for_sparse_jacobian", "psjac"]
+__all__ = ["parallel_for_sparse_jacobian", "psjac"]
