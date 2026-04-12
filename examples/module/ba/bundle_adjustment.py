@@ -29,6 +29,8 @@ class Reproj(nn.Module):
 
     # The decorator psjac parallelizes sparse Jacobian assembly for the batch dimension.
     # psjac is an alias of pypose.autograd.function.parallel_sparse_jacobian.
+    # psjac can only be used with static methods, or a simple function.
+    # It cannot be used with instance methods, since the `self` argument is not traceable.
     @psjac
     def project(K, C, P):
         # See math explanation at https://grail.cs.washington.edu/projects/bal/
