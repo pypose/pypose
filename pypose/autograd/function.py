@@ -154,17 +154,18 @@ def _missing_parallel_for_sparse_jacobian():
 def __getattr__(name):
     if name in {"TT", "TrackingTensor"}:
         return _load_tracking_tensor()
-    if name == "parallel_for_sparse_jacobian":
+    if name in {"parallel_for_sparse_jacobian", "pjac"}:
         value, _ = _load_optional_backend_attr("bae.autograd.function", "map_transform")
         value = _missing_parallel_for_sparse_jacobian() if value is None else value
         value.__doc__ = _PARALLEL_FOR_SPARSE_JACOBIAN_DOC
-        globals()[name] = value
-        return value
+        globals()["parallel_for_sparse_jacobian"] = value
+        globals()["pjac"] = value
+        return globals()[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def __dir__():
-    return sorted(set(globals()) | {"TT", "TrackingTensor", "parallel_for_sparse_jacobian"})
+    return sorted(set(globals()) | {"TT", "TrackingTensor", "parallel_for_sparse_jacobian", "pjac"})
 
 
-__all__ = ["TT", "TrackingTensor", "parallel_for_sparse_jacobian"]
+__all__ = ["TT", "TrackingTensor", "parallel_for_sparse_jacobian", "pjac"]
