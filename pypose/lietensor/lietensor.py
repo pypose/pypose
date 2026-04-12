@@ -934,11 +934,18 @@ class LieTensor(Tensor):
 
     def new_empty(self, size, *, dtype=None, layout=None, device=None, pin_memory=None,
                   requires_grad=None):
-        return Tensor.as_subclass(
-            torch.empty(size, dtype=dtype, layout=layout, device=device,
-                        pin_memory=pin_memory, requires_grad=requires_grad),
-            LieTensor
+        tensor = torch.empty(
+            size,
+            dtype=self.dtype if dtype is None else dtype,
+            layout=self.layout if layout is None else layout,
+            device=self.device if device is None else device,
+            pin_memory=pin_memory,
+            requires_grad=self.requires_grad if requires_grad is None else requires_grad,
         )
+        out = Tensor.as_subclass(tensor, type(self))
+        if hasattr(self, 'ltype'):
+            out.ltype = self.ltype
+        return out
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs={}):
@@ -1232,16 +1239,16 @@ class Parameter(LieTensor, nn.Parameter):
     When setting `sjac=True`, it tracks all operations performed on the tensor,
     allowing PyPose's sparse backend to build structured sparse Jacobians.
 
-    Use `sjac=True` together with :func:`pypose.autograd.function.parallel_for_sparse_jacobian`
-    (alias :func:`psjac`) for any :class:`pypose.Parameter` that needs to be optimized with
-    the sparse backend, when the optimization model is instantiated.
-
     Args:
         data (Tensor or LieTensor): parameter data.
         requires_grad (bool, optional): if the parameter requires
             gradient. Default: ``True``
         sjac (bool, optional): if ``True``, sparse Jacobian tracing is enabled.
             Default: ``False``
+
+    Use `sjac=True` together with :func:`pypose.autograd.function.parallel_for_sparse_jacobian`
+    (alias :func:`psjac`) for any :class:`pypose.Parameter` that needs to be optimized with
+    the sparse backend, when the optimization model is instantiated.
 
     .. note::
         Recommend to use alias :func:`psjac` for brevity.
@@ -1315,7 +1322,10 @@ class Parameter(LieTensor, nn.Parameter):
             data = TrackingTensor(data)
             return nn.Parameter(data, requires_grad)
         if isinstance(data, LieTensor):
-            return LieTensor._make_subclass(cls, data, requires_grad)
+            param = Tensor._make_subclass(cls, data.tensor(), requires_grad)
+            param.ltype = data.ltype
+            param._is_param = True
+            return param
         return nn.Parameter(data, requires_grad)
 
     def __deepcopy__(self, memo):
