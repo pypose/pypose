@@ -18,7 +18,7 @@ DATA_URL = "https://grail.cs.washington.edu/projects/bal/"
 ALL_DATASETS = ("ladybug", "trafalgar", "dubrovnik", "venice", "final")
 
 
-def _normalize_problem_name(problem_name):
+def _norm_name(problem_name):
     name = os.path.basename(problem_name)
     for suffix in (".txt.bz2", ".txt", ".bz2"):
         if name.endswith(suffix):
@@ -26,12 +26,12 @@ def _normalize_problem_name(problem_name):
     return name
 
 
-def _validate_dataset(dataset):
+def _check_dataset(dataset):
     if dataset not in ALL_DATASETS:
         raise ValueError(f"dataset must be one of {ALL_DATASETS}, got {dataset!r}")
 
 
-def _download_url(url, destination, user_agent="pypose-bal-loader/1.0", timeout=60.0):
+def _download(url, destination, user_agent="pypose-bal-loader/1.0", timeout=60.0):
     destination.parent.mkdir(parents=True, exist_ok=True)
     request = urllib.request.Request(url, headers={"User-Agent": user_agent})
     tmp = destination.with_suffix(destination.suffix + ".tmp")
@@ -45,23 +45,23 @@ def _download_url(url, destination, user_agent="pypose-bal-loader/1.0", timeout=
     return destination
 
 
-def _problem_paths(cache_dir, problem_name):
-    normalized = _normalize_problem_name(problem_name)
+def _paths(cache_dir, problem_name):
+    normalized = _norm_name(problem_name)
     return cache_dir / f"{normalized}.txt", cache_dir / f"{normalized}.txt.bz2"
 
 
-def _problem_url(dataset, problem_name):
-    normalized = _normalize_problem_name(problem_name)
+def _url(dataset, problem_name):
+    normalized = _norm_name(problem_name)
     return f"{DATA_URL}data/{dataset}/{normalized}.txt.bz2"
 
 
-def _ensure_problem_available(dataset, problem_name, cache_dir):
-    txt_path, archive_path = _problem_paths(cache_dir, problem_name)
+def _ensure(dataset, problem_name, cache_dir):
+    txt_path, archive_path = _paths(cache_dir, problem_name)
     if txt_path.exists() and txt_path.stat().st_size > 0:
         return txt_path
 
     if not archive_path.exists() or archive_path.stat().st_size == 0:
-        _download_url(_problem_url(dataset, problem_name), archive_path)
+        _download(_url(dataset, problem_name), archive_path)
 
     tmp = txt_path.with_suffix(txt_path.suffix + ".tmp")
     try:
@@ -74,7 +74,7 @@ def _ensure_problem_available(dataset, problem_name, cache_dir):
     return txt_path
 
 
-def _rotvec_to_quat_xyzw(rotvec):
+def _rotvec_to_quat(rotvec):
     theta = torch.linalg.norm(rotvec, dim=-1, keepdim=True)
     half_theta = theta * 0.5
     sin_half = torch.sin(half_theta)
@@ -88,9 +88,9 @@ def _rotvec_to_quat_xyzw(rotvec):
     return torch.cat((xyz, cos_half), dim=-1)
 
 
-def _split_camera_params(camera_params):
-    camera_pose = pp.SE3(camera_params[:, :7].clone())
-    camera_intrinsics = camera_params[:, 7:].clone()
+def _split_cam(cameras):
+    camera_pose = pp.SE3(cameras[:, :7].clone())
+    camera_intrinsics = cameras[:, 7:].clone()
     return camera_pose, camera_intrinsics
 
 
@@ -108,10 +108,10 @@ def read_bal_data(path, use_quat=True):
             points_2d[row, 0] = float(x)
             points_2d[row, 1] = float(y)
 
-        camera_params = torch.empty((n_cameras, 9), dtype=DTYPE)
+        cameras = torch.empty((n_cameras, 9), dtype=DTYPE)
         for row in range(n_cameras):
             for col in range(9):
-                camera_params[row, col] = float(file.readline())
+                cameras[row, col] = float(file.readline())
 
         points_3d = torch.empty((n_points, 3), dtype=DTYPE)
         for row in range(n_points):
@@ -119,15 +119,15 @@ def read_bal_data(path, use_quat=True):
                 points_3d[row, col] = float(file.readline())
 
     if use_quat:
-        translation = camera_params[:, 3:6]
-        rotation = _rotvec_to_quat_xyzw(camera_params[:, :3])
-        camera_params = torch.cat((translation, rotation, camera_params[:, 6:]), dim=-1)
+        translation = cameras[:, 3:6]
+        rotation = _rotvec_to_quat(cameras[:, :3])
+        cameras = torch.cat((translation, rotation, cameras[:, 6:]), dim=-1)
     else:
-        camera_params = torch.cat((camera_params[:, 3:6], camera_params[:, :3], camera_params[:, 6:]), dim=-1)
+        cameras = torch.cat((cameras[:, 3:6], cameras[:, :3], cameras[:, 6:]), dim=-1)
 
     return {
         "name": Path(path).stem,
-        "camera_params": camera_params,
+        "cameras": cameras,
         "points": points_3d,
         "pixels": points_2d,
         "cidx": camera_index,
@@ -136,12 +136,12 @@ def read_bal_data(path, use_quat=True):
 
 
 def ba_problem(problem_name, dataset, cache_dir="bal_data", device=None):
-    _validate_dataset(dataset)
+    _check_dataset(dataset)
     cache_dir = Path(cache_dir)
 
-    path = _ensure_problem_available(dataset, problem_name, cache_dir)
+    path = _ensure(dataset, problem_name, cache_dir)
     problem = read_bal_data(path)
-    camera_pose, intrinsics = _split_camera_params(problem["camera_params"])
+    camera_pose, intrinsics = _split_cam(problem["cameras"])
     problem["cameras"] = camera_pose
     problem["intrinsics"] = intrinsics
     if device is not None:
@@ -154,14 +154,14 @@ def ba_problem(problem_name, dataset, cache_dir="bal_data", device=None):
     return problem
 
 
-def _sample_rows(points, count):
+def _sample(points, count):
     if points.shape[0] <= count:
         return points
     index = torch.linspace(0, points.shape[0] - 1, count).long()
     return points[index]
 
 
-def _focus_points(points):
+def _focus(points):
     points = points.float()
     if points.shape[0] < 32:
         return points
@@ -173,8 +173,8 @@ def _focus_points(points):
     return inliers if inliers.shape[0] >= 16 else points
 
 
-def _set_axes_equal(ax, xyz):
-    xyz = _focus_points(xyz)
+def _axes_equal(ax, xyz):
+    xyz = _focus(xyz)
     if xyz.shape[0] >= 16:
         quantiles = torch.tensor([0.05, 0.95], dtype=xyz.dtype, device=xyz.device)
         mins, maxs = torch.quantile(xyz, quantiles, dim=0)
@@ -189,12 +189,12 @@ def _set_axes_equal(ax, xyz):
 
 
 @torch.no_grad()
-def _camera_centers(camera_pose):
+def _cam_centers(camera_pose):
     return camera_pose.Inv().translation()
 
 
 @torch.no_grad()
-def _least_square_error(camera_pose, camera_intrinsics, points, cidx, pidx, observes):
+def _mse(camera_pose, camera_intrinsics, points, cidx, pidx, observes):
     camera_points = camera_pose[cidx].Act(points[pidx])
     normalized = -camera_points[..., :2] / camera_points[..., [2]]
     radius_sq = normalized.square().sum(dim=-1, keepdim=True)
@@ -208,14 +208,8 @@ def _least_square_error(camera_pose, camera_intrinsics, points, cidx, pidx, obse
 
 
 @torch.no_grad()
-def _make_reconstruction_figure(
-    points,
-    cameras,
-    max_points,
-    title,
-    figure_title=None,
-):
-    points = _sample_rows(points.detach().cpu(), max_points)
+def _make_fig(points, cameras, max_points, title, ftitle=None):
+    points = _sample(points.detach().cpu(), max_points)
     cameras = cameras.detach().cpu()
 
     figure = plt.figure(figsize=(6, 6))
@@ -234,29 +228,16 @@ def _make_reconstruction_figure(
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.set_zlabel("Z")
-    _set_axes_equal(ax, points)
+    _axes_equal(ax, points)
 
-    if figure_title is not None:
-        figure.suptitle(figure_title)
+    if ftitle is not None:
+        figure.suptitle(ftitle)
     return figure
 
 
 @torch.no_grad()
-def plot_reconstruction(
-    points,
-    cameras,
-    output_path,
-    max_points,
-    title="Optimized reconstruction",
-    figure_title=None,
-):
-    figure = _make_reconstruction_figure(
-        points,
-        cameras,
-        max_points=max_points,
-        title=title,
-        figure_title=figure_title,
-    )
+def plot_rec(points, cameras, output_path, max_points, title="Reconst", ftitle=None):
+    figure = _make_fig(points, cameras, max_points=max_points, title=title, ftitle=ftitle)
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure.tight_layout()
@@ -266,14 +247,7 @@ def plot_reconstruction(
 
 
 @torch.no_grad()
-def save_ba(
-    model,
-    problem,
-    save_dir,
-    suffix,
-    title,
-    max_points=8000,
-):
+def save_ba(model, problem, save_dir, suffix, title, max_points=8000):
     prefix = f"{problem['dataset']}-{problem['name']}"
     title_prefix = f"{problem['dataset']}/{problem['name']}"
     output_path = Path(save_dir) / f"{prefix}-{suffix}.png"
@@ -285,20 +259,7 @@ def save_ba(
     cidx = problem["cidx"]
     pidx = problem["pidx"]
 
-    loss = _least_square_error(
-        pose,
-        intrinsics,
-        points,
-        cidx,
-        pidx,
-        observes,
-    )
-    plot_reconstruction(
-        points,
-        _camera_centers(pose),
-        output_path,
-        max_points=max_points,
-        title=title,
-        figure_title=f"{title_prefix} | MSE={loss.item():.6f}",
-    )
+    loss = _mse(pose, intrinsics, points, cidx, pidx, observes)
+    plot_rec(points, _cam_centers(pose), output_path, max_points=max_points,
+             title=title, ftitle=f"{title_prefix} | MSE={loss.item():.6f}")
     return loss.item()
