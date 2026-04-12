@@ -4,156 +4,71 @@ https://github.com/sair-lab/bae/blob/release/ba_example.py
 """
 
 import argparse
-from pathlib import Path
-
-import torch
-import torch.nn as nn
-
 import pypose as pp
-from pypose.autograd.function import TT, parallel_for_sparse_jacobian
+import torch, torch.nn as nn
 from pypose.optim.solver import PCG
+from pypose.autograd.function import psjac
 
-from ba_visualization import save_bundle_adjustment_visualization
-from bal_dataset import get_problem
-
-
-TARGET_DATASET = "trafalgar"
-TARGET_PROBLEM = "problem-257-65132-pre"
-OPTIMIZE_INTRINSICS = True
-NUM_STEPS = 20
-CG_TOL = 1e-4
-CG_MAXITER = 250
-REJECT_STEPS = 30
+from bal_dataset import ba_problem, save_ba
 
 
-@parallel_for_sparse_jacobian
-def project(points, camera_pose, intrinsics):
-    camera_points = camera_pose.Act(points)
-    normalized = -camera_points[..., :2] / camera_points[..., [2]]
-    radius_sq = normalized.square().sum(dim=-1, keepdim=True)
+class Reproj(nn.Module):
 
-    focal = intrinsics[..., :1]
-    k1 = intrinsics[..., 1:2]
-    k2 = intrinsics[..., 2:3]
-    distortion = 1 + k1 * radius_sq + k2 * radius_sq.square()
-    return focal * distortion * normalized
-
-
-class Residual(nn.Module):
-
-    def __init__(self, camera_pose, camera_intrinsics, points):
+    def __init__(self, K, C, P):
+        # K: intrinsic, C: camera pose, P: point cloud
         super().__init__()
-        self.pose = nn.Parameter(TT(camera_pose))
-        if OPTIMIZE_INTRINSICS:
-            self.intrinsics = nn.Parameter(TT(camera_intrinsics))
-        else:
-            self.register_buffer("intrinsics", camera_intrinsics)
-        self.points = nn.Parameter(TT(points))
+        self.K = pp.Parameter(K, sjac=True)
+        self.C = pp.Parameter(C, sjac=True)
+        self.P = pp.Parameter(P, sjac=True)
 
-    def forward(self, observes, cidx, pidx):
-        return project(self.points[pidx], self.pose[cidx], self.intrinsics[cidx]) - observes
+    def forward(self, observe, cidx, pidx):
+        return Reproj.project(self.K[cidx], self.C[cidx], self.P[pidx]) - observe
 
-def main():
+    @psjac
+    def project(K, C, P):
+        cp = C.Act(P)
+        n = - cp[..., :2] / cp[..., [2]]
+        radius = n.square().sum(dim=-1, keepdim=True)
+        focal, k1, k2 = K[..., :1], K[..., 1:2], K[..., 2:3]
+        distortion = 1 + k1 * radius + k2 * radius.square()
+        return focal * distortion * n
+
+
+if __name__ == "__main__":
+
     parser = argparse.ArgumentParser(description="Bundle adjustment on a BAL problem")
-    parser.add_argument(
-        "--dataset",
-        default=TARGET_DATASET,
-        choices=["ladybug", "trafalgar", "dubrovnik", "venice", "final"],
-    )
-    parser.add_argument(
-        "--problem",
-        default=TARGET_PROBLEM,
-        help="BAL problem name, with or without .txt/.bz2",
-    )
+    datasets = ["ladybug", "trafalgar", "dubrovnik", "venice", "final"]
+
+    parser.add_argument("--dataset", default="trafalgar", choices=datasets)
+    parser.add_argument("--problem", default="problem-257-65132-pre")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--cache-dir", default="./examples/module/ba/data")
-    parser.add_argument("--save-dir", default="./examples/module/ba/save")
-    parser.add_argument("--plot-max-points", type=int, default=8000)
+    parser.add_argument("--save", default="./examples/module/ba/save")
+    parser.add_argument("--steps", type=int, default=20)
+    parser.add_argument("--reject", type=int, default=30)
+    parser.add_argument("--cg-tol", type=float, default=1e-4)
+    parser.add_argument("--cg-maxiter", type=int, default=250)
     args = parser.parse_args()
 
     device = torch.device(args.device)
     assert torch.cuda.is_available(), "Sparse LM currently requires CUDA."
-    assert device.type == "cuda", "This sparse bundle-adjustment example must run on CUDA."
+    assert device.type == "cuda", "This sparse BA example must run on CUDA."
 
-    problem = get_problem(
-        problem_name=args.problem,
-        dataset=args.dataset,
-        cache_dir=args.cache_dir
-    )
-    print(f"Loaded {problem['problem_name']} from {args.dataset}")
+    prob = ba_problem(args.problem, args.dataset, args.cache_dir, device)
+    inp = {"observe": prob["pixels"], "cidx": prob["cidx"], "pidx": prob["pidx"]}
 
-    problem = {
-        key: value.to(device) if isinstance(value, torch.Tensor) else value
-        for key, value in problem.items()
-    }
-    input = {
-        "observes": problem["points_2d"],
-        "cidx": problem["camera_index"],
-        "pidx": problem["point_index"],
-    }
-
-    model = Residual(
-        camera_pose=problem["camera_pose"],
-        camera_intrinsics=problem["camera_intrinsics"],
-        points=problem["points_3d"],
-    ).to(device)
+    model = Reproj(prob["intrinsics"], prob["cameras"], prob["points"]).to(device)
 
     strategy = pp.optim.strategy.TrustRegion(up=2.0, down=0.5 ** 4)
-    solver = PCG(tol=CG_TOL, maxiter=CG_MAXITER)
-    optimizer = pp.optim.LM(
-        model,
-        solver=solver,
-        strategy=strategy,
-        reject=REJECT_STEPS,
-        min=1e-6,
-        sparse=True,
-    )
+    solver = PCG(tol=args.cg_tol, maxiter=args.cg_maxiter)
+    optimizer = pp.optim.LM(model, solver=solver, strategy=strategy, reject=args.reject, min=1e-6, sparse=True)
 
-    save_prefix = f"{args.dataset}-{problem['problem_name']}"
-    title_prefix = f"{args.dataset}/{problem['problem_name']}"
-    save_bundle_adjustment_visualization(
-        model.pose,
-        model.intrinsics,
-        model.points,
-        problem["points_2d"],
-        problem["camera_index"],
-        problem["point_index"],
-        Path(args.save_dir) / f"{save_prefix}-initial.png",
-        args.plot_max_points,
-        title_prefix,
-        "Initial reconstruction",
-    )
+    save_ba(model, prob, args.save, "initial", "Initial reconstruction")
 
-    for step in range(NUM_STEPS):
-        optimizer.step(input)
-        loss = save_bundle_adjustment_visualization(
-            model.pose,
-            model.intrinsics,
-            model.points,
-            problem["points_2d"],
-            problem["camera_index"],
-            problem["point_index"],
-            Path(args.save_dir) / f"{save_prefix}-iter-{step:02d}.png",
-            args.plot_max_points,
-            title_prefix,
-            f"Iteration {step:02d}",
-        )
+    for step in range(args.steps):
+        optimizer.step(inp)
+        loss = save_ba(model, prob, args.save, f"iter-{step:02d}", f"Iteration {step:02d}")
         print(f"Iteration {step:02d}, loss: {loss:.6f}")
 
-    final_loss = save_bundle_adjustment_visualization(
-        model.pose,
-        model.intrinsics,
-        model.points,
-        problem["points_2d"],
-        problem["camera_index"],
-        problem["point_index"],
-        Path(args.save_dir) / f"{save_prefix}-sparse-lm.png",
-        args.plot_max_points,
-        title_prefix,
-        "Optimized reconstruction",
-    )
-    print(f"Final mean squared reprojection error: {final_loss:.6f}")
-
-
-if __name__ == "__main__":
-    main()
+    final = save_ba(model, prob, args.save, "sparse-lm", "Optimized reconstruction")
+    print(f"Final mean squared reprojection error: {final:.6f}")

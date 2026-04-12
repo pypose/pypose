@@ -2,11 +2,17 @@ Autograd
 ========
 
 .. currentmodule:: pypose
-.. autosummary::
-   :toctree: generated
-   :nosignatures:
+.. list-table::
+   :widths: 50 50
+   :class: autosummary longtable
 
-   :template: autosummary/class-no-inherit.rst
-   autograd.TrackingTensor
-   autograd.TT
-   autograd.function.parallel_for_sparse_jacobian
+   * - :func:`autograd.function.parallel_for_sparse_jacobian <pypose.autograd.function.parallel_for_sparse_jacobian>`
+     - The :func:`parallel_for_sparse_jacobian() <pypose.autograd.function.parallel_for_sparse_jacobian>` decorator allows PyPose's optional sparse backend to trace and assemble sparse Jacobians more efficiently.
+   * - :func:`autograd.function.psjac <pypose.autograd.function.psjac>`
+     - Alias of :func:`parallel_for_sparse_jacobian() <pypose.autograd.function.parallel_for_sparse_jacobian>`.
+
+.. toctree::
+   :hidden:
+
+   generated/pypose.autograd.function.parallel_for_sparse_jacobian
+   generated/pypose.autograd.function.psjac

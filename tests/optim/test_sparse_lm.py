@@ -4,7 +4,7 @@ import pypose as pp
 import pypose.autograd.function as ppaf
 from torch import nn
 import pypose.optim.solver as ppos
-from pypose.autograd.function import TT, parallel_for_sparse_jacobian
+from pypose.autograd.function import parallel_for_sparse_jacobian, psjac
 
 
 @parallel_for_sparse_jacobian
@@ -15,7 +15,7 @@ def edge_error(node1, node2, relpose):
 class _SparseIdentityModel(nn.Module):
     def __init__(self, x0):
         super().__init__()
-        self.x = nn.Parameter(TT(x0))
+        self.x = pp.Parameter(x0, sjac=True)
 
     def forward(self):
         return self.x
@@ -25,7 +25,7 @@ class _SparseChainPGO(nn.Module):
     def __init__(self, root, nodes):
         super().__init__()
         self.register_buffer("root", root)
-        self.nodes = nn.Parameter(TT(nodes))
+        self.nodes = pp.Parameter(nodes, sjac=True)
 
     def forward(self, edges, relposes):
         nodes = torch.cat((self.root, self.nodes), dim=0)
@@ -37,9 +37,9 @@ class _SparseChainPGO(nn.Module):
 
 
 class TestSparseLM:
-    def test_tracking_tensor_export(self):
-        assert TT is ppaf.TrackingTensor
-        assert TT is ppaf.TT
+    def test_psjac_export(self):
+        assert psjac is parallel_for_sparse_jacobian
+        assert psjac is ppaf.psjac
 
     def test_sparse_lm_runs_and_converges(self):
         if not torch.cuda.is_available():

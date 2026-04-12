@@ -570,7 +570,7 @@ class LevenbergMarquardt(_Optimizer):
             In the example, the root pose is fixed, and the remaining poses are optimized
             only from relative-pose edge errors.
 
-            >>> from pypose.autograd.function import TT, parallel_for_sparse_jacobian
+            >>> from pypose.autograd.function import parallel_for_sparse_jacobian
             >>> torch.manual_seed(0)
             >>> device = torch.device("cuda")
             >>> dtype = torch.float64
@@ -583,7 +583,7 @@ class LevenbergMarquardt(_Optimizer):
             ...     def __init__(self, root, nodes):
             ...         super().__init__()
             ...         self.register_buffer('root', root)
-            ...         self.nodes = nn.Parameter(TT(nodes))
+            ...         self.nodes = pp.Parameter(nodes, sjac=True)
             ...
             ...     def forward(self, edges, relposes):
             ...         nodes = torch.cat((self.root, self.nodes), dim=0)
