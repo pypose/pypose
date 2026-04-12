@@ -68,7 +68,7 @@ when the optimization model is instantiated.
           xy = -points[..., :2] / points[..., 2].unsqueeze(-1)
           return xy
 
-      class Residual(nn.Module):
+      class Reproj(nn.Module):
           def __init__(self, poses, points_3d):
               # self.points_3d: tensor (P, 3), self.poses: pp.SE3 (C, 7)
               super().__init__()
@@ -85,7 +85,7 @@ when the optimization model is instantiated.
    Here, ``self.poses`` and ``self.points_3d`` are the optimization variables
    in a bundle-adjustment model.
    ``TrackingTensor`` records the indexing and reprojection operations
-   so the sparse backend knows how the residual depends on these variables.
+   so the sparse backend knows how each entry in the output depends on these variables.
    This includes tracing :func:`parallel_for_sparse_jacobian` functions as well,
    so the dependency through ``project`` is preserved.
    ``observations``, ``camera_indices``, and ``point_indices``
