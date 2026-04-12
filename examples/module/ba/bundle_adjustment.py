@@ -7,7 +7,7 @@ import argparse
 import pypose as pp
 import torch, torch.nn as nn
 from pypose.optim.solver import PCG
-from pypose.autograd.function import TT, psjac
+from pypose.autograd.function import psjac
 
 from bal_dataset import ba_problem, save_ba
 
@@ -17,9 +17,9 @@ class Reproj(nn.Module):
     def __init__(self, K, C, P):
         # K: intrinsic, C: camera pose, P: point cloud
         super().__init__()
-        self.K = pp.Parameter(TT(K))
-        self.C = pp.Parameter(TT(C))
-        self.P = pp.Parameter(TT(P))
+        self.K = pp.Parameter(K, sjac=True)
+        self.C = pp.Parameter(C, sjac=True)
+        self.P = pp.Parameter(P, sjac=True)
 
     def forward(self, observe, cidx, pidx):
         return Reproj.project(self.K[cidx], self.C[cidx], self.P[pidx]) - observe
@@ -43,12 +43,11 @@ if __name__ == "__main__":
     parser.add_argument("--problem", default="problem-257-65132-pre")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--cache-dir", default="./examples/module/ba/data")
-    parser.add_argument("--save-dir", default="./examples/module/ba/save")
+    parser.add_argument("--save", default="./examples/module/ba/save")
     parser.add_argument("--steps", type=int, default=20)
     parser.add_argument("--reject", type=int, default=30)
     parser.add_argument("--cg-tol", type=float, default=1e-4)
     parser.add_argument("--cg-maxiter", type=int, default=250)
-    parser.add_argument("--plot-max-points", type=int, default=8000)
     args = parser.parse_args()
 
     device = torch.device(args.device)
@@ -64,12 +63,12 @@ if __name__ == "__main__":
     solver = PCG(tol=args.cg_tol, maxiter=args.cg_maxiter)
     optimizer = pp.optim.LM(model, solver=solver, strategy=strategy, reject=args.reject, min=1e-6, sparse=True)
 
-    save_ba(model, prob, args.save_dir, args.plot_max_points, "initial", "Initial reconstruction")
+    save_ba(model, prob, args.save, "initial", "Initial reconstruction")
 
     for step in range(args.steps):
         optimizer.step(inp)
-        loss = save_ba(model, prob, args.save_dir, args.plot_max_points, f"iter-{step:02d}", f"Iteration {step:02d}")
+        loss = save_ba(model, prob, args.save, f"iter-{step:02d}", f"Iteration {step:02d}")
         print(f"Iteration {step:02d}, loss: {loss:.6f}")
 
-    final = save_ba(model, prob, args.save_dir, args.plot_max_points, "sparse-lm", "Optimized reconstruction")
+    final = save_ba(model, prob, args.save, "sparse-lm", "Optimized reconstruction")
     print(f"Final mean squared reprojection error: {final:.6f}")

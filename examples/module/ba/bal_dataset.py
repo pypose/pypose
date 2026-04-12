@@ -270,9 +270,9 @@ def save_ba(
     model,
     problem,
     save_dir,
-    max_points,
     suffix,
     title,
+    max_points=8000,
 ):
     prefix = f"{problem['dataset']}-{problem['name']}"
     title_prefix = f"{problem['dataset']}/{problem['name']}"
