@@ -45,52 +45,16 @@ output tensor is the batch dimension.
 """
 
 _TRACKING_TENSOR_DOC = r"""
-:class:`TrackingTensor` wraps a tensor (or LieTensor) and
-tracks all operations performed on the tensor,
-allowing PyPose's sparse backend to build correctly structured sparse Jacobians.
+:class:`TrackingTensor` (alias :class:`TT`) wraps a :class:`torch.Tensor` or
+:class:`pypose.LieTensor` and tracks all operations performed on the tensor,
+allowing PyPose's sparse backend to build structured sparse Jacobians.
 
-Use it for any parameter that needs to be optimized with the sparse backend,
-when the optimization model is instantiated.
+Use it together with :func:`pypose.autograd.function.parallel_for_sparse_jacobian`
+(alias :func:`pjac`) for any :class:`pypose.Parameter` that needs to be optimized with
+the sparse backend, when the optimization model is instantiated.
 
-.. admonition:: Example
-
-   .. code-block:: python
-
-      import pypose as pp
-      from torch import nn
-      from pypose.autograd.function import TrackingTensor, parallel_for_sparse_jacobian
-
-      @parallel_for_sparse_jacobian
-      def project(points, poses):
-          # points: tensor (N, 3), poses: pp.SE3 (N, 7)
-          # returns: (N, 2)
-          points = poses.Act(points)
-          xy = -points[..., :2] / points[..., 2].unsqueeze(-1)
-          return xy
-
-      class Reproj(nn.Module):
-          def __init__(self, poses, points_3d):
-              # self.points_3d: tensor (P, 3), self.poses: pp.SE3 (C, 7)
-              super().__init__()
-              self.poses = nn.Parameter(TrackingTensor(poses))
-              self.points_3d = nn.Parameter(TrackingTensor(points_3d))
-
-          def forward(self, observations, camera_indices, point_indices):
-              # observations: tensor (N, 2), camera_indices: (N,), point_indices: (N,)
-              poses = self.poses[camera_indices]
-              points = self.points_3d[point_indices]
-              points_proj = project(points, poses)
-              return points_proj - observations
-
-   Here, ``self.poses`` and ``self.points_3d`` are the optimization variables
-   in a bundle-adjustment model.
-   ``TrackingTensor`` records the indexing and reprojection operations
-   so the sparse backend knows how each entry in the output depends on these variables.
-   This includes tracing :func:`parallel_for_sparse_jacobian` functions as well,
-   so the dependency through ``project`` is preserved.
-   ``observations``, ``camera_indices``, and ``point_indices``
-   do not need to be wrapped in ``TrackingTensor`` because they are fixed inputs,
-   not optimization variables.
+.. note::
+    Recommend to use alias :class:`TT` and :func:`pjac` for brevity.
 
 .. warning::
 
@@ -102,6 +66,45 @@ when the optimization model is instantiated.
 
    :class:`TrackingTensor` does not change numerical results. It only adds
    tracing information for sparse Jacobian construction.
+
+.. admonition:: Example
+
+   Below, ``self.poses`` and ``self.points_3d`` are the optimization variables
+   in a bundle-adjustment model.
+   ``TrackingTensor`` records the indexing and reprojection operations
+   so the sparse backend knows how each entry in the output depends on these variables.
+   This includes tracing :func:`pjac` functions as well,
+   so the dependency through ``project`` is preserved.
+   ``observations``, ``camera_indices``, and ``point_indices``
+   do not need to be wrapped in ``TrackingTensor`` because they are fixed inputs,
+   not optimization variables.
+
+   .. code-block:: python
+
+    import pypose as pp
+    from torch import nn
+    from pypose.autograd.function import TT, pjac
+
+    class Reproj(nn.Module):
+        def __init__(self, poses, points_3d):
+            # self.points_3d: tensor (P, 3), self.poses: pp.SE3 (C, 7)
+            super().__init__()
+            self.poses = nn.Parameter(TT(poses))
+            self.points_3d = nn.Parameter(TT(points_3d))
+
+        @pjac
+        def project(points, poses):
+            # points: tensor (N, 3), poses: pp.SE3 (N, 7)
+            # returns: (N, 2)
+            points = poses.Act(points)
+            return -points[..., :2] / points[..., 2].unsqueeze(-1)
+
+        def forward(self, observations, camera_indices, point_indices):
+            # observations: tensor (N, 2), camera_indices: (N,), point_indices: (N,)
+            poses = self.poses[camera_indices]
+            points = self.points_3d[point_indices]
+            points_proj = Reproj.project(points, poses)
+            return points_proj - observations
 
 """
 
