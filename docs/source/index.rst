@@ -5,6 +5,7 @@ PyPose Documentation
 
 .. toctree::
    :maxdepth: 2
+   :includehidden:
    :caption: Contents:
 
    lietensor
