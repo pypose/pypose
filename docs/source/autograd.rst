@@ -8,3 +8,4 @@ Autograd
 
    :template: autosummary/class-no-inherit.rst
    autograd.function.parallel_for_sparse_jacobian
+   autograd.function.psjac
