@@ -56,29 +56,41 @@ when the optimization model is instantiated.
 
    .. code-block:: python
 
-      import torch
+      import pypose as pp
       from torch import nn
-      from pypose.autograd.function import TrackingTensor
+      from pypose.autograd.function import TrackingTensor, parallel_for_sparse_jacobian
 
-      class Model(nn.Module):
-          def __init__(self, table):
+      @parallel_for_sparse_jacobian
+      def project(points, poses):
+          # points: tensor (N, 3), poses: pp.SE3 (N, 7)
+          # returns: (N, 2)
+          points = poses.Act(points)
+          xy = -points[..., :2] / points[..., 2].unsqueeze(-1)
+          return xy
+
+      class Residual(nn.Module):
+          def __init__(self, poses, points_3d):
+              # self.points_3d: tensor (P, 3), self.poses: pp.SE3 (C, 7)
               super().__init__()
-              self.table = nn.Parameter(TrackingTensor(table))
+              self.poses = nn.Parameter(TrackingTensor(poses))
+              self.points_3d = nn.Parameter(TrackingTensor(points_3d))
 
-          def forward(self, target, idx):
-              selected = self.table[idx]
-              ones = torch.ones_like(selected)
-              features = torch.cat([selected, ones], dim=-1)
-              return features - target
+          def forward(self, observations, camera_indices, point_indices):
+              # observations: tensor (N, 2), camera_indices: (N,), point_indices: (N,)
+              poses = self.poses[camera_indices]
+              points = self.points_3d[point_indices]
+              points_proj = project(points, poses)
+              return points_proj - observations
 
-   Here, ``self.table`` is the parameter being optimized.
-   In ``forward``, the model first selects batch entries from ``self.table`` using ``idx``,
-   then concatenates the result with ``ones``, and finally subtracts ``target``.
-   ``TrackingTensor`` records this chain of operations
-   so the sparse backend knows how the output depends on ``self.table``.
-   ``ones`` and ``target`` do not need to be wrapped in ``TrackingTensor``
-   because they are fixed values, not optimization variables,
-   so their Jacobians are unnecessary.
+   Here, ``self.poses`` and ``self.points_3d`` are the optimization variables
+   in a bundle-adjustment model.
+   ``TrackingTensor`` records the indexing and reprojection operations
+   so the sparse backend knows how the residual depends on these variables.
+   This includes tracing :func:`parallel_for_sparse_jacobian` functions as well,
+   so the dependency through ``project`` is preserved.
+   ``observations``, ``camera_indices``, and ``point_indices``
+   do not need to be wrapped in ``TrackingTensor`` because they are fixed inputs,
+   not optimization variables.
 
 .. warning::
 
