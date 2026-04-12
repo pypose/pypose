@@ -161,7 +161,7 @@ If you use PyPose, please cite the paper below. You may also [download it here](
 }
 ```
 
-If you use the sparse Jacobian, GPU sparse linear algebra, conjugate gradient solver, or sparse LM optimizer in PyPose, please cite the following paper.
+If you use the sparse Jacobian, GPU sparse linear algebra, conjugate gradient solver, or sparse LM optimizer in PyPose, please cite the [following paper](https://arxiv.org/abs/2409.12190).
 
 ```bibtex
 @article{zhan2024bundle,
