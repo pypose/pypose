@@ -161,6 +161,18 @@ If you use PyPose, please cite the paper below. You may also [download it here](
 }
 ```
 
+If you use the sparse Jacobian, GPU sparse linear algebra, conjugate gradient solver, or sparse LM optimizer in PyPose, please cite the [following paper](https://arxiv.org/abs/2409.12190).
+
+```bibtex
+@article{zhan2024bundle,
+  title = {Bundle Adjustment in the Eager Mode},
+  author = {Zhan, Zitong and Xu, Huan and Fang, Zihang and Wei, Xinpeng and Hu, Yaoyu and Wang, Chen},
+  journal = {arXiv preprint arXiv:2409.12190},
+  year = {2024},
+  url = {https://arxiv.org/abs/2409.12190}
+}
+```
+
 More papers describing PyPose:
 
 ```bibtex

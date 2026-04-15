@@ -5,9 +5,11 @@ PyPose Documentation
 
 .. toctree::
    :maxdepth: 2
+   :includehidden:
    :caption: Contents:
 
    lietensor
+   autograd
    func
    functions
    convert

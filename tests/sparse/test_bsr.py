@@ -3,6 +3,7 @@ import torch
 import pytest
 import pypose as pp
 from pypose.sparse import bsr_mm_triton, bsr_output_to_dense_numpy
+from pypose.sparse.ops import _sparse_csr_mm
 
 def random_compressed(pshape, bshape, mode, zero_prob=0.):
     #generate coo
@@ -76,8 +77,8 @@ def test_triton_bsr_mm():
 class TestBSR:
     @pytest.mark.parametrize('zero_prob', [0., 0.7, 1.0])
     @pytest.mark.parametrize('op, dense_op, layouts, mode, dim', [
-        (torch.matmul, torch.matmul, ['bsr', 'bsc'], 'mT', 2),
-        (torch.matmul, torch.matmul, ['bsr', 'bsc'], 'identical_square', 2)])
+        (_sparse_csr_mm, torch.matmul, ['bsr', 'bsc'], 'mT', 2),
+        (_sparse_csr_mm, torch.matmul, ['bsr', 'bsc'], 'identical_square', 2)])
     def test_universal(self, op, dense_op, layouts, mode, dim, zero_prob):
         if mode == 'identical':
             pshape = torch.Size(torch.randint(1, 10, (dim,)))
