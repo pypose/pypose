@@ -429,7 +429,7 @@ class LevenbergMarquardt(_Optimizer):
 
         * Zitong Zhan, Huan Xu, Zihang Fang, Xinpeng Wei, Yaoyu Hu, Chen Wang,
           `Bundle Adjustment in the Eager Mode <https://arxiv.org/abs/2409.12190>`_,
-          arXiv preprint arXiv:2409.12190, 2024.
+          IEEE Transactions on Robotics, 2026.
 
         Check a `full and clean runable example
         <https://github.com/pypose/pypose/tree/main/examples/module/ba>`_ with
