@@ -399,7 +399,9 @@ class SE3Type(LieType):
         return LieTensor(input.tensor()[..., 3:7], ltype=SO3_type)
 
     def translation(self, input):
-        return input.tensor()[..., 0:3]
+        input = input.tensor() if isinstance(input, LieTensor) else input
+        p = torch.zeros(input.shape[:-1] + (3,), device=input.device, dtype=input.dtype)
+        return self.Act(input, p)
 
     def Adj(self, X, a):
         X = X.tensor() if isinstance(X, LieTensor) else X

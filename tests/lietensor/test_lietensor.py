@@ -285,5 +285,36 @@ def test_parameter_dispatch(monkeypatch):
     print('Done')
 
 
+def test_se3_translation_grad_from_exp_matches_finite_difference():
+    dtype = torch.float64
+
+    class Probe(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.xi = pp.Parameter(pp.se3(torch.tensor([0.2, 0.3, 0.1, 0.2, 0.3, 0.1], dtype=dtype)))
+
+        def forward(self):
+            return self.xi.Exp().translation()
+
+    def finite_difference_jacobian(module, eps=1e-7):
+        p = module.xi
+        J = torch.zeros(3, 6, dtype=dtype)
+        for i in range(6):
+            p.data.view(-1)[i] += eps
+            rp = module().clone()
+            p.data.view(-1)[i] -= 2 * eps
+            rm = module().clone()
+            p.data.view(-1)[i] += eps
+            J[:, i] = (rp - rm) / (2 * eps)
+        return J
+
+    m = Probe()
+    J_auto = pp.optim.functional.modjac(m, input=(), flatten=False, vectorize=True)
+    J_auto = (J_auto[0] if isinstance(J_auto, tuple) else J_auto).reshape(3, 6)
+    J_fd = finite_difference_jacobian(Probe())
+
+    torch.testing.assert_close(J_auto, J_fd, atol=1e-8, rtol=1e-8)
+
+
 if __name__ == '__main__':
     test_lietensor()
