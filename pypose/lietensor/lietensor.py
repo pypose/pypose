@@ -400,8 +400,10 @@ class SE3Type(LieType):
 
     def translation(self, input):
         input = input.tensor() if isinstance(input, LieTensor) else input
-        p = torch.zeros(input.shape[:-1] + (3,), device=input.device, dtype=input.dtype)
-        return self.Act(input, p)
+        if not torch.is_grad_enabled() or not input.requires_grad:
+            return input[..., 0:3]
+        origin = torch.zeros(input.shape[:-1] + (3,), device=input.device, dtype=input.dtype)
+        return self.Act(input, origin)
 
     def Adj(self, X, a):
         X = X.tensor() if isinstance(X, LieTensor) else X
