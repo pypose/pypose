@@ -15,7 +15,7 @@ def _format_sparse_backend_error(feature):
     return (
         f"PyPose requires bae=={_BAE_VERSION}.x when "
         f"the optional backend is used. \n"
-        f"Recommend running:\n "
+        f"Recommend running (for a compatible 0.2.x release):\n "
         f"   {_BAE_INSTALL_COMMAND}"
     )
 
@@ -30,7 +30,7 @@ def _ensure_sparse_backend_version():
         raise ImportError(
             f"PyPose requires bae=={_BAE_VERSION}.x when "
             f"the optional backend is installed, but found "
-            f"bae=={installed_version}. \n Recommend running:\n "
+            f"bae=={installed_version}. \n Recommend running (for a compatible 0.2.x release):\n "
             f"   {_BAE_INSTALL_COMMAND}"
         )
 
