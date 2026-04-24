@@ -581,6 +581,7 @@ class LevenbergMarquardt(_Optimizer):
             ...         self.poses = pp.Parameter(poses, sjac=True)
             ...         self.points = pp.Parameter(points, sjac=True)
             ...
+            ...     @staticmethod
             ...     @psjac
             ...     def project(poses, points):
             ...         points = poses.Act(points)
