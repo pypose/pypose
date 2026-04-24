@@ -8,7 +8,7 @@ from ._version import __version__
 
 _BAE_VERSION_SPEC = SpecifierSet(">=0.2,<0.3")
 _BAE_KNOWN_COMPATIBLE_VERSION = "0.2"
-_BAE_INSTALL_COMMAND = "pip install git+https://github.com/sair-lab/bae.git" + f"@{_BAE_KNOWN_COMPATIBLE_VERSION}"
+_BAE_INSTALL_COMMAND = "pip install --upgrade git+https://github.com/sair-lab/bae.git" + f"@{_BAE_KNOWN_COMPATIBLE_VERSION}"
 
 
 def _format_sparse_backend_error(feature):
