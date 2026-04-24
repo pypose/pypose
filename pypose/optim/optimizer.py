@@ -563,62 +563,52 @@ class LevenbergMarquardt(_Optimizer):
             Pose Inversion error: 0.0000004 @ 3 it
             Early Stopping with error: 4.443569991963159e-07
 
-            Optimizing a tiny **pose graph** with **sparse LM** (requires the optional sparse
+            Optimizing reprojection error with **sparse LM** (requires the optional sparse
             backend `bae` and CUDA).
 
-            Here, ``parallel_for_sparse_jacobian`` marks the relative-pose residual so the
-            sparse backend can assemble sparse Jacobians for sparse LM. Use it on factorwise
-            residual functions that take batch inputs and return one residual block per
-            batch item. When you call the function normally, it behaves the same as before;
-            the decorator only helps the sparse backend build sparse Jacobians.
-            In the example, the root pose is fixed, and the remaining poses are optimized
-            only from relative-pose edge errors.
-
-            >>> from pypose.autograd.function import parallel_for_sparse_jacobian
-            >>> torch.manual_seed(0)
-            >>> device = torch.device("cuda")
-            >>> dtype = torch.float64
+            >>> import torch
+            >>> import pypose as pp
+            >>> from torch import nn
+            >>> from pypose.optim import LM
+            >>> from pypose.optim.solver import PCG
+            >>> from pypose.optim.strategy import TrustRegion
+            >>> from pypose.optim.scheduler import StopOnPlateau
+            >>> from pypose.autograd.function import psjac
             >>>
-            >>> @parallel_for_sparse_jacobian
-            ... def edge_error(node1, node2, relpose):
-            ...     return (relpose.Inv() @ node1.Inv() @ node2).Log().tensor()
-            ...
-            >>> class PoseGraph(nn.Module):
-            ...     def __init__(self, root, nodes):
+            >>> class ReprojErr(nn.Module):
+            ...     def __init__(self, poses, points):
             ...         super().__init__()
-            ...         self.register_buffer('root', root)
-            ...         self.nodes = pp.Parameter(nodes, sjac=True)
+            ...         self.poses = pp.Parameter(poses, sjac=True)
+            ...         self.points = pp.Parameter(points, sjac=True)
             ...
-            ...     def forward(self, edges, relposes):
-            ...         nodes = torch.cat((self.root, self.nodes), dim=0)
-            ...         return edge_error(nodes[edges[:, 0]], nodes[edges[:, 1]], relposes)
+            ...     @psjac
+            ...     def project(poses, points):
+            ...         points = poses.Act(points)
+            ...         return - points[..., :2] / points[..., [2]]
             ...
-            >>> gt_nodes = pp.SE3(torch.tensor([
-            ...     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-            ...     [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-            ...     [2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-            ... ], device=device, dtype=dtype))
-            >>> edges = torch.tensor([[0, 1], [1, 2]], device=device)
-            >>> relposes = gt_nodes[edges[:, 0]].Inv() @ gt_nodes[edges[:, 1]]
-            >>> init = gt_nodes[1:] * pp.randn_SE3(2, sigma=0.1, device=device, dtype=dtype)
-            >>> graph = PoseGraph(gt_nodes[:1], init).to(device)
-            >>> strategy = pp.optim.strategy.Constant(damping=1e-4)
-            >>> optimizer = pp.optim.LM(
-            ...     graph,
-            ...     solver=pp.optim.solver.PCG(),
-            ...     strategy=strategy,
-            ...     sparse=True)
+            ...     def forward(self, pixels, cidx, pidx):
+            ...         poses = self.poses[cidx]
+            ...         points = self.points[pidx]
+            ...         return ReprojErr.project(poses, points) - pixels
             ...
-            >>> for idx in range(5):
-            ...     loss = optimizer.step(input=(edges, relposes))
-            ...     print('Sparse chain PGO loss %.7f @ %d it'%(loss, idx))
-            ...     if loss < 1e-5:
-            ...         print('Early Stopping with loss:', loss.item())
-            ...         break
-            ...
-            Sparse chain PGO loss 0.0265935 @ 0 it
-            Sparse chain PGO loss 0.0000001 @ 1 it
-            Early Stopping with loss: 6.876693949595198e-08
+            >>> torch.set_default_device("cuda")
+            >>> npts, poses = 8, pp.randn_SE3(1)
+            >>> points = torch.randn(npts, 3)
+            >>> points[:, 2] += 4
+            >>> cidx = torch.zeros(npts, dtype=torch.long)
+            >>> pidx = torch.arange(npts)
+            >>> pixels = torch.randn(npts, 2)
+            >>> inputs = (pixels, cidx, pidx)
+            >>>
+            >>> model = ReprojErr(poses, points)
+            >>> strategy = TrustRegion(up=2.0, down=0.5**4)
+            >>> solver = PCG(tol=1e-4, maxiter=250)
+            >>> optimizer = LM(model, solver, strategy, sparse=True)
+            >>> scheduler = StopOnPlateau(optimizer, steps=5, verbose=True)
+            >>>
+            >>> while scheduler.continual():
+            ...     loss = optimizer.step(inputs)
+            ...     scheduler.step(loss)
 
         '''
         for pg in self.param_groups:
