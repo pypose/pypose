@@ -8,14 +8,15 @@ from ._version import __version__
 
 _BAE_VERSION = "0.2"
 _BAE_VERSION_SPEC = SpecifierSet(">=0.2,<0.3")
+_BAE_VERSION_REQUIREMENT = ">=0.2,<0.3"
 _BAE_INSTALL_COMMAND = "pip install git+https://github.com/sair-lab/bae.git" + f"@{_BAE_VERSION}"
 
 
 def _format_sparse_backend_error(feature):
     return (
-        f"PyPose requires bae=={_BAE_VERSION}.x when "
+        f"PyPose requires bae{_BAE_VERSION_REQUIREMENT} when "
         f"the optional backend is used. \n"
-        f"Recommend running (for a compatible 0.2.x release):\n "
+        f"Recommend running (known-compatible):\n "
         f"   {_BAE_INSTALL_COMMAND}"
     )
 
@@ -28,9 +29,9 @@ def _ensure_sparse_backend_version():
 
     if version.parse(installed_version) not in _BAE_VERSION_SPEC:
         raise ImportError(
-            f"PyPose requires bae=={_BAE_VERSION}.x when "
+            f"PyPose requires bae{_BAE_VERSION_REQUIREMENT} when "
             f"the optional backend is installed, but found "
-            f"bae=={installed_version}. \n Recommend running (for a compatible 0.2.x release):\n "
+            f"bae=={installed_version}. \n Recommend running (known-compatible):\n "
             f"   {_BAE_INSTALL_COMMAND}"
         )
 
