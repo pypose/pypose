@@ -167,7 +167,7 @@ If you use the sparse Jacobian, GPU sparse linear algebra, conjugate gradient so
 @article{zhan2024bundle,
   title = {Bundle Adjustment in the Eager Mode},
   author = {Zhan, Zitong and Xu, Huan and Fang, Zihang and Wei, Xinpeng and Hu, Yaoyu and Wang, Chen},
-  journal = {IEEE Transactions on Robotics},
+  journal = {IEEE Transactions on Robotics (T-RO)},
   year = {2026},
   url = {https://arxiv.org/abs/2409.12190}
 }
