@@ -2,16 +2,18 @@ from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, version as get_version
 from importlib import import_module
 from packaging import version
+from packaging.specifiers import SpecifierSet
 
 from ._version import __version__
 
 _BAE_VERSION = "0.2"
+_BAE_VERSION_SPEC = SpecifierSet(">=0.2,<0.3")
 _BAE_INSTALL_COMMAND = "pip install git+https://github.com/sair-lab/bae.git" + f"@{_BAE_VERSION}"
 
 
 def _format_sparse_backend_error(feature):
     return (
-        f"PyPose requires bae=={_BAE_VERSION} when "
+        f"PyPose requires bae=={_BAE_VERSION}.x when "
         f"the optional backend is used. \n"
         f"Recommend running:\n "
         f"   {_BAE_INSTALL_COMMAND}"
@@ -24,9 +26,9 @@ def _ensure_sparse_backend_version():
     except PackageNotFoundError:
         return
 
-    if version.parse(installed_version) != version.parse(_BAE_VERSION):
+    if version.parse(installed_version) not in _BAE_VERSION_SPEC:
         raise ImportError(
-            f"PyPose requires bae=={_BAE_VERSION} when "
+            f"PyPose requires bae=={_BAE_VERSION}.x when "
             f"the optional backend is installed, but found "
             f"bae=={installed_version}. \n Recommend running:\n "
             f"   {_BAE_INSTALL_COMMAND}"
