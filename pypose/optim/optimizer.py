@@ -566,13 +566,13 @@ class LevenbergMarquardt(_Optimizer):
             Solving bundle adjustment by minimizing reprojection error with **sparse LM**.
             (requires the optional sparse backend `bae` and CUDA).
 
-            Here, ``psjac`` marks the relative-pose residual so the
+            Here, psjac marks the reprojection residual so the
             sparse backend can assemble sparse Jacobians for sparse LM. Use it on factorwise
             residual functions that take batch inputs and return one residual block per
             batch item. When you call the function normally, it behaves the same as before;
             the decorator only helps the sparse backend build sparse Jacobians.
-            In the example, the root pose is fixed, and the remaining poses are optimized
-            only from relative-pose edge errors.
+            In the example, both camera poses and 3D points are optimized to minimize
+            the reprojection error.
 
             >>> import torch
             >>> import pypose as pp
