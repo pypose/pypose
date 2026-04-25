@@ -118,14 +118,16 @@ class StopOnPlateau(_Scheduler):
             >>> while scheduler.continual():
             ...     loss = optimizer.step(input)
             ...     scheduler.step(loss)
-            StopOnPlateau on step 0 Loss 9.337769e+01 --> Loss 3.502787e-05 (reduction/loss: 1.0000e+00).
-            StopOnPlateau on step 1 Loss 3.502787e-05 --> Loss 4.527339e-13 (reduction/loss: 1.0000e+00).
-            StopOnPlateau on step 2 Loss 4.527339e-13 --> Loss 7.112640e-14 (reduction/loss: 8.4290e-01).
-            StopOnPlateau on step 3 Loss 7.112640e-14 --> Loss 3.693307e-14 (reduction/loss: 4.8074e-01).
-            StopOnPlateau: Maximum patience steps reached, Quiting..
+            StopOnPlateau on step 1 Loss 9.337769e+01 --> Loss 3.502787e-05 (reduction/loss: 1.0000e+00).
+            StopOnPlateau on step 2 Loss 3.502787e-05 --> Loss 4.527339e-13 (reduction/loss: 1.0000e+00).
+            StopOnPlateau on step 3 Loss 4.527339e-13 --> Loss 7.112640e-14 (reduction/loss: 8.4290e-01).
+            StopOnPlateau on step 4 Loss 7.112640e-14 --> Loss 3.693307e-14 (reduction/loss: 4.8074e-01).
+            StopOnPlateau: Maximum patience steps reached, Quitting..
         '''
         assert self.optimizer.loss is not None, \
             'scheduler.step() should be called after optimizer.step()'
+
+        self.steps = self.steps + 1
 
         if self.verbose:
             print('StopOnPlateau on step {} Loss {:.6e} --> Loss {:.6e} '\
@@ -133,12 +135,10 @@ class StopOnPlateau(_Scheduler):
                   self.optimizer.loss, (self.optimizer.last - self.optimizer.loss) /\
                   (self.optimizer.last + 1e-31)))
 
-        self.steps = self.steps + 1
-
         if self.steps >= self.max_steps:
             self._continual = False
             if self.verbose:
-                print("StopOnPlateau: Maximum steps reached, Quiting..")
+                print("StopOnPlateau: Maximum steps reached, Quitting..")
 
         if (self.optimizer.last - self.optimizer.loss) < self.decreasing:
             self.patience_count = self.patience_count + 1
@@ -148,13 +148,13 @@ class StopOnPlateau(_Scheduler):
         if self.patience_count >= self.patience:
             self._continual = False
             if self.verbose:
-                print("StopOnPlateau: Maximum patience steps reached, Quiting..")
+                print("StopOnPlateau: Maximum patience steps reached, Quitting..")
 
         if hasattr(self.optimizer, 'reject_count'):
-            if self.optimizer.reject_count > 0:
+            if hasattr(self.optimizer, 'reject') and self.optimizer.reject_count >= self.optimizer.reject:
                 self._continual = False
                 if self.verbose:
-                    print("StopOnPlateau: Maximum rejected steps reached, Quiting..")
+                    print("StopOnPlateau: Maximum rejected steps reached, Quitting..")
 
     @torch.no_grad()
     def optimize(self, input, target=None, weight=None):
@@ -190,11 +190,11 @@ class StopOnPlateau(_Scheduler):
             >>>                     patience=3, decreasing=1e-3, verbose=True)
             ...
             >>> scheduler.optimize(input=input)
-            StopOnPlateau on step 0 Loss 5.199298e+01 --> Loss 8.425808e-06 (reduction/loss: 1.0000e+00).
-            StopOnPlateau on step 1 Loss 8.425808e-06 --> Loss 3.456247e-13 (reduction/loss: 1.0000e+00).
-            StopOnPlateau on step 2 Loss 3.456247e-13 --> Loss 1.525355e-13 (reduction/loss: 5.5867e-01).
-            StopOnPlateau on step 3 Loss 1.525355e-13 --> Loss 6.769275e-14 (reduction/loss: 5.5622e-01).
-            StopOnPlateau: Maximum patience steps reached, Quiting..
+            StopOnPlateau on step 1 Loss 5.199298e+01 --> Loss 8.425808e-06 (reduction/loss: 1.0000e+00).
+            StopOnPlateau on step 2 Loss 8.425808e-06 --> Loss 3.456247e-13 (reduction/loss: 1.0000e+00).
+            StopOnPlateau on step 3 Loss 3.456247e-13 --> Loss 1.525355e-13 (reduction/loss: 5.5867e-01).
+            StopOnPlateau on step 4 Loss 1.525355e-13 --> Loss 6.769275e-14 (reduction/loss: 5.5622e-01).
+            StopOnPlateau: Maximum patience steps reached, Quitting..
         '''
         while self.continual():
             loss = self.optimizer.step(input, target, weight)
