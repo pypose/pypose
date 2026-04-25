@@ -151,7 +151,9 @@ class StopOnPlateau(_Scheduler):
                 print("StopOnPlateau: Maximum patience steps reached, Quitting..")
 
         if hasattr(self.optimizer, 'reject_count'):
-            if hasattr(self.optimizer, 'reject') and self.optimizer.reject_count >= self.optimizer.reject:
+            if self.optimizer.reject_count > 0:
+            # To know whether the last step is rejected by the optimizer.
+            # If rejected, the scheduler also need to quit.
                 self._continual = False
                 if self.verbose:
                     print("StopOnPlateau: Maximum rejected steps reached, Quitting..")
