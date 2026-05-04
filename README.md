@@ -193,8 +193,8 @@ bundle adjustment.
 >>> scheduler = StopOnPlateau(optimizer, steps=5, verbose=True)
 
 >>> while scheduler.continual():
->>>     loss = optimizer.step(inputs)
->>>     scheduler.step(loss)
+...     loss = optimizer.step(inputs)
+...     scheduler.step(loss)
 ```
 
 For more usage, see [Documentation](https://pypose.org/docs). For more applications, see [Examples](https://github.com/pypose/pypose/tree/main/examples).
