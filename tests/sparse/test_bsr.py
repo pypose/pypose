@@ -119,7 +119,7 @@ class TestBSR:
 
 if __name__ == '__main__':
     test_triton_bsr_mm()
-    TestBSR.test_universal(None, torch.matmul, torch.matmul, ['bsr', 'bsc'], 'mT', 2, 0.7)
+    TestBSR.test_universal(None, _sparse_csr_mm, torch.matmul, ['bsr', 'bsc'], 'mT', 2, 0.7)
 
     crow_indices = torch.tensor([0, 2, 4])
     col_indices = torch.tensor([0, 1, 0, 1])
@@ -131,6 +131,6 @@ if __name__ == '__main__':
     import time
     start = time.perf_counter()
     for _ in range(1000):
-        bsr @ bsr.mT
+        _sparse_csr_mm(bsr, bsr.mT)
     end = time.perf_counter()
     print(end - start)
