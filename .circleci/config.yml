@@ -21,6 +21,7 @@ build_binary_params: &build_binary_params
       type: string
       default: ""
   environment:
+    TRITON_INTERPRET: "1"
     DOCKER_IMAGE: << parameters.docker_image >>
     CUDA_VERSION: << parameters.cuda_version >>
     CUDNN_VERSION: << parameters.cudnn_version >>
@@ -45,6 +46,7 @@ commands:
             sudo apt-get update -y
             sudo apt-get install -y make
             pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+            pip3 install triton
             pip3 install build
   build_package: &build_package
     description: Build the PyPose wheel
@@ -123,6 +125,8 @@ jobs:
     docker:
       - image: cimg/python:<< parameters.python_version >>
     resource_class: small
+    environment:
+      TRITON_INTERPRET: "1"
     steps:
       - setup_env
       - checkout
