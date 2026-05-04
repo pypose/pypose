@@ -161,21 +161,21 @@ bundle adjustment.
 >>> from pypose.autograd.function import psjac
 
 >>> class ReprojErr(nn.Module):
-        def __init__(self, poses, points):
-            super().__init__()
-            # sjac: enabling tracing of sparse Jacobian
-            self.poses = pp.Parameter(poses, sjac=True)
-            self.points = pp.Parameter(points, sjac=True)
-
-        @psjac  # parallelize assembly of sparse Jacobian
-        def project(poses, points):
-            points = poses.Act(points)
-            return - points[..., :2] / points[..., [2]]
-
-        def forward(self, pixels, cidx, pidx):
-            poses = self.poses[cidx]
-            points = self.points[pidx]
-            return ReprojErr.project(poses, points) - pixels
+...     def __init__(self, poses, points):
+...         super().__init__()
+...         # sjac: enabling tracing of sparse Jacobian
+...         self.poses = pp.Parameter(poses, sjac=True)
+...         self.points = pp.Parameter(points, sjac=True)
+...
+...     @psjac  # parallelize assembly of sparse Jacobian
+...     def project(poses, points):
+...         points = poses.Act(points)
+...         return - points[..., :2] / points[..., [2]]
+...
+...     def forward(self, pixels, cidx, pidx):
+...         poses = self.poses[cidx]
+...         points = self.points[pidx]
+...         return ReprojErr.project(poses, points) - pixels
 
 >>> torch.set_default_device("cuda")
 >>> npts, poses = 8, pp.randn_SE3(1)
