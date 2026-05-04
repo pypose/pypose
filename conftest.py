@@ -1,4 +1,5 @@
-import os
+import os, torch
 
 def pytest_configure(config):
-    os.environ["TRITON_INTERPRET"] = "1"
+    if not torch.cuda.is_available():
+        os.environ["TRITON_INTERPRET"] = "1"
