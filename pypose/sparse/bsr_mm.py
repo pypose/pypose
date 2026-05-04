@@ -2,7 +2,6 @@ import torch
 import triton
 import triton.language as tl
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
 
 @triton.jit
 def bsr_mm_count_coeffs(
@@ -322,6 +321,7 @@ def bsr_mm_triton(
     COUNT_BLOCK: int = 128,
     LIST_NUM_WARPS: int = 4,
 ):
+    device = x_vals.device
     x_nrow = x_num_block_rows
     x_nnz = int(x_offsets[-1].item())
     y_ncol = y_num_block_cols
@@ -432,6 +432,7 @@ def bsr_output_to_dense_numpy(
         A dense tensor representing z with shape
         (z_block_row_num * z_block_row_size, z_block_col_num * z_block_col_size).
     '''
+    device = vals_np.device if torch.is_tensor(vals_np) else torch.device("cpu")
     offsets = torch.as_tensor(offsets_np, device=device)
     cols = torch.as_tensor(cols_np, device=device)
     vals = torch.as_tensor(vals_np, device=device)
