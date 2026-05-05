@@ -118,15 +118,15 @@ pytest
 >>> from pypose.optim.scheduler import StopOnPlateau
 
 >>> class InvNet(nn.Module):
-
-        def __init__(self, *dim):
-            super().__init__()
-            init = pp.randn_SE3(*dim)
-            self.pose = pp.Parameter(init)
-
-        def forward(self, input):
-            error = (self.pose @ input).Log()
-            return error.tensor()
+...
+...     def __init__(self, *dim):
+...         super().__init__()
+...         init = pp.randn_SE3(*dim)
+...         self.pose = pp.Parameter(init)
+...
+...     def forward(self, input):
+...         error = (self.pose @ input).Log()
+...         return error.tensor()
 
 >>> device = torch.device("cuda")
 >>> input = pp.randn_SE3(2, 2, device=device)
@@ -140,8 +140,8 @@ pytest
 
 >>> # 2nd option, step optimization
 >>> while scheduler.continual():
-        loss = optimizer.step(input)
-        scheduler.step(loss)
+...     loss = optimizer.step(input)
+...     scheduler.step(loss)
 
 >>> # Note: remove one of the above options for usage!
 ```
