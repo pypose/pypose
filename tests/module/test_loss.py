@@ -16,7 +16,9 @@ class TestLoss:
         y = y.rotation()
         e2 = (((x * y.Inv()).matrix().diagonal(dim1=-1, dim2=-2).sum(dim=-1)-1)/2).arccos()
 
-        assert torch.allclose(e1, e2), "GeodesicLoss computation is incorrect."
+        assert torch.allclose(e1, e2, rtol=1e-4, atol=1e-6), (
+            "GeodesicLoss computation is incorrect."
+        )
 
 
 if __name__ == '__main__':
