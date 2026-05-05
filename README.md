@@ -118,6 +118,7 @@ pytest
 >>> from pypose.optim.scheduler import StopOnPlateau
 
 >>> class InvNet(nn.Module):
+...
 ...     def __init__(self, *dim):
 ...         super().__init__()
 ...         init = pp.randn_SE3(*dim)
@@ -139,10 +140,61 @@ pytest
 
 >>> # 2nd option, step optimization
 >>> while scheduler.continual():
-        loss = optimizer.step(input)
-        scheduler.step(loss)
+...     loss = optimizer.step(input)
+...     scheduler.step(loss)
 
 >>> # Note: remove one of the above options for usage!
+```
+
+3. May 2026: Starting from v0.9.5, PyPose introduces sparse Jacobian tracing, enabling
+efficient sparse 2nd-order optimization, significantly accelerating applications such as
+bundle adjustment.
+
+```python
+>>> import torch
+>>> import pypose as pp
+>>> from torch import nn
+>>> from pypose.optim import LM
+>>> from pypose.optim.solver import PCG
+>>> from pypose.optim.strategy import TrustRegion
+>>> from pypose.optim.scheduler import StopOnPlateau
+>>> from pypose.autograd.function import psjac
+
+>>> class ReprojErr(nn.Module):
+...     def __init__(self, poses, points):
+...         super().__init__()
+...         # sjac: enabling tracing of sparse Jacobian
+...         self.poses = pp.Parameter(poses, sjac=True)
+...         self.points = pp.Parameter(points, sjac=True)
+...
+...     @psjac  # parallelize assembly of sparse Jacobian
+...     def project(poses, points):
+...         points = poses.Act(points)
+...         return - points[..., :2] / points[..., [2]]
+...
+...     def forward(self, pixels, cidx, pidx):
+...         poses = self.poses[cidx]
+...         points = self.points[pidx]
+...         return ReprojErr.project(poses, points) - pixels
+
+>>> torch.set_default_device("cuda")
+>>> npts, poses = 8, pp.randn_SE3(1)
+>>> points = torch.randn(npts, 3)
+>>> points[:, 2] += 4  # positive depth
+>>> cidx = torch.zeros(npts, dtype=torch.long)
+>>> pidx = torch.arange(npts)
+>>> pixels = torch.randn(npts, 2)
+>>> inputs = (pixels, cidx, pidx)
+
+>>> model = ReprojErr(poses, points)
+>>> solver = PCG(tol=1e-4, maxiter=250)
+>>> strategy = TrustRegion(up=2.0, down=0.5**4)
+>>> optimizer = LM(model, solver, strategy, sparse=True)
+>>> scheduler = StopOnPlateau(optimizer, steps=5, verbose=True)
+
+>>> while scheduler.continual():
+...     loss = optimizer.step(inputs)
+...     scheduler.step(loss)
 ```
 
 For more usage, see [Documentation](https://pypose.org/docs). For more applications, see [Examples](https://github.com/pypose/pypose/tree/main/examples).
@@ -163,7 +215,7 @@ If you use PyPose, please cite the paper below. You may also [download it here](
 If you use the sparse Jacobian, GPU sparse linear algebra, conjugate gradient solver, or sparse LM optimizer in PyPose, please cite the [following paper](https://arxiv.org/abs/2409.12190).
 
 ```bibtex
-@article{zhan2024bundle,
+@article{zhan2026bundle,
   title = {Bundle Adjustment in the Eager Mode},
   author = {Zhan, Zitong and Xu, Huan and Fang, Zihang and Wei, Xinpeng and Hu, Yaoyu and Wang, Chen},
   journal = {IEEE Transactions on Robotics (T-RO)},
