@@ -12,7 +12,7 @@ The default configuration uses the `trafalgar` `problem-257-65132-pre` dataset a
 
 ```bash
 python -m pip install -U matplotlib
-python -m pip install git+https://github.com/sair-lab/bae.git@0.2.1
+python -m pip install git+https://github.com/pypose/bae.git@0.2.1
 ```
 
 Sparse LM currently requires CUDA.
