@@ -1,0 +1,50 @@
+---
+  task: flow
+  modalities: 
+    - img0
+    - flow
+  input_seqlen: 
+    - 2
+    - 1
+  transform_data_augment: true
+  transform_rand_hsv: 0.2
+  transform_flow_norm_factor: 0.05
+  dataset_frame_skip: 0
+  dataset_seq_stride: 1
+  data:
+    "data/flyingchairs_train_seq.txt":
+      cacher:
+        datatype: "chairs-z"
+        load_size: [384, 512]
+        subset_framenum: 10000
+        worker_num: 2
+      transform:
+        resize_factor: 1.5
+        input_size: [384, 448]
+      dataset:
+    "data/tartan_train.txt":
+      cacher:
+        datatype: "tartan-z"
+        load_size: [480, 640]
+        subset_framenum: 2000
+        worker_num: 1
+      transform:
+        resize_factor: 2
+        input_size: [384, 512]
+      dataset:
+        frame_skip: 0
+        random_blur: 0.5   
+        seq_stride: 5  
+    "data/tartan_train_flow2.txt":
+      cacher:
+        datatype: "tartan-z"
+        load_size: [480, 640]
+        subset_framenum: 2000
+        worker_num: 1
+      transform:
+        resize_factor: 1.5
+        input_size: [448, 640]
+      dataset:
+        frame_skip: 1
+        random_blur: 0.5
+        seq_stride: 3
