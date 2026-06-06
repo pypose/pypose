@@ -2,7 +2,7 @@ import os
 import torch
 import pytest
 import pypose as pp
-from pypose.sparse import bsr_mm_triton, bsr_output_to_dense_numpy
+from pypose.sparse import bsr_mm_triton
 from pypose.sparse.ops import _sparse_csr_mm
 
 def random_compressed(pshape, bshape, mode, zero_prob=0.):
@@ -57,15 +57,12 @@ def test_triton_bsr_mm():
             B_bsr.shape[1] // B_block_cols,
         )
 
-        C_dense_triton = bsr_output_to_dense_numpy(
+        C_dense_triton = torch.sparse_bsr_tensor(
             C_offsets,
             C_cols,
             C_vals,
-            A_bsr.shape[0] // A_block_rows,
-            B_bsr.shape[1] // B_block_cols,
-            A_block_rows,
-            B_block_cols,
-        )
+            size=(A_bsr.shape[0], B_bsr.shape[1]),
+        ).to_dense()
 
         C_dense_triton = C_dense_triton.to(device)
         torch.testing.assert_close(C_dense_triton, C_dense_reference, rtol=1e-4, atol=1e-4)
