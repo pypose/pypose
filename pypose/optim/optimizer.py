@@ -74,8 +74,18 @@ class RobustModel(nn.Module):
 
     def flatten_row_jacobian(self, J, params_values):
         if isinstance(J, (tuple, list)):
-            J = torch.cat([j.reshape(-1, p.numel()) for j, p in zip(J, params_values)], 1)
+            # Only include trainable parameters to match update_parameter split.
+            pairs = [(j, p) for j, p in zip(J, params_values) if p.requires_grad]
+            J = torch.cat([self._flatten_single_jacobian(j, p) for j, p in pairs], 1)
         return J
+
+    def _flatten_single_jacobian(self, j, param):
+        update_shape = _parameter_update_shape(param)
+        if isinstance(param, pp.LieTensor) and not param.ltype.on_manifold:
+            # For LieGroup parameters, slice the redundant embedding dimensions
+            # from the Jacobian's last axis before flattening.
+            j = j[..., :update_shape[-1]]
+        return j.reshape(-1, update_shape.numel())
 
     def normalize_RWJ(self, R, weight, J):
         weight_diag = None
@@ -136,8 +146,11 @@ class _Optimizer(Optimizer):
         r'''
         params will be updated by calling this function
         '''
-        steps = step.split([p.numel() for p in params if p.requires_grad])
-        [p.add_(d.view(p.shape)) for p, d in zip(params, steps) if p.requires_grad]
+        grad_params = [p for p in params if p.requires_grad]
+        numels = [_parameter_update_shape(p).numel() for p in grad_params]
+        steps = step.split(numels)
+        for p, d in zip(grad_params, steps):
+            p.add_(d.view(_parameter_update_shape(p)))
 
 
 class GaussNewton(_Optimizer):
@@ -484,14 +497,11 @@ class LevenbergMarquardt(_Optimizer):
 
     def update_parameter(self, params, step):
         if getattr(self, 'sparse', False):
-            numels = []
-            for param in params:
-                if param.requires_grad:
-                    numels.append(_parameter_update_shape(param).numel())
+            grad_params = [p for p in params if p.requires_grad]
+            numels = [_parameter_update_shape(p).numel() for p in grad_params]
             steps = step.split(numels)
-            for (param, d) in zip(params, steps):
-                if param.requires_grad:
-                    param.add_(d.view(_parameter_update_shape(param)))
+            for p, d in zip(grad_params, steps):
+                p.add_(d.view(_parameter_update_shape(p)))
         else:
             super().update_parameter(params, step)
 

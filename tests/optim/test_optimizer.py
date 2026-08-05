@@ -359,6 +359,130 @@ class TestOptim:
         assert idx < 9, "Optimization requires too many steps."
 
 
+# --- PR #387 regression tests: LieGroup gradient dimension ---
+
+class TestLieGroupGradientDimension:
+    """Regression tests for batched LieGroup (SE3) parameter updates.
+
+    Second-order optimizers must consume and reshape optimizer steps using
+    the manifold dimension (6 for SE3), not the embedding dimension (7).
+    """
+
+    def test_batched_se3_liegroup_optimizer_step(self):
+        """Batched SE3 LieTensor parameters converge with LM."""
+        class PoseInv(nn.Module):
+            def __init__(self, *dim):
+                super().__init__()
+                self.pose = pp.Parameter(pp.randn_se3(*dim).Exp())
+
+            def forward(self, inputs):
+                return (self.pose @ inputs).Log()
+
+        model = PoseInv(3, 3)
+        inputs = pp.randn_SE3(3, 3, sigma=0.01)
+        optimizer = pp.optim.LM(model)
+
+        for _ in range(10):
+            loss = optimizer.step(inputs)
+            if loss < 1e-4:
+                break
+        assert loss < 1e-4, f"Batched SE3 LieGroup should converge, loss={loss}"
+
+    def test_batched_se3_no_padded_zeros(self):
+        """Jacobian columns for SE3 must be manifold-sized (not embedding-sized)."""
+        from pypose.optim.optimizer import RobustModel, _parameter_update_shape
+        from pypose.optim.functional import modjac
+
+        class PoseInv(nn.Module):
+            def __init__(self, *dim):
+                super().__init__()
+                self.pose = pp.Parameter(pp.randn_se3(*dim).Exp())
+
+            def forward(self, inputs):
+                return (self.pose @ inputs).Log()
+
+        model = PoseInv(2, 2)
+        inputs = pp.randn_SE3(2, 2)
+
+        J = modjac(model, input=(inputs,), flatten=False)
+        params_values = tuple(dict(model.named_parameters()).values())
+        robust = RobustModel(model)
+        flat_J = robust.flatten_row_jacobian(J, params_values)
+
+        # SE3 has 4 elements in batch dims, each with manifold=6
+        expected_cols = int(model.pose.ltype.manifold[0]) * model.pose.shape[:-1].numel()
+        assert flat_J.shape[1] == expected_cols, \
+            f"Expected {expected_cols} Jacobian columns (manifold), got {flat_J.shape[1]}"
+
+    def test_ordinary_tensor_unchanged(self):
+        """Ordinary (non-LieTensor) parameters retain existing behavior."""
+        class LinearModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = nn.Parameter(torch.randn(4, 4))
+
+            def forward(self, x):
+                return self.weight @ x
+
+        model = LinearModel()
+        x = torch.randn(4, 2)
+        target = torch.randn(4, 2)
+        optimizer = pp.optim.LM(model)
+
+        for _ in range(5):
+            loss = optimizer.step(x, target)
+            if loss < 1e-6:
+                break
+        # Ordinary tensors work as before (no assertion on convergence,
+        # just verify no shape error is raised)
+
+    def test_mixed_lietensor_and_tensor_params(self):
+        """Mixed LieTensor + ordinary Tensor parameters work together."""
+        class MixedModel(nn.Module):
+            def __init__(self, *dim):
+                super().__init__()
+                self.pose = pp.Parameter(pp.randn_se3(*dim).Exp())
+                self.scale = nn.Parameter(torch.ones(1))
+
+            def forward(self, inputs):
+                return ((self.pose @ inputs).Log() * self.scale).tensor()
+
+        model = MixedModel(2, 2)
+        # Target is zero: pose should become identity and scale is irrelevant
+        inputs = pp.randn_SE3(2, 2, sigma=0.01)
+        optimizer = pp.optim.LM(model)
+
+        for _ in range(15):
+            loss = optimizer.step(inputs)
+            if loss < 1e-4:
+                break
+        # Mixed params should converge when target is implicit zero
+        assert loss < 1e-3, f"Mixed params should converge, loss={loss}"
+
+    def test_frozen_parameters_excluded(self):
+        """Parameters with requires_grad=False are excluded from updates."""
+        class PoseInv(nn.Module):
+            def __init__(self, *dim):
+                super().__init__()
+                self.pose1 = pp.Parameter(pp.randn_se3(*dim).Exp())
+                self.pose2 = pp.Parameter(pp.randn_se3(*dim).Exp())
+
+            def forward(self, inputs):
+                return (self.pose1 @ inputs).Log()
+
+        model = PoseInv(2, 2)
+        model.pose2.requires_grad_(False)
+        pose2_before = model.pose2.clone()
+        inputs = pp.randn_SE3(2, 2, sigma=0.01)
+        optimizer = pp.optim.LM(model)
+
+        for _ in range(5):
+            loss = optimizer.step(inputs)
+
+        # pose2 should be untouched
+        torch.testing.assert_close(model.pose2, pose2_before)
+
+
 if __name__ == '__main__':
     test = TestOptim()
     test.test_optim_liealgebra()
