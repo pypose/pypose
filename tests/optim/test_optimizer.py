@@ -1,4 +1,5 @@
 import time
+import pytest
 import torch
 import pypose as pp
 from torch import nn
@@ -481,6 +482,18 @@ class TestLieGroupGradientDimension:
 
         # pose2 should be untouched
         torch.testing.assert_close(model.pose2, pose2_before)
+
+    def test_all_parameters_frozen_fail_clearly(self):
+        """Jacobian flattening reports when no trainable parameters remain."""
+        from pypose.optim.optimizer import RobustModel
+
+        model = nn.Linear(2, 2)
+        for parameter in model.parameters():
+            parameter.requires_grad_(False)
+
+        jacobian = (torch.zeros(2, 2, 2, 2, 2),)
+        with pytest.raises(RuntimeError, match="no trainable parameters"):
+            RobustModel(model).flatten_row_jacobian(jacobian, tuple(model.parameters()))
 
 
 if __name__ == '__main__':
