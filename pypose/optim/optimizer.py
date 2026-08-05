@@ -76,6 +76,8 @@ class RobustModel(nn.Module):
         if isinstance(J, (tuple, list)):
             # Only include trainable parameters to match update_parameter split.
             pairs = [(j, p) for j, p in zip(J, params_values) if p.requires_grad]
+            if not pairs:
+                raise RuntimeError("Cannot flatten a Jacobian with no trainable parameters")
             J = torch.cat([self._flatten_single_jacobian(j, p) for j, p in pairs], 1)
         return J
 

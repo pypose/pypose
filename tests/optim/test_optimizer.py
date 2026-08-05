@@ -465,10 +465,10 @@ class TestLieGroupGradientDimension:
             def __init__(self, *dim):
                 super().__init__()
                 self.pose1 = pp.Parameter(pp.randn_se3(*dim).Exp())
-                self.pose2 = pp.Parameter(pp.randn_se3(*dim).Exp())
+                self.pose2 = pp.Parameter(pp.identity_SE3(*dim))
 
             def forward(self, inputs):
-                return (self.pose1 @ inputs).Log()
+                return (self.pose1 @ self.pose2 @ inputs).Log()
 
         model = PoseInv(2, 2)
         model.pose2.requires_grad_(False)
