@@ -390,7 +390,7 @@ class TestLieGroupGradientDimension:
 
     def test_batched_se3_no_padded_zeros(self):
         """Jacobian columns for SE3 must be manifold-sized (not embedding-sized)."""
-        from pypose.optim.optimizer import RobustModel, _parameter_update_shape
+        from pypose.optim.optimizer import RobustModel
         from pypose.optim.functional import modjac
 
         class PoseInv(nn.Module):
