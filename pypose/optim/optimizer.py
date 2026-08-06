@@ -74,7 +74,7 @@ class RobustModel(nn.Module):
 
     def flatten_row_jacobian(self, J, params_values):
         if isinstance(J, (tuple, list)):
-            # Only include trainable parameters to match update_parameter split.
+            # Keep J columns aligned with trainable update segments in R^n.
             pairs = [(j, p) for j, p in zip(J, params_values) if p.requires_grad]
             if not pairs:
                 raise RuntimeError("Cannot flatten a Jacobian with no trainable parameters")
@@ -84,8 +84,8 @@ class RobustModel(nn.Module):
     def _flatten_single_jacobian(self, j, param):
         update_shape = _parameter_update_shape(param)
         if isinstance(param, pp.LieTensor) and not param.ltype.on_manifold:
-            # For LieGroup parameters, slice the redundant embedding dimensions
-            # from the Jacobian's last axis before flattening.
+            # J is initially in R^(m x d_embed); retain d_manifold columns
+            # before flattening because updates live in the tangent space.
             j = j[..., :update_shape[-1]]
         return j.reshape(-1, update_shape.numel())
 
@@ -148,7 +148,9 @@ class _Optimizer(Optimizer):
         r'''
         params will be updated by calling this function
         '''
+        # Frozen parameters do not consume optimizer-step segments.
         grad_params = [p for p in params if p.requires_grad]
+        # For LieTensor p, each delta_i is shaped in R^(batch x d_manifold).
         numels = [_parameter_update_shape(p).numel() for p in grad_params]
         steps = step.split(numels)
         for p, d in zip(grad_params, steps):
@@ -499,6 +501,7 @@ class LevenbergMarquardt(_Optimizer):
 
     def update_parameter(self, params, step):
         if getattr(self, 'sparse', False):
+            # Keep sparse updates aligned with the same trainable parameters.
             grad_params = [p for p in params if p.requires_grad]
             numels = [_parameter_update_shape(p).numel() for p in grad_params]
             steps = step.split(numels)
