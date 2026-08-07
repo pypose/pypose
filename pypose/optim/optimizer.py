@@ -74,6 +74,8 @@ class RobustModel(nn.Module):
 
     def flatten_row_jacobian(self, J, params_values):
         if isinstance(J, (tuple, list)):
+            if len(J) != len(params_values):
+                raise ValueError("Jacobian and parameter sequences must have the same length")
             # Keep J columns aligned with trainable update segments in R^n.
             pairs = [(j, p) for j, p in zip(J, params_values) if p.requires_grad]
             if not pairs:
@@ -150,6 +152,8 @@ class _Optimizer(Optimizer):
         '''
         # Frozen parameters do not consume optimizer-step segments.
         grad_params = [p for p in params if p.requires_grad]
+        if not grad_params:
+            raise RuntimeError("Cannot update parameters when none require gradients")
         # For LieTensor p, each delta_i is shaped in R^(batch x d_manifold).
         numels = [_parameter_update_shape(p).numel() for p in grad_params]
         steps = step.split(numels)
@@ -503,6 +507,8 @@ class LevenbergMarquardt(_Optimizer):
         if getattr(self, 'sparse', False):
             # Keep sparse updates aligned with the same trainable parameters.
             grad_params = [p for p in params if p.requires_grad]
+            if not grad_params:
+                raise RuntimeError("Cannot update parameters when none require gradients")
             numels = [_parameter_update_shape(p).numel() for p in grad_params]
             steps = step.split(numels)
             for p, d in zip(grad_params, steps):

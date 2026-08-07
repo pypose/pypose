@@ -371,6 +371,8 @@ class TestLieGroupGradientDimension:
 
     def test_batched_se3_liegroup_optimizer_step(self):
         """Batched SE3 LieTensor parameters converge with LM."""
+        torch.manual_seed(0)
+
         class PoseInv(nn.Module):
             def __init__(self, *dim):
                 super().__init__()
@@ -406,7 +408,7 @@ class TestLieGroupGradientDimension:
         inputs = pp.randn_SE3(2, 2)
 
         J = modjac(model, input=(inputs,), flatten=False)
-        params_values = tuple(dict(model.named_parameters()).values())
+        params_values = tuple(p for _, p in model.named_parameters())
         robust = RobustModel(model)
         flat_J = robust.flatten_row_jacobian(J, params_values)
 
@@ -439,6 +441,8 @@ class TestLieGroupGradientDimension:
 
     def test_mixed_lietensor_and_tensor_params(self):
         """Mixed LieTensor + ordinary Tensor parameters work together."""
+        torch.manual_seed(1)
+
         class MixedModel(nn.Module):
             def __init__(self, *dim):
                 super().__init__()
@@ -446,10 +450,11 @@ class TestLieGroupGradientDimension:
                 self.scale = nn.Parameter(torch.ones(1))
 
             def forward(self, inputs):
-                return ((self.pose @ inputs).Log() * self.scale).tensor()
+                pose_residual = ((self.pose @ inputs).Log() * self.scale).tensor()
+                return pose_residual, self.scale - 1
 
         model = MixedModel(2, 2)
-        # Target is zero: pose should become identity and scale is irrelevant
+        # The second residual constrains scale to one, forcing pose to converge.
         inputs = pp.randn_SE3(2, 2, sigma=0.01)
         optimizer = pp.optim.LM(model)
 
@@ -457,7 +462,9 @@ class TestLieGroupGradientDimension:
             loss = optimizer.step(inputs)
             if loss < 1e-4:
                 break
-        # Mixed params should converge when target is implicit zero
+        torch.testing.assert_close(model.scale, torch.ones(1), atol=1e-4, rtol=1e-4)
+        pose_residual = (model.pose @ inputs).Log().tensor()
+        assert pose_residual.norm() < 1e-3, "Pose update did not converge independently of scale"
         assert loss < 1e-3, f"Mixed params should converge, loss={loss}"
 
     def test_frozen_parameters_excluded(self):
@@ -491,8 +498,17 @@ class TestLieGroupGradientDimension:
         for parameter in model.parameters():
             parameter.requires_grad_(False)
 
-        jacobian = (torch.zeros(2, 2, 2, 2, 2),)
+        jacobian = (torch.zeros(2, 2, 2, 2, 2),) * 2
         with pytest.raises(RuntimeError, match="no trainable parameters"):
+            RobustModel(model).flatten_row_jacobian(jacobian, tuple(model.parameters()))
+
+    def test_jacobian_parameter_length_mismatch(self):
+        """Jacobian and parameter sequences must describe the same model."""
+        from pypose.optim.optimizer import RobustModel
+
+        model = nn.Linear(2, 2)
+        jacobian = (torch.zeros(2, 2, 2, 2, 2),)
+        with pytest.raises(ValueError, match="same length"):
             RobustModel(model).flatten_row_jacobian(jacobian, tuple(model.parameters()))
 
 
