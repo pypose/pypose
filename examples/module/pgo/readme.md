@@ -1,11 +1,16 @@
 # Pose Graph Optimization
 
-An example for Pose Graph Optimization (PGO)
+An example of pose graph optimization (PGO) using either sparse or dense
+Levenberg-Marquardt optimization.
 
-## Installation
+## Requirements
 
-    python -m pip install -U matplotlib
-    pip install torchvision
+```bash
+python -m pip install -U matplotlib
+```
+
+Sparse optimization is enabled by default and requires CUDA. Use
+`--no-sparse --device cpu` to run the dense implementation on CPU.
 
 ## Prepare Dataset (Optional)
 
@@ -16,21 +21,35 @@ An example for Pose Graph Optimization (PGO)
         DATAROOT
             ├── parking-garage.g2o
 
-## Run:
+## Run
+
+Run sparse PGO using the default CUDA device:
 
 ```bash
 python examples/module/pgo/pgo.py
 ```
 
-Or
+This is equivalent to passing `--sparse`. Sparse mode uses the `PCG` solver and
+sparse Jacobian assembly. Information matrices are not currently supported by
+the sparse optimizer, so `infos` is not passed as a weight in this mode.
+
+Run dense PGO with the dataset information matrices as optimizer weights:
+
+```bash
+python examples/module/pgo/pgo.py --no-sparse --device cpu
+```
+
+Dense mode uses the `Cholesky` solver and passes `infos` to the optimizer.
+
+To select a CUDA device or a different dataset directory:
 
 ```bash
 python examples/module/pgo/pgo.py --device cuda:0 --dataroot DATAROOT
 ```
 
-Note: change `DATAROOT` to the folder you select.
+Replace `DATAROOT` with the directory containing the dataset.
 
-* Other supported arguments:
+Other supported arguments:
 
         Pose Graph Optimization
 
@@ -41,9 +60,16 @@ Note: change `DATAROOT` to the folder you select.
           --save SAVE          files location to save
           --dataroot DATAROOT  dataset location
           --dataname DATANAME  dataset name
+          --no-sparse          use dense optimization with information matrices
+          --sparse             use sparse Jacobians (information matrices are
+                               unsupported)
           --no-vectorize       to save memory
           --vectorize          to accelerate computation
 
-## Note
+## Notes
 
-The current implementation of PGO is not using sparse matrices. Therefore, when the number of poses is very big, the memory consumption can be large (`--vectorize`) or running speed can be slow (`--no-vectorize`). The sparse matrices will be integrated in the next main release, while the API will be mostly unchanged, only internal logic will be updated.
+- Sparse mode is the default and is recommended for large pose graphs.
+- Dense mode incorporates the dataset information matrices but can require
+  considerably more memory.
+- `--vectorize` is enabled by default. Use `--no-vectorize` to reduce peak
+  memory usage in dense mode at the cost of speed.
