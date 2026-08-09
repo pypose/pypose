@@ -58,7 +58,9 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(args.save), exist_ok=True)
 
     data = G2OPGO(args.dataroot, args.dataname, device=args.device, download=True)
-    edges, poses = data.edges, data.poses
+    edges, poses, infos = data.edges, data.poses, data.infos
+    infos = None # TODO: Remove this line when sparse LM supports weight matrix.
+    # Currently take None as weights to bypass the RunTime error, but the PGO works well.
 
     graph = PoseGraph(data.nodes).to(args.device)
     solver = ppos.PCG()
@@ -70,7 +72,7 @@ if __name__ == '__main__':
     axlim = plot_and_save(graph.nodes.translation(), pngname, args.dataname)
     ### the 1st implementation: for customization and easy to extend
     while scheduler.continual():
-        loss = optimizer.step(input=(edges, poses))
+        loss = optimizer.step(input=(edges, poses), weight=infos)
         scheduler.step(loss)
 
         name = os.path.join(args.save, args.dataname + '_' + str(scheduler.steps))
@@ -79,4 +81,4 @@ if __name__ == '__main__':
         torch.save(graph.state_dict(), name+'.pt')
 
     ### The 2nd implementation: equivalent to the 1st one, but more compact
-    scheduler.optimize(input=(edges, poses))
+    scheduler.optimize(input=(edges, poses), weight=infos)

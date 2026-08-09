@@ -29,7 +29,8 @@ python examples/module/pgo/pgo.py
 ```
 
 The example uses the `PCG` solver and sparse Jacobian assembly. Information
-matrices are not currently supported by the sparse optimizer.
+matrices (`infos`) are loaded with the dataset but are not currently supported
+as weights by the sparse optimizer. Support will be added in a future release.
 
 To select a CUDA device or a different dataset directory:
 
