@@ -58,11 +58,14 @@ if __name__ == '__main__':
     parser.add_argument('--sparse', action='store_true', \
                         help='use sparse Jacobians (information matrices are unsupported)')
     parser.add_argument('--no-vectorize', dest='vectorize', action='store_false', \
-                        help='disable vectorization in dense mode to save memory')
+                        help='disable vectorization in dense mode to save memory (incompatible with --sparse)')
     parser.add_argument('--vectorize', action='store_true', \
-                        help='vectorize dense Jacobian computation (default)')
+                        help='vectorize dense Jacobian computation in dense mode (default)')
     parser.set_defaults(vectorize=True, sparse=True)
-    args = parser.parse_args(); print(args)
+    args = parser.parse_args()
+    assert not (args.sparse and not args.vectorize), \
+        "--no-vectorize cannot be used with --sparse; use --no-sparse for dense mode"
+    print(args)
     os.makedirs(os.path.join(args.save), exist_ok=True)
 
     data = G2OPGO(args.dataroot, args.dataname, device=args.device, download=True)

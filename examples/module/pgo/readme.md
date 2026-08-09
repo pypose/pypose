@@ -64,7 +64,9 @@ Other supported arguments:
           --sparse             use sparse Jacobians (information matrices are
                                unsupported)
           --no-vectorize       disable vectorization in dense mode to save memory
-          --vectorize          vectorize dense Jacobian computation (default)
+                               (incompatible with --sparse)
+          --vectorize          vectorize dense Jacobian computation when --sparse
+                               is False (default in dense mode)
 
 ## Notes
 
