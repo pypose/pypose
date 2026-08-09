@@ -51,7 +51,6 @@ Other supported arguments:
           --save SAVE          files location to save
           --dataroot DATAROOT  dataset location
           --dataname DATANAME  dataset name
-
 ---
 
 If you use the pose graph optimization example, please cite the following paper.
