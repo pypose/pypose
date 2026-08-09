@@ -63,13 +63,14 @@ Other supported arguments:
           --no-sparse          use dense optimization with information matrices
           --sparse             use sparse Jacobians (information matrices are
                                unsupported)
-          --no-vectorize       to save memory
-          --vectorize          to accelerate computation
+          --no-vectorize       disable vectorization in dense mode to save memory
+          --vectorize          vectorize dense Jacobian computation (default)
 
 ## Notes
 
 - Sparse mode is the default and is recommended for large pose graphs.
 - Dense mode incorporates the dataset information matrices but can require
   considerably more memory.
-- `--vectorize` is enabled by default. Use `--no-vectorize` to reduce peak
-  memory usage in dense mode at the cost of speed.
+- Sparse Jacobian assembly is always vectorized, so the vectorization options
+  do not apply in sparse mode. Dense mode enables `--vectorize` by default; use
+  `--no-vectorize` to reduce peak memory usage at the cost of speed.

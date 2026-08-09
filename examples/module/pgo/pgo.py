@@ -58,9 +58,9 @@ if __name__ == '__main__':
     parser.add_argument('--sparse', action='store_true', \
                         help='use sparse Jacobians (information matrices are unsupported)')
     parser.add_argument('--no-vectorize', dest='vectorize', action='store_false', \
-                        help="to save memory")
+                        help='disable vectorization in dense mode to save memory')
     parser.add_argument('--vectorize', action='store_true', \
-                        help='to accelerate computation')
+                        help='vectorize dense Jacobian computation (default)')
     parser.set_defaults(vectorize=True, sparse=True)
     args = parser.parse_args(); print(args)
     os.makedirs(os.path.join(args.save), exist_ok=True)
@@ -71,8 +71,12 @@ if __name__ == '__main__':
     graph = PoseGraph(data.nodes, sparse=args.sparse).to(args.device)
     solver = ppos.PCG() if args.sparse else ppos.Cholesky()
     strategy = ppost.TrustRegion(radius=args.radius)
-    optimizer = pp.optim.LM(graph, solver=solver, strategy=strategy, min=1e-6,
-                            vectorize=args.vectorize, sparse=args.sparse)
+    if args.sparse:
+        optimizer = pp.optim.LM(graph, solver=solver, strategy=strategy,
+                                min=1e-6, sparse=True)
+    else:
+        optimizer = pp.optim.LM(graph, solver=solver, strategy=strategy,
+                                min=1e-6, vectorize=args.vectorize)
     scheduler = StopOnPlateau(optimizer, steps=10, patience=3, decreasing=1e-3, verbose=True)
     weight = None if args.sparse else infos
 
