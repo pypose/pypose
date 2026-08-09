@@ -72,11 +72,10 @@ Other supported arguments:
 
 - Sparse mode is the default and is recommended for large pose graphs.
 - Dense mode incorporates the dataset information matrices but can require
-  considerably more memory.
-- Sparse Jacobian assembly is always vectorized, so the vectorization options
-  do not apply in sparse mode. Dense mode enables `--vectorize` by default; use
+  considerably more memory. Dense mode enables `--vectorize` by default,  use
   `--no-vectorize` to reduce peak memory usage at the cost of speed.
-
+- Sparse Jacobian assembly is always vectorized, so the vectorization options
+  do not apply in sparse mode. 
 ---
 
 If you use the sparse-mode pose graph optimization, please cite the following paper.
