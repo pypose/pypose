@@ -60,7 +60,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-vectorize', dest='vectorize', action='store_false', \
                         help='disable vectorization in dense mode to save memory (incompatible with --sparse)')
     parser.add_argument('--vectorize', action='store_true', \
-                        help='vectorize dense Jacobian computation in dense mode (default)')
+                        help='vectorize dense Jacobian computation')
     parser.set_defaults(vectorize=True, sparse=True)
     args = parser.parse_args()
     assert not (args.sparse and not args.vectorize), \
