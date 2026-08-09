@@ -76,3 +76,17 @@ Other supported arguments:
 - Sparse Jacobian assembly is always vectorized, so the vectorization options
   do not apply in sparse mode. Dense mode enables `--vectorize` by default; use
   `--no-vectorize` to reduce peak memory usage at the cost of speed.
+
+---
+
+If you use the sparse-mode pose graph optimization, please cite the following paper.
+
+```bibtex
+@article{zhan2024bundle,
+  title = {Bundle Adjustment in the Eager Mode},
+  author = {Zhan, Zitong and Xu, Huan and Fang, Zihang and Wei, Xinpeng and Hu, Yaoyu and Wang, Chen},
+  journal = {IEEE Transactions on Robotics (T-RO)},
+  year = {2026},
+  url = {https://arxiv.org/abs/2409.12190}
+}
+```
