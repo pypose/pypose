@@ -13,9 +13,9 @@ from pypose.optim.scheduler import StopOnPlateau
 
 class PoseGraph(nn.Module):
 
-    def __init__(self, nodes, sparse=True):
+    def __init__(self, nodes):
         super().__init__()
-        self.nodes = pp.Parameter(nodes, sjac=sparse)
+        self.nodes = pp.Parameter(nodes, sjac=True)
 
     def forward(self, edges, poses):
         node1 = self.nodes[edges[..., 0]]
@@ -45,7 +45,7 @@ def plot_and_save(points, pngname, title='', axlim=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Pose Graph Optimization')
-    parser.add_argument("--device", type=str, default='cuda', help="cuda or cpu")
+    parser.add_argument("--device", type=str, default='cuda', help="cuda device")
     parser.add_argument("--radius", type=float, default=1e4, help="trust region radius")
     parser.add_argument("--save", type=str, default='./examples/module/pgo/save/', \
                         help="files location to save")
@@ -53,41 +53,24 @@ if __name__ == '__main__':
                         help="dataset location")
     parser.add_argument("--dataname", type=str, default='parking-garage.g2o', \
                         help="dataset name")
-    parser.add_argument('--no-sparse', dest='sparse', action='store_false', \
-                        help='use dense optimization with information matrices')
-    parser.add_argument('--sparse', action='store_true', \
-                        help='use sparse Jacobians (information matrices are unsupported)')
-    parser.add_argument('--no-vectorize', dest='vectorize', action='store_false', \
-                        help='disable vectorization in dense mode to save memory (incompatible with --sparse)')
-    parser.add_argument('--vectorize', action='store_true', \
-                        help='vectorize dense Jacobian computation')
-    parser.set_defaults(vectorize=True, sparse=True)
     args = parser.parse_args()
-    assert not (args.sparse and not args.vectorize), \
-        "--no-vectorize cannot be used with --sparse; use --no-sparse for dense mode"
     print(args)
     os.makedirs(os.path.join(args.save), exist_ok=True)
 
     data = G2OPGO(args.dataroot, args.dataname, device=args.device, download=True)
-    edges, poses, infos = data.edges, data.poses, data.infos
+    edges, poses = data.edges, data.poses
 
-    graph = PoseGraph(data.nodes, sparse=args.sparse).to(args.device)
-    solver = ppos.PCG() if args.sparse else ppos.Cholesky()
+    graph = PoseGraph(data.nodes).to(args.device)
+    solver = ppos.PCG()
     strategy = ppost.TrustRegion(radius=args.radius)
-    if args.sparse:
-        optimizer = pp.optim.LM(graph, solver=solver, strategy=strategy,
-                                min=1e-6, sparse=True)
-    else:
-        optimizer = pp.optim.LM(graph, solver=solver, strategy=strategy,
-                                min=1e-6, vectorize=args.vectorize)
+    optimizer = pp.optim.LM(graph, solver=solver, strategy=strategy, min=1e-6, sparse=True)
     scheduler = StopOnPlateau(optimizer, steps=10, patience=3, decreasing=1e-3, verbose=True)
-    weight = None if args.sparse else infos
 
     pngname = os.path.join(args.save, args.dataname+'.png')
     axlim = plot_and_save(graph.nodes.translation(), pngname, args.dataname)
     ### the 1st implementation: for customization and easy to extend
     while scheduler.continual():
-        loss = optimizer.step(input=(edges, poses), weight=weight)
+        loss = optimizer.step(input=(edges, poses))
         scheduler.step(loss)
 
         name = os.path.join(args.save, args.dataname + '_' + str(scheduler.steps))
@@ -96,4 +79,4 @@ if __name__ == '__main__':
         torch.save(graph.state_dict(), name+'.pt')
 
     ### The 2nd implementation: equivalent to the 1st one, but more compact
-    scheduler.optimize(input=(edges, poses), weight=weight)
+    scheduler.optimize(input=(edges, poses))
