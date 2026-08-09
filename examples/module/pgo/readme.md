@@ -65,8 +65,7 @@ Other supported arguments:
                                unsupported)
           --no-vectorize       disable vectorization in dense mode to save memory
                                (incompatible with --sparse)
-          --vectorize          vectorize dense Jacobian computation when --sparse
-                               is False (default in dense mode)
+          --vectorize          vectorize dense Jacobian computation
 
 ## Notes
 
