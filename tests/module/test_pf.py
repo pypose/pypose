@@ -20,22 +20,22 @@ class TestPF:
         model = NLS().to(device)
         pf = pp.module.PF(model).to(device)
 
-        T, N = 5, 2  # steps, state dim
-        states = torch.zeros(T, N, device=device)
-        inputs = torch.randn(T, N, device=device)
-        observ = torch.zeros(T, N, device=device)
+        B, T, N = 3, 5, 2  # steps, state dim
+        states = torch.zeros(B, T, N, device=device)
+        inputs = torch.randn(B, T, N, device=device)
+        observ = torch.zeros(B, T, N, device=device)
         # std of transition, observation, and estimation
         q, r, p = 0.1, 0.1, 10
-        Q = torch.eye(N, device=device) * q ** 2
-        R = torch.eye(N, device=device) * r ** 2
-        P = torch.eye(N, device=device).repeat(T, 1, 1) * p ** 2
-        estim = torch.ones(T, N, device=device) * p
+        Q = torch.eye(N, device=device).repeat(B, 1, 1) * q ** 2
+        R = torch.eye(N, device=device).repeat(B, 1, 1) * r ** 2
+        P = torch.eye(N, device=device).repeat(B, T, 1, 1) * p ** 2
+        estim = torch.ones(B, T, N, device=device) * p
 
         for i in range(T - 1):
-            w = q * torch.randn(N, device=device)  # transition noise
-            v = r * torch.randn(N, device=device)  # observation noise
-            states[i + 1], observ[i] = model(states[i] + w, inputs[i])
-            estim[i + 1], P[i + 1] = pf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
+            w = q * torch.randn(B, N, device=device)  # transition noise
+            v = r * torch.randn(B, N, device=device)  # observation noise
+            states[:, i+1], observ[:, i] = model(states[:, i] + w, inputs[:, i])
+            estim[:, i+1], P[:, i+1] = pf(estim[:, i], observ[:, i] + v, inputs[:, i], P[:, i], Q, R)
         error = (states - estim).norm(dim=-1)
 
         assert torch.all(error[0] - error[-1] > 0), "Filter error last step too large."

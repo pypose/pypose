@@ -94,26 +94,28 @@ class PF(EKF):
 
         3. Prepare data
 
-        >>> T, N = 5, 2 # steps, state dim
-        >>> states = torch.zeros(T, N)
-        >>> inputs = torch.randn(T, N)
-        >>> observ = torch.zeros(T, N)
+        >>> B, T, N = 3, 5, 2 # batchsize, steps, state dim
+        >>> states = torch.zeros(B, T, N)
+        >>> inputs = torch.randn(B, T, N)
+        >>> observ = torch.zeros(B, T, N)
         >>> # std of transition, observation, and estimation
         >>> q, r, p = 0.1, 0.1, 10
-        >>> Q = torch.eye(N) * q**2
-        >>> R = torch.eye(N) * r**2
-        >>> P = torch.eye(N).repeat(T, 1, 1) * p**2
-        >>> estim = torch.randn(T, N) * p
+        >>> Q = torch.eye(N).repeat(B, 1, 1) * q**2
+        >>> R = torch.eye(N).repeat(B, 1, 1) * r**2
+        >>> P = torch.eye(N).repeat(B, T, 1, 1) * p**2
+        >>> estim = torch.randn(B, T, N) * p
 
         4. Perform PF prediction. Note that estimation error becomes smaller with more steps.
 
         >>> for i in range(T - 1):
-        ...     w = q * torch.randn(N) # transition noise
-        ...     v = r * torch.randn(N) # observation noise
-        ...     states[i+1], observ[i] = model(states[i] + w, inputs[i])
-        ...     estim[i+1], P[i+1] = pf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
+        ...     w = q * torch.randn(B, N) # transition noise
+        ...     v = r * torch.randn(B, N) # observation noise
+        ...     states[:, i+1], observ[:, i] = model(states[:, i] + w, inputs[:, i])
+        ...     estim[:, i+1], P[:, i+1] = pf(estim[:, i], observ[:, i] + v, inputs[:, i], P[:, i], Q, R)
         ... print('Est error:', (states - estim).norm(dim=-1))
-        Est error: tensor([10.7083,  1.6012,  0.3339,  0.1723,  0.1107])
+        Est error: tensor([[13.5084,  1.3604,  1.1626,  0.4157,  0.7117],
+                           [14.4350,  2.0775,  1.0280,  0.2258,  0.4144],
+                           [16.8538,  2.4473,  1.1300,  0.5104,  0.1647]])
 
     Note:
         Implementation is based on Section 15.2 of this book
@@ -157,7 +159,7 @@ class PF(EKF):
         q = self.relative_likelihood(y, ye, R)
         xr = self.resample_particles(q, xs)
 
-        x = xr.mean(dim=-2)
+        x = xr.mean(dim=0)
         ex = xr - x
         P = self.compute_cov(ex, ex, Q)
 
@@ -187,10 +189,10 @@ class PF(EKF):
         r'''
         Resample the set of a posteriori particles
         '''
-        r = torch.rand(self.particles, dtype=x.dtype, device=x.device)
-        cumsumq = torch.cumsum(q, dim=-1)
-        return x[torch.searchsorted(cumsumq, r)]
+        r = torch.rand(x.shape[:-1], dtype=x.dtype, device=x.device)
+        index = torch.searchsorted(torch.cumsum(q, dim=0), r)
+        return x[index, torch.arange(x.shape[1]).unsqueeze(0)] if x.dim()==3 else x[index]
 
     def compute_cov(self, a, b, Q=0):
         '''Compute covariance of two set of variables.'''
-        return Q + bvv(a, b).mean(dim=-3)
+        return Q + bvv(a, b).mean(dim=0)
