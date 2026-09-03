@@ -1,0 +1,24 @@
+---
+  task: flowvo
+  modalities: 
+    - flow
+    - motion
+  input_seqlen: 
+    - 10
+    - 15
+  transform_flow_norm_factor: 0.05
+  dataset_frame_skip: 0
+  dataset_seq_stride: 1
+  data:
+    "data/tartan_train_local.txt":
+      cacher:
+        datatype: "tartan"
+        load_size: [120, 160]
+        subset_framenum: 300
+        worker_num: 2
+      transform:
+        resize_factor: 2.5
+        input_size: [112, 160]
+      dataset:
+        intrinsics: [640, 480, 320, 320, 320, 240]
+        intrinsics_scale: 0.25
