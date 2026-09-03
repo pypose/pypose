@@ -1,1 +1,1 @@
-from .jac import jacrev
+from .jac import jacobian, jacrev

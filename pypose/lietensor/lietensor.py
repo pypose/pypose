@@ -775,6 +775,7 @@ RxSO3_type, rxso3_type = RxSO3Type(), rxso3Type()
 liegroup = [SO3_type, SE3_type, Sim3_type, RxSO3_type]
 liealgebra = [so3_type, se3_type, sim3_type, rxso3_type]
 
+
 class LieTensor(Tensor):
     r""" A sub-class of :obj:`Tensor` to represent Lie Algebra and Lie Group.
 
@@ -910,6 +911,24 @@ class LieTensor(Tensor):
         `converting functions <https://pypose.org/docs/main/convert/>`_ between Lie Groups
         and other data structures, e.g., transformation matrix, Euler angle, etc. The users
         can convert data between Lie Group and Lie algebra with :obj:`Exp` and :obj:`Log`.
+
+    .. note::
+
+        A LieGroup created directly as a :class:`LieTensor` retains its embedded
+        storage. Its :obj:`grad`, however, transparently returns a
+        **manifold-sized, zero-copy view** (the leading slice) of the
+        full-dimension autograd gradient, so reading ``a.grad``,
+        ``print(a.grad)`` or :meth:`jacobian` yields the Lie-aware,
+        manifold-sized gradient without knowing the embedded layout. The
+        autograd engine still accumulates the full-dimension gradient (no extra
+        storage); :obj:`grad` is a *view* over it, not a copy. This is a
+        public, manifold-dimension grad view over the embedded autograd grad --
+        it is the same quantity the historical :obj:`tangent_grad` exposed --
+        and is not a claim that the slice equals the full differential-
+        geometric tangent pullback. :class:`pypose.Parameter` for a Lie group
+        keeps the same embedded storage, so its :obj:`grad` exposes the same
+        manifold-sized, zero-copy view -- one shared tangent-space convention
+        for ``a.grad``, the Jacobian column, and PyPose optimizers.
     """
     def __init__(self, *data, ltype:LieType):
         assert self.shape[-1:] == ltype.dimension, 'The last dimension of a LieTensor has to be ' \
@@ -932,6 +951,114 @@ class LieTensor(Tensor):
         else:
             return super().__repr__()
 
+    def _raw_autograd_grad(self):
+        """Return the full-dimension gradient held by the autograd engine.
+
+        This bypasses the :obj:`grad` view property below so that internal code
+        (and tests) can still see the embedded-dimension gradient that
+        :meth:`Tensor.backward` accumulates. It is a view into the same storage
+        as :obj:`grad`, not a separate copy.
+        """
+        return super(LieTensor, self).grad
+
+    @property
+    def grad(self):
+        r'''
+        Manifold-sized gradient view (zero-copy) over the embedded autograd gradient.
+
+        Returns:
+            Tensor
+
+        Note:
+            - For a Lie-group :class:`LieTensor` (embedded storage, e.g. SE3 is
+              7-wide), this returns the leading manifold-dimension slice (e.g.
+              6-wide for SE3) of the accumulated autograd gradient as a *view*,
+              not a copy: it shares storage with the full embedded gradient, so
+              no new memory is allocated.
+
+            - :obj:`tangent_grad` is an alias of this property, kept for
+              backward compatibility; :obj:`grad` is the primary interface.
+
+            - For Lie-algebra (``on_manifold``) :class:`LieTensor` and ordinary
+              tensors, the gradient is already manifold-sized and is returned
+              unchanged.
+
+        Examples:
+            >>> x = pp.Parameter(pp.randn_SE3(1))
+            >>> (x @ pp.randn_SE3(1)).Log().sum().backward()
+            >>> x.grad.shape
+            torch.Size([1, 6])
+            >>> x.shape
+            torch.Size([1, 7])
+        '''
+        grad = super(LieTensor, self).grad
+        if (grad is not None and hasattr(self, 'ltype')
+                and self.ltype in liegroup
+                and grad.shape[-1:] == self.ltype.embedding):
+            return grad[..., :self.ltype.manifold[0]]
+        return grad
+
+    @grad.setter
+    def grad(self, value):
+        # Store the gradient in the autograd engine's full-dimension slot.
+        #
+        # An embedded LieGroup (both a raw group LieTensor and a group
+        # ``Parameter``) keeps its storage at the *embedded* width (SE3 = 7),
+        # while the public :obj:`grad` getter exposes the leading *manifold*
+        # width (SE3 = 6). Assignments therefore come in two widths:
+        #
+        #   * ``p.grad = None``                       -> clears the gradient.
+        #   * ``p.grad = <manifold-width tensor>``    -> the value is written
+        #       into the leading manifold coordinates and the single trailing
+        #       redundant coordinate is zero-padded, so the autograd gradient
+        #       stays embedded-sized and its redundant coordinate is never
+        #       corrupted (this is what ``p.grad = torch.zeros_like(p.grad)``
+        #       does, since ``p.grad`` is the manifold view).
+        #   * ``p.grad = <embedded-width tensor>``    -> stored unchanged.
+        #
+        # Lie-algebra (``on_manifold``) and ordinary tensors are already
+        # manifold/own-width, so they are stored unchanged.
+        if (value is not None and isinstance(self, LieTensor)
+                and hasattr(self, 'ltype') and self.ltype in liegroup
+                and not self.ltype.on_manifold):
+            embedding = int(self.ltype.embedding[0])
+            manifold = int(self.ltype.manifold[0])
+            if embedding != manifold and value.dim() > 0 \
+                    and value.shape[-1] == manifold:
+                full = value.new_zeros(*value.shape[:-1], embedding)
+                full[..., :manifold] = value
+                value = full
+        # Forward the assignment straight to the C++ autograd ``grad`` slot.
+        # The plain ``super().grad = value`` form cannot route to the C getset
+        # descriptor, so look it up in the MRO (skipping this class's property)
+        # and call its ``__set__`` directly.
+        for klass in type(self).__mro__:
+            if klass is LieTensor:
+                continue
+            descriptor = vars(klass).get('grad')
+            # The C++ autograd ``grad`` slot is a getset descriptor that
+            # exposes ``__set__``; a Python ``property`` (e.g. this one) does
+            # not, so skip it.
+            if descriptor is not None and not isinstance(descriptor, property) \
+                    and hasattr(descriptor, '__set__'):
+                descriptor.__set__(self, value)
+                return
+        raise AttributeError(
+            "Cannot set grad: no Tensor grad descriptor found in %s"
+            % type(self).__name__)
+
+    @property
+    def tangent_grad(self):
+        """Return the manifold-sized gradient view (kept for compatibility).
+
+        Alias for :obj:`grad`: for Lie-group LieTensors :obj:`grad` already
+        returns the manifold-sized view; for tangent-space parameters
+        (:class:`pypose.Parameter`) it returns the (already manifold) gradient
+        unchanged. Users should not need to call this -- :obj:`grad` is the
+        public interface.
+        """
+        return self.grad
+
     def new_empty(self, size, *, dtype=None, layout=None, device=None, pin_memory=None,
                   requires_grad=None):
         tensor = torch.empty(
@@ -953,7 +1080,8 @@ class LieTensor(Tensor):
         data = Tensor.__torch_function__(func, ltypes, args, kwargs)
         if data is not None and hasattr(func, '__name__') and func.__name__ in HANDLED_FUNCTIONS:
             args, spec = tree_flatten(args)
-            ltype = [arg.ltype for arg in args if isinstance(arg, LieTensor)][0]
+            sources = [arg for arg in args if isinstance(arg, LieTensor)]
+            ltype = sources[0].ltype
             def wrap(t):
                 if isinstance(t, Tensor) and not isinstance(t, cls):
                     lt = Tensor.as_subclass(t, LieTensor)
@@ -1017,7 +1145,7 @@ class LieTensor(Tensor):
             >>> x.lview(-1).lshape
             torch.Size([4])
         '''
-        return self.view(*shape+self.ltype.dimension)
+        return self.view(*shape + self.ltype.dimension)
 
     def Exp(self) -> LieTensor:
         r'''
@@ -1261,8 +1389,28 @@ class Parameter(LieTensor, nn.Parameter):
 
     .. note::
 
-        :class:`Parameter` does not change numerical results. It only adds
-        tracing information for sparse Jacobian construction when setting `sjac=True`.
+        For the standard dense path (``sjac=False``), a LieGroup parameter keeps
+        its **embedded** storage (for example, seven values for an SE3
+        parameter), so ``shape``, ``numel()``, ``tensor()``, ``detach()``,
+        ``clone()``, indexing and ``state_dict()`` all follow the original
+        7-wide representation. Its :obj:`grad`, however, transparently returns a
+        **manifold-sized, zero-copy view** (six values for SE3) over the full
+        autograd gradient, and the PyPose differentiation APIs
+        (:func:`pypose.func.jacobian`, :func:`pypose.func.jacrev`,
+        :func:`pypose.optim.functional.modjac`, ``modjacrev``/``modjacfwd``)
+        expose the tangent-sized column. Ordinary tensors and Lie-algebra data
+        keep their existing representation.
+
+        The optional ``sjac=True`` path remains an independently tracked sparse
+        backend representation.
+
+        Native PyTorch optimizers are **not** the supported path for embedded
+        LieGroup parameters: a stock optimizer builds state tensors
+        (e.g. Adam ``exp_avg``) sized to the *parameter storage* (7 for SE3),
+        while the public ``.grad`` is 6-wide, so ``state.add_(grad)`` fails on
+        the dimension mismatch. Use a PyPose optimizer, which performs the
+        update in the 6-wide tangent space and retracts back onto the
+        embedded storage.
 
     .. admonition:: Example
 
@@ -1322,6 +1470,13 @@ class Parameter(LieTensor, nn.Parameter):
             data = TrackingTensor(data)
             return nn.Parameter(data, requires_grad)
         if isinstance(data, LieTensor):
+            # Design B: a dense LieGroup Parameter keeps its EMBEDDED storage
+            # (SE3 -> 7, SO3 -> 4, ...). We do NOT convert it to a tangent leaf:
+            # the public ``.grad`` already exposes the manifold-sized (6 for SE3)
+            # zero-copy view over the full-dimension autograd gradient, and the
+            # PyPose differentiation/optimizer APIs operate in that tangent space.
+            # Ordinary tensors and Lie-algebra data keep their existing
+            # representation unchanged.
             param = Tensor._make_subclass(cls, data.tensor(), requires_grad)
             param.ltype = data.ltype
             param._is_param = True
@@ -1348,7 +1503,8 @@ def retain_ltype():
 
     def wrap_function(func):
         def wrapper(*args, **kwargs):
-            ltype = args[0].ltype if isinstance(args[0], LieTensor) else None
+            source = args[0] if isinstance(args[0], LieTensor) else None
+            ltype = source.ltype if source is not None else None
             res = func(*args, **kwargs)
             if ltype is not None:
                 res = Tensor.as_subclass(res, LieTensor)

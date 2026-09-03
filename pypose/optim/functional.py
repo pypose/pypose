@@ -1,5 +1,6 @@
 import torch
-from .. import hasnan
+from .. import hasnan, retain_ltype
+from ..func.jac import _slice_lie_jacobian, _tangent_numel
 from functools import partial
 from torch.autograd.functional import jacobian
 from torch.func import jacrev, jacfwd, functional_call
@@ -140,28 +141,74 @@ def modjac(model, input=None, create_graph=False, strict=False, vectorize=False,
     J = jacobian(func_param, params_values, create_graph=create_graph, strict=strict, \
                     vectorize=vectorize, strategy=strategy)
 
+    if isinstance(J, tuple):
+        # Unified LieGroup tangent-axis convention: embedded group parameter
+        # axes (last dim) are reduced to the left-trivialized tangent, matching
+        # pp.func.jacobian / pp.func.jacrev. Ordinary Tensor params pass through
+        # unchanged.
+        #
+        # jacobian() output structure (input is always the params tuple here):
+        #   * single output: J = (J_p0, J_p1, ...)            per-parameter
+        #   * multiple outputs: J = ((J_p0, ...), (...), ...)  per-output,
+        #     each element a per-parameter tuple
+        # The elements' tuple-ness disambiguates the two layouts, so every
+        # leaf is sliced against its own parameter (a naive zip of the top
+        # level would silently drop outputs in the multi-output case).
+        if any(isinstance(j, tuple) for j in J):
+            J = tuple(tuple(_slice_lie_jacobian(j, value)
+                            for j, value in zip(Jr, params_values))
+                      for Jr in J)
+        else:
+            J = tuple(_slice_lie_jacobian(j, value)
+                      for j, value in zip(J, params_values))
+
     assert not hasnan(J), 'Jacobian contains Nan! Check your model and input!'
 
     if flatten and isinstance(J, tuple):
         if any(isinstance(j, tuple) for j in J):
-            J = torch.cat([torch.cat([j.view(-1, p.numel()) \
+            J = torch.cat([torch.cat([j.reshape(-1, _tangent_numel(p)) \
                     for j, p in zip(Jr, params_values)], dim=1) for Jr in J])
         else:
-            J = torch.cat([j.view(-1, p.numel()) \
+            J = torch.cat([j.reshape(-1, _tangent_numel(p)) \
                            for j, p in zip(J, params_values)], dim=1)
 
     return J
+
+
+def _tangent_jacobian_postprocess(result, params, has_aux=False):
+    r"""Shared tangent-axis postprocessing for per-parameter Jacobians.
+
+    Applies the canonical ``_slice_lie_jacobian`` slice to the dict-of-jacobians
+    layout produced by ``jacrev``/``jacfwd`` with dict inputs, so ``modjac``,
+    ``modjacrev``, and ``modjacfwd`` agree with ``pp.func.jacobian``. If
+    ``has_aux`` is set, only the Jacobian component is postprocessed.
+    """
+    if has_aux:
+        j, aux = result
+        return (_tangent_jacobian_postprocess(j, params, has_aux=False), aux)
+    if isinstance(result, dict):
+        return {k: _slice_lie_jacobian(v, params[k]) for k, v in result.items()}
+    return result
 
 
 @torch.enable_grad()
 def modjacrev(model, input, argnums=0, *, has_aux=False):
     params = dict(model.named_parameters())
     func = partial(functional_call, model)
-    return jacrev(func, argnums=argnums, has_aux=has_aux)(params, input)
+    with retain_ltype():
+        result = jacrev(func, argnums=argnums, has_aux=has_aux)(params, input)
+    return _tangent_jacobian_postprocess(result, params, has_aux=has_aux)
 
 
 @torch.enable_grad()
 def modjacfwd(model, input, argnums=0, *, has_aux=False):
     params = dict(model.named_parameters())
     func = partial(functional_call, model)
-    return jacfwd(func, argnums=argnums, has_aux=has_aux)(params, input)
+    with retain_ltype():
+        # NOTE: forward-mode AD requires custom pypose autograd.Function
+        # implementations to provide ``jvp``; until they do, this raises the
+        # pre-existing NotImplementedError before any Jacobian exists. The
+        # shared postprocessing below is in place so the tangent-axis
+        # convention applies automatically once forward AD works.
+        result = jacfwd(func, argnums=argnums, has_aux=has_aux)(params, input)
+    return _tangent_jacobian_postprocess(result, params, has_aux=has_aux)
