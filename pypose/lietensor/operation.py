@@ -1032,16 +1032,18 @@ class SO3_AdjTXa(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx: Any, inputs, output) -> Any:
         X, a = inputs
-        ctx.save_for_backward(X, a)
+        adj_matrix = SO3_Adj(SO3_Inv.forward(X))
+        out = output
+        ctx.save_for_backward(out, adj_matrix)
         return
 
     @staticmethod
     def backward(ctx, grad_output):
-        X, a = ctx.saved_tensors
-        a_grad = SO3_AdjXa.apply(X, grad_output)
-        X_grad = -a.unsqueeze(-2) @ so3_adj(a_grad)
-        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
-        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad
+        out, adj_matrix = ctx.saved_tensors
+        X_grad = grad_output.unsqueeze(-2) @ so3_adj(out) @ adj_matrix
+        a_grad = grad_output.unsqueeze(-2) @ adj_matrix
+        zero = torch.zeros(out.shape[:-1]+(1,), device=out.device, dtype=out.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad.squeeze(-2)
 
 
 class SE3_AdjTXa(torch.autograd.Function):
@@ -1055,16 +1057,18 @@ class SE3_AdjTXa(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx: Any, inputs, output) -> Any:
         X, a = inputs
-        ctx.save_for_backward(X, a)
+        adj_matrix = SE3_Adj(SE3_Inv.forward(X))
+        out = output
+        ctx.save_for_backward(out, adj_matrix)
         return
 
     @staticmethod
     def backward(ctx, grad_output):
-        X, a = ctx.saved_tensors
-        a_grad = SE3_AdjXa.apply(X, grad_output)
-        X_grad = -a.unsqueeze(-2) @ se3_adj(a_grad)
-        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
-        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad
+        out, adj_matrix = ctx.saved_tensors
+        X_grad = grad_output.unsqueeze(-2) @ se3_adj(out) @ adj_matrix
+        a_grad = grad_output.unsqueeze(-2) @ adj_matrix
+        zero = torch.zeros(out.shape[:-1]+(1,), device=out.device, dtype=out.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad.squeeze(-2)
 
 
 class RxSO3_AdjTXa(torch.autograd.Function):
@@ -1078,16 +1082,18 @@ class RxSO3_AdjTXa(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx: Any, inputs, output) -> Any:
         X, a = inputs
-        ctx.save_for_backward(X, a)
+        adj_matrix = RxSO3_Adj(RxSO3_Inv.forward(X))
+        out = output
+        ctx.save_for_backward(out, adj_matrix)
         return
 
     @staticmethod
     def backward(ctx, grad_output):
-        X, a = ctx.saved_tensors
-        a_grad = RxSO3_AdjXa.apply(X, grad_output)
-        X_grad = -a.unsqueeze(-2) @ rxso3_adj(a_grad)
-        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
-        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad
+        out, adj_matrix = ctx.saved_tensors
+        X_grad = grad_output.unsqueeze(-2) @ rxso3_adj(out) @ adj_matrix
+        a_grad = grad_output.unsqueeze(-2) @ adj_matrix
+        zero = torch.zeros(out.shape[:-1]+(1,), device=out.device, dtype=out.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad.squeeze(-2)
 
 
 class Sim3_AdjTXa(torch.autograd.Function):
@@ -1101,16 +1107,18 @@ class Sim3_AdjTXa(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx: Any, inputs, output) -> Any:
         X, a = inputs
-        ctx.save_for_backward(X, a)
+        adj_matrix = Sim3_Adj(Sim3_Inv.forward(X))
+        out = output
+        ctx.save_for_backward(out, adj_matrix)
         return
 
     @staticmethod
     def backward(ctx, grad_output):
-        X, a = ctx.saved_tensors
-        a_grad = Sim3_AdjXa.apply(X, grad_output)
-        X_grad = -a.unsqueeze(-2) @ sim3_adj(a_grad)
-        zero = torch.zeros(X.shape[:-1]+(1,), device=X.device, dtype=X.dtype)
-        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad
+        out, adj_matrix = ctx.saved_tensors
+        X_grad = grad_output.unsqueeze(-2) @ sim3_adj(out) @ adj_matrix
+        a_grad = grad_output.unsqueeze(-2) @ adj_matrix
+        zero = torch.zeros(out.shape[:-1]+(1,), device=out.device, dtype=out.dtype)
+        return torch.cat((X_grad.squeeze(-2), zero), dim = -1), a_grad.squeeze(-2)
 
 
 def broadcast_inputs(x, y):
