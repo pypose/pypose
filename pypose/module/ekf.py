@@ -106,10 +106,10 @@ class EKF(nn.Module):
         >>> for i in range(T - 1):
         ...     w = q * torch.randn(N) # transition noise
         ...     v = r * torch.randn(N) # observation noise
-        ...     states[i+1], observ[i] = model(states[i] + w, inputs[i])
+        ...     states[i+1] = model.state_transition(states[i] + w, inputs[i])
+        ...     observ[i] = model.observation(states[i+1], inputs[i])
         ...     estim[i+1], P[i+1] = ekf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
         ... print('Est error:', (states - estim).norm(dim=-1))
-        Est error: tensor([5.7655, 5.3436, 3.5947, 0.3359, 0.0639])
 
     Warning:
         Don't introduce noise in ``System`` methods ``state_transition`` and ``observation``
@@ -150,15 +150,16 @@ class EKF(nn.Module):
         self.model.set_refpoint(state=x, input=u, t=t)
         I = torch.eye(P.shape[-1], device=P.device, dtype=P.dtype)
         A, B = self.model.A, self.model.B
-        C, D = self.model.C, self.model.D
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
 
         xm = self.model.state_transition(x, u, t=t)        # 1. System transition
 
         P = A @ P @ A.mT + Q                 # 2. Covariance predict
+        self.model.set_refpoint(state=xm, input=u, t=t)
+        C, D = self.model.C, self.model.D
         K = P @ C.mT @ pinv(C @ P @ C.mT + R) # 3. Kalman gain
-        e = y - self.model.observation(x, u, t=t)    #    predicted observation error
+        e = y - self.model.observation(xm, u, t=t)    #    predicted observation error
         xp = xm + bmv(K, e)                     # 4. Posteriori state
         P = (I - K @ C) @ P                   # 5. Posteriori covariance
         return xp, P
