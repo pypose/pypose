@@ -156,8 +156,8 @@ def pixel2point(pixels, depth, intrinsics):
     assert depth.size(-1) == pixels.size(-2), "Depth shape does not match pixels"
     assert intrinsics.size(-1) == intrinsics.size(-2) == 3, "Intrinsics shape incorrect."
 
-    fx, fy = intrinsics[..., 0, 0], intrinsics[..., 1, 1]
-    cx, cy = intrinsics[..., 0, 2], intrinsics[..., 1, 2]
+    fx, fy = intrinsics[..., 0, 0, None], intrinsics[..., 1, 1, None]
+    cx, cy = intrinsics[..., 0, 2, None], intrinsics[..., 1, 2, None]
 
     assert not torch.any(fx == 0), "fx Cannot contain zero"
     assert not torch.any(fy == 0), "fy Cannot contain zero"
