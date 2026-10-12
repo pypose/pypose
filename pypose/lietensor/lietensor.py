@@ -64,6 +64,9 @@ class LieType(ABC):
             return input.copy_(other1 + other2[..., :self.manifold[0]])
         raise NotImplementedError("Instance has no add_ attribute.")
 
+    def addcdiv_(self, input: LieTensor, tensor1: Tensor, tensor2: Tensor, value: Number | Tensor = 1) -> LieTensor:
+        return self.add_(input, other = value * (tensor1 / tensor2))
+
     def Log(self, X: LieTensor) -> LieTensor:
         if self.on_manifold:
             raise AttributeError("Lie Algebra has no Log attribute")
@@ -1054,6 +1057,18 @@ class LieTensor(Tensor):
         See :meth:`pypose.add_`
         '''
         return self.ltype.add_(self, other = alpha * other)
+
+    def addcdiv(self, tensor1, tensor2, value=1):
+        r'''
+        See :meth:`pypose.addcdiv`
+        '''
+        return self.clone().addcdiv_(tensor1, tensor2, value=value)
+
+    def addcdiv_(self, tensor1, tensor2, value=1):
+        r'''
+        See :meth:`pypose.addcdiv_`
+        '''
+        return self.ltype.addcdiv_(self, tensor1, tensor2, value=value)
 
     def __add__(self, other):
         return self.add(other=other)

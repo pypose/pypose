@@ -285,5 +285,99 @@ def test_parameter_dispatch(monkeypatch):
     print('Done')
 
 
+def test_addcdiv():
+    for group_fn, dim in [
+        (pp.randn_SO3, 3),
+        (pp.randn_SE3, 6),
+        (pp.randn_Sim3, 7),
+        (pp.randn_RxSO3, 4),
+    ]:
+        x = group_fn(5)
+        t1 = torch.randn(5, dim)
+        t2 = torch.rand(5, dim) + 0.5
+        val = 0.3
+
+        # Functional out-of-place
+        res1 = pp.addcdiv(x, t1, t2, value=val)
+        assert isinstance(res1, pp.LieTensor)
+        assert res1.ltype == x.ltype
+
+        # Method out-of-place
+        res2 = x.addcdiv(t1, t2, value=val)
+        assert isinstance(res2, pp.LieTensor)
+        assert res2.ltype == x.ltype
+        torch.testing.assert_close(res1.tensor(), res2.tensor())
+
+        # Mathematical correctness: compare with add(x, val * (t1 / t2))
+        expected = pp.add(x, val * (t1 / t2))
+        torch.testing.assert_close(res1.tensor(), expected.tensor())
+
+        # Method in-place
+        x_copy = x.clone()
+        x_copy.addcdiv_(t1, t2, value=val)
+        torch.testing.assert_close(x_copy.tensor(), expected.tensor())
+
+        # Functional in-place
+        x_copy2 = x.clone()
+        pp.addcdiv_(x_copy2, t1, t2, value=val)
+        torch.testing.assert_close(x_copy2.tensor(), expected.tensor())
+
+        # Positional value
+        res_pos = x.addcdiv(t1, t2, val)
+        torch.testing.assert_close(res_pos.tensor(), expected.tensor())
+
+        # Default value=1
+        res_def = x.addcdiv(t1, t2)
+        torch.testing.assert_close(res_def.tensor(), pp.add(x, t1 / t2).tensor())
+
+    for algebra_fn, dim in [
+        (pp.randn_so3, 3),
+        (pp.randn_se3, 6),
+        (pp.randn_sim3, 7),
+        (pp.randn_rxso3, 4),
+    ]:
+        x = algebra_fn(5)
+        t1 = torch.randn(5, dim)
+        t2 = torch.rand(5, dim) + 0.5
+        val = 0.3
+
+        res1 = pp.addcdiv(x, t1, t2, value=val)
+        assert isinstance(res1, pp.LieTensor)
+        assert res1.ltype == x.ltype
+
+        res2 = x.addcdiv(t1, t2, value=val)
+        torch.testing.assert_close(res1.tensor(), res2.tensor())
+
+        expected = x + val * (t1 / t2)
+        torch.testing.assert_close(res1.tensor(), expected.tensor())
+
+        x_copy = x.clone()
+        x_copy.addcdiv_(t1, t2, value=val)
+        torch.testing.assert_close(x_copy.tensor(), expected.tensor())
+
+
+def test_adam_parameter():
+    torch.manual_seed(42)
+    rot_to_fit = pp.randn_SO3(5)
+    rot_to_optimize = pp.Parameter(pp.identity_SO3(5))
+    optimizer = torch.optim.Adam([rot_to_optimize], lr=0.01)
+
+    init_loss = (rot_to_optimize.Inv() * rot_to_fit).Log().norm(dim=-1).mean().item()
+    for _ in range(300):
+        optimizer.zero_grad()
+        loss = (rot_to_optimize.Inv() * rot_to_fit).Log().norm(dim=-1).mean()
+        loss.backward()
+        optimizer.step()
+
+    final_loss = loss.item()
+    assert final_loss < init_loss * 0.05, f"Adam failed to converge: init={init_loss}, final={final_loss}"
+    torch.testing.assert_close(
+        torch.linalg.vector_norm(rot_to_optimize.tensor(), dim=-1),
+        torch.ones(5),
+        atol=1e-5,
+        rtol=1e-5,
+    )
+
+
 if __name__ == '__main__':
     test_lietensor()
