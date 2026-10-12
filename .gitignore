@@ -129,7 +129,9 @@ dmypy.json
 .pyre/
 
 # sphinx
-docs/source/generated
+docs/source/generated/*
+!docs/source/generated/pypose.autograd.function.parallel_for_sparse_jacobian.rst
+!docs/source/generated/pypose.autograd.function.psjac.rst
 
 # Operating system
 .DS_Store
@@ -157,3 +159,6 @@ examples/module/reprojpgo/save/*
 *fr2_desk_groundtruth.txt*
 *fr2_desk_ORB.txt*
 *__MACOSX
+examples/module/ba/save/*
+examples/module/ba/data/*
+.deb

@@ -850,9 +850,15 @@ def quat2unit(input: LieTensor, eps=1e-12) -> LieTensor:
     if isinstance(input, LieTensor) and (input.ltype in liegroup):
         data = input.tensor()
         if input.ltype in [SO3_type, RxSO3_type]:
-            data[..., :4] = normalize(data[..., :4], p=2, dim=-1, eps=eps)
+            # Build a fresh tensor instead of writing through ``data``.  The
+            # latter is a view of the input storage and in-place assignment
+            # breaks autograd for leaf LieTensors (and can invalidate saved
+            # intermediates in differentiable robot-geometry pipelines).
+            quat = normalize(data[..., :4], p=2, dim=-1, eps=eps)
+            data = torch.cat((quat, data[..., 4:]), dim=-1)
         elif input.ltype in [SE3_type, Sim3_type]:
-            data[..., 3:7] = normalize(data[..., 3:7], p=2, dim=-1, eps=eps)
+            quat = normalize(data[..., 3:7], p=2, dim=-1, eps=eps)
+            data = torch.cat((data[..., :3], quat, data[..., 7:]), dim=-1)
         output = LieTensor(data, ltype=input.ltype)
         if (output.rotation().norm(p=2, dim=-1) < eps).any():
             raise ValueError("Detected zero quaternions, which cannot be normalized.")

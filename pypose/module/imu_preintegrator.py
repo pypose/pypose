@@ -108,18 +108,20 @@ class IMUPreintegrator(nn.Module):
 
         # Initial status of IMU: (pos)ition, (rot)ation, (vel)ocity, (cov)ariance
         self.register_buffer('gravity', torch.tensor([0, 0, gravity]), persistent=False)
-        self.register_buffer('pos', self._check(pos).clone(), persistent=False)
-        self.register_buffer('rot', self._check(rot).clone(), persistent=False)
-        self.register_buffer('vel', self._check(vel).clone(), persistent=False)
+        self.register_buffer('pos', self._check(pos, dim=1).clone(), persistent=False)
+        self.register_buffer('rot', self._check(rot, dim=1).clone(), persistent=False)
+        self.register_buffer('vel', self._check(vel, dim=1).clone(), persistent=False)
         self.register_buffer('cov', torch.zeros(1, 9, 9), persistent=False)
         self.register_buffer('gyro_cov', gyro_cov, persistent=False)
         self.register_buffer('acc_cov', acc_cov, persistent=False)
-        self.Rij = None # rotation corresponding to the "zero-state" covariance Sigma_ii.
+        # Rotation corresponding to the "zero-state" covariance Sigma_ii.
+        self.register_buffer('Rij', None, persistent=False)
 
-    def _check(self, obj):
+    @staticmethod
+    def _check(obj, dim=0):
         if obj is not None:
             if len(obj.shape) == 2:
-                obj = obj[None, ...]
+                obj = obj.unsqueeze(dim)
 
             elif len(obj.shape) == 1:
                 obj = obj[None, None, ...]
@@ -366,6 +368,8 @@ class IMUPreintegrator(nn.Module):
         else:
             if init_rot is None:
                 init_rot = identity_SO3(B, 1, dtype=dt.dtype, device=dt.device)
+            else:
+                init_rot = self._check(init_rot, dim=1)
             inte_rot = init_rot * incre_r
             a = acc - inte_rot[:,1:,:].Inv() @ self.gravity
 
@@ -419,10 +423,13 @@ class IMUPreintegrator(nn.Module):
             ``vel``: velocity, each of which has a shape :math:`(B, F, H_{out})`, where
             :math:`H_{out}` is the signal dimension.
         """
+        pos = cls._check(init_state['pos'], dim=1)
+        rot = cls._check(init_state['rot'], dim=1)
+        vel = cls._check(init_state['vel'], dim=1)
         return {
-            'rot': init_state['rot'] * integrate['Dr'],
-            'vel': init_state['vel'] + init_state['rot'] * integrate['Dv'],
-            'pos': init_state['pos'] + init_state['rot'] * integrate['Dp'] + init_state['vel'] * integrate['Dt'],
+            'rot': rot * integrate['Dr'],
+            'vel': vel + rot * integrate['Dv'],
+            'pos': pos + rot * integrate['Dp'] + vel * integrate['Dt'],
         }
 
     @classmethod

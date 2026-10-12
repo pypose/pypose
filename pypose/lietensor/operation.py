@@ -26,10 +26,9 @@ def so3_Jl_inv(x):
     I = torch.eye(3, device=x.device, dtype=x.dtype).expand(x.shape[:-1]+(3, 3))
     idx = (theta > torch.finfo(theta.dtype).eps)
     coef2 = torch.zeros_like(theta, requires_grad=False)
-    theta_idx = theta[idx]
-    theta_half_idx, theta2_idx = 0.5 * theta_idx, theta_idx * theta_idx
-    coef2[idx] = (1.0 - theta_idx * theta_half_idx.cos() / (2.0 * theta_half_idx.sin())) / theta2_idx
-    coef2[~idx] = 1.0 / 12.0
+    coef2 += idx * torch.nan_to_num((1.0 - theta * (0.5 * theta).cos() / \
+             (2.0 * (0.5 * theta).sin())) / (theta * theta))
+    coef2 += (~idx) * 1.0 / 12.0
     return (I - 0.5 * K + coef2 * (K @ K))
 
 def so3_adj(x):
@@ -44,16 +43,16 @@ def calcQ(x):
     idx = (theta > torch.finfo(theta.dtype).eps)
     # coef1
     coef1 = torch.zeros_like(theta, requires_grad=False)
-    coef1[idx] = (theta[idx] - theta[idx].sin()) / (theta2[idx] * theta[idx])
-    coef1[~idx] = 1.0 / 6.0 - (1.0 / 120.0) * theta2[~idx]
+    coef1 += idx * torch.nan_to_num((theta - theta.sin()) / (theta2 * theta))
+    coef1 += (~idx) * (1.0 / 6.0 - (1.0 / 120.0) * theta2)
     # coef2
     coef2 = torch.zeros_like(theta, requires_grad=False)
-    coef2[idx] = (theta2[idx] + 2 * theta[idx].cos() - 2) / (2 * theta4[idx])
-    coef2[~idx] = 1.0 / 24.0 - (1.0 / 720.0) * theta2[~idx]
+    coef2 += idx * torch.nan_to_num((theta2 + 2 * theta.cos() - 2) / (2 * theta4))
+    coef2 += (~idx) * (1.0 / 24.0 - (1.0 / 720.0) * theta2)
     # coef3
     coef3 = torch.zeros_like(theta, requires_grad=False)
-    coef3[idx] = (2 * theta[idx] - 3 * theta[idx].sin() + theta[idx] * theta[idx].cos()) / (2 * theta4[idx] * theta[idx])
-    coef3[~idx] = 1.0 / 120.0 - (1.0 / 2520.0) * theta2[~idx]
+    coef3 += idx * torch.nan_to_num((2 * theta - 3 * theta.sin() + theta * theta.cos()) / (2 * theta4 * theta))
+    coef3 += (~idx) * (1.0 / 120.0 - (1.0 / 2520.0) * theta2)
     Q = 0.5 * Tau + coef1 * (Phi@Tau + Tau@Phi + Phi@Tau@Phi) + \
         coef2 * (Phi@Phi@Tau + Tau@Phi@Phi - 3*Phi@Tau@Phi) + coef3 * (Phi@Tau@Phi@Phi + Phi@Phi@Tau@Phi)
     return Q
@@ -68,11 +67,12 @@ def se3_Jl(x):
 
 def se3_Jl_inv(x):
     Jl_inv_3x3, Q = so3_Jl_inv(x[..., 3:]), calcQ(x)
-    Jl_inv_6x6 = torch.zeros((x.shape[:-1]+(6, 6)), device=x.device, dtype=x.dtype, requires_grad=False)
-    Jl_inv_6x6[..., :3, :3] = Jl_inv_3x3
-    Jl_inv_6x6[..., :3, 3:] = -Jl_inv_3x3 @ Q @ Jl_inv_3x3
-    Jl_inv_6x6[..., 3:, 3:] = Jl_inv_3x3
-    return Jl_inv_6x6
+    _zeros_3x3 = torch.zeros((x.shape[:-1]+(3, 3)), device=x.device, dtype=x.dtype, requires_grad=False)
+    Jl_inv_6x6_0_0 = Jl_inv_3x3
+    Jl_inv_6x6_0_1 = -Jl_inv_3x3 @ Q @ Jl_inv_3x3
+    Jl_inv_6x6_1_0 = _zeros_3x3
+    Jl_inv_6x6_1_1 = Jl_inv_3x3
+    return torch.cat((torch.cat((Jl_inv_6x6_0_0, Jl_inv_6x6_0_1), dim = -1), torch.cat((Jl_inv_6x6_1_0, Jl_inv_6x6_1_1), dim = -1),), dim = -2)
 
 def se3_adj(x):
     adj_6x6 = torch.zeros((x.shape[:-1]+(6, 6)), device=x.device, dtype=x.dtype, requires_grad=False)
@@ -204,9 +204,9 @@ def SE3_Adj(X):
     t, q = X[..., :3], X[..., 3:]
     R3x3 = SO3_Adj(q)
     tx = vec2skew(t)
-    Adj[..., :3, :3] = R3x3
-    Adj[..., :3, 3:] = torch.matmul(tx, R3x3)
-    Adj[..., 3:, 3:] = R3x3
+    Adj = torch.cat([R3x3, torch.matmul(tx, R3x3)], dim=-1)
+    Adj = torch.cat([Adj, torch.cat([torch.zeros_like(R3x3, requires_grad=False), R3x3], dim=-1)], dim=-2)
+
     return Adj
 
 
@@ -317,9 +317,9 @@ class SO3_Log(torch.autograd.Function):
         idx3 = (~v_larger_than_eps)
 
         factor = torch.zeros_like(v_norm, requires_grad=False)
-        factor[idx1] = 2.0 * torch.atan(v_norm[idx1]/w[idx1]) / v_norm[idx1]
-        factor[idx2] = pm(w[idx2]) * torch.pi / v_norm[idx2]
-        factor[idx3] = 2.0 * (1.0 / w[idx3] - v_norm[idx3] * v_norm[idx3] / (3 * w[idx3]**3))
+        factor = factor + idx1 * torch.nan_to_num(2.0 * torch.atan(v_norm/w) / v_norm)
+        factor = factor + idx2 * torch.nan_to_num(pm(w) * torch.pi / v_norm)
+        factor = factor + idx3 * torch.nan_to_num(2.0 * (1.0 / w - v_norm * v_norm / (3 * w**3)))
         output = factor * v
         return output
 
