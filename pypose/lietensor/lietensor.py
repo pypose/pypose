@@ -19,6 +19,7 @@ from .operation import SO3_Act4, SE3_Act4, RxSO3_Act4, Sim3_Act4
 from .operation import SO3_AdjXa, SE3_AdjXa, RxSO3_AdjXa, Sim3_AdjXa
 from .operation import SO3_AdjTXa, SE3_AdjTXa, RxSO3_AdjTXa, Sim3_AdjTXa
 from .operation import so3_Jl_inv, se3_Jl_inv, rxso3_Jl_inv, sim3_Jl_inv
+from .operation import SE3_translation, Sim3_translation
 from ..basics import pm, cumops_, cummul_, cumprod_, cumops, cummul, cumprod
 from torch.nn.modules.utils import _single, _pair, _triple, _quadruple, _ntuple
 
@@ -399,7 +400,8 @@ class SE3Type(LieType):
         return LieTensor(input.tensor()[..., 3:7], ltype=SO3_type)
 
     def translation(self, input):
-        return input.tensor()[..., 0:3]
+        input = input.tensor() if isinstance(input, LieTensor) else input
+        return SE3_translation.apply(input)
 
     def Adj(self, X, a):
         X = X.tensor() if isinstance(X, LieTensor) else X
@@ -566,7 +568,8 @@ class Sim3Type(LieType):
         return LieTensor(input.tensor()[..., 3:7], ltype=SO3_type)
 
     def translation(self, input):
-        return input.tensor()[..., 0:3]
+        input = input.tensor() if isinstance(input, LieTensor) else input
+        return Sim3_translation.apply(input)
 
     def scale(self, input):
         return input.tensor()[..., 7:8]
