@@ -149,16 +149,17 @@ class EKF(nn.Module):
         # Upper cases are matrices, lower cases are vectors
         self.model.set_refpoint(state=x, input=u, t=t)
         I = torch.eye(P.shape[-1], device=P.device, dtype=P.dtype)
-        A, B = self.model.A, self.model.B
-        C, D = self.model.C, self.model.D
+        A = self.model.A
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
 
         xm = self.model.state_transition(x, u, t=t)        # 1. System transition
 
         P = A @ P @ A.mT + Q                 # 2. Covariance predict
+        self.model.set_refpoint(state=xm, input=u, t=t)
+        C = self.model.C
         K = P @ C.mT @ pinv(C @ P @ C.mT + R) # 3. Kalman gain
-        e = y - self.model.observation(x, u, t=t)    #    predicted observation error
+        e = y - self.model.observation(xm, u, t=t)   #    predicted observation error
         xp = xm + bmv(K, e)                     # 4. Posteriori state
         P = (I - K @ C) @ P                   # 5. Posteriori covariance
         return xp, P
