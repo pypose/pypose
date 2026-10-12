@@ -114,7 +114,8 @@ class IMUPreintegrator(nn.Module):
         self.register_buffer('cov', torch.zeros(1, 9, 9), persistent=False)
         self.register_buffer('gyro_cov', gyro_cov, persistent=False)
         self.register_buffer('acc_cov', acc_cov, persistent=False)
-        self.Rij = None # rotation corresponding to the "zero-state" covariance Sigma_ii.
+        # Rotation corresponding to the "zero-state" covariance Sigma_ii.
+        self.register_buffer('Rij', None, persistent=False)
 
     def _check(self, obj):
         if obj is not None:
