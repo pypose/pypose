@@ -131,7 +131,7 @@ class Cauchy(nn.Module):
             input (torch.Tensor): the input tensor (non-negative).
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
-        return self.delta2 * (input/self.delta2 + 1).log()
+        return self.delta2 * (input/self.delta2).log1p()
 
 
 class SoftLOne(nn.Module):
