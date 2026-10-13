@@ -3,6 +3,26 @@ import pypose as pp
 import torch as torch
 
 
+def test_nls_observes_next_state():
+    class NLS(pp.module.NLS):
+        def state_transition(self, state, input, t):
+            return state + input + t
+
+        def observation(self, state, input, t):
+            return state.square() + input + t
+
+    model = NLS().reset(t=3)
+    state = torch.tensor([1.])
+    input = torch.tensor([2.])
+
+    next_state, observation = model(state, input)
+
+    assert torch.equal(next_state, torch.tensor([6.]))
+    assert torch.equal(observation, torch.tensor([41.]))
+    assert model.systime.item() == 4
+    assert torch.equal(model.state, state)
+
+
 def test_dynamics_cartpole():
     """
     Manually generate a trajectory for a forced cart-pole system and
@@ -124,7 +144,7 @@ def test_dynamics_floquet():
     state_ref[0] = state
     for i in range(N):
         state_ref[i + 1], _, _ = f(state_ref[i], time[i])
-    obser_ref = state_ref[:-1] + time[:-1].reshape(-1, 1)
+    obser_ref = state_ref[1:] + time[:-1].reshape(-1, 1)
 
     _, A0_N, B0_N = f(torch.tensor([0., 0.], device=device), torch.tensor(N, device=device))
     _, A0_i, B0_i = f(torch.tensor([0., 0.], device=device), torch.tensor(idx, device=device))
