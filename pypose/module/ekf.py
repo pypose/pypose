@@ -22,8 +22,8 @@ class EKF(nn.Module):
         \begin{aligned}
             \mathbf{x}_{k+1} &= \mathbf{f}(\mathbf{x}_k, \mathbf{u}_k, t_k) + \mathbf{w}_k,
             \quad \mathbf{w}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{Q})  \\
-            \mathbf{y}_{k+1} &= \mathbf{h}(\mathbf{x}_{k+1}, \mathbf{u}_k, t_k) + \mathbf{v}_{k+1},
-            \quad \mathbf{v}_{k+1} \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
+            \mathbf{y}_{k} &= \mathbf{h}(\mathbf{x}_k, \mathbf{u}_k, t_k) + \mathbf{v}_k,
+            \quad \mathbf{v}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
         \end{aligned}
 
     It will be linearized automatically:
@@ -106,7 +106,8 @@ class EKF(nn.Module):
         >>> for i in range(T - 1):
         ...     w = q * torch.randn(N) # transition noise
         ...     v = r * torch.randn(N) # observation noise
-        ...     states[i+1], observ[i+1] = model(states[i] + w, inputs[i])
+        ...     states[i+1], _ = model(states[i] + w, inputs[i])
+        ...     observ[i+1] = model.observation(states[i+1], inputs[i])
         ...     estim[i+1], P[i+1] = ekf(estim[i], observ[i+1] + v, inputs[i], P[i], Q, R)
         ... print('Est error:', (states - estim).norm(dim=-1))
         Est error: tensor(...)

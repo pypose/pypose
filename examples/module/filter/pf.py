@@ -32,7 +32,7 @@ if __name__ == "__main__":
     for i in range(T - 1):
         w = q * torch.randn(N, device=args.device)
         v = r * torch.randn(N, device=args.device)
-        state[i + 1], obs[i + 1] = bicycle(state[i] + w, input[i])
-        est[i + 1], P[i + 1] = filter(est[i], obs[i + 1] + v, input[i], P[i])
+        state[i + 1], obs[i] = bicycle(state[i] + w, input[i])     # model measurement
+        est[i + 1], P[i + 1] = filter(est[i], obs[i] + v, input[i], P[i])
 
     bicycle_plot('PF', state, est, P, save=args.save, show=args.show)

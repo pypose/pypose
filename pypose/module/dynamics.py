@@ -406,7 +406,7 @@ class NLS(System):
     .. math::
         \begin{aligned}
             \mathbf{x}_{k+1} &= \mathbf{f}(\mathbf{x}_k, \mathbf{u}_k, t_k), \\
-            \mathbf{y}_{k+1} &= \mathbf{g}(\mathbf{x}_{k+1}, \mathbf{u}_k, t_k),
+            \mathbf{y}_{k}   &= \mathbf{g}(\mathbf{x}_k, \mathbf{u}_k, t_k),
         \end{aligned}
 
     where :math:`k`, :math:`\mathbf{x}`, :math:`\mathbf{u}`, :math:`\mathbf{y}` are the time
@@ -498,7 +498,7 @@ class NLS(System):
         >>> print(system.A)    # Linearized state matrix
         >>> print(system.B)    # Linearized input matrix
         tensor([1.4944, 1.9320])
-        tensor([9.4944, 9.9320])
+        tensor([9., 9.])
         tensor([[1.0000, 0.0844],
                 [0.0844, 1.0000]])
         tensor([[0.5358],
@@ -515,9 +515,7 @@ class NLS(System):
 
     def forward(self, state, input):
         r'''
-        Advances the system by one time step and returns the next state and its observation.
-
-        Both functions receive the input and timestamp of the transition step.
+        Defines the computation performed at every call that advances the system by one time step.
 
         Note:
             The :obj:`forward` method implicitly increments the time step via :obj:`forward_hook`.
@@ -531,7 +529,7 @@ class NLS(System):
         '''
         self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
         state = self.state_transition(self.state, self.input, self.systime)
-        obs = self.observation(state, self.input, self.systime)
+        obs = self.observation(self.state, self.input, self.systime)
         return state, obs
 
     def set_refpoint(self, state=None, input=None, t=None):

@@ -24,8 +24,8 @@ class PF(EKF):
         \begin{aligned}
             \mathbf{x}_{k+1} &= \mathbf{f}(\mathbf{x}_k, \mathbf{u}_k, t_k) + \mathbf{w}_k,
             \quad \mathbf{w}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{Q})  \\
-            \mathbf{y}_{k+1} &= \mathbf{g}(\mathbf{x}_{k+1}, \mathbf{u}_k, t_k) + \mathbf{v}_{k+1},
-            \quad \mathbf{v}_{k+1} \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
+            \mathbf{y}_{k} &= \mathbf{g}(\mathbf{x}_k, \mathbf{u}_k, t_k) + \mathbf{v}_k,
+            \quad \mathbf{v}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
         \end{aligned}
 
     Particle filter can be described as the following equations, where the subscript
@@ -110,8 +110,8 @@ class PF(EKF):
         >>> for i in range(T - 1):
         ...     w = q * torch.randn(N) # transition noise
         ...     v = r * torch.randn(N) # observation noise
-        ...     states[i+1], observ[i+1] = model(states[i] + w, inputs[i])
-        ...     estim[i+1], P[i+1] = pf(estim[i], observ[i+1] + v, inputs[i], P[i], Q, R)
+        ...     states[i+1], observ[i] = model(states[i] + w, inputs[i])
+        ...     estim[i+1], P[i+1] = pf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
         ... print('Est error:', (states - estim).norm(dim=-1))
         Est error: tensor([10.7083,  1.6012,  0.3339,  0.1723,  0.1107])
 
