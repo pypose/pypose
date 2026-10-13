@@ -22,28 +22,30 @@ class UKF(EKF):
         \begin{aligned}
             \mathbf{x}_{k+1} &= \mathbf{f}(\mathbf{x}_k, \mathbf{u}_k, t_k) + \mathbf{w}_k,
             \quad \mathbf{w}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{Q})  \\
-            \mathbf{y}_{k} &= \mathbf{g}(\mathbf{x}_k, \mathbf{u}_k, t_k) + \mathbf{v}_k,
-            \quad \mathbf{v}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
+            \mathbf{y}_{k+1} &= \mathbf{g}(\mathbf{x}_{k+1}, \mathbf{u}_k, t_k) + \mathbf{v}_{k+1},
+            \quad \mathbf{v}_{k+1} \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
         \end{aligned}
 
-    UKF can be described as the following equations, where the subscript :math:`\cdot_{k}`
-    is omited for simplicity.
+    UKF can be described as the following equations. The sigma-point index :math:`i`
+    identifies a sample, and the time indices indicate the state or measurement step.
 
     1. Sigma Points.
 
       .. math::
           \begin{aligned}
-              & \mathbf{x}^{\left ( i \right ) } = \mathbf{x}^{+} +
-                  \mathbf{\check{x}}^{\left(i \right)}, & \quad i=0,...,2n\\
-              & \mathbf{\check{x}}^{\left (i \right)} = \mathbf{0}, & \quad i=0 \\
-              & \mathbf{\check{x}}^{\left (i \right)} = \left(\sqrt{(n+\kappa)P} \right)_{i}^{T},
+              & \mathbf{x}_k^{\left ( i \right ) } = \mathbf{x}_k^{+} +
+                  \mathbf{\check{x}}_k^{\left(i \right)}, & \quad i=0,...,2n\\
+              & \mathbf{\check{x}}_k^{\left (i \right)} = \mathbf{0}, & \quad i = 0 \\
+              & \mathbf{\check{x}}_k^{\left (i \right)} =
+                  \left(\sqrt{(n+\kappa)P_k} \right)_{i}^{T},
                & \quad i= 1, ..., n \\
-              & \mathbf{\check{x}}^{\left(i \right)} = -\left(\sqrt{(n+\kappa)P} \right)_{i}^{T},
+              & \mathbf{\check{x}}_k^{\left(i \right)} =
+                  -\left(\sqrt{(n+\kappa)P_k} \right)_{i}^{T},
                    & \quad i=n+1, ..., 2n \\
          \end{aligned}
 
-    where :math:`\left(\sqrt{(n+\kappa)P}\right) _{i}` is the :math:`i`-th row of
-    :math:`\left(\sqrt{(n+\kappa)P}\right)` and :math:`n` is the dimension of state :math:`\mathbf{x}`.
+    where :math:`\left(\sqrt{(n+\kappa)P_k}\right) _{i}` is the :math:`i`-th row of
+    :math:`\left(\sqrt{(n+\kappa)P_k}\right)` and :math:`n` is the dimension of state :math:`\mathbf{x}`.
 
     Their weighting cofficients are given as
 
@@ -56,52 +58,58 @@ class UKF(EKF):
     2. Priori State Estimation.
 
       .. math::
-           \mathbf{x}^{-} = \sum_{i=0}^{2n} W^{(i)} f(\mathbf{x}^{(i)}, \mathbf{u}, t)
+           \begin{aligned}
+               \mathbf{x}_{k+1}^{(i)} &= f(\mathbf{x}_k^{(i)}, \mathbf{u}_k, t_k),
+                   & \quad i = 0, \cdots, 2n \\
+               \mathbf{x}_{k+1}^{-} &= \sum_{i=0}^{2n} W^{(i)} \mathbf{x}_{k+1}^{(i)}
+           \end{aligned}
 
     3. Priori Covariance.
 
       .. math::
-          \mathbf{P}^{-} = \sum_{i=0}^{2n} W^{(i)}
-              \left(\mathbf{x}^{(i)} - \mathbf{x}^{-} \right)
-              \left(\mathbf{x}^{(i)} - \mathbf{x}^- \right)^T + \mathbf{Q}
+          \mathbf{P}_{k+1}^{-} = \sum_{i=0}^{2n} W^{(i)}
+              \left(\mathbf{x}_{k+1}^{(i)} - \mathbf{x}_{k+1}^{-} \right)
+              \left(\mathbf{x}_{k+1}^{(i)} - \mathbf{x}_{k+1}^- \right)^T + \mathbf{Q}
 
     4. Observational Estimation.
 
       .. math::
           \begin{aligned}
-              & \mathbf{y}^{(i)} = g \left( \mathbf{x}^{(i)}, \mathbf{u}, t \right),
+              & \mathbf{y}_{k+1}^{(i)} = g \left( \mathbf{x}_{k+1}^{(i)}, \mathbf{u}_k, t_k \right),
                   & \quad i = 0, \cdots, 2n \\
-              & \bar{\mathbf{y}} = \sum_{i=0}^{2n} W^{(i)} \mathbf{y}^{(i)}
+              & \bar{\mathbf{y}}_{k+1} = \sum_{i=0}^{2n} W^{(i)} \mathbf{y}_{k+1}^{(i)}
           \end{aligned}
 
     5. Observational Covariance.
 
       .. math::
-          \mathbf{P}_{y} = \sum_{i=0}^{2n} W^{(i)}
-              \left(\mathbf{y}^{(i)} - \bar{\mathbf{y}} \right)
-              \left( \mathbf{y}^{(i)} - \bar{\mathbf{y}} \right)^T + \mathbf{R}
+          \mathbf{P}_{y_{k+1}} = \sum_{i=0}^{2n} W^{(i)}
+              \left(\mathbf{y}_{k+1}^{(i)} - \bar{\mathbf{y}}_{k+1} \right)
+              \left( \mathbf{y}_{k+1}^{(i)} - \bar{\mathbf{y}}_{k+1} \right)^T + \mathbf{R}
 
     6. Priori and Observation Covariance:
 
       .. math::
-          \mathbf{P}_{xy} = \sum_{i=0}^{2n} W^{(i)}
-              \left( \mathbf{x}^{(i)} - \mathbf{x}^- \right)
-              \left( \mathbf{y}^{(i)} - \bar{\mathbf{y}} \right)^T
+          \mathbf{P}_{x_{k+1}y_{k+1}} = \sum_{i=0}^{2n} W^{(i)}
+              \left( \mathbf{x}_{k+1}^{(i)} - \mathbf{x}_{k+1}^- \right)
+              \left( \mathbf{y}_{k+1}^{(i)} - \bar{\mathbf{y}}_{k+1} \right)^T
 
     7. Kalman Gain
 
       .. math::
-          \mathbf{K} = \mathbf{P}_{xy}\mathbf{P}_{y}^{-1}
+          \mathbf{K}_{k+1} = \mathbf{P}_{x_{k+1}y_{k+1}}\mathbf{P}_{y_{k+1}}^{-1}
 
     8. Posteriori State Estimation.
 
       .. math::
-          \mathbf{x}^{+} = \mathbf{x}^{-} + \mathbf{K} (\mathbf{y}- \bar{\mathbf{y}})
+          \mathbf{x}_{k+1}^{+} = \mathbf{x}_{k+1}^{-} +
+              \mathbf{K}_{k+1} (\mathbf{y}_{k+1}- \bar{\mathbf{y}}_{k+1})
 
     9. Posteriori Covariance Estimation.
 
       .. math::
-          \mathbf{P} = \mathbf{P}^{-} - \mathbf{K}\mathbf{P}_{y}\mathbf{K}^T
+          \mathbf{P}_{k+1} = \mathbf{P}_{k+1}^{-} -
+              \mathbf{K}_{k+1}\mathbf{P}_{y_{k+1}}\mathbf{K}_{k+1}^T
 
     where superscript :math:`\cdot^{-}` and :math:`\cdot^{+}` denote the priori and
     posteriori estimation, respectively.
