@@ -22,8 +22,8 @@ class UKF(EKF):
         \begin{aligned}
             \mathbf{x}_{k+1} &= \mathbf{f}(\mathbf{x}_k, \mathbf{u}_k, t_k) + \mathbf{w}_k,
             \quad \mathbf{w}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{Q})  \\
-            \mathbf{y}_{k+1} &= \mathbf{g}(\mathbf{x}_{k+1}, \mathbf{u}_k, t_k) + \mathbf{v}_{k+1},
-            \quad \mathbf{v}_{k+1} \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
+            \mathbf{y}_{k} &= \mathbf{g}(\mathbf{x}_k, \mathbf{u}_k, t_k) + \mathbf{v}_k,
+            \quad \mathbf{v}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
         \end{aligned}
 
     UKF can be described as the following equations, where the subscript :math:`\cdot_{k}`
@@ -143,8 +143,8 @@ class UKF(EKF):
         >>> for i in range(T - 1):
         ...     w = q * torch.randn(N) # transition noise
         ...     v = r * torch.randn(N) # observation noise
-        ...     states[i+1], observ[i+1] = model(states[i] + w, inputs[i])
-        ...     estim[i+1], P[i+1] = ukf(estim[i], observ[i+1] + v, inputs[i], P[i], Q, R)
+        ...     states[i+1], observ[i] = model(states[i] + w, inputs[i])
+        ...     estim[i+1], P[i+1] = ukf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
         ... print('Est error:', (states - estim).norm(dim=-1))
         Est error: tensor([8.8161, 9.0322, 5.4756, 2.2453, 0.9141])
 
