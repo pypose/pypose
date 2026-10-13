@@ -138,15 +138,16 @@ class UKF(EKF):
         >>> P = torch.eye(N).repeat(T, 1, 1) * p**2
         >>> estim = torch.randn(T, N) * p
 
-        4. Perform UKF prediction. Note that estimation error becomes smaller with more steps.
+        4. Predict the next state and correct it using a measurement of that same state.
 
         >>> for i in range(T - 1):
         ...     w = q * torch.randn(N) # transition noise
         ...     v = r * torch.randn(N) # observation noise
-        ...     states[i+1], observ[i] = model(states[i] + w, inputs[i])
-        ...     estim[i+1], P[i+1] = ukf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
+        ...     states[i+1], _ = model(states[i] + w, inputs[i])
+        ...     observ[i+1] = model.observation(states[i+1], inputs[i])
+        ...     estim[i+1], P[i+1] = ukf(estim[i], observ[i+1] + v, inputs[i], P[i], Q, R)
         ... print('Est error:', (states - estim).norm(dim=-1))
-        Est error: tensor([8.8161, 9.0322, 5.4756, 2.2453, 0.9141])
+        Est error: tensor(...)
 
     Note:
         Implementation is based on Section 14.3 of this book
@@ -163,6 +164,9 @@ class UKF(EKF):
     def forward(self, x, y, u, P, Q=None, R=None, t=None, k=None):
         r'''
         Performs one step estimation.
+
+        The measurement ``y`` must correspond to the state after applying the
+        transition to ``x`` with input ``u``.
 
         Args:
             x (:obj:`Tensor`): estimated system state of previous step.
