@@ -10,6 +10,10 @@ class TestEKF:
             def __init__(self):
                 super().__init__()
 
+            def forward(self, state, input, noise):
+                state = self.state_transition(state, input, self.systime) + noise
+                return state, self.observation(state, input, self.systime + 1)
+
             def state_transition(self, state, input, t=None):
                 return state.cos() + input
 
@@ -34,11 +38,33 @@ class TestEKF:
         for i in range(T - 1):
             w = q * torch.randn(N, device=device)  # transition noise
             v = r * torch.randn(N, device=device)  # observation noise
-            states[i + 1], observ[i] = model(states[i] + w, inputs[i])
-            estim[i + 1], P[i + 1] = ekf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
+            states[i + 1], observ[i + 1] = model(states[i], inputs[i], w)
+            estim[i + 1], P[i + 1] = ekf(estim[i], observ[i + 1] + v, inputs[i], P[i], Q, R)
         error = (states - estim).norm(dim=-1)
 
         assert torch.all(error[0] - error[-1] > 0), "Filter error last step too large."
+
+    def test_update_linearizes_at_predicted_state(self):
+        class NLS(pp.module.NLS):
+            def state_transition(self, state, input, t=None):
+                return 2 * state
+
+            def observation(self, state, input, t=None):
+                return state.square()
+
+        model = NLS()
+        ekf = pp.module.EKF(model)
+        x = torch.tensor([1.], dtype=torch.float64)
+        y = torch.tensor([5.], dtype=torch.float64)
+        u = torch.tensor([0.], dtype=torch.float64)
+        P = torch.tensor([[1.]], dtype=torch.float64)
+        Q = torch.tensor([[0.]], dtype=torch.float64)
+        R = torch.tensor([[1.]], dtype=torch.float64)
+
+        xp, Pp = ekf(x, y, u, P, Q, R)
+
+        assert torch.allclose(xp, torch.tensor([2 + 16 / 65], dtype=torch.float64))
+        assert torch.allclose(Pp, torch.tensor([[4 / 65]], dtype=torch.float64))
 
 
 if __name__ == '__main__':
