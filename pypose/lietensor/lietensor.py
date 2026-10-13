@@ -976,6 +976,13 @@ class LieTensor(Tensor):
         else:
             scalar_list = [scalars] * len(self)
 
+        lengths = (len(self), len(tensor1), len(tensor2), len(scalar_list))
+        if len(set(lengths)) != 1:
+            raise ValueError(
+                "foreach addcdiv expects params, tensor1, tensor2, and scalars "
+                f"to have equal lengths, got {lengths}"
+            )
+
         if inplace:
             for s, t1, t2, val in zip(self, tensor1, tensor2, scalar_list):
                 s.addcdiv_(t1, t2, value=val)

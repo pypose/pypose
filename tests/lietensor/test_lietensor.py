@@ -4,6 +4,7 @@ import torch
 import random
 import warnings
 import torch.linalg
+import pytest
 import pypose as pp
 from torch import nn
 import pypose.optim.solver as ppos
@@ -415,6 +416,31 @@ def test_torch_addcdiv_function():
     assert isinstance(out, (list, tuple))
     assert isinstance(out[0], pp.LieTensor)
     assert out[0].ltype == p1.ltype
+
+
+@pytest.mark.parametrize("mismatch", ["params", "tensor1", "tensor2", "scalars"])
+@pytest.mark.parametrize("inplace", [True, False])
+def test_torch_foreach_addcdiv_rejects_mismatched_lengths(mismatch, inplace):
+    params = [pp.randn_SO3(2), pp.randn_SO3(2)]
+    original = [param.clone() for param in params]
+    tensor1 = [torch.randn(2, 3), torch.randn(2, 3)]
+    tensor2 = [torch.rand(2, 3) + 0.5, torch.rand(2, 3) + 0.5]
+    scalars = [0.2, 0.2]
+    if mismatch == "params":
+        params.pop()
+    elif mismatch == "tensor1":
+        tensor1.pop()
+    elif mismatch == "tensor2":
+        tensor2.pop()
+    else:
+        scalars.pop()
+
+    operation = torch._foreach_addcdiv_ if inplace else torch._foreach_addcdiv
+    with pytest.raises(ValueError, match="equal lengths"):
+        operation(params, tensor1, tensor2, scalars)
+
+    for param, expected in zip(params, original):
+        torch.testing.assert_close(param.tensor(), expected.tensor())
 
 
 def test_adam_foreach():
