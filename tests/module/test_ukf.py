@@ -43,6 +43,10 @@ class TestUKF:
             def __init__(self):
                 super().__init__()
 
+            def forward(self, state, input, noise):
+                state = self.state_transition(state, input, self.systime) + noise
+                return state, self.observation(state, input, self.systime + 1)
+
             def state_transition(self, state, input, t=None):
                 return state.cos() + input
 
@@ -68,9 +72,7 @@ class TestUKF:
         for i in range(T - 1):
             w = q * torch.randn(N, device=device)  # transition noise
             v = r * torch.randn(N, device=device)  # observation noise
-            states[i + 1], _ = model(states[i], inputs[i])
-            states[i + 1] += w
-            observ[i + 1] = model.observation(states[i + 1], inputs[i])
+            states[i + 1], observ[i + 1] = model(states[i], inputs[i], w)
             estim[i + 1], P[i + 1] = ukf(estim[i], observ[i + 1] + v, inputs[i], P[i], Q, R)
         error = (states - estim).norm(dim=-1)
 
