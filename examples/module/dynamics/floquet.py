@@ -55,7 +55,7 @@ if __name__ == "__main__":
     # Calculate trajectory
     model = Floquet().to(args.device)
     for i in range(N - 1):
-        state[i + 1], obser[i] = model(state[i], input[i])
+        state[i + 1], obser[i + 1] = model(state[i], input[i])
 
     # Jacobian computation - Find jacobians at the last step
     vars = ['A', 'B', 'C', 'D', 'c1', 'c2']
@@ -71,8 +71,8 @@ if __name__ == "__main__":
     f, ax = plt.subplots(nrows=4, sharex=True)
     subPlot(ax[0], time, state[:, 0], ylabel='State[0]')
     subPlot(ax[1], time, state[:, 1], ylabel='State[1]')
-    subPlot(ax[2], time[:-1], obser[:-1, 0], ylabel='Observe[0]')
-    subPlot(ax[3], time[:-1], obser[:-1, 1], ylabel='Observe[1]', xlabel='Time')
+    subPlot(ax[2], time[1:], obser[1:, 0], ylabel='Observe[0]')
+    subPlot(ax[3], time[1:], obser[1:, 1], ylabel='Observe[1]', xlabel='Time')
 
     figure = os.path.join(args.save + 'floquet.png')
     plt.savefig(figure)

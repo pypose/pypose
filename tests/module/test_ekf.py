@@ -34,8 +34,7 @@ class TestEKF:
         for i in range(T - 1):
             w = q * torch.randn(N, device=device)  # transition noise
             v = r * torch.randn(N, device=device)  # observation noise
-            states[i + 1], _ = model(states[i] + w, inputs[i])
-            observ[i + 1] = model.observation(states[i + 1], inputs[i])
+            states[i + 1], observ[i + 1] = model(states[i] + w, inputs[i])
             estim[i + 1], P[i + 1] = ekf(estim[i], observ[i + 1] + v, inputs[i], P[i], Q, R)
         error = (states - estim).norm(dim=-1)
 
