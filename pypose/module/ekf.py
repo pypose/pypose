@@ -106,7 +106,8 @@ class EKF(nn.Module):
         >>> for i in range(T - 1):
         ...     w = q * torch.randn(N) # transition noise
         ...     v = r * torch.randn(N) # observation noise
-        ...     states[i+1], _ = model(states[i] + w, inputs[i])
+        ...     states[i+1], _ = model(states[i], inputs[i])
+        ...     states[i+1] += w
         ...     observ[i+1] = model.observation(states[i+1], inputs[i])
         ...     estim[i+1], P[i+1] = ekf(estim[i], observ[i+1] + v, inputs[i], P[i], Q, R)
         ... print('Est error:', (states - estim).norm(dim=-1))
