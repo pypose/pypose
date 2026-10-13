@@ -4,6 +4,40 @@ import torch as torch
 
 class TestUKF:
 
+    def test_sigma_points_preserve_correlated_covariance(self):
+        ukf = pp.module.UKF(pp.module.NLS())
+        x = torch.tensor([1., 2.], dtype=torch.float64)
+        P = torch.tensor([[2., 0.5], [0.5, 1.]], dtype=torch.float64)
+
+        xs, w = ukf.sigma_weight_points(x, P, k=1)
+        mean = (w * xs).sum(dim=-2)
+        covariance = ukf.compute_cov(xs - mean, xs - mean, w)
+
+        assert torch.allclose(mean, x)
+        assert torch.allclose(covariance, P)
+
+    def test_update_matches_linear_kalman_filter_with_process_noise(self):
+        class NLS(pp.module.NLS):
+            def state_transition(self, state, input, t=None):
+                return state + input
+
+            def observation(self, state, input, t=None):
+                return state
+
+        ukf = pp.module.UKF(NLS())
+        x = torch.tensor([0.], dtype=torch.float64)
+        y = torch.tensor([2.], dtype=torch.float64)
+        u = torch.tensor([1.], dtype=torch.float64)
+        P = torch.tensor([[1.]], dtype=torch.float64)
+        Q = torch.tensor([[3.]], dtype=torch.float64)
+        R = torch.tensor([[1.]], dtype=torch.float64)
+
+        xp, Pp = ukf(x, y, u, P, Q, R)
+
+        # Predicted covariance is 4, so the Kalman gain is 4 / (4 + 1).
+        assert torch.allclose(xp, torch.tensor([1.8], dtype=torch.float64))
+        assert torch.allclose(Pp, torch.tensor([[0.8]], dtype=torch.float64))
+
     def test_ukf(self):
         class NLS(pp.module.NLS):
             def __init__(self):

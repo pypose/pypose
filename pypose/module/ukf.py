@@ -15,6 +15,8 @@ class UKF(EKF):
             Ignored if provided during each iteration. Default: ``None``
         R (:obj:`Tensor`, optional): The covariance matrices of system observation noise.
             Ignored if provided during each iteration. Default: ``None``
+        msqrt (callable, optional): Matrix square-root function returning a factor
+            ``L`` such that ``L @ L.mT`` equals its input. Default: ``torch.linalg.cholesky``.
 
     A non-linear system can be described as
 
@@ -46,6 +48,8 @@ class UKF(EKF):
 
     where :math:`\left(\sqrt{(n+\kappa)P_k}\right) _{i}` is the :math:`i`-th row of
     :math:`\left(\sqrt{(n+\kappa)P_k}\right)` and :math:`n` is the dimension of state :math:`\mathbf{x}`.
+    Here the square-root matrix is :math:`L^T`, where
+    :math:`LL^T=(n+\kappa)P_k`, so its rows are the sigma-point offsets.
 
     Their weighting cofficients are given as
 
@@ -73,9 +77,13 @@ class UKF(EKF):
 
     4. Observational Estimation.
 
+      Regenerate sigma points :math:`\tilde{\mathbf{x}}_{k+1}^{(i)}` from
+      :math:`(\mathbf{x}_{k+1}^{-}, \mathbf{P}_{k+1}^{-})` using step 1.
+      These points include the process-noise covariance added in step 3.
+
       .. math::
           \begin{aligned}
-              & \mathbf{y}_{k+1}^{(i)} = g \left( \mathbf{x}_{k+1}^{(i)}, \mathbf{u}_k, t_k \right),
+              & \mathbf{y}_{k+1}^{(i)} = g \left( \tilde{\mathbf{x}}_{k+1}^{(i)}, \mathbf{u}_k, t_k \right),
                   & \quad i = 0, \cdots, 2n \\
               & \bar{\mathbf{y}}_{k+1} = \sum_{i=0}^{2n} W^{(i)} \mathbf{y}_{k+1}^{(i)}
           \end{aligned}
@@ -91,7 +99,7 @@ class UKF(EKF):
 
       .. math::
           \mathbf{P}_{x_{k+1}y_{k+1}} = \sum_{i=0}^{2n} W^{(i)}
-              \left( \mathbf{x}_{k+1}^{(i)} - \mathbf{x}_{k+1}^- \right)
+              \left( \tilde{\mathbf{x}}_{k+1}^{(i)} - \mathbf{x}_{k+1}^- \right)
               \left( \mathbf{y}_{k+1}^{(i)} - \bar{\mathbf{y}}_{k+1} \right)^T
 
     7. Kalman Gain
@@ -204,6 +212,7 @@ class UKF(EKF):
         P = self.compute_cov(ex, ex, w, Q)
 
         xs, w = self.sigma_weight_points(xe, P, k)
+        ex = xe - xs
         ys = self.model.observation(xs, u, t)
         ye = (w * ys).sum(dim=-2)
         ey = ye - ys
@@ -230,7 +239,7 @@ class UKF(EKF):
         '''
         assert x.size(-1) == P.size(-1) == P.size(-2), 'Invalid shape'
         n, xe = x.size(-1), x.unsqueeze(-2)
-        xr = self.msqrt((n + k) * P)
+        xr = self.msqrt((n + k) * P).mT
         we = torch.full(xe.shape[:-1], k / (n + k), dtype=x.dtype, device=x.device)
         wr = torch.full(xr.shape[:-1], 1 / (2 * (n + k)), dtype=x.dtype, device=x.device)
         p = torch.cat((xe, xe + xr, xe - xr), dim=-2)
