@@ -950,8 +950,155 @@ class LieTensor(Tensor):
             out.ltype = self.ltype
         return out
 
+    @staticmethod
+    def _handle_foreach_addcdiv(args, kwargs, inplace=True):
+        self = args[0] if len(args) > 0 else kwargs.get('self', kwargs.get('input', None))
+        tensor1 = args[1] if len(args) > 1 else kwargs.get('tensor1', None)
+        tensor2 = args[2] if len(args) > 2 else kwargs.get('tensor2', None)
+        scalars = kwargs.get('scalars', None)
+        if scalars is None:
+            if len(args) > 3:
+                scalars = args[3]
+            elif 'value' in kwargs:
+                scalars = kwargs['value']
+            else:
+                scalars = 1
+
+        if isinstance(scalars, Number):
+            scalar_list = [scalars] * len(self)
+        elif isinstance(scalars, Tensor):
+            if scalars.numel() == 1:
+                scalar_list = [scalars.item()] * len(self)
+            else:
+                scalar_list = [s.item() if s.numel() == 1 else s for s in scalars]
+        elif isinstance(scalars, Sequence):
+            scalar_list = [s.item() if isinstance(s, Tensor) and s.numel() == 1 else s for s in scalars]
+        else:
+            scalar_list = [scalars] * len(self)
+
+        if inplace:
+            for s, t1, t2, val in zip(self, tensor1, tensor2, scalar_list):
+                s.addcdiv_(t1, t2, value=val)
+            return self
+        else:
+            res = [s.addcdiv(t1, t2, value=val) for s, t1, t2, val in zip(self, tensor1, tensor2, scalar_list)]
+            return tuple(res) if isinstance(self, tuple) else list(res)
+
+    @staticmethod
+    def _handle_fused_adam(
+        params, grads, exp_avgs, exp_avg_sqs, max_exp_avg_sqs, state_steps,
+        *extra_args, decoupled=False, **kwargs
+    ):
+        extra_names = ['lr', 'beta1', 'beta2', 'weight_decay', 'eps', 'amsgrad', 'maximize', 'grad_scale', 'found_inf']
+        for idx, val in enumerate(extra_args):
+            if idx < len(extra_names) and extra_names[idx] not in kwargs:
+                kwargs[extra_names[idx]] = val
+
+        lr = kwargs.get('lr', 1e-3)
+        if isinstance(lr, Tensor):
+            lr = lr.item() if lr.numel() == 1 else float(lr)
+        beta1 = kwargs.get('beta1', 0.9)
+        if isinstance(beta1, Tensor):
+            beta1 = beta1.item() if beta1.numel() == 1 else float(beta1)
+        beta2 = kwargs.get('beta2', 0.999)
+        if isinstance(beta2, Tensor):
+            beta2 = beta2.item() if beta2.numel() == 1 else float(beta2)
+        weight_decay = kwargs.get('weight_decay', 0.0)
+        if isinstance(weight_decay, Tensor):
+            weight_decay = weight_decay.item() if weight_decay.numel() == 1 else float(weight_decay)
+        eps = kwargs.get('eps', 1e-8)
+        if isinstance(eps, Tensor):
+            eps = eps.item() if eps.numel() == 1 else float(eps)
+        amsgrad = bool(kwargs.get('amsgrad', False))
+        maximize = bool(kwargs.get('maximize', False))
+        grad_scale = kwargs.get('grad_scale', None)
+        found_inf = kwargs.get('found_inf', None)
+
+        if found_inf is not None:
+            if isinstance(found_inf, Tensor):
+                if found_inf.item() != 0:
+                    return
+            elif bool(found_inf):
+                return
+
+        for i, param in enumerate(params):
+            grad = grads[i]
+            if grad is None:
+                continue
+            if maximize:
+                grad = -grad
+            if grad_scale is not None:
+                grad = grad / grad_scale
+
+            exp_avg = exp_avgs[i]
+            exp_avg_sq = exp_avg_sqs[i]
+            step_t = state_steps[i]
+
+            if weight_decay != 0:
+                if decoupled:
+                    if isinstance(param, LieTensor) and not param.ltype.on_manifold:
+                        pass
+                    else:
+                        param.mul_(1 - lr * weight_decay)
+                else:
+                    grad = grad.add(param, alpha=weight_decay)
+
+            is_complex = torch.is_complex(param)
+            if is_complex:
+                grad = torch.view_as_real(grad)
+                exp_avg = torch.view_as_real(exp_avg)
+                exp_avg_sq = torch.view_as_real(exp_avg_sq)
+
+            exp_avg.lerp_(grad, 1 - beta1)
+            exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
+
+            step = step_t.item() if isinstance(step_t, Tensor) else step_t
+            bias_correction1 = 1 - beta1 ** step
+            bias_correction2 = 1 - beta2 ** step
+            step_size = lr / bias_correction1
+            bias_correction2_sqrt = bias_correction2 ** 0.5
+
+            if amsgrad and max_exp_avg_sqs and i < len(max_exp_avg_sqs) and max_exp_avg_sqs[i] is not None and max_exp_avg_sqs[i].numel() > 0:
+                max_exp_avg_sq = max_exp_avg_sqs[i]
+                if is_complex:
+                    max_exp_avg_sq = torch.view_as_real(max_exp_avg_sq)
+                torch.maximum(max_exp_avg_sq, exp_avg_sq, out=max_exp_avg_sq)
+                denom = (max_exp_avg_sq.sqrt() / bias_correction2_sqrt).add_(eps)
+            else:
+                denom = (exp_avg_sq.sqrt() / bias_correction2_sqrt).add_(eps)
+
+            if is_complex:
+                real_param = torch.view_as_real(param)
+                real_param.addcdiv_(exp_avg, denom, value=-step_size)
+            else:
+                param.addcdiv_(exp_avg, denom, value=-step_size)
+
     @classmethod
-    def __torch_function__(cls, func, types, args=(), kwargs={}):
+    def __torch_function__(cls, func, types, args=(), kwargs=None):
+        if kwargs is None:
+            kwargs = {}
+        func_name = getattr(func, '__name__', None)
+        if func_name == 'addcdiv':
+            input_tensor = args[0] if len(args) > 0 else kwargs.get('input', None)
+            if isinstance(input_tensor, cls):
+                call_args = args[1:] if len(args) > 0 else ()
+                call_kwargs = {k: v for k, v in kwargs.items() if k != 'input'}
+                return input_tensor.addcdiv(*call_args, **call_kwargs)
+        elif func_name == 'addcdiv_':
+            input_tensor = args[0] if len(args) > 0 else kwargs.get('input', None)
+            if isinstance(input_tensor, cls):
+                call_args = args[1:] if len(args) > 0 else ()
+                call_kwargs = {k: v for k, v in kwargs.items() if k != 'input'}
+                return input_tensor.addcdiv_(*call_args, **call_kwargs)
+        elif func_name == '_foreach_addcdiv_':
+            return cls._handle_foreach_addcdiv(args, kwargs, inplace=True)
+        elif func_name == '_foreach_addcdiv':
+            return cls._handle_foreach_addcdiv(args, kwargs, inplace=False)
+        elif func_name == '_fused_adam_':
+            return cls._handle_fused_adam(*args, decoupled=False, **kwargs)
+        elif func_name == '_fused_adamw_':
+            return cls._handle_fused_adam(*args, decoupled=True, **kwargs)
+
         ltypes = (Tensor if t is LieTensor or Parameter else t for t in types)
         data = Tensor.__torch_function__(func, ltypes, args, kwargs)
         if data is not None and hasattr(func, '__name__') and func.__name__ in HANDLED_FUNCTIONS:

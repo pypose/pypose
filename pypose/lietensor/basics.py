@@ -165,8 +165,10 @@ def addcdiv(input, tensor1, tensor2, value=1):
 
     Note:
         See :meth:`pypose.add` for notes on manifold tangent spaces and compatibility with optimizers.
-        This provides convenience to work with PyTorch optimizers like :obj:`torch.optim.Adam`,
-        which calls function :meth:`.addcdiv_` of a Lie Group to adjust parameters.
+        This provides convenience to work with PyTorch optimizers like :obj:`torch.optim.Adam`
+        and :obj:`torch.optim.AdamW`, which adjust parameters via :meth:`.addcdiv_` of a Lie Group.
+        Both multi-tensor (:attr:`foreach=True`) and fused (:attr:`fused=True`) execution modes
+        are supported in addition to the standard single-tensor update path.
 
     See :meth:`LieTensor` for types of Lie Algebra and Lie Group.
 
