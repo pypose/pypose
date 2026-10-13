@@ -80,7 +80,7 @@ class EKF(nn.Module):
         ...     def state_transition(self, state, input, t=None):
         ...         return state.cos() + input
         ...
-        ...     def observation(self, state, input, t):
+        ...     def observation(self, state, input, t=None):
         ...         return state.sin() + input
 
         2. Create a model and filter
@@ -101,15 +101,16 @@ class EKF(nn.Module):
         >>> P = torch.eye(N).repeat(T, 1, 1) * p**2
         >>> estim = torch.randn(T, N) * p
 
-        4. Perform EKF prediction. Note that estimation error becomes smaller with more steps.
+        4. Predict the next state and correct it using a measurement of that same state.
 
         >>> for i in range(T - 1):
         ...     w = q * torch.randn(N) # transition noise
         ...     v = r * torch.randn(N) # observation noise
-        ...     states[i+1], observ[i] = model(states[i] + w, inputs[i])
-        ...     estim[i+1], P[i+1] = ekf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
+        ...     states[i+1], _ = model(states[i] + w, inputs[i])
+        ...     observ[i+1] = model.observation(states[i+1], inputs[i])
+        ...     estim[i+1], P[i+1] = ekf(estim[i], observ[i+1] + v, inputs[i], P[i], Q, R)
         ... print('Est error:', (states - estim).norm(dim=-1))
-        Est error: tensor([5.7655, 5.3436, 3.5947, 0.3359, 0.0639])
+        Est error: tensor(...)
 
     Warning:
         Don't introduce noise in ``System`` methods ``state_transition`` and ``observation``
@@ -132,6 +133,9 @@ class EKF(nn.Module):
     def forward(self, x, y, u, P, Q=None, R=None, t=None):
         r'''
         Performs one step estimation.
+
+        The measurement ``y`` must correspond to the state after applying the
+        transition to ``x`` with input ``u``.
 
         Args:
             x (:obj:`Tensor`): estimated system state of previous step.
