@@ -15,7 +15,7 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(args.save), exist_ok=True)
 
     T, N, M = 30, 3, 2  # steps, state dim, input dim
-    q, r, p = 0.2, 0.2, 5  # covariance of transition noise, observation noise, and estimation
+    q, r, p = 0.2, 0.2, 5  # standard deviations of process noise, measurement noise, and estimation
 
     input = torch.randn(T, M, device=args.device) * 0.1 + \
             torch.tensor([1, 0], device=args.device)
@@ -32,7 +32,9 @@ if __name__ == "__main__":
     for i in range(T - 1):
         w = q * torch.randn(N, device=args.device)
         v = r * torch.randn(N, device=args.device)
-        state[i + 1], obs[i + 1] = bicycle(state[i] + w, input[i])
+        state[i + 1], obs[i + 1] = bicycle(state[i], input[i])
+        state[i + 1] += w
+        obs[i + 1] += w  # Bicycle observes the state directly.
         est[i + 1], P[i + 1] = filter(est[i], obs[i + 1] + v, input[i], P[i])
 
     bicycle_plot('PF', state, est, P, save=args.save, show=args.show)
