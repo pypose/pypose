@@ -32,8 +32,7 @@ if __name__ == "__main__":
     for i in range(T - 1):
         w = q * torch.randn(M, device=args.device)
         v = r * torch.randn(N, device=args.device)
-        state[i + 1], _ = bicycle(state[i], input[i] + w)
-        obs[i + 1] = bicycle.observation(state[i + 1], input[i])
+        state[i + 1], obs[i + 1] = bicycle(state[i], input[i] + w)
         est[i + 1], P[i + 1] = filter(est[i], obs[i + 1] + v, input[i], P[i])
 
     bicycle_plot('EKF', state, est, P, save=args.save, show=args.show)
