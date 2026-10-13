@@ -117,7 +117,7 @@ class UKF(EKF):
         ...     def state_transition(self, state, input, t=None):
         ...         return state.cos() + input
         ...
-        ...     def observation(self, state, input, t):
+        ...     def observation(self, state, input, t=None):
         ...         return state.sin() + input
 
         2. Create a model and filter
