@@ -212,7 +212,7 @@ If you use PyPose, please cite the papers below. The original paper is available
 }
 ```
 
-If you use the sparse Jacobian, GPU sparse linear algebra, conjugate gradient solver, or sparse LM optimizer in PyPose, please cite the [following paper](https://arxiv.org/abs/2409.12190).
+If you use the bundle adjustment or pose graph optimization functions, or its components such as sparse Jacobian, GPU sparse linear algebra, conjugate gradient solver, or sparse LM optimizer, you must cite [*Bundle Adjustment in the Eager Mode*](https://arxiv.org/abs/2409.12190).
 
 ```bibtex
 @article{zhan2026bundle,
