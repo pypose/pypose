@@ -146,9 +146,9 @@ pytest
 >>> # Note: remove one of the above options for usage!
 ```
 
-3. May 2026: Starting from v0.9.5, PyPose introduces sparse Jacobian tracing, enabling
-efficient sparse 2nd-order optimization, significantly accelerating applications such as
-bundle adjustment.
+3. May 2026: PyPose v0.9.5 integrates the sparse Jacobian tracing and sparse second-order
+optimization methods developed in [*Bundle Adjustment in the Eager Mode*](https://arxiv.org/abs/2409.12190)
+to accelerate applications such as bundle adjustment.
 
 ```python
 >>> import torch
