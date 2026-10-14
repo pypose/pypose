@@ -201,7 +201,7 @@ For more usage, see [Documentation](https://pypose.org/docs). For more applicati
 
 ## Citing PyPose
 
-If you use PyPose, please cite the paper below. You may also [download it here](https://arxiv.org/abs/2209.15428).
+If you use PyPose, please cite the papers below. The original paper is available [here](https://arxiv.org/abs/2209.15428).
 
 ```bibtex
 @inproceedings{wang2023pypose,
@@ -234,3 +234,7 @@ More papers describing PyPose:
   booktitle = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) Workshop},
 }
 ```
+
+## Point of Contact
+
+For any questions, please contact @zitongzhan with a copy to @wang-chen.
