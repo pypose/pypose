@@ -165,6 +165,7 @@ def pixel2point(pixels, depth, intrinsics):
     pts3d_z = depth
     pts3d_x = ((pixels[..., 0] - cx) * pts3d_z) / fx
     pts3d_y = ((pixels[..., 1] - cy) * pts3d_z) / fy
+    pts3d_x, pts3d_y, pts3d_z = torch.broadcast_tensors(pts3d_x, pts3d_y, pts3d_z)
     return torch.stack([pts3d_x, pts3d_y, pts3d_z], dim=-1)
 
 
