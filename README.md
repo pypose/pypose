@@ -237,4 +237,4 @@ More papers describing PyPose:
 
 ## Point of Contact
 
-For any questions, please contact @zitongzhan with a copy to @wang-chen.
+For any questions, please contact [@zitongzhan](https://github.com/zitongzhan) with a copy to [@wang-chen](https://github.com/wang-chen).
