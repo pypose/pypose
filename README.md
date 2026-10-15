@@ -201,7 +201,9 @@ For more usage, see [Documentation](https://pypose.org/docs). For more applicati
 
 ## Citing PyPose
 
-If you use PyPose, please cite the papers below. The original paper is available [here](https://arxiv.org/abs/2209.15428).
+If you use PyPose, please cite the papers below.
+
+#### [PyPose: A Library for Robot Learning with Physics-based Optimization](https://arxiv.org/abs/2209.15428)
 
 ```bibtex
 @inproceedings{wang2023pypose,
@@ -212,7 +214,7 @@ If you use PyPose, please cite the papers below. The original paper is available
 }
 ```
 
-If you use the bundle adjustment or pose graph optimization functions, or its components such as sparse Jacobian, GPU sparse linear algebra, conjugate gradient solver, or sparse LM optimizer, you must cite [*Bundle Adjustment in the Eager Mode*](https://arxiv.org/abs/2409.12190).
+#### [Bundle Adjustment in the Eager Mode](https://arxiv.org/abs/2409.12190)
 
 ```bibtex
 @article{zhan2026bundle,
@@ -224,7 +226,7 @@ If you use the bundle adjustment or pose graph optimization functions, or its co
 }
 ```
 
-More papers describing PyPose:
+#### [PyPose v0.6: The Imperative Programming Interface for Robotics](https://arxiv.org/abs/2309.13035)
 
 ```bibtex
 @inproceedings{zhan2023pypose,
@@ -234,6 +236,8 @@ More papers describing PyPose:
   booktitle = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) Workshop},
 }
 ```
+
+If you use the bundle adjustment or pose graph optimization functions, or its components such as sparse Jacobian, GPU sparse linear algebra, conjugate gradient solver, or sparse LM optimizer, you must cite [*Bundle Adjustment in the Eager Mode*](https://arxiv.org/abs/2409.12190).
 
 ## Point of Contact
 
