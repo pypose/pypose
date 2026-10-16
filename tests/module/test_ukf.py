@@ -67,15 +67,6 @@ class TestUKF:
         torch.testing.assert_close(actual_x, expected_x)
         torch.testing.assert_close(actual_P, expected_P.expand(*batch, 2, 2))
 
-    def test_covariance_correction(self):
-        ukf = pp.module.UKF(pp.module.NLS(), correct_PD_eps=0.1)
-        P = torch.tensor([[[1., 0.], [0., -0.2]], [[2., 0.3], [0.3, 1.]]],
-                         dtype=torch.float64)
-        corrected = ukf.project_to_positive_definite(P)
-        torch.testing.assert_close(torch.linalg.eigvalsh(corrected),
-                                   torch.linalg.eigvalsh(P).clamp_min(0.1))
-        torch.linalg.cholesky(corrected)
-
     def test_ukf(self):
         class NLS(pp.module.NLS):
             def __init__(self):

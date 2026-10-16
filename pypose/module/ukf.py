@@ -17,8 +17,6 @@ class UKF(EKF):
             Ignored if provided during each iteration. Default: ``None``
         msqrt (callable, optional): Matrix square-root function returning a factor
             ``L`` such that ``L @ L.mT`` equals its input. Default: ``torch.linalg.cholesky``.
-        correct_PD_eps (:obj:`Float`, optional): Positive eigenvalue floor for covariance
-            correction. Negative values disable correction. Default: ``-1``.
 
     A non-linear system can be described as
 
@@ -178,10 +176,9 @@ class UKF(EKF):
           Cleveland State University, 2006
     '''
 
-    def __init__(self, model, Q=None, R=None, msqrt=None, correct_PD_eps=-1):
+    def __init__(self, model, Q=None, R=None, msqrt=None):
         super().__init__(model, Q, R)
         self.msqrt = torch.linalg.cholesky if msqrt is None else msqrt
-        self.correct_PD_eps = correct_PD_eps
 
     def forward(self, x, y, u, P, Q=None, R=None, t=None, k=None):
         r'''
@@ -216,8 +213,6 @@ class UKF(EKF):
         xe = (w * xs).sum(dim=0)
         ex = xe - xs
         P = self.compute_cov(ex, ex, w, Q)
-        if self.correct_PD_eps >= 0:
-            P = self.project_to_positive_definite(P)
 
         xs, w = self.sigma_weight_points(xe, P, k)
         ex = xe - xs
@@ -230,8 +225,6 @@ class UKF(EKF):
         K = Pxy @ pinv(Py)
         x = xe + bmv(K, y - ye)
         P = P - K @ Py @ K.mT
-        if self.correct_PD_eps >= 0:
-            P = self.project_to_positive_definite(P)
 
         return x, P
 
@@ -263,10 +256,3 @@ class UKF(EKF):
         '''Compute covariance of two set of variables.'''
         a, b = a.unsqueeze(-1), b.unsqueeze(-1)
         return Q + (w.unsqueeze(-1) * a @ b.mT).sum(dim=0)
-
-    def project_to_positive_definite(self, A):
-        '''Project matrix to positive definite by clamping its eigenvalues to positive.'''
-        A = (A + A.mT) / 2
-        eigenvalues, eigenvectors = torch.linalg.eigh(A)
-        eigenvalues = torch.clamp(eigenvalues, min=self.correct_PD_eps)
-        return (eigenvectors @ torch.diag_embed(eigenvalues)) @ eigenvectors.mT
