@@ -18,6 +18,19 @@ class PF(EKF):
             Ignored if provided during each iteration. Default: ``None``
         particles (:obj:`Int`, optional): The number of particle. Default: ``1000``
 
+    Batch dimensions precede vector and matrix dimensions. For batch shape ``B``,
+    states have shape ``(*B, n)``, observations ``(*B, m)``, and inputs
+    ``(*B, l)``. Covariances ``P`` and ``Q`` have shape ``(*B, n, n)``,
+    and ``R`` has shape ``(*B, m, m)``. Covariances can be shared across
+    batches using shapes ``(n, n)`` and ``(m, m)``. An empty ``B`` gives an
+    unbatched filter. Batch entries represent independent systems, not time steps.
+
+    Internally, the particle dimension comes first. Model methods receive
+    states of shape ``(S, *B, n)`` and return states or observations of shape
+    ``(S, *B, n)`` or ``(S, *B, m)``. Inputs retain shape ``(*B, l)`` and
+    broadcast across samples. Model operations must preserve batch independence.
+    Here ``S = particles``. Returned estimates have no sample dimension.
+
     A non-linear system can be described as
 
     .. math::
@@ -134,10 +147,11 @@ class PF(EKF):
         Performs one step estimation.
 
         Args:
-            x (:obj:`Tensor`): estimated system state of previous step.
-            y (:obj:`Tensor`): system observation at current step (measurement).
-            u (:obj:`Tensor`): system input at current step.
-            P (:obj:`Tensor`): state estimation covariance of previous step.
+            x (:obj:`Tensor`): estimated system state of previous step, shape ``(*B, n)``.
+            y (:obj:`Tensor`): system observation at current step, shape ``(*B, m)``.
+            u (:obj:`Tensor`): system input at current step, shape ``(*B, l)``.
+            P (:obj:`Tensor`): state estimation covariance of previous step, shape
+                ``(*B, n, n)`` or ``(n, n)``.
             Q (:obj:`Tensor`, optional): covariance of system transition model.
                 Default: ``None``.
             R (:obj:`Tensor`, optional): covariance of system observation model.
@@ -146,7 +160,8 @@ class PF(EKF):
                 If ``None``, current system time is used. Default: ``None``.
 
         Return:
-            list of :obj:`Tensor`: posteriori state and covariance estimation
+            tuple of :obj:`Tensor`: posteriori state ``(*B, n)`` and covariance
+            ``(*B, n, n)``, where ``B`` is the broadcast batch shape.
         '''
         # Upper cases are matrices, lower cases are vectors
         Q = Q if Q is not None else self.Q
@@ -174,7 +189,7 @@ class PF(EKF):
             P (:obj:`Tensor`): state estimation covariance of previous step
 
         Return:
-            list of :obj:`Tensor`: particles
+            :obj:`Tensor`: particles of shape ``(particles, *B, n)``.
         '''
         m = MultivariateNormal(x, P)
         return m.sample(torch.Size([self.particles]))
@@ -190,6 +205,7 @@ class PF(EKF):
         Resample the set of a posteriori particles
         '''
         r = torch.rand(x.shape[:-1], dtype=x.dtype, device=x.device)
+        # searchsorted searches the last axis; move particles there temporarily.
         cdf = torch.cumsum(q, dim=0).movedim(0, -1).contiguous()
         index = torch.searchsorted(cdf, r.movedim(0, -1).contiguous())
         index = index.movedim(-1, 0).clamp_max(x.shape[0] - 1)

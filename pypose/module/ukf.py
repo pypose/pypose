@@ -18,6 +18,19 @@ class UKF(EKF):
         msqrt (callable, optional): Matrix square-root function returning a factor
             ``L`` such that ``L @ L.mT`` equals its input. Default: ``torch.linalg.cholesky``.
 
+    Batch dimensions precede vector and matrix dimensions. For batch shape ``B``,
+    states have shape ``(*B, n)``, observations ``(*B, m)``, and inputs
+    ``(*B, l)``. Covariances ``P`` and ``Q`` have shape ``(*B, n, n)``,
+    and ``R`` has shape ``(*B, m, m)``. Covariances can be shared across
+    batches using shapes ``(n, n)`` and ``(m, m)``. An empty ``B`` gives an
+    unbatched filter. Batch entries represent independent systems, not time steps.
+
+    Internally, the sigma-point dimension comes first. Model methods receive
+    states of shape ``(S, *B, n)`` and return states or observations of shape
+    ``(S, *B, n)`` or ``(S, *B, m)``. Inputs retain shape ``(*B, l)`` and
+    broadcast across samples. Model operations must preserve batch independence.
+    Here ``S = 2*n+1``. Returned estimates have no sample dimension.
+
     A non-linear system can be described as
 
     .. math::
@@ -188,10 +201,11 @@ class UKF(EKF):
         transition to ``x`` with input ``u``.
 
         Args:
-            x (:obj:`Tensor`): estimated system state of previous step.
-            y (:obj:`Tensor`): system observation at current step (measurement).
-            u (:obj:`Tensor`): system input at current step.
-            P (:obj:`Tensor`): state estimation covariance of previous step.
+            x (:obj:`Tensor`): estimated system state of previous step, shape ``(*B, n)``.
+            y (:obj:`Tensor`): system observation at current step, shape ``(*B, m)``.
+            u (:obj:`Tensor`): system input at current step, shape ``(*B, l)``.
+            P (:obj:`Tensor`): state estimation covariance of previous step, shape
+                ``(*B, n, n)`` or ``(n, n)``.
             Q (:obj:`Tensor`, optional): covariance of system transition model.
             R (:obj:`Tensor`, optional): covariance of system observation model.
             t (:obj:`Tensor`, optional): timestamp for ths system to estimate. Default: ``None``.
@@ -200,7 +214,8 @@ class UKF(EKF):
                 which is best for Gaussian noise model. Default: ``None``.
 
         Return:
-            list of :obj:`Tensor`: posteriori state and covariance estimation
+            tuple of :obj:`Tensor`: posteriori state ``(*B, n)`` and covariance
+            ``(*B, n, n)``, where ``B`` is the broadcast batch shape.
         '''
         # Upper cases are matrices, lower cases are vectors
         k = 3 - x.size(-1) if k is None else k
@@ -238,13 +253,15 @@ class UKF(EKF):
             k (:obj:`int`): parameter for weighting sigma points.
 
         Return:
-            tuple of :obj:`Tensor`: sigma points and their weights
+            tuple of :obj:`Tensor`: sigma points ``(2*n+1, *B, n)`` and
+            weights ``(2*n+1, *B, 1)``.
         '''
         assert x.size(-1) == P.size(-1) == P.size(-2), 'Invalid shape'
         batch = torch.broadcast_shapes(x.shape[:-1], P.shape[:-2])
         x = x.expand(batch + x.shape[-1:])
         P = P.expand(batch + P.shape[-2:])
         n, xe = x.size(-1), x.unsqueeze(0)
+        # Factor columns become sigma-point offsets on the leading sample axis.
         xr = self.msqrt((n + k) * P).mT.movedim(-2, 0)
         we = torch.full(xe.shape[:-1], k / (n + k), dtype=x.dtype, device=x.device)
         wr = torch.full(xr.shape[:-1], 1 / (2 * (n + k)), dtype=x.dtype, device=x.device)
