@@ -178,7 +178,7 @@ class UKF(EKF):
         ...     v = r * torch.randn(B, N) # observation noise
         ...     states[:, i+1], observ[:, i+1] = model(states[:, i], inputs[:, i], w)
         ...     estim[:, i+1], P[:, i+1] = ukf(estim[:, i], observ[:, i+1] + v, inputs[:, i], P[:, i], Q, R)
-        ... print('Est error:', (states - estim).norm(dim=-1))
+        >>> print('Est error:', (states - estim).norm(dim=-1))
         Est error: tensor(...)
 
     Note:

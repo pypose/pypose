@@ -94,6 +94,12 @@ class PF(EKF):
         ...     def __init__(self):
         ...         super().__init__()
         ...
+        ...     def forward(self, state, input, noise=None):
+        ...         state = self.state_transition(state, input, self.systime)
+        ...         if noise is not None:
+        ...             state = state + noise
+        ...         return state, self.observation(state, input, self.systime + 1)
+        ...
         ...     def state_transition(self, state, input, t=None):
         ...         return state.cos() + input
         ...
@@ -118,17 +124,15 @@ class PF(EKF):
         >>> P = torch.eye(N).repeat(B, T, 1, 1) * p**2
         >>> estim = torch.randn(B, T, N) * p
 
-        4. Perform PF prediction. Note that estimation error becomes smaller with more steps.
+        4. Predict the next state and correct it using a measurement of that same state.
 
         >>> for i in range(T - 1):
         ...     w = q * torch.randn(B, N) # transition noise
         ...     v = r * torch.randn(B, N) # observation noise
-        ...     states[:, i+1], observ[:, i] = model(states[:, i] + w, inputs[:, i])
-        ...     estim[:, i+1], P[:, i+1] = pf(estim[:, i], observ[:, i] + v, inputs[:, i], P[:, i], Q, R)
-        ... print('Est error:', (states - estim).norm(dim=-1))
-        Est error: tensor([[13.5084,  1.3604,  1.1626,  0.4157,  0.7117],
-                           [14.4350,  2.0775,  1.0280,  0.2258,  0.4144],
-                           [16.8538,  2.4473,  1.1300,  0.5104,  0.1647]])
+        ...     states[:, i+1], observ[:, i+1] = model(states[:, i], inputs[:, i], w)
+        ...     estim[:, i+1], P[:, i+1] = pf(estim[:, i], observ[:, i+1] + v, inputs[:, i], P[:, i], Q, R)
+        >>> print('Est error:', (states - estim).norm(dim=-1))
+        Est error: tensor(...)
 
     Note:
         Implementation is based on Section 15.2 of this book

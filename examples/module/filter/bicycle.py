@@ -30,7 +30,7 @@ class Bicycle(pp.module.NLS):
         Don't add noise in this function, as it will be used for automatically
         linearizing the system by the parent class ``pp.module.NLS``.
         '''
-        theta = state[..., 2] + input[1]
+        theta = state[..., 2] + input[..., 1]
         x = state[..., 0] + input[..., 0] * theta.cos()
         y = state[..., 1] + input[..., 0] * theta.sin()
         return torch.stack([x, y, theta], dim=-1)
