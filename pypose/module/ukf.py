@@ -225,6 +225,7 @@ class UKF(EKF):
         K = Pxy @ pinv(Py)
         x = xe + bmv(K, y - ye)
         P = P - K @ Py @ K.mT
+        P = (P + P.mT) / 2  # remove roundoff asymmetry; does not fix negative eigenvalues
 
         return x, P
 
