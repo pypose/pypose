@@ -1,7 +1,9 @@
 import pypose as pp
 import torch as torch
 import pytest
+from itertools import product
 from unittest.mock import patch
+from contextlib import contextmanager
 
 
 class TestPF:
@@ -36,46 +38,46 @@ class TestPF:
             def observation(self, state, input, t=None):
                 return state + 0.2 * state.sin()
 
-        count = torch.Size(batch).numel()
-        values = torch.arange(count, dtype=torch.float64)
-        x = torch.stack((values * 0.2, values * -0.3), dim=-1)
-        u = torch.stack((values * 0.03 + 0.1, values * 0.02 - 0.1), dim=-1)
-        y = x + torch.stack((values * 0.05 + 0.3, values * -0.04 + 0.2), dim=-1)
+        indices = list(product(*(range(size) for size in batch)))
+        values = torch.arange(len(indices), dtype=torch.float64).reshape(batch)
+        x = torch.stack((0.2 * values, -0.3 * values), dim=-1)
+        u = torch.stack((0.03 * values + 0.1, 0.02 * values - 0.1), dim=-1)
+        y = x + torch.stack((0.05 * values + 0.3, -0.04 * values + 0.2), dim=-1)
+
         base = torch.tensor([[0.8, 0.15], [0.15, 0.5]], dtype=x.dtype)
-        P = (1 + values[:, None, None] * 0.1) * base
-        Q = (0.1 + values[:, None, None] * 0.01) * base
-        R = (0.2 + values[:, None, None] * 0.02) * base
-        if shared_covariance:
-            P, Q, R = [matrix[0].expand_as(matrix) for matrix in (P, Q, R)]
+        scale = 0 if shared_covariance else values[..., None, None]
+        P = (1 + 0.1 * scale) * base
+        Q = (0.1 + 0.01 * scale) * base
+        R = (0.2 + 0.02 * scale) * base
+        expected_x = x.clone()
+        expected_P = P.expand(*batch, 2, 2).clone()
+        batch_Q, batch_R = Q.expand(*batch, 2, 2), R.expand(*batch, 2, 2)
+
+        @contextmanager
+        def fixed_draws(normals, uniforms):
+            # Control only randomness; exercise the actual particle-filter operations.
+            with patch("torch.distributions.multivariate_normal._standard_normal",
+                       return_value=normals), patch("torch.rand", return_value=uniforms):
+                yield
 
         particles = 64
         batched = pp.module.PF(NLS(), particles=particles)
-        independent = [pp.module.PF(NLS(), particles=particles) for _ in range(count)]
+        independent = [pp.module.PF(NLS(), particles=particles) for _ in indices]
         generator = torch.Generator().manual_seed(0)
-        batch_x, batch_P = x.reshape(*batch, 2), P.reshape(*batch, 2, 2)
         for step in range(3):
-            # Supply identical standard-normal and uniform draws to both paths.
-            # Keep the production sampling, likelihood, and resampling algorithms.
-            normals = torch.randn(particles, count, 2, dtype=x.dtype, generator=generator)
-            uniforms = torch.rand(particles, count, dtype=x.dtype, generator=generator)
-            with patch("torch.distributions.multivariate_normal._standard_normal",
-                       return_value=normals.reshape(particles, *batch, 2)), \
-                 patch("torch.rand", return_value=uniforms.reshape(particles, *batch)):
-                batch_x, batch_P = batched(
-                    batch_x, (y + step * 0.1).reshape(*batch, 2), u.reshape(*batch, 2),
-                    batch_P if step else (P[0] if shared_covariance else batch_P),
-                    Q[0] if shared_covariance else Q.reshape(*batch, 2, 2),
-                    R[0] if shared_covariance else R.reshape(*batch, 2, 2))
-            results = []
-            for i in range(count):
-                with patch("torch.distributions.multivariate_normal._standard_normal",
-                           return_value=normals[:, i]), \
-                     patch("torch.rand", return_value=uniforms[:, i]):
-                    results.append(independent[i](x[i], y[i] + step * 0.1,
-                                                  u[i], P[i], Q[i], R[i]))
-            x, P = [torch.stack(items) for items in zip(*results)]
-            torch.testing.assert_close(batch_x, x.reshape(*batch, 2))
-            torch.testing.assert_close(batch_P, P.reshape(*batch, 2, 2))
+            measurement = y + 0.1 * step
+            normals = torch.randn(particles, *batch, 2, dtype=x.dtype, generator=generator)
+            uniforms = torch.rand(particles, *batch, dtype=x.dtype, generator=generator)
+            with fixed_draws(normals, uniforms):
+                x, P = batched(x, measurement, u, P, Q, R)
+            for index, filter in zip(indices, independent):
+                draws = (slice(None),) + index
+                with fixed_draws(normals[draws], uniforms[draws]):
+                    expected_x[index], expected_P[index] = filter(
+                        expected_x[index], measurement[index], u[index],
+                        expected_P[index], batch_Q[index], batch_R[index])
+            torch.testing.assert_close(x, expected_x)
+            torch.testing.assert_close(P, expected_P)
 
     def test_pf(self):
         class NLS(pp.module.NLS):

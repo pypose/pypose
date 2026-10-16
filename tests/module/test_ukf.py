@@ -1,6 +1,7 @@
 import pypose as pp
 import torch as torch
 import pytest
+from itertools import product
 
 
 class TestUKF:
@@ -77,32 +78,32 @@ class TestUKF:
             def observation(self, state, input, t=None):
                 return state + 0.2 * state.sin()
 
-        count = torch.Size(batch).numel()
-        values = torch.arange(count, dtype=torch.float64)
-        x = torch.stack((values * 0.2, values * -0.3), dim=-1)
-        u = torch.stack((values * 0.03 + 0.1, values * 0.02 - 0.1), dim=-1)
-        y = x + torch.stack((values * 0.05 + 0.3, values * -0.04 + 0.2), dim=-1)
+        indices = list(product(*(range(size) for size in batch)))
+        values = torch.arange(len(indices), dtype=torch.float64).reshape(batch)
+        x = torch.stack((0.2 * values, -0.3 * values), dim=-1)
+        u = torch.stack((0.03 * values + 0.1, 0.02 * values - 0.1), dim=-1)
+        y = x + torch.stack((0.05 * values + 0.3, -0.04 * values + 0.2), dim=-1)
+
         base = torch.tensor([[0.8, 0.15], [0.15, 0.5]], dtype=x.dtype)
-        P = (1 + values[:, None, None] * 0.1) * base
-        Q = (0.1 + values[:, None, None] * 0.01) * base
-        R = (0.2 + values[:, None, None] * 0.02) * base
-        if shared_covariance:
-            P, Q, R = [matrix[0].expand_as(matrix) for matrix in (P, Q, R)]
+        scale = 0 if shared_covariance else values[..., None, None]
+        P = (1 + 0.1 * scale) * base
+        Q = (0.1 + 0.01 * scale) * base
+        R = (0.2 + 0.02 * scale) * base
+        expected_x = x.clone()
+        expected_P = P.expand(*batch, 2, 2).clone()
+        batch_Q, batch_R = Q.expand(*batch, 2, 2), R.expand(*batch, 2, 2)
 
         batched = pp.module.UKF(NLS())
-        independent = [pp.module.UKF(NLS()) for _ in range(count)]
-        batch_x, batch_P = x.reshape(*batch, 2), P.reshape(*batch, 2, 2)
+        independent = [pp.module.UKF(NLS()) for _ in indices]
         for step in range(3):
-            batch_x, batch_P = batched(
-                batch_x, (y + step * 0.1).reshape(*batch, 2), u.reshape(*batch, 2),
-                batch_P if step else (P[0] if shared_covariance else batch_P),
-                Q[0] if shared_covariance else Q.reshape(*batch, 2, 2),
-                R[0] if shared_covariance else R.reshape(*batch, 2, 2))
-            results = [independent[i](x[i], y[i] + step * 0.1, u[i], P[i], Q[i], R[i])
-                       for i in range(count)]
-            x, P = [torch.stack(items) for items in zip(*results)]
-            torch.testing.assert_close(batch_x, x.reshape(*batch, 2))
-            torch.testing.assert_close(batch_P, P.reshape(*batch, 2, 2))
+            measurement = y + 0.1 * step
+            x, P = batched(x, measurement, u, P, Q, R)
+            for index, filter in zip(indices, independent):
+                expected_x[index], expected_P[index] = filter(
+                    expected_x[index], measurement[index], u[index],
+                    expected_P[index], batch_Q[index], batch_R[index])
+            torch.testing.assert_close(x, expected_x)
+            torch.testing.assert_close(P, expected_P)
 
     def test_ukf(self):
         class NLS(pp.module.NLS):
