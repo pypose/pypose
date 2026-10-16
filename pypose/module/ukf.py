@@ -18,6 +18,19 @@ class UKF(EKF):
         msqrt (callable, optional): Matrix square-root function returning a factor
             ``L`` such that ``L @ L.mT`` equals its input. Default: ``torch.linalg.cholesky``.
 
+    Batch dimensions precede vector and matrix dimensions. For batch shape ``B``,
+    states have shape ``(*B, n)``, observations ``(*B, m)``, and inputs
+    ``(*B, l)``. Covariances ``P`` and ``Q`` have shape ``(*B, n, n)``,
+    and ``R`` has shape ``(*B, m, m)``. Covariances can be shared across
+    batches using shapes ``(n, n)`` and ``(m, m)``. An empty ``B`` gives an
+    unbatched filter. Batch entries represent independent systems, not time steps.
+
+    Internally, the sigma-point dimension comes first. Model methods receive
+    states of shape ``(S, *B, n)`` and return states or observations of shape
+    ``(S, *B, n)`` or ``(S, *B, m)``. Inputs retain shape ``(*B, l)`` and
+    broadcast across samples. Model operations must preserve batch independence.
+    Here ``S = 2*n+1``. Returned estimates have no sample dimension.
+
     A non-linear system can be described as
 
     .. math::
@@ -147,25 +160,25 @@ class UKF(EKF):
 
         3. Prepare data
 
-        >>> T, N = 5, 2 # steps, state dim
-        >>> states = torch.zeros(T, N)
-        >>> inputs = torch.randn(T, N)
-        >>> observ = torch.zeros(T, N)
+        >>> B, T, N = 3, 5, 2 # batchsize, steps, state dim
+        >>> states = torch.zeros(B, T, N)
+        >>> inputs = torch.randn(B, T, N)
+        >>> observ = torch.zeros(B, T, N)
         >>> # std of transition, observation, and estimation
         >>> q, r, p = 0.1, 0.1, 10
-        >>> Q = torch.eye(N) * q**2
-        >>> R = torch.eye(N) * r**2
-        >>> P = torch.eye(N).repeat(T, 1, 1) * p**2
-        >>> estim = torch.randn(T, N) * p
+        >>> Q = torch.eye(N).repeat(B, 1, 1) * q**2
+        >>> R = torch.eye(N).repeat(B, 1, 1) * r**2
+        >>> P = torch.eye(N).repeat(B, T, 1, 1) * p**2
+        >>> estim = torch.randn(B, T, N) * p
 
         4. Predict the next state and correct it using a measurement of that same state.
 
         >>> for i in range(T - 1):
-        ...     w = q * torch.randn(N) # transition noise
-        ...     v = r * torch.randn(N) # observation noise
-        ...     states[i+1], observ[i+1] = model(states[i], inputs[i], w)
-        ...     estim[i+1], P[i+1] = ukf(estim[i], observ[i+1] + v, inputs[i], P[i], Q, R)
-        ... print('Est error:', (states - estim).norm(dim=-1))
+        ...     w = q * torch.randn(B, N) # transition noise
+        ...     v = r * torch.randn(B, N) # observation noise
+        ...     states[:, i+1], observ[:, i+1] = model(states[:, i], inputs[:, i], w)
+        ...     estim[:, i+1], P[:, i+1] = ukf(estim[:, i], observ[:, i+1] + v, inputs[:, i], P[:, i], Q, R)
+        >>> print('Est error:', (states - estim).norm(dim=-1))
         Est error: tensor(...)
 
     Note:
@@ -188,10 +201,11 @@ class UKF(EKF):
         transition to ``x`` with input ``u``.
 
         Args:
-            x (:obj:`Tensor`): estimated system state of previous step.
-            y (:obj:`Tensor`): system observation at current step (measurement).
-            u (:obj:`Tensor`): system input at current step.
-            P (:obj:`Tensor`): state estimation covariance of previous step.
+            x (:obj:`Tensor`): estimated system state of previous step, shape ``(*B, n)``.
+            y (:obj:`Tensor`): system observation at current step, shape ``(*B, m)``.
+            u (:obj:`Tensor`): system input at current step, shape ``(*B, l)``.
+            P (:obj:`Tensor`): state estimation covariance of previous step, shape
+                ``(*B, n, n)`` or ``(n, n)``.
             Q (:obj:`Tensor`, optional): covariance of system transition model.
             R (:obj:`Tensor`, optional): covariance of system observation model.
             t (:obj:`Tensor`, optional): timestamp for ths system to estimate. Default: ``None``.
@@ -200,7 +214,8 @@ class UKF(EKF):
                 which is best for Gaussian noise model. Default: ``None``.
 
         Return:
-            list of :obj:`Tensor`: posteriori state and covariance estimation
+            tuple of :obj:`Tensor`: posteriori state ``(*B, n)`` and covariance
+            ``(*B, n, n)``, where ``B`` is the broadcast batch shape.
         '''
         # Upper cases are matrices, lower cases are vectors
         k = 3 - x.size(-1) if k is None else k
@@ -210,14 +225,14 @@ class UKF(EKF):
 
         xs, w = self.sigma_weight_points(x, P, k)
         xs = self.model.state_transition(xs, u, t)
-        xe = (w * xs).sum(dim=-2)
+        xe = (w * xs).sum(dim=0)
         ex = xe - xs
         P = self.compute_cov(ex, ex, w, Q)
 
         xs, w = self.sigma_weight_points(xe, P, k)
         ex = xe - xs
         ys = self.model.observation(xs, u, t)
-        ye = (w * ys).sum(dim=-2)
+        ye = (w * ys).sum(dim=0)
         ey = ye - ys
         Py = self.compute_cov(ey, ey, w, R)
 
@@ -238,18 +253,23 @@ class UKF(EKF):
             k (:obj:`int`): parameter for weighting sigma points.
 
         Return:
-            tuple of :obj:`Tensor`: sigma points and their weights
+            tuple of :obj:`Tensor`: sigma points ``(2*n+1, *B, n)`` and
+            weights ``(2*n+1, *B, 1)``.
         '''
         assert x.size(-1) == P.size(-1) == P.size(-2), 'Invalid shape'
-        n, xe = x.size(-1), x.unsqueeze(-2)
-        xr = self.msqrt((n + k) * P).mT
+        batch = torch.broadcast_shapes(x.shape[:-1], P.shape[:-2])
+        x = x.expand(batch + x.shape[-1:])
+        P = P.expand(batch + P.shape[-2:])
+        n, xe = x.size(-1), x.unsqueeze(0)
+        # Factor columns become sigma-point offsets on the leading sample axis.
+        xr = self.msqrt((n + k) * P).mT.movedim(-2, 0)
         we = torch.full(xe.shape[:-1], k / (n + k), dtype=x.dtype, device=x.device)
         wr = torch.full(xr.shape[:-1], 1 / (2 * (n + k)), dtype=x.dtype, device=x.device)
-        p = torch.cat((xe, xe + xr, xe - xr), dim=-2)
-        w = torch.cat((we, wr, wr), dim=-1)
+        p = torch.cat((xe, xe + xr, xe - xr), dim=0)
+        w = torch.cat((we, wr, wr), dim=0)
         return p, w.unsqueeze(-1)
 
     def compute_cov(self, a, b, w, Q=0):
         '''Compute covariance of two set of variables.'''
         a, b = a.unsqueeze(-1), b.unsqueeze(-1)
-        return Q + (w.unsqueeze(-1) * a @ b.mT).sum(dim=-3)
+        return Q + (w.unsqueeze(-1) * a @ b.mT).sum(dim=0)
