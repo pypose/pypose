@@ -620,6 +620,52 @@ class Sim3_Act(torch.autograd.Function):
         return torch.cat((X_grad.squeeze(-2), zero), dim = -1), p_grad.squeeze(-2)
 
 
+class SE3_translation(torch.autograd.Function):
+    generate_vmap_rule = True
+
+    @staticmethod
+    def forward(X):
+        return X[..., :3]
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, = inputs
+        out = output
+        ctx.save_for_backward(out)
+        return
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        out, = ctx.saved_tensors
+        dq = grad_output.unsqueeze(-2)
+        zero = torch.zeros(out.shape[:-1]+(1,), device=out.device, dtype=out.dtype)
+        X_grad = dq @ SE3_Act_Jacobian(out)
+        return torch.cat((X_grad.squeeze(-2), zero), dim=-1)
+
+
+class Sim3_translation(torch.autograd.Function):
+    generate_vmap_rule = True
+
+    @staticmethod
+    def forward(X):
+        return X[..., :3]
+
+    @staticmethod
+    def setup_context(ctx: Any, inputs, output) -> Any:
+        X, = inputs
+        out = output
+        ctx.save_for_backward(out)
+        return
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        out, = ctx.saved_tensors
+        dq = grad_output.unsqueeze(-2)
+        zero = torch.zeros(out.shape[:-1]+(1,), device=out.device, dtype=out.dtype)
+        X_grad = dq @ Sim3_Act_Jacobian(out)
+        return torch.cat((X_grad.squeeze(-2), zero), dim=-1)
+
+
 class SO3_Act4(torch.autograd.Function):
     generate_vmap_rule = True
 
