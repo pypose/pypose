@@ -67,6 +67,43 @@ class TestUKF:
         torch.testing.assert_close(actual_x, expected_x)
         torch.testing.assert_close(actual_P, expected_P.expand(*batch, 2, 2))
 
+    @pytest.mark.parametrize("batch", [(3,), (2, 3)])
+    @pytest.mark.parametrize("shared_covariance", [False, True])
+    def test_batched_matches_independent_updates(self, batch, shared_covariance):
+        class NLS(pp.module.NLS):
+            def state_transition(self, state, input, t=None):
+                return state + 0.1 * state.sin() + input
+
+            def observation(self, state, input, t=None):
+                return state + 0.2 * state.sin()
+
+        count = torch.Size(batch).numel()
+        values = torch.arange(count, dtype=torch.float64)
+        x = torch.stack((values * 0.2, values * -0.3), dim=-1)
+        u = torch.stack((values * 0.03 + 0.1, values * 0.02 - 0.1), dim=-1)
+        y = x + torch.stack((values * 0.05 + 0.3, values * -0.04 + 0.2), dim=-1)
+        base = torch.tensor([[0.8, 0.15], [0.15, 0.5]], dtype=x.dtype)
+        P = (1 + values[:, None, None] * 0.1) * base
+        Q = (0.1 + values[:, None, None] * 0.01) * base
+        R = (0.2 + values[:, None, None] * 0.02) * base
+        if shared_covariance:
+            P, Q, R = [matrix[0].expand_as(matrix) for matrix in (P, Q, R)]
+
+        batched = pp.module.UKF(NLS())
+        independent = [pp.module.UKF(NLS()) for _ in range(count)]
+        batch_x, batch_P = x.reshape(*batch, 2), P.reshape(*batch, 2, 2)
+        for step in range(3):
+            batch_x, batch_P = batched(
+                batch_x, (y + step * 0.1).reshape(*batch, 2), u.reshape(*batch, 2),
+                batch_P if step else (P[0] if shared_covariance else batch_P),
+                Q[0] if shared_covariance else Q.reshape(*batch, 2, 2),
+                R[0] if shared_covariance else R.reshape(*batch, 2, 2))
+            results = [independent[i](x[i], y[i] + step * 0.1, u[i], P[i], Q[i], R[i])
+                       for i in range(count)]
+            x, P = [torch.stack(items) for items in zip(*results)]
+            torch.testing.assert_close(batch_x, x.reshape(*batch, 2))
+            torch.testing.assert_close(batch_P, P.reshape(*batch, 2, 2))
+
     def test_ukf(self):
         class NLS(pp.module.NLS):
             def __init__(self):
