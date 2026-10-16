@@ -8,6 +8,7 @@ Examples for how to use PyPose
 * [Dynamical Systems](./module/dynamics)
 * [Filters](./module/filter)
 * [IMU Preintegration](./module/imu)
+* [Bundle Adjustment](./module/ba)
 * [Pose Graph Optimization](./module/pgo)
 * [Point Cloud Registration](./module/pcr)
 * [Model Predictive Control](./module/mpc)

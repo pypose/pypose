@@ -1,8 +1,29 @@
 import pypose as pp
 import torch as torch
+import pytest
 
 
 class TestPF:
+
+    @pytest.mark.parametrize("batch", [(), (3,), (2, 3)])
+    def test_particle_batch_axes(self, batch):
+        pf = pp.module.PF(pp.module.NLS(), particles=5)
+        x = torch.zeros(*batch, 2, dtype=torch.float64)
+        ye = torch.arange(10., dtype=x.dtype).reshape(5, *([1] * len(batch)), 2)
+        ye = ye.expand(5, *batch, 2)
+        R = torch.eye(2, dtype=x.dtype)
+        q = pf.relative_likelihood(x, ye, R)
+        expected = torch.softmax(torch.distributions.MultivariateNormal(ye, R).log_prob(x),
+                                 dim=0)
+        torch.testing.assert_close(q, expected)
+        torch.testing.assert_close(q.sum(dim=0), torch.ones(batch, dtype=x.dtype))
+        # A point mass must select the same particle independently in every batch.
+        selected = torch.arange(torch.Size(batch).numel()).reshape(batch) % 5
+        q = torch.zeros_like(q).scatter_(0, selected.unsqueeze(0), 1)
+        actual = pf.resample_particles(q, ye)
+        expected = torch.gather(ye, 0, selected.unsqueeze(0).unsqueeze(-1)
+                                .expand(5, *batch, 2))
+        torch.testing.assert_close(actual, expected)
 
     def test_pf(self):
         class NLS(pp.module.NLS):
@@ -38,7 +59,7 @@ class TestPF:
             estim[:, i+1], P[:, i+1] = pf(estim[:, i], observ[:, i] + v, inputs[:, i], P[:, i], Q, R)
         error = (states - estim).norm(dim=-1)
 
-        assert torch.all(error[0] - error[-1] > 0), "Filter error last step too large."
+        assert torch.all(error[:, 0] - error[:, -1] > 0), "Filter error last step too large."
 
 
 if __name__ == '__main__':

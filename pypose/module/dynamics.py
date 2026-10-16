@@ -210,7 +210,7 @@ class LTI(System):
         Returns:
             ``Tensor``: The state the system in next time step.
         '''
-        z = bmv(self.A, state) + bmv(self.B, input)
+        z = bmv(self.A, state.clone()) + bmv(self.B, input)
         return z if self.c1 is None else z + self.c1
 
     def observation(self, state, input):

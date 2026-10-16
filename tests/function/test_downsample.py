@@ -39,13 +39,13 @@ class TestDownsample:
                             [0., 1., 0.],
                             [0., 1., 1.],
                             [10., 1., 1.],
-                            [10., 1., 10.]])
+                            [10., 1., 10.]], device=device)
         expect = torch.tensor([[ 0.,  0.,  0.],
                     [ 0.,  1.,  0.],
                     [ 0.,  1.,  1.],
                     [ 1.,  0.,  0.],
                     [10.,  1.,  1.],
-                    [10.,  1., 10.]])
+                    [10.,  1., 10.]], device=device)
         result = pp.voxel_filter(points, [1., 1., 1.])
         pp.testing.assert_close(result, expect)
         # test random select
@@ -54,7 +54,7 @@ class TestDownsample:
                             [0., 1., 0.],
                             [0., 1., 1.],
                             [10., 1., 1.],
-                            [10., 1., 10.]])
+                            [10., 1., 10.]], device=device)
         result = pp.voxel_filter(points, [1., 1., 1.])
         for p in result:
             assert p in points
@@ -64,13 +64,13 @@ class TestDownsample:
                                [ 0., 1.,  0., 0],
                                [ 0., 1.,  1., 0],
                                [10., 1.,  1., 0],
-                               [10., 1., 10., 0]])
+                               [10., 1., 10., 0]], device=device)
         expect = torch.tensor([[ 0.,  0.,  0., 0],
                                [ 0.,  1.,  0., 0],
                                [ 0.,  1.,  1., 0],
                                [ 1.,  0.,  0., 0],
                                [10.,  1.,  1., 0],
-                               [10.,  1., 10., 0]])
+                               [10.,  1., 10., 0]], device=device)
         result = pp.voxel_filter(points, [1., 1., 1.])
         pp.testing.assert_close(result, expect)
 

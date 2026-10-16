@@ -13,7 +13,7 @@ class FastTriggs(nn.Module):
             \mathbf{R}_i^\rho &= \sqrt{\rho'(c_i)} \mathbf{R}_i\\
             \mathbf{J}_i^\rho &= \sqrt{\rho'(c_i)} \mathbf{J}_i
         \end{align*},
-    
+
     where :math:`\mathbf{R}_i` and :math:`\mathbf{J}_i` are the :math:`i`-th item of the
     model residual and Jacobian, respectively. :math:`\rho()` is the kernel function and
     :math:`c_i = \mathbf{R}_i^T\mathbf{R}_i` is the point to compute the gradient.
@@ -39,7 +39,7 @@ class FastTriggs(nn.Module):
         :math:`\mathbf{g}(\bm{\delta})` to zero, we have
 
         .. math::
-            \frac{\partial \bm{g}}{\partial \bm{\delta}} 
+            \frac{\partial \bm{g}}{\partial \bm{\delta}}
             = \sum_i \frac{\partial \rho}{\partial c_i} \frac{\partial c_i}{\partial \bm{\delta}}
             = \bm{0}
 
@@ -52,9 +52,9 @@ class FastTriggs(nn.Module):
         Rearrange the gradient of :math:`\rho`, we have
 
         .. math::
-            \sum_i \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right)^T 
+            \sum_i \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right)^T
                 \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right) \bm{\delta}
-            = - \sum_i \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right)^T 
+            = - \sum_i \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{J}_i\right)^T
                 \left(\sqrt{\frac{\partial \rho}{\partial c_i}} \mathbf{R}_i\right)
 
         This gives us the corrected model residual :math:`\mathbf{R}_i^\rho` and Jacobian
@@ -84,8 +84,13 @@ class FastTriggs(nn.Module):
             function is not supposed to be directly called by PyPose users. It will be called
             internally by optimizers such as :meth:`pypose.optim.GN` and :meth:`pypose.optim.LM`.
         '''
+        assert not torch.is_inference_mode_enabled(), \
+            "FastTriggs modifier does not work in torch.inference_mode."
+
         x = R.square().sum(-1, keepdim=True)
-        s = jacobian(self.func, x).sqrt()
+        with torch.enable_grad():
+            s = jacobian(self.func, x.requires_grad_(True)).sqrt()
+
         sj = s.expand_as(R).reshape(-1, 1)
         return s * R, sj * J
 
@@ -99,7 +104,7 @@ class Triggs(nn.Module):
             \mathbf{J}_i^\rho &= \sqrt{\rho'(c_i)} \left(\mathbf{I} - \alpha
                 \frac{\mathbf{R}_i^T\mathbf{R}_i}{\|\mathbf{R}_i\|^2} \right) \mathbf{J}_i,
         \end{align*}
-    
+
     where :math:`\alpha` is a root of
 
     .. math::
@@ -118,7 +123,7 @@ class Triggs(nn.Module):
         * Bill Triggs, etc., `Bundle Adjustment -- A Modern Synthesis
           <https://link.springer.com/chapter/10.1007/3-540-44480-7_21>`_, International
           Workshop on Vision Algorithms, 1999.
-    
+
     Warning:
 
         The :meth:`FastTriggs` corrector is preferred when the kernel function has a

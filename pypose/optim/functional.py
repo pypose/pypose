@@ -5,6 +5,7 @@ from torch.autograd.functional import jacobian
 from torch.func import jacrev, jacfwd, functional_call
 
 
+@torch.enable_grad()
 def modjac(model, input=None, create_graph=False, strict=False, vectorize=False, \
                     strategy='reverse-mode', flatten=False):
     r'''
@@ -152,12 +153,14 @@ def modjac(model, input=None, create_graph=False, strict=False, vectorize=False,
     return J
 
 
+@torch.enable_grad()
 def modjacrev(model, input, argnums=0, *, has_aux=False):
     params = dict(model.named_parameters())
     func = partial(functional_call, model)
     return jacrev(func, argnums=argnums, has_aux=has_aux)(params, input)
 
 
+@torch.enable_grad()
 def modjacfwd(model, input, argnums=0, *, has_aux=False):
     params = dict(model.named_parameters())
     func = partial(functional_call, model)

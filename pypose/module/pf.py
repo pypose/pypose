@@ -183,15 +183,17 @@ class PF(EKF):
         r'''
         Compute the relative likelihood
         '''
-        return F.softmax(MultivariateNormal(ye, R).log_prob(y), dim=-1)
+        return F.softmax(MultivariateNormal(ye, R).log_prob(y), dim=0)
 
     def resample_particles(self, q, x):
         r'''
         Resample the set of a posteriori particles
         '''
         r = torch.rand(x.shape[:-1], dtype=x.dtype, device=x.device)
-        index = torch.searchsorted(torch.cumsum(q, dim=0), r)
-        return x[index, torch.arange(x.shape[1]).unsqueeze(0)] if x.dim()==3 else x[index]
+        cdf = torch.cumsum(q, dim=0).movedim(0, -1).contiguous()
+        index = torch.searchsorted(cdf, r.movedim(0, -1).contiguous())
+        index = index.movedim(-1, 0).clamp_max(x.shape[0] - 1)
+        return torch.gather(x, 0, index.unsqueeze(-1).expand_as(x))
 
     def compute_cov(self, a, b, Q=0):
         '''Compute covariance of two set of variables.'''

@@ -15,11 +15,10 @@ class UKF(EKF):
             Ignored if provided during each iteration. Default: ``None``
         R (:obj:`Tensor`, optional): The covariance matrices of system observation noise.
             Ignored if provided during each iteration. Default: ``None``
-        msqrt (:obj:`Function`, optional): The method for computing the square root of matrices.
-            Use ``torch.linalg.cholesky`` if not provided. Default: ``None``
-        correct_PD_eps (:obj:`Float`, optional): The eps used in positive definite correction of the state covariance matrices P.
-            If provided a small positive number, P will be projected to be positive definite by clamping its smaller eigenvalues to eps.
-            If provided a negative number, no correction will be made. Default: ``-1``
+        msqrt (callable, optional): Matrix square-root function returning a factor
+            ``L`` such that ``L @ L.mT`` equals its input. Default: ``torch.linalg.cholesky``.
+        correct_PD_eps (:obj:`Float`, optional): Positive eigenvalue floor for covariance
+            correction. Negative values disable correction. Default: ``-1``.
 
     A non-linear system can be described as
 
@@ -27,28 +26,32 @@ class UKF(EKF):
         \begin{aligned}
             \mathbf{x}_{k+1} &= \mathbf{f}(\mathbf{x}_k, \mathbf{u}_k, t_k) + \mathbf{w}_k,
             \quad \mathbf{w}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{Q})  \\
-            \mathbf{y}_{k} &= \mathbf{g}(\mathbf{x}_k, \mathbf{u}_k, t_k) + \mathbf{v}_k,
-            \quad \mathbf{v}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
+            \mathbf{y}_{k+1} &= \mathbf{g}(\mathbf{x}_{k+1}, \mathbf{u}_k, t_k) + \mathbf{v}_{k+1},
+            \quad \mathbf{v}_{k+1} \sim \mathcal{N}(\mathbf{0}, \mathbf{R})
         \end{aligned}
 
-    UKF can be described as the following equations, where the subscript :math:`\cdot_{k}`
-    is omited for simplicity.
+    UKF can be described as the following equations. The sigma-point index :math:`i`
+    identifies a sample, and the time indices indicate the state or measurement step.
 
     1. Sigma Points.
 
       .. math::
           \begin{aligned}
-              & \mathbf{x}^{\left ( i \right ) } = \mathbf{x}^{+} +
-                  \mathbf{\check{x}}^{\left(i \right)}, & \quad i=0,...,2n\\
-              & \mathbf{\check{x}}^{\left (i \right)} = \mathbf{0}, & \quad i=0 \\
-              & \mathbf{\check{x}}^{\left (i \right)} = \left(\sqrt{(n+\kappa)P} \right)_{i}^{T},
+              & \mathbf{x}_k^{\left ( i \right ) } = \mathbf{x}_k^{+} +
+                  \mathbf{\check{x}}_k^{\left(i \right)}, & \quad i=0,...,2n\\
+              & \mathbf{\check{x}}_k^{\left (i \right)} = \mathbf{0}, & \quad i = 0 \\
+              & \mathbf{\check{x}}_k^{\left (i \right)} =
+                  \left(\sqrt{(n+\kappa)P_k} \right)_{i}^{T},
                & \quad i= 1, ..., n \\
-              & \mathbf{\check{x}}^{\left(i \right)} = -\left(\sqrt{(n+\kappa)P} \right)_{i}^{T},
+              & \mathbf{\check{x}}_k^{\left(i \right)} =
+                  -\left(\sqrt{(n+\kappa)P_k} \right)_{i}^{T},
                    & \quad i=n+1, ..., 2n \\
          \end{aligned}
 
-    where :math:`\left(\sqrt{(n+\kappa)P}\right) _{i}` is the :math:`i`-th row of
-    :math:`\left(\sqrt{(n+\kappa)P}\right)` and :math:`n` is the dimension of state :math:`\mathbf{x}`.
+    where :math:`\left(\sqrt{(n+\kappa)P_k}\right) _{i}` is the :math:`i`-th row of
+    :math:`\left(\sqrt{(n+\kappa)P_k}\right)` and :math:`n` is the dimension of state :math:`\mathbf{x}`.
+    Here the square-root matrix is :math:`L^T`, where
+    :math:`LL^T=(n+\kappa)P_k`, so its rows are the sigma-point offsets.
 
     Their weighting cofficients are given as
 
@@ -61,52 +64,62 @@ class UKF(EKF):
     2. Priori State Estimation.
 
       .. math::
-           \mathbf{x}^{-} = \sum_{i=0}^{2n} W^{(i)} f(\mathbf{x}^{(i)}, \mathbf{u}, t)
+           \begin{aligned}
+               \mathbf{x}_{k+1}^{(i)} &= f(\mathbf{x}_k^{(i)}, \mathbf{u}_k, t_k),
+                   & \quad i = 0, \cdots, 2n \\
+               \mathbf{x}_{k+1}^{-} &= \sum_{i=0}^{2n} W^{(i)} \mathbf{x}_{k+1}^{(i)}
+           \end{aligned}
 
     3. Priori Covariance.
 
       .. math::
-          \mathbf{P}^{-} = \sum_{i=0}^{2n} W^{(i)}
-              \left(\mathbf{x}^{(i)} - \mathbf{x}^{-} \right)
-              \left(\mathbf{x}^{(i)} - \mathbf{x}^- \right)^T + \mathbf{Q}
+          \mathbf{P}_{k+1}^{-} = \sum_{i=0}^{2n} W^{(i)}
+              \left(\mathbf{x}_{k+1}^{(i)} - \mathbf{x}_{k+1}^{-} \right)
+              \left(\mathbf{x}_{k+1}^{(i)} - \mathbf{x}_{k+1}^- \right)^T + \mathbf{Q}
 
     4. Observational Estimation.
 
+      Regenerate sigma points :math:`\tilde{\mathbf{x}}_{k+1}^{(i)}` from
+      :math:`(\mathbf{x}_{k+1}^{-}, \mathbf{P}_{k+1}^{-})` using step 1.
+      These points include the process-noise covariance added in step 3.
+
       .. math::
           \begin{aligned}
-              & \mathbf{y}^{(i)} = g \left( \mathbf{x}^{(i)}, \mathbf{u}, t \right),
+              & \mathbf{y}_{k+1}^{(i)} = g \left( \tilde{\mathbf{x}}_{k+1}^{(i)}, \mathbf{u}_k, t_k \right),
                   & \quad i = 0, \cdots, 2n \\
-              & \bar{\mathbf{y}} = \sum_{i=0}^{2n} W^{(i)} \mathbf{y}^{(i)}
+              & \bar{\mathbf{y}}_{k+1} = \sum_{i=0}^{2n} W^{(i)} \mathbf{y}_{k+1}^{(i)}
           \end{aligned}
 
     5. Observational Covariance.
 
       .. math::
-          \mathbf{P}_{y} = \sum_{i=0}^{2n} W^{(i)}
-              \left(\mathbf{y}^{(i)} - \bar{\mathbf{y}} \right)
-              \left( \mathbf{y}^{(i)} - \bar{\mathbf{y}} \right)^T + \mathbf{R}
+          \mathbf{P}_{y_{k+1}} = \sum_{i=0}^{2n} W^{(i)}
+              \left(\mathbf{y}_{k+1}^{(i)} - \bar{\mathbf{y}}_{k+1} \right)
+              \left( \mathbf{y}_{k+1}^{(i)} - \bar{\mathbf{y}}_{k+1} \right)^T + \mathbf{R}
 
     6. Priori and Observation Covariance:
 
       .. math::
-          \mathbf{P}_{xy} = \sum_{i=0}^{2n} W^{(i)}
-              \left( \mathbf{x}^{(i)} - \mathbf{x}^- \right)
-              \left( \mathbf{y}^{(i)} - \bar{\mathbf{y}} \right)^T
+          \mathbf{P}_{x_{k+1}y_{k+1}} = \sum_{i=0}^{2n} W^{(i)}
+              \left( \tilde{\mathbf{x}}_{k+1}^{(i)} - \mathbf{x}_{k+1}^- \right)
+              \left( \mathbf{y}_{k+1}^{(i)} - \bar{\mathbf{y}}_{k+1} \right)^T
 
     7. Kalman Gain
 
       .. math::
-          \mathbf{K} = \mathbf{P}_{xy}\mathbf{P}_{y}^{-1}
+          \mathbf{K}_{k+1} = \mathbf{P}_{x_{k+1}y_{k+1}}\mathbf{P}_{y_{k+1}}^{-1}
 
     8. Posteriori State Estimation.
 
       .. math::
-          \mathbf{x}^{+} = \mathbf{x}^{-} + \mathbf{K} (\mathbf{y}- \bar{\mathbf{y}})
+          \mathbf{x}_{k+1}^{+} = \mathbf{x}_{k+1}^{-} +
+              \mathbf{K}_{k+1} (\mathbf{y}_{k+1}- \bar{\mathbf{y}}_{k+1})
 
     9. Posteriori Covariance Estimation.
 
       .. math::
-          \mathbf{P} = \mathbf{P}^{-} - \mathbf{K}\mathbf{P}_{y}\mathbf{K}^T
+          \mathbf{P}_{k+1} = \mathbf{P}_{k+1}^{-} -
+              \mathbf{K}_{k+1}\mathbf{P}_{y_{k+1}}\mathbf{K}_{k+1}^T
 
     where superscript :math:`\cdot^{-}` and :math:`\cdot^{+}` denote the priori and
     posteriori estimation, respectively.
@@ -119,10 +132,14 @@ class UKF(EKF):
         ...     def __init__(self):
         ...         super().__init__()
         ...
+        ...     def forward(self, state, input, noise):
+        ...         state = self.state_transition(state, input, self.systime) + noise
+        ...         return state, self.observation(state, input, self.systime + 1)
+        ...
         ...     def state_transition(self, state, input, t=None):
         ...         return state.cos() + input
         ...
-        ...     def observation(self, state, input, t):
+        ...     def observation(self, state, input, t=None):
         ...         return state.sin() + input
 
         2. Create a model and filter
@@ -143,17 +160,15 @@ class UKF(EKF):
         >>> P = torch.eye(N).repeat(B, T, 1, 1) * p**2
         >>> estim = torch.randn(B, T, N) * p
 
-        4. Perform UKF prediction. Note that estimation error becomes smaller with more steps.
+        4. Predict the next state and correct it using a measurement of that same state.
 
         >>> for i in range(T - 1):
         ...     w = q * torch.randn(B, N) # transition noise
         ...     v = r * torch.randn(B, N) # observation noise
-        ...     states[:, i+1], observ[:, i] = model(states[:, i] + w, inputs[:, i])
-        ...     estim[:, i+1], P[:, i+1] = ukf(estim[:, i], observ[:, i] + v, inputs[:, i], P[:, i], Q, R)
+        ...     states[:, i+1], observ[:, i+1] = model(states[:, i], inputs[:, i], w)
+        ...     estim[:, i+1], P[:, i+1] = ukf(estim[:, i], observ[:, i+1] + v, inputs[:, i], P[:, i], Q, R)
         ... print('Est error:', (states - estim).norm(dim=-1))
-        Est error: tensor([[19.2216,  0.9972,  0.7375,  0.8644,  0.9604],
-                           [16.6286,  2.1883,  1.7114,  0.8491,  1.2250],
-                           [10.5133,  2.1080,  1.9851,  0.5087,  1.3921]])
+        Est error: tensor(...)
 
     Note:
         Implementation is based on Section 14.3 of this book
@@ -171,6 +186,9 @@ class UKF(EKF):
     def forward(self, x, y, u, P, Q=None, R=None, t=None, k=None):
         r'''
         Performs one step estimation.
+
+        The measurement ``y`` must correspond to the state after applying the
+        transition to ``x`` with input ``u``.
 
         Args:
             x (:obj:`Tensor`): estimated system state of previous step.
@@ -202,6 +220,7 @@ class UKF(EKF):
             P = self.project_to_positive_definite(P)
 
         xs, w = self.sigma_weight_points(xe, P, k)
+        ex = xe - xs
         ys = self.model.observation(xs, u, t)
         ye = (w * ys).sum(dim=0)
         ey = ye - ys
@@ -229,8 +248,11 @@ class UKF(EKF):
             tuple of :obj:`Tensor`: sigma points and their weights
         '''
         assert x.size(-1) == P.size(-1) == P.size(-2), 'Invalid shape'
+        batch = torch.broadcast_shapes(x.shape[:-1], P.shape[:-2])
+        x = x.expand(batch + x.shape[-1:])
+        P = P.expand(batch + P.shape[-2:])
         n, xe = x.size(-1), x.unsqueeze(0)
-        xr = self.msqrt((n + k) * P).transpose(0, -2)
+        xr = self.msqrt((n + k) * P).mT.movedim(-2, 0)
         we = torch.full(xe.shape[:-1], k / (n + k), dtype=x.dtype, device=x.device)
         wr = torch.full(xr.shape[:-1], 1 / (2 * (n + k)), dtype=x.dtype, device=x.device)
         p = torch.cat((xe, xe + xr, xe - xr), dim=0)
@@ -244,6 +266,7 @@ class UKF(EKF):
 
     def project_to_positive_definite(self, A):
         '''Project matrix to positive definite by clamping its eigenvalues to positive.'''
+        A = (A + A.mT) / 2
         eigenvalues, eigenvectors = torch.linalg.eigh(A)
         eigenvalues = torch.clamp(eigenvalues, min=self.correct_PD_eps)
         return (eigenvectors @ torch.diag_embed(eigenvalues)) @ eigenvectors.mT

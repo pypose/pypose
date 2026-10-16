@@ -19,3 +19,4 @@ Modules
    module.EPnP
    module.MPC
    module.ICP
+   module.GeodesicLoss

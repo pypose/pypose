@@ -131,7 +131,7 @@ class Cauchy(nn.Module):
             input (torch.Tensor): the input tensor (non-negative).
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
-        return self.delta2 * (input/self.delta2 + 1).log()
+        return self.delta2 * (input/self.delta2).log1p()
 
 
 class SoftLOne(nn.Module):
@@ -253,9 +253,9 @@ class Tolerant(nn.Module):
             input (torch.Tensor): the input tensor (non-negative).
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
-        result = self.b * (1 + ((input-self.a) / self.b).exp()).log()
-        offset = self.b * math.log((1 + math.exp(-self.a / self.b))) # constant, no grad.
-        return result - offset
+        result = torch.nn.functional.softplus((input-self.a) / self.b)
+        offset = torch.nn.functional.softplus(result.new_tensor(-self.a) / self.b)
+        return self.b * (result - offset)
 
 
 class Scale(nn.Module):

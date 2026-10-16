@@ -4,7 +4,7 @@
 
 -----
 
-Deep learning has had remarkable success in robotic perception, but its data-centric nature suffers when it comes to generalizing to ever-changing environments. By contrast, physics-based optimization generalizes better, but it does not perform as well in complicated tasks due to the lack of high-level semantic information and the reliance on manual parametric tuning. To take advantage of these two complementary worlds, we present PyPose: a **robotics-oriented**, **PyTorch-based** library that combines **deep perceptual models** with **physics-based optimization techniques**. Our design goal for PyPose is to make it **user-friendly**, **efficient**, and **interpretable** with a tidy and well-organized architecture. Using an **imperative style interface**, it can be easily integrated into **real-world robotic applications**. 
+Deep learning has had remarkable success in robotic perception, but its data-centric nature suffers when it comes to generalizing to ever-changing environments. By contrast, physics-based optimization generalizes better, but it does not perform as well in complicated tasks due to the lack of high-level semantic information and the reliance on manual parametric tuning. To take advantage of these two complementary worlds, we present PyPose: a **robotics-oriented**, **PyTorch-based** library that combines **deep perceptual models** with **physics-based optimization techniques**. Our design goal for PyPose is to make it **user-friendly**, **efficient**, and **interpretable** with a tidy and well-organized architecture. Using an **imperative style interface**, it can be easily integrated into **real-world robotic applications**.
 
 
 -----
@@ -42,7 +42,7 @@ Efficiency and memory comparison of batched Lie group operations (we take Theseu
 More information about efficiency comparison goes to [our paper for PyPose](https://arxiv.org/abs/2209.15428).
 
 ## Getting Started
-    
+
 ### Installation
 
 #### Install from **pypi**
@@ -64,7 +64,7 @@ pip install -r requirements/runtime.txt
 
 ```bash
 git clone  https://github.com/pypose/pypose.git
-cd pypose && python setup.py develop
+cd pypose && pip install -e .
 ```
 
 3. Run tests
@@ -75,7 +75,7 @@ pytest
 
 ####  For contributors
 
-1. Make sure the above installation is correct. 
+1. Make sure the above installation is correct.
 
 2. Go to [CONTRIBUTING.md](CONTRIBUTING.md)
 
@@ -118,15 +118,15 @@ pytest
 >>> from pypose.optim.scheduler import StopOnPlateau
 
 >>> class InvNet(nn.Module):
-
-        def __init__(self, *dim):
-            super().__init__()
-            init = pp.randn_SE3(*dim)
-            self.pose = pp.Parameter(init)
-
-        def forward(self, input):
-            error = (self.pose @ input).Log()
-            return error.tensor()
+...
+...     def __init__(self, *dim):
+...         super().__init__()
+...         init = pp.randn_SE3(*dim)
+...         self.pose = pp.Parameter(init)
+...
+...     def forward(self, input):
+...         error = (self.pose @ input).Log()
+...         return error.tensor()
 
 >>> device = torch.device("cuda")
 >>> input = pp.randn_SE3(2, 2, device=device)
@@ -140,17 +140,70 @@ pytest
 
 >>> # 2nd option, step optimization
 >>> while scheduler.continual():
-        loss = optimizer.step(input)
-        scheduler.step(loss)
+...     loss = optimizer.step(input)
+...     scheduler.step(loss)
 
 >>> # Note: remove one of the above options for usage!
+```
+
+3. May 2026: PyPose v0.9.5 integrates the sparse Jacobian tracing and sparse second-order
+optimization methods developed in [*Bundle Adjustment in the Eager Mode*](https://arxiv.org/abs/2409.12190)
+to accelerate applications such as bundle adjustment.
+
+```python
+>>> import torch
+>>> import pypose as pp
+>>> from torch import nn
+>>> from pypose.optim import LM
+>>> from pypose.optim.solver import PCG
+>>> from pypose.optim.strategy import TrustRegion
+>>> from pypose.optim.scheduler import StopOnPlateau
+>>> from pypose.autograd.function import psjac
+
+>>> class ReprojErr(nn.Module):
+...     def __init__(self, poses, points):
+...         super().__init__()
+...         # sjac: enabling tracing of sparse Jacobian
+...         self.poses = pp.Parameter(poses, sjac=True)
+...         self.points = pp.Parameter(points, sjac=True)
+...
+...     @psjac  # parallelize assembly of sparse Jacobian
+...     def project(poses, points):
+...         points = poses.Act(points)
+...         return - points[..., :2] / points[..., [2]]
+...
+...     def forward(self, pixels, cidx, pidx):
+...         poses = self.poses[cidx]
+...         points = self.points[pidx]
+...         return ReprojErr.project(poses, points) - pixels
+
+>>> torch.set_default_device("cuda")
+>>> npts, poses = 8, pp.randn_SE3(1)
+>>> points = torch.randn(npts, 3)
+>>> points[:, 2] += 4  # positive depth
+>>> cidx = torch.zeros(npts, dtype=torch.long)
+>>> pidx = torch.arange(npts)
+>>> pixels = torch.randn(npts, 2)
+>>> inputs = (pixels, cidx, pidx)
+
+>>> model = ReprojErr(poses, points)
+>>> solver = PCG(tol=1e-4, maxiter=250)
+>>> strategy = TrustRegion(up=2.0, down=0.5**4)
+>>> optimizer = LM(model, solver, strategy, sparse=True)
+>>> scheduler = StopOnPlateau(optimizer, steps=5, verbose=True)
+
+>>> while scheduler.continual():
+...     loss = optimizer.step(inputs)
+...     scheduler.step(loss)
 ```
 
 For more usage, see [Documentation](https://pypose.org/docs). For more applications, see [Examples](https://github.com/pypose/pypose/tree/main/examples).
 
 ## Citing PyPose
 
-If you use PyPose, please cite the paper below. You may also [download it here](https://arxiv.org/abs/2209.15428).
+If you use PyPose, please cite the papers below.
+
+#### [PyPose: A Library for Robot Learning with Physics-based Optimization](https://arxiv.org/abs/2209.15428)
 
 ```bibtex
 @inproceedings{wang2023pypose,
@@ -161,7 +214,19 @@ If you use PyPose, please cite the paper below. You may also [download it here](
 }
 ```
 
-More papers describing PyPose:
+#### [Bundle Adjustment in the Eager Mode](https://arxiv.org/abs/2409.12190)
+
+```bibtex
+@article{zhan2026bundle,
+  title = {Bundle Adjustment in the Eager Mode},
+  author = {Zhan, Zitong and Xu, Huan and Fang, Zihang and Wei, Xinpeng and Hu, Yaoyu and Wang, Chen},
+  journal = {IEEE Transactions on Robotics (T-RO)},
+  year = {2026},
+  url = {https://arxiv.org/abs/2409.12190}
+}
+```
+
+#### [PyPose v0.6: The Imperative Programming Interface for Robotics](https://arxiv.org/abs/2309.13035)
 
 ```bibtex
 @inproceedings{zhan2023pypose,
@@ -171,3 +236,9 @@ More papers describing PyPose:
   booktitle = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) Workshop},
 }
 ```
+
+If you use the bundle adjustment or pose graph optimization functions, or its components such as sparse Jacobian, GPU sparse linear algebra, conjugate gradient solver, or sparse LM optimizer, you must cite [*Bundle Adjustment in the Eager Mode*](https://arxiv.org/abs/2409.12190).
+
+## Point of Contact
+
+For any questions, please contact [@zitongzhan](https://github.com/zitongzhan) with a copy to [@wang-chen](https://github.com/wang-chen).

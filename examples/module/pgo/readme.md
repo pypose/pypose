@@ -1,11 +1,15 @@
 # Pose Graph Optimization
 
-An example for Pose Graph Optimization (PGO)
+An example of pose graph optimization (PGO) using sparse Levenberg-Marquardt
+optimization.
 
-## Installation
+## Requirements
 
-    python -m pip install -U matplotlib
-    pip install torchvision
+```bash
+python -m pip install -U matplotlib
+```
+
+Sparse optimization requires CUDA.
 
 ## Prepare Dataset (Optional)
 
@@ -16,34 +20,47 @@ An example for Pose Graph Optimization (PGO)
         DATAROOT
             ├── parking-garage.g2o
 
-## Run:
+## Run
+
+Run PGO using the default CUDA device:
 
 ```bash
 python examples/module/pgo/pgo.py
 ```
 
-Or
+The example uses the `PCG` solver and sparse Jacobian assembly. Information
+matrices (`infos`) are loaded with the dataset but are not currently supported
+as weights by the sparse optimizer. Support will be added in a future release.
+
+To select a CUDA device or a different dataset directory:
 
 ```bash
 python examples/module/pgo/pgo.py --device cuda:0 --dataroot DATAROOT
 ```
 
-Note: change `DATAROOT` to the folder you select.
+Replace `DATAROOT` with the directory containing the dataset.
 
-* Other supported arguments:
+Other supported arguments:
 
         Pose Graph Optimization
 
         optional arguments:
           -h, --help           show this help message and exit
-          --device DEVICE      cuda or cpu
+          --device DEVICE      cuda device
           --radius RADIUS      trust region radius
           --save SAVE          files location to save
           --dataroot DATAROOT  dataset location
           --dataname DATANAME  dataset name
-          --no-vectorize       to save memory
-          --vectorize          to accelerate computation
+---
 
-## Note
+If you use the pose graph optimization example, please cite the following paper.
 
-The current implementation of PGO is not using sparse matrices. Therefore, when the number of poses is very big, the memory consumption can be large (`--vectorize`) or running speed can be slow (`--no-vectorize`). The sparse matrices will be integrated in the next main release, while the API will be mostly unchanged, only internal logic will be updated.
+```bibtex
+@article{zhan2024bundle,
+  title = {Bundle Adjustment in the Eager Mode},
+  author = {Zhan, Zitong and Xu, Huan and Fang, Zihang and Wei, Xinpeng and Hu, Yaoyu and Wang, Chen},
+  journal = {IEEE Transactions on Robotics (T-RO)},
+  year = {2026},
+  url = {https://arxiv.org/abs/2409.12190}
+}
+```

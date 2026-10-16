@@ -1,15 +1,29 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/python
 {
-	"name": "Python 3",
+	"name": "PyTorch",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/python:0-3.9",
+	"image": "nvcr.io/nvidia/pytorch:25.11-py3",
+
+	"runArgs": [
+		"--user=0:0",
+		"--gpus=all",
+		"--ipc=host"
+	],
+
 	"features": {
+		"ghcr.io/jsburckhardt/devcontainer-features/codex:1": {},
 		"ghcr.io/devcontainers-contrib/features/curl-apt-get:1": {},
 		"ghcr.io/devcontainers-contrib/features/ffmpeg-apt-get:1": {},
 		"ghcr.io/devcontainers-contrib/features/wget-apt-get:1": {},
 		"ghcr.io/jungaretti/features/make:1": {}
 	},
+
+	"mounts": [
+		"source=${localEnv:HOME}/.cache,target=/root/.cache,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.codex,target=/root/.codex,type=bind",
+		"source=${localEnv:HOME}/.gitconfig,target=/root/.gitconfig,type=bind",
+	],
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
@@ -19,7 +33,7 @@
 
 	// Use 'postCreateCommand' to run commands after the container is created.
 	// "postCreateCommand": "pip3 install --user -r requirements.txt",
-	"postCreateCommand": "echo 'Please wait until this command finished before running any PyPose examples and pytest.'; pwd ; pip install --upgrade pip; pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu ; pip3 install -e .",
+	"postCreateCommand": "pip3 install -e .",
 
 	// Configure tool-specific properties.
 	"customizations": {
@@ -29,7 +43,6 @@
 			"extensions": [
 				"ms-python.python",
 				"GitHub.codespaces",
-				"GitHub.copilot"
 			]
 		}
 	}

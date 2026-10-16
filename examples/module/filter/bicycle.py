@@ -19,6 +19,12 @@ class Bicycle(pp.module.NLS):
     def __init__(self):
         super().__init__()
 
+    def forward(self, state, input):
+        '''Return the next state and its observation.'''
+        self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
+        state = self.state_transition(self.state, self.input, self.systime)
+        return state, self.observation(state, self.input, self.systime + 1)
+
     def state_transition(self, state, input, t=None):
         '''
         Don't add noise in this function, as it will be used for automatically
