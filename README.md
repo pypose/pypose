@@ -146,9 +146,9 @@ pytest
 >>> # Note: remove one of the above options for usage!
 ```
 
-3. May 2026: Starting from v0.9.5, PyPose introduces sparse Jacobian tracing, enabling
-efficient sparse 2nd-order optimization, significantly accelerating applications such as
-bundle adjustment.
+3. May 2026: PyPose v0.9.5 integrates the sparse Jacobian tracing and sparse second-order
+optimization methods developed in [*Bundle Adjustment in the Eager Mode*](https://arxiv.org/abs/2409.12190)
+to accelerate applications such as bundle adjustment.
 
 ```python
 >>> import torch
@@ -201,7 +201,9 @@ For more usage, see [Documentation](https://pypose.org/docs). For more applicati
 
 ## Citing PyPose
 
-If you use PyPose, please cite the paper below. You may also [download it here](https://arxiv.org/abs/2209.15428).
+If you use PyPose, please cite the papers below.
+
+#### [PyPose: A Library for Robot Learning with Physics-based Optimization](https://arxiv.org/abs/2209.15428)
 
 ```bibtex
 @inproceedings{wang2023pypose,
@@ -212,7 +214,7 @@ If you use PyPose, please cite the paper below. You may also [download it here](
 }
 ```
 
-If you use the sparse Jacobian, GPU sparse linear algebra, conjugate gradient solver, or sparse LM optimizer in PyPose, please cite the [following paper](https://arxiv.org/abs/2409.12190).
+#### [Bundle Adjustment in the Eager Mode](https://arxiv.org/abs/2409.12190)
 
 ```bibtex
 @article{zhan2026bundle,
@@ -224,7 +226,7 @@ If you use the sparse Jacobian, GPU sparse linear algebra, conjugate gradient so
 }
 ```
 
-More papers describing PyPose:
+#### [PyPose v0.6: The Imperative Programming Interface for Robotics](https://arxiv.org/abs/2309.13035)
 
 ```bibtex
 @inproceedings{zhan2023pypose,
@@ -234,3 +236,9 @@ More papers describing PyPose:
   booktitle = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) Workshop},
 }
 ```
+
+If you use the bundle adjustment or pose graph optimization functions, or its components such as sparse Jacobian, GPU sparse linear algebra, conjugate gradient solver, or sparse LM optimizer, you must cite [*Bundle Adjustment in the Eager Mode*](https://arxiv.org/abs/2409.12190).
+
+## Point of Contact
+
+For any questions, please contact [@zitongzhan](https://github.com/zitongzhan) with a copy to [@wang-chen](https://github.com/wang-chen).
