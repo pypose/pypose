@@ -56,8 +56,7 @@ def bicycle_plot(model_name, state, est, cov, save=None, show=False):
     for i in range(N):
         eigvals, eigvecs = np.linalg.eig(cov[i])
         axis = np.sqrt(eigvals) * 3
-        slope = eigvecs[1][0] / eigvecs[1][1]
-        angle = 180.0 * np.arctan(slope) / np.pi
+        angle = np.degrees(np.arctan2(eigvecs[1, 0], eigvecs[0, 0]))
         e = Ellipse(est[i, 0:2], axis[0], axis[1], angle=angle)
         ax.add_artist(e)
         e.set_facecolor("none")
