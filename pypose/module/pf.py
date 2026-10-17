@@ -18,6 +18,19 @@ class PF(EKF):
             Ignored if provided during each iteration. Default: ``None``
         particles (:obj:`Int`, optional): The number of particle. Default: ``1000``
 
+    Batch dimensions precede vector and matrix dimensions. For batch shape ``B``,
+    states have shape ``(*B, n)``, observations ``(*B, m)``, and inputs
+    ``(*B, l)``. Covariances ``P`` and ``Q`` have shape ``(*B, n, n)``,
+    and ``R`` has shape ``(*B, m, m)``. Covariances can be shared across
+    batches using shapes ``(n, n)`` and ``(m, m)``. An empty ``B`` gives an
+    unbatched filter. Batch entries represent independent systems, not time steps.
+
+    Internally, the particle dimension comes first. Model methods receive
+    states of shape ``(S, *B, n)`` and return states or observations of shape
+    ``(S, *B, n)`` or ``(S, *B, m)``. Inputs retain shape ``(*B, l)`` and
+    broadcast across samples. Model operations must preserve batch independence.
+    Here ``S = particles``. Returned estimates have no sample dimension.
+
     A non-linear system can be described as
 
     .. math::
@@ -81,6 +94,12 @@ class PF(EKF):
         ...     def __init__(self):
         ...         super().__init__()
         ...
+        ...     def forward(self, state, input, noise=None):
+        ...         state = self.state_transition(state, input, self.systime)
+        ...         if noise is not None:
+        ...             state = state + noise
+        ...         return state, self.observation(state, input, self.systime + 1)
+        ...
         ...     def state_transition(self, state, input, t=None):
         ...         return state.cos() + input
         ...
@@ -94,26 +113,26 @@ class PF(EKF):
 
         3. Prepare data
 
-        >>> T, N = 5, 2 # steps, state dim
-        >>> states = torch.zeros(T, N)
-        >>> inputs = torch.randn(T, N)
-        >>> observ = torch.zeros(T, N)
+        >>> B, T, N = 3, 5, 2 # batchsize, steps, state dim
+        >>> states = torch.zeros(B, T, N)
+        >>> inputs = torch.randn(B, T, N)
+        >>> observ = torch.zeros(B, T, N)
         >>> # std of transition, observation, and estimation
         >>> q, r, p = 0.1, 0.1, 10
-        >>> Q = torch.eye(N) * q**2
-        >>> R = torch.eye(N) * r**2
-        >>> P = torch.eye(N).repeat(T, 1, 1) * p**2
-        >>> estim = torch.randn(T, N) * p
+        >>> Q = torch.eye(N).repeat(B, 1, 1) * q**2
+        >>> R = torch.eye(N).repeat(B, 1, 1) * r**2
+        >>> P = torch.eye(N).repeat(B, T, 1, 1) * p**2
+        >>> estim = torch.randn(B, T, N) * p
 
-        4. Perform PF prediction. Note that estimation error becomes smaller with more steps.
+        4. Predict the next state and correct it using a measurement of that same state.
 
         >>> for i in range(T - 1):
-        ...     w = q * torch.randn(N) # transition noise
-        ...     v = r * torch.randn(N) # observation noise
-        ...     states[i+1], observ[i] = model(states[i] + w, inputs[i])
-        ...     estim[i+1], P[i+1] = pf(estim[i], observ[i] + v, inputs[i], P[i], Q, R)
-        ... print('Est error:', (states - estim).norm(dim=-1))
-        Est error: tensor([10.7083,  1.6012,  0.3339,  0.1723,  0.1107])
+        ...     w = q * torch.randn(B, N) # transition noise
+        ...     v = r * torch.randn(B, N) # observation noise
+        ...     states[:, i+1], observ[:, i+1] = model(states[:, i], inputs[:, i], w)
+        ...     estim[:, i+1], P[:, i+1] = pf(estim[:, i], observ[:, i+1] + v, inputs[:, i], P[:, i], Q, R)
+        >>> print('Est error:', (states - estim).norm(dim=-1))
+        Est error: tensor(...)
 
     Note:
         Implementation is based on Section 15.2 of this book
@@ -132,10 +151,11 @@ class PF(EKF):
         Performs one step estimation.
 
         Args:
-            x (:obj:`Tensor`): estimated system state of previous step.
-            y (:obj:`Tensor`): system observation at current step (measurement).
-            u (:obj:`Tensor`): system input at current step.
-            P (:obj:`Tensor`): state estimation covariance of previous step.
+            x (:obj:`Tensor`): estimated system state of previous step, shape ``(*B, n)``.
+            y (:obj:`Tensor`): system observation at current step, shape ``(*B, m)``.
+            u (:obj:`Tensor`): system input at current step, shape ``(*B, l)``.
+            P (:obj:`Tensor`): state estimation covariance of previous step, shape
+                ``(*B, n, n)`` or ``(n, n)``.
             Q (:obj:`Tensor`, optional): covariance of system transition model.
                 Default: ``None``.
             R (:obj:`Tensor`, optional): covariance of system observation model.
@@ -144,7 +164,8 @@ class PF(EKF):
                 If ``None``, current system time is used. Default: ``None``.
 
         Return:
-            list of :obj:`Tensor`: posteriori state and covariance estimation
+            tuple of :obj:`Tensor`: posteriori state ``(*B, n)`` and covariance
+            ``(*B, n, n)``, where ``B`` is the broadcast batch shape.
         '''
         # Upper cases are matrices, lower cases are vectors
         Q = Q if Q is not None else self.Q
@@ -157,7 +178,7 @@ class PF(EKF):
         q = self.relative_likelihood(y, ye, R)
         xr = self.resample_particles(q, xs)
 
-        x = xr.mean(dim=-2)
+        x = xr.mean(dim=0)
         ex = xr - x
         P = self.compute_cov(ex, ex, Q)
 
@@ -172,7 +193,7 @@ class PF(EKF):
             P (:obj:`Tensor`): state estimation covariance of previous step
 
         Return:
-            list of :obj:`Tensor`: particles
+            :obj:`Tensor`: particles of shape ``(particles, *B, n)``.
         '''
         m = MultivariateNormal(x, P)
         return m.sample(torch.Size([self.particles]))
@@ -181,16 +202,19 @@ class PF(EKF):
         r'''
         Compute the relative likelihood
         '''
-        return F.softmax(MultivariateNormal(ye, R).log_prob(y), dim=-1)
+        return F.softmax(MultivariateNormal(ye, R).log_prob(y), dim=0)
 
     def resample_particles(self, q, x):
         r'''
         Resample the set of a posteriori particles
         '''
-        r = torch.rand(self.particles, dtype=x.dtype, device=x.device)
-        cumsumq = torch.cumsum(q, dim=-1)
-        return x[torch.searchsorted(cumsumq, r)]
+        r = torch.rand(x.shape[:-1], dtype=x.dtype, device=x.device)
+        # searchsorted searches the last axis; move particles there temporarily.
+        cdf = torch.cumsum(q, dim=0).movedim(0, -1).contiguous()
+        index = torch.searchsorted(cdf, r.movedim(0, -1).contiguous())
+        index = index.movedim(-1, 0).clamp_max(x.shape[0] - 1)
+        return torch.gather(x, 0, index.unsqueeze(-1).expand_as(x))
 
     def compute_cov(self, a, b, Q=0):
         '''Compute covariance of two set of variables.'''
-        return Q + bvv(a, b).mean(dim=-3)
+        return Q + bvv(a, b).mean(dim=0)

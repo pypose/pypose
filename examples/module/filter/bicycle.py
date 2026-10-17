@@ -19,12 +19,18 @@ class Bicycle(pp.module.NLS):
     def __init__(self):
         super().__init__()
 
+    def forward(self, state, input):
+        '''Return the next state and its observation.'''
+        self.state, self.input = torch.atleast_1d(state), torch.atleast_1d(input)
+        state = self.state_transition(self.state, self.input, self.systime)
+        return state, self.observation(state, self.input, self.systime + 1)
+
     def state_transition(self, state, input, t=None):
         '''
         Don't add noise in this function, as it will be used for automatically
         linearizing the system by the parent class ``pp.module.NLS``.
         '''
-        theta = state[..., 2] + input[1]
+        theta = state[..., 2] + input[..., 1]
         x = state[..., 0] + input[..., 0] * theta.cos()
         y = state[..., 1] + input[..., 0] * theta.sin()
         return torch.stack([x, y, theta], dim=-1)
@@ -50,8 +56,7 @@ def bicycle_plot(model_name, state, est, cov, save=None, show=False):
     for i in range(N):
         eigvals, eigvecs = np.linalg.eig(cov[i])
         axis = np.sqrt(eigvals) * 3
-        slope = eigvecs[1][0] / eigvecs[1][1]
-        angle = 180.0 * np.arctan(slope) / np.pi
+        angle = np.degrees(np.arctan2(eigvecs[1, 0], eigvecs[0, 0]))
         e = Ellipse(est[i, 0:2], axis[0], axis[1], angle=angle)
         ax.add_artist(e)
         e.set_facecolor("none")
