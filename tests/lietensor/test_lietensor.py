@@ -132,6 +132,11 @@ def test_parameter_dispatch(monkeypatch):
     assert isinstance(lie_param, pp.Parameter)
     assert isinstance(lie_param, pp.LieTensor)
     assert lie_param.ltype is lie.ltype
+    # Design B: a Lie-group Parameter keeps its ORIGINAL FULL EMBEDDED
+    # storage (SE3 = 7-wide); the manifold dimension is exposed only by the
+    # public ``.grad`` view (see test_grad_view.py).
+    assert lie_param.shape == lie.shape
+    assert lie_param.shape[-1:] == lie_param.ltype.embedding
     torch.testing.assert_close(lie_param.detach(), lie.detach())
 
     calls = []
@@ -147,7 +152,9 @@ def test_parameter_dispatch(monkeypatch):
     torch.testing.assert_close(sjac_param.detach(), torch.ones(2, 3))
 
     sjac_lie_param = pp.Parameter(pp.randn_SE3(2), sjac=True, requires_grad=False)
-    assert not isinstance(sjac_lie_param, pp.Parameter)
+    assert isinstance(sjac_lie_param, pp.LieTensor)
+    assert sjac_lie_param.shape[-1:] == sjac_lie_param.ltype.embedding
+    assert not getattr(sjac_lie_param, '_tangent_parameter', False)
 
     S = pp.randn_Sim3(4)
     S.Log().Exp()
