@@ -67,6 +67,7 @@ class TestUKF:
         expected_P = P + Q - gain @ (P + Q + R) @ gain.mT
         torch.testing.assert_close(actual_x, expected_x)
         torch.testing.assert_close(actual_P, expected_P.expand(*batch, 2, 2))
+        assert torch.equal(actual_P, actual_P.mT)
 
     @pytest.mark.parametrize("batch", [(3,), (2, 3)])
     @pytest.mark.parametrize("shared_covariance", [False, True])
@@ -149,32 +150,3 @@ class TestUKF:
 if __name__ == '__main__':
     test = TestUKF()
     test.test_ukf()
-
-
-def test_ukf_posterior_covariance_symmetric_and_matches_kalman():
-    import torch, pypose as pp
-
-    class Lin(pp.module.NLS):
-        def __init__(self, A, C):
-            super().__init__()
-            self.A, self.C = A, C
-        def state_transition(self, state, input, t=None):
-            return state @ self.A.mT + input
-        def observation(self, state, input, t=None):
-            return state @ self.C.mT
-
-    torch.manual_seed(0)
-    n = 3
-    A = torch.randn(n, n, dtype=torch.float64) * 0.5
-    C = torch.eye(n, dtype=torch.float64)
-    Q = torch.eye(n, dtype=torch.float64) * 1e-2
-    R = torch.eye(n, dtype=torch.float64) * 1e-1
-    P0 = torch.eye(n, dtype=torch.float64)
-    x0 = torch.zeros(n, dtype=torch.float64)
-    u = torch.zeros(n, dtype=torch.float64)
-    y = torch.randn(n, dtype=torch.float64)
-    x, P = pp.module.UKF(Lin(A, C))(x0, y, u, P0, Q, R)
-    Pp = A @ P0 @ A.mT + Q
-    K = Pp @ C.mT @ torch.linalg.inv(C @ Pp @ C.mT + R)
-    assert torch.allclose(P, P.mT)
-    assert torch.allclose(P, Pp - K @ C @ Pp, atol=1e-8)
