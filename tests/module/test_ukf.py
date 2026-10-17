@@ -67,6 +67,7 @@ class TestUKF:
         expected_P = P + Q - gain @ (P + Q + R) @ gain.mT
         torch.testing.assert_close(actual_x, expected_x)
         torch.testing.assert_close(actual_P, expected_P.expand(*batch, 2, 2))
+        assert torch.equal(actual_P, actual_P.mT)
 
     @pytest.mark.parametrize("batch", [(3,), (2, 3)])
     @pytest.mark.parametrize("shared_covariance", [False, True])
