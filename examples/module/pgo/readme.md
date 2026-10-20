@@ -13,12 +13,19 @@ Sparse optimization requires CUDA.
 
 ## Prepare Dataset (Optional)
 
-* The default parking-garage sample is downloaded if the requested file is missing.
-* For other datasets, place the `.g2o` file in `DATAROOT` before running.
-  * In this case, the data in `DATAROOT` folder should look like:
+All five PGO example datasets are downloaded automatically to `--dataroot`
+when selected with `--dataname`. Existing files are reused, so manual preparation
+is optional. The datasets are hosted in the
+[BAE 0.2.2 release](https://github.com/pypose/bae/releases/tag/0.2.2):
 
-        DATAROOT
-            ├── parking-garage.g2o
+* [parking-garage.g2o](https://github.com/pypose/bae/releases/download/0.2.2/parking-garage.g2o) (default)
+* [sphere_bignoise_vertex3.g2o](https://github.com/pypose/bae/releases/download/0.2.2/sphere_bignoise_vertex3.g2o)
+* [sphere_g2o.g2o](https://github.com/pypose/bae/releases/download/0.2.2/sphere_g2o.g2o)
+* [torus3D.g2o](https://github.com/pypose/bae/releases/download/0.2.2/torus3D.g2o)
+* [grid3D.g2o](https://github.com/pypose/bae/releases/download/0.2.2/grid3D.g2o)
+
+You can also place a custom `.g2o` file in `--dataroot` and select it with
+`--dataname`.
 
 ## Run
 
@@ -45,8 +52,8 @@ To select a CUDA device or a different dataset directory:
 python examples/module/pgo/pgo.py --device cuda:0 --dataroot DATAROOT
 ```
 
-Replace `DATAROOT` with the directory containing the dataset. For example,
-with `sphere_bignoise_vertex3.g2o` already downloaded:
+Replace `DATAROOT` with the directory where datasets should be stored. For
+example, this command automatically downloads Sphere big-noise if needed:
 
 ```bash
 python examples/module/pgo/pgo.py --dataroot DATAROOT \

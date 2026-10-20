@@ -2,7 +2,7 @@ import os,torch
 import numpy as np
 import pypose as pp
 import torch.utils.data as Data
-from torchvision.datasets.utils import download_and_extract_archive
+from torchvision.datasets.utils import download_url
 
 
 class G2OPGO(Data.Dataset):
@@ -12,12 +12,12 @@ class G2OPGO(Data.Dataset):
     SLAM: a Survey on Rotation Estimation and its Use in Pose Graph Optimization. In IEEE
     Intl. Conf. on Robotics and Automation (ICRA), pages 4597-4604, 2015.
     '''
-    link = 'https://github.com/pypose/pypose/releases/download/v0.4.0/parking-garage.zip'
+    link = 'https://github.com/pypose/bae/releases/download/0.2.2/'
     def __init__(self, root, dataname, device='cpu', download=True):
         super().__init__()
 
         if download and not os.path.exists(os.path.join(root, dataname)):
-            download_and_extract_archive(self.link, root)
+            download_url(self.link + dataname, root, filename=dataname)
 
         def info2mat(info):
             mat = np.zeros((6,6))
