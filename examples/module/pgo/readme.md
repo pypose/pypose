@@ -13,8 +13,8 @@ Sparse optimization requires CUDA.
 
 ## Prepare Dataset (Optional)
 
-* The PGO sample data will be downloaded automatically.
-* Set dataset `download` option to `False` if you have other data in same format.
+* The default parking-garage sample is downloaded if the requested file is missing.
+* For other datasets, place the `.g2o` file in `DATAROOT` before running.
   * In this case, the data in `DATAROOT` folder should look like:
 
         DATAROOT
@@ -28,9 +28,16 @@ Run PGO using the default CUDA device:
 python examples/module/pgo/pgo.py
 ```
 
-The example uses the `PCG` solver and sparse Jacobian assembly. Information
-matrices (`infos`) are loaded with the dataset but are not currently supported
-as weights by the sparse optimizer. Support will be added in a future release.
+The example uses the `PCG` solver, sparse Jacobian assembly, double precision,
+and a fixed first pose. It minimizes translation and quaternion-vector errors,
+whitened inside the residual with the transpose of the information matrix's
+Cholesky factor. The quaternion residual is evaluated through Lie operations
+so that its derivatives follow PyPose's tangent convention.
+
+The example retains `StopOnPlateau`, with up to 80 iterations and the original
+patience (3) and decrease threshold (`1e-3`). A conservative initial trust-region radius
+of 100 avoids the early rejected trial steps that make this scheduler stop on
+the Sphere big-noise dataset.
 
 To select a CUDA device or a different dataset directory:
 
@@ -38,7 +45,13 @@ To select a CUDA device or a different dataset directory:
 python examples/module/pgo/pgo.py --device cuda:0 --dataroot DATAROOT
 ```
 
-Replace `DATAROOT` with the directory containing the dataset.
+Replace `DATAROOT` with the directory containing the dataset. For example,
+with `sphere_bignoise_vertex3.g2o` already downloaded:
+
+```bash
+python examples/module/pgo/pgo.py --dataroot DATAROOT \
+    --dataname sphere_bignoise_vertex3.g2o --steps 80
+```
 
 Other supported arguments:
 
@@ -47,10 +60,11 @@ Other supported arguments:
         optional arguments:
           -h, --help           show this help message and exit
           --device DEVICE      cuda device
-          --radius RADIUS      trust region radius
+          --radius RADIUS      initial trust region radius (default: 100)
           --save SAVE          files location to save
           --dataroot DATAROOT  dataset location
           --dataname DATANAME  dataset name
+          --steps STEPS        maximum optimization steps (default: 80)
 ---
 
 If you use the pose graph optimization example, please cite the following paper.

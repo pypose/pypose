@@ -16,7 +16,7 @@ class G2OPGO(Data.Dataset):
     def __init__(self, root, dataname, device='cpu', download=True):
         super().__init__()
 
-        if download:
+        if download and not os.path.exists(os.path.join(root, dataname)):
             download_and_extract_archive(self.link, root)
 
         def info2mat(info):
@@ -28,7 +28,7 @@ class G2OPGO(Data.Dataset):
                 ix += (6-i)
             return mat
 
-        self.dtype = torch.get_default_dtype()
+        self.dtype = torch.float64
         filename = os.path.join(root, dataname)
         ids, nodes, edges, poses, infos = [], [], [], [], []
         with open(filename) as f:
