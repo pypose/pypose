@@ -13,10 +13,7 @@ Sparse optimization requires CUDA.
 
 ## Prepare Dataset (Optional)
 
-All five PGO example datasets are downloaded automatically to `--dataroot`
-when selected with `--dataname`. Existing files are reused, so manual preparation
-is optional. The datasets are hosted in the
-[BAE 0.2.2 release](https://github.com/pypose/bae/releases/tag/0.2.2):
+The PGO samples below are downloaded automatically when selected with `--dataname`.
 
 * [parking-garage.g2o](https://github.com/pypose/bae/releases/download/0.2.2/parking-garage.g2o) (default)
 * [sphere_bignoise_vertex3.g2o](https://github.com/pypose/bae/releases/download/0.2.2/sphere_bignoise_vertex3.g2o)
@@ -35,16 +32,8 @@ Run PGO using the default CUDA device:
 python examples/module/pgo/pgo.py
 ```
 
-The example uses the `PCG` solver, sparse Jacobian assembly, double precision,
-and a fixed first pose. It minimizes translation and quaternion-vector errors,
-whitened inside the residual with the transpose of the information matrix's
-Cholesky factor. The quaternion residual is evaluated through Lie operations
-so that its derivatives follow PyPose's tangent convention.
-
-The example retains `StopOnPlateau`, with up to 80 iterations and the original
-patience (3) and decrease threshold (`1e-3`). A conservative initial trust-region radius
-of 100 avoids the early rejected trial steps that make this scheduler stop on
-the Sphere big-noise dataset.
+The example uses the `PCG` solver and sparse Jacobian assembly, with information
+matrices applied as residual weights.
 
 To select a CUDA device or a different dataset directory:
 
@@ -57,7 +46,7 @@ example, this command automatically downloads Sphere big-noise if needed:
 
 ```bash
 python examples/module/pgo/pgo.py --dataroot DATAROOT \
-    --dataname sphere_bignoise_vertex3.g2o --steps 80
+    --dataname sphere_bignoise_vertex3.g2o
 ```
 
 Other supported arguments:
