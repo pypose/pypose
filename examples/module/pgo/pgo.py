@@ -32,10 +32,8 @@ class PoseGraph(nn.Module):
         estimate = node1.Inv() @ node2
         translation = estimate.translation() - poses.translation()
         rotation = poses.rotation() @ estimate.rotation().Inv()
-        # Compute 2 * vec(q) through Log so backward uses PyPose's tangent convention.
         phi = rotation.Log().tensor()
         rotation_error = phi * torch.sinc(phi.norm(dim=-1, keepdim=True) / (2 * torch.pi))
-        # Restore the quaternion's hemisphere after taking the principal Log.
         rotation_error = torch.where(rotation.tensor()[..., 3:] < 0, -rotation_error, rotation_error)
         residual = torch.cat((translation, rotation_error), dim=-1)
         return (sqrt_info @ residual.unsqueeze(-1)).squeeze(-1)
