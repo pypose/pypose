@@ -351,9 +351,10 @@ def svdtf(source, target):
     target = target - ctntarget
     M = torch.einsum('...Na, ...Nb -> ...ab', target, source)
     U, S, Vh = torch.linalg.svd(M)
-    R = U @ Vh
-    mask = (R.det() + 1).abs() < 1e-6
-    R[mask] = - R[mask]
+    correction = torch.ones_like(S)
+    correction[..., -1] = torch.where((U @ Vh).det() < 0, -1, 1)
+    # Change only the weakest singular direction to preserve the optimum.
+    R = (U * correction.unsqueeze(-2)) @ Vh
     t = ctntarget.mT - R @ ctnsource.mT
     T = torch.cat((R, t), dim=-1)
     return mat2SE3(T, check=False)
