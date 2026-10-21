@@ -28,7 +28,7 @@ class G2OPGO(Data.Dataset):
                 ix += (6-i)
             return mat
 
-        self.dtype = torch.float64
+        self.dtype = torch.get_default_dtype()
         filename = os.path.join(root, dataname)
         ids, nodes, edges, poses, infos = [], [], [], [], []
         with open(filename) as f:
