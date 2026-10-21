@@ -13,7 +13,7 @@ Sparse optimization requires CUDA.
 
 ## Prepare Dataset (Optional)
 
-The PGO samples below are downloaded automatically when selected with `--dataname`.
+The PGO samples below are downloaded automatically if the selected `--datafile` is missing.
 
 * [parking-garage.g2o](https://github.com/pypose/bae/releases/download/0.2.2/parking-garage.g2o) (default)
 * [sphere_bignoise_vertex3.g2o](https://github.com/pypose/bae/releases/download/0.2.2/sphere_bignoise_vertex3.g2o)
@@ -21,8 +21,7 @@ The PGO samples below are downloaded automatically when selected with `--datanam
 * [torus3D.g2o](https://github.com/pypose/bae/releases/download/0.2.2/torus3D.g2o)
 * [grid3D.g2o](https://github.com/pypose/bae/releases/download/0.2.2/grid3D.g2o)
 
-You can also place a custom `.g2o` file in `--dataroot` and select it with
-`--dataname`.
+You can also select an existing custom `.g2o` file with `--datafile`.
 
 ## Run
 
@@ -35,18 +34,10 @@ python examples/module/pgo/pgo.py
 The example uses the `PCG` solver and sparse Jacobian assembly, with information
 matrices applied as residual weights.
 
-To select a CUDA device or a different dataset directory:
+To run Sphere big-noise, replace `DATAROOT` with your dataset directory:
 
 ```bash
-python examples/module/pgo/pgo.py --device cuda:0 --dataroot DATAROOT
-```
-
-Replace `DATAROOT` with the directory where datasets should be stored. For
-example, this command automatically downloads Sphere big-noise if needed:
-
-```bash
-python examples/module/pgo/pgo.py --dataroot DATAROOT \
-    --dataname sphere_bignoise_vertex3.g2o
+python examples/module/pgo/pgo.py --datafile DATAROOT/sphere_bignoise_vertex3.g2o
 ```
 
 Other supported arguments:
@@ -58,8 +49,7 @@ Other supported arguments:
           --device DEVICE      cuda device
           --radius RADIUS      initial trust region radius (default: 100)
           --save SAVE          files location to save
-          --dataroot DATAROOT  dataset location
-          --dataname DATANAME  dataset name
+          --datafile DATAFILE  dataset file path
           --steps STEPS        maximum optimization steps (default: 80)
 ---
 

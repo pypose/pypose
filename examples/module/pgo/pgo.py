@@ -61,16 +61,15 @@ if __name__ == '__main__':
     parser.add_argument("--radius", type=float, default=1e2, help="initial trust region radius")
     parser.add_argument("--save", type=str, default='./examples/module/pgo/save/', \
                         help="files location to save")
-    parser.add_argument("--dataroot", type=str, default='./examples/module/pgo/data', \
-                        help="dataset location")
-    parser.add_argument("--dataname", type=str, default='parking-garage.g2o', \
-                        help="dataset name")
+    parser.add_argument("--datafile", type=str, default='./examples/module/pgo/data/parking-garage.g2o', \
+                        help="dataset file path")
     parser.add_argument("--steps", type=int, default=80, help="maximum optimization steps")
     args = parser.parse_args()
     print(args)
     os.makedirs(os.path.join(args.save), exist_ok=True)
 
-    data = G2OPGO(args.dataroot, args.dataname, device=args.device, download=True)
+    dataroot, dataname = os.path.split(os.path.abspath(args.datafile))
+    data = G2OPGO(dataroot, dataname, device=args.device, download=True)
     edges, poses, infos = data.edges, data.poses, data.infos
     # Whiten inside the residual because sparse LM does not accept a weight matrix.
     sqrt_info = torch.linalg.cholesky(infos).mT
@@ -81,14 +80,14 @@ if __name__ == '__main__':
     optimizer = pp.optim.LM(graph, solver=solver, strategy=strategy, min=1e-6, sparse=True)
     scheduler = StopOnPlateau(optimizer, steps=args.steps, patience=3, decreasing=1e-3, verbose=True)
 
-    pngname = os.path.join(args.save, args.dataname+'.png')
-    axlim = plot_and_save(graph.nodes_all().translation(), pngname, args.dataname)
+    pngname = os.path.join(args.save, dataname+'.png')
+    axlim = plot_and_save(graph.nodes_all().translation(), pngname, dataname)
     ### the 1st implementation: for customization and easy to extend
     while scheduler.continual():
         loss = optimizer.step(input=(edges, poses, sqrt_info))
         scheduler.step(loss)
 
-        name = os.path.join(args.save, args.dataname + '_' + str(scheduler.steps))
+        name = os.path.join(args.save, dataname + '_' + str(scheduler.steps))
         title = 'PyPose PGO at the %d step(s) with loss %7f'%(scheduler.steps, loss.item())
         plot_and_save(graph.nodes_all().translation(), name+'.png', title, axlim=axlim)
         torch.save(graph.state_dict(), name+'.pt')
