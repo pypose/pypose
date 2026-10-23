@@ -13,12 +13,15 @@ Sparse optimization requires CUDA.
 
 ## Prepare Dataset (Optional)
 
-* The PGO sample data will be downloaded automatically.
-* Set dataset `download` option to `False` if you have other data in same format.
-  * In this case, the data in `DATAROOT` folder should look like:
+The PGO samples below are downloaded automatically if the selected `--datafile` is missing.
 
-        DATAROOT
-            ├── parking-garage.g2o
+* [parking-garage.g2o](https://github.com/pypose/bae/releases/download/0.2.2/parking-garage.g2o) (default)
+* [sphere_bignoise_vertex3.g2o](https://github.com/pypose/bae/releases/download/0.2.2/sphere_bignoise_vertex3.g2o)
+* [sphere_g2o.g2o](https://github.com/pypose/bae/releases/download/0.2.2/sphere_g2o.g2o)
+* [torus3D.g2o](https://github.com/pypose/bae/releases/download/0.2.2/torus3D.g2o)
+* [grid3D.g2o](https://github.com/pypose/bae/releases/download/0.2.2/grid3D.g2o)
+
+You can also select an existing custom `.g2o` file with `--datafile`.
 
 ## Run
 
@@ -28,17 +31,14 @@ Run PGO using the default CUDA device:
 python examples/module/pgo/pgo.py
 ```
 
-The example uses the `PCG` solver and sparse Jacobian assembly. Information
-matrices (`infos`) are loaded with the dataset but are not currently supported
-as weights by the sparse optimizer. Support will be added in a future release.
+The example uses the `PCG` solver and sparse Jacobian assembly, with information
+matrices applied as residual weights.
 
-To select a CUDA device or a different dataset directory:
+To run Sphere big-noise, replace `DATAROOT` with your dataset directory:
 
 ```bash
-python examples/module/pgo/pgo.py --device cuda:0 --dataroot DATAROOT
+python examples/module/pgo/pgo.py --datafile DATAROOT/sphere_bignoise_vertex3.g2o
 ```
-
-Replace `DATAROOT` with the directory containing the dataset.
 
 Other supported arguments:
 
@@ -47,10 +47,10 @@ Other supported arguments:
         optional arguments:
           -h, --help           show this help message and exit
           --device DEVICE      cuda device
-          --radius RADIUS      trust region radius
+          --radius RADIUS      initial trust region radius (default: 100)
           --save SAVE          files location to save
-          --dataroot DATAROOT  dataset location
-          --dataname DATANAME  dataset name
+          --datafile DATAFILE  dataset file path
+          --steps STEPS        maximum optimization steps (default: 80)
 ---
 
 If you use the pose graph optimization example, please cite the following paper.
