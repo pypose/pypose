@@ -8,3 +8,4 @@ Func
     :nosignatures:
 
     func.jacrev
+    func.jacobian
