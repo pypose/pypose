@@ -128,6 +128,61 @@ def add(input, other, alpha=1):
     '''
     return input.add(other, alpha)
 
+
+def addcdiv_(input, tensor1, tensor2, value=1):
+    r'''
+    Inplace version of :meth:`pypose.addcdiv`.
+    '''
+    return input.addcdiv_(tensor1, tensor2, value=value)
+
+
+def addcdiv(input, tensor1, tensor2, value=1):
+    r'''
+    Performs the element-wise division of :obj:`tensor1` by :obj:`tensor2`, multiplies the result
+    by the scalar :obj:`value` and adds it to :obj:`input` LieTensor.
+
+    Args:
+        input (:obj:`LieTensor`): the input LieTensor (Lie Algebra or Lie Group).
+
+        tensor1 (:obj:`Tensor`): the numerator tensor.
+
+        tensor2 (:obj:`Tensor`): the denominator tensor.
+
+        value (:obj:`Number`, optional): multiplier for :math:`\text{tensor1} / \text{tensor2}`. Default: 1.
+
+    Return:
+        :obj:`LieTensor`: the output LieTensor.
+
+    .. math::
+        \bm{y}_i =
+        \begin{cases}
+        \mathrm{value} * (\bm{a}_i / \bm{b}_i) + \bm{x}_i & \text{if}~\bm{x}_i~\text{is a Lie Algebra} \\
+        \mathrm{Exp}(\mathrm{value} * (\bm{a}_i / \bm{b}_i)) \times \bm{x}_i & \text{if}~\bm{x}_i~\text{is a Lie Group}
+        \end{cases}
+
+    where :math:`\bm{x}` is the ``input`` LieTensor, :math:`\bm{a}` is ``tensor1``, :math:`\bm{b}` is ``tensor2``,
+    and :math:`\bm{y}` is the output LieTensor.
+
+    Note:
+        See :meth:`pypose.add` for notes on manifold tangent spaces and compatibility with optimizers.
+        This provides convenience to work with PyTorch optimizers like :obj:`torch.optim.Adam`
+        and :obj:`torch.optim.AdamW`, which adjust parameters via :meth:`.addcdiv_` of a Lie Group.
+        Both multi-tensor (:attr:`foreach=True`) and fused (:attr:`fused=True`) execution modes
+        are supported in addition to the standard single-tensor update path.
+
+    See :meth:`LieTensor` for types of Lie Algebra and Lie Group.
+
+    See :meth:`Exp` for Exponential mapping of Lie Algebra.
+
+    Examples:
+        >>> x = pp.randn_SO3()
+        >>> t1 = torch.randn(3)
+        >>> t2 = torch.full((3,), 2.0)
+        >>> pp.addcdiv(x, t1, t2, value=0.1)
+    '''
+    return input.addcdiv(tensor1, tensor2, value=value)
+
+
 def mul(input, other):
     r'''
     Multiply input LieTensor by other.
