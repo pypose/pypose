@@ -1160,12 +1160,12 @@ class Sim3_AdjTXa(torch.autograd.Function):
 
 
 def broadcast_inputs(x, y):
-    """ Automatic broadcasting of missing dimensions """
+    """Broadcast batch dimensions as views for the batched Lie kernels."""
     if y is None:
-        xs, xd = x.shape[:-1], x.shape[-1]
-        return (x.reshape(-1, xd).contiguous(), ), x.shape[:-1]
+        return (x, ), x.shape[:-1]
     out_shape = torch.broadcast_shapes(x.shape[:-1], y.shape[:-1])
     shape = out_shape if out_shape != torch.Size([]) else (1,)
-    x = x.expand(shape+(x.shape[-1],)).reshape(-1,x.shape[-1]).contiguous()
-    y = y.expand(shape+(y.shape[-1],)).reshape(-1,y.shape[-1]).contiguous()
+    # Keep the batch axes: flattening an expanded tensor can copy its storage.
+    x = x.expand(shape+(x.shape[-1],))
+    y = y.expand(shape+(y.shape[-1],))
     return (x, y), tuple(out_shape)
