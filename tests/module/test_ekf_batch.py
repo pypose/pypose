@@ -126,8 +126,10 @@ def test_general_nls_jacobians_keep_coupled_batch_semantics():
         def observation(self, state, input, t=None):
             return 2 * state + state.sum(dim=0) + input
 
-    x = torch.randn(3, 2, dtype=torch.float64)
-    u = torch.randn_like(x)
+    # Keep this regression independent of the suite's global random state.
+    generator = torch.Generator().manual_seed(435)
+    x = torch.randn(3, 2, dtype=torch.float64, generator=generator)
+    u = torch.randn(x.shape, dtype=x.dtype, generator=generator)
     model = Coupled().set_refpoint(x, u)
     for name, function, argument in [('A', model.state_transition, x),
                                      ('B', model.state_transition, u),
