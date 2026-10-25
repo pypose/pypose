@@ -28,12 +28,26 @@ def test_broadcast_inputs_preserves_storage(device, shapes):
 
 
 @pytest.mark.parametrize('device', DEVICES)
-def test_broadcast_inputs_unary_noncontiguous(device):
-    x = torch.randn(3, 2, 7, device=device).transpose(0, 1)
-    (out,), batch = broadcast_inputs(x, None)
-    assert batch == (2, 3)
-    assert out.untyped_storage().data_ptr() == x.untyped_storage().data_ptr()
-    torch.testing.assert_close(out, x)
+@pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+@pytest.mark.parametrize('group,dimension', GROUPS)
+def test_act_transposed_points_contiguous(device, dtype, group, dimension):
+    # A fixed quarter-turn about z, with translation/scale where supported.
+    q = [0., 0., 2 ** -0.5, 2 ** -0.5]
+    translation = [1., 2., 3.] if group in ('SE3', 'Sim3') else [0., 0., 0.]
+    scale = 2. if group in ('RxSO3', 'Sim3') else 1.
+    values = (translation if group in ('SE3', 'Sim3') else []) + q
+    if group in ('RxSO3', 'Sim3'):
+        values += [scale]
+    X = getattr(pp, group)(torch.tensor(values, device=device, dtype=dtype)).expand(2, 3, -1)
+    points = torch.arange(18, device=device, dtype=dtype).reshape(3, 2, 3).transpose(0, 1)
+    assert not points.is_contiguous()
+    out = X.Act(points)
+    # Independent geometric oracle, not another call through broadcast_inputs.
+    expected = scale * torch.stack((-points[..., 1], points[..., 0], points[..., 2]), -1)
+    expected += torch.tensor(translation, device=device, dtype=dtype)
+    torch.testing.assert_close(out, expected)
+    assert out.is_contiguous()
+    torch.testing.assert_close(out.view(-1, 3), expected.reshape(-1, 3))
 
 
 def apply_operation(group, operation, x, y):
@@ -75,6 +89,7 @@ def test_broadcast_operations_match_flattened_copy(device, dtype, group, dimensi
 
     x, y = x.requires_grad_(), y.requires_grad_()
     actual = apply_operation(group, operation, x, y)
+    assert actual.is_contiguous()
     weight = torch.randn_like(actual)
     actual_grads = torch.autograd.grad((actual * weight).sum(), (x, y))
 
