@@ -420,7 +420,9 @@ class LevenbergMarquardt(_Optimizer):
             ignored when weight is given when calling :meth:`.step` or :meth:`.optimize` method.
             Default: ``None``.
         reject (integer, optional): the maximum number of rejecting unsuccessfull steps.
-            Default: 16.
+            Non-finite trial losses are never accepted. If the retry limit is reached
+            with a non-finite trial loss, the previous parameter values and loss are
+            retained. Default: 16.
         min (float, optional): the lower-bound of the Hessian diagonal. Default: 1e-6.
         max (float, optional): the upper-bound of the Hessian diagonal. Default: 1e32.
         vectorize (bool, optional): the method of computing Jacobian. If ``True``, the
@@ -680,6 +682,8 @@ class LevenbergMarquardt(_Optimizer):
             self.last = self.loss = self.loss if hasattr(self, 'loss') \
                                     else self.model.loss(input, target)
             self.reject_count = 0
+            # An inverse update cannot undo NaNs or overflow in a trial parameter.
+            params_backup = [(p, p.detach().clone()) for p in pg['params'] if p.requires_grad]
             while self.last <= self.loss:
                 if self.sparse:
                     diagonal_op_(A, op=partial(torch.mul, other=1 + pg['damping']))
@@ -693,9 +697,14 @@ class LevenbergMarquardt(_Optimizer):
                 self.update_parameter(pg['params'], D)
                 self.loss = self.model.loss(input, target)
                 self.strategy.update(pg, last=self.last, loss=self.loss, J=J, D=D, R=R.view(-1, 1))
-                if self.last < self.loss and self.reject_count < self.reject: # reject step
-                    self.update_parameter(params = pg['params'], step = -D)
-                    self.loss, self.reject_count = self.last, self.reject_count + 1
+                if not torch.isfinite(self.loss) or \
+                        (self.last < self.loss and self.reject_count < self.reject):
+                    for parameter, value in params_backup:
+                        parameter.copy_(value)
+                    self.loss = self.last
+                    if self.reject_count >= self.reject:
+                        break
+                    self.reject_count += 1
                 else:
                     break
         return self.loss
