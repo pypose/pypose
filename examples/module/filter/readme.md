@@ -24,6 +24,27 @@ Particle Filter (PF)
 python examples/module/filter/pf.py
 ```
 
+## Batched comparison
+
+Run EKF, UKF and PF on the same fixed-seed bicycle trajectories:
+
+```bash
+python examples/module/filter/batched.py --device cpu
+python examples/module/filter/batched.py --device cuda --shared-covariance
+```
+
+States and observations are `(B, T, 3)`, inputs are `(B, T, 2)` and
+estimation covariances are `(B, T, 3, 3)`. Batch entries are independent systems;
+time is a separate dimension, and the filters manage their own sigma-point or
+particle dimension. Each observation measures the next state **after** process
+noise has been added. All three filters receive the same measurements and
+initial estimates.
+
+The default uses different process and measurement covariances per system;
+`--shared-covariance` uses common `(3, 3)` matrices. The example prints position
+and wrapped-heading RMSE separately, and saves one plot per filter and trajectory.
+Use `--batch`, `--steps`, `--particles`, `--save` and `--show` to adjust the run.
+
 * Other supported arguments:
 
     EKF
