@@ -213,7 +213,7 @@ class SO3Type(LieType):
         else:
             out = SO3_Act4.apply(*input)
         dim = -1 if out.nelement() != 0 else p.shape[-1]
-        return out.view(out_shape + (dim,))
+        return out.contiguous().view(out_shape + (dim,))
 
     def Mul(self, X, Y):
         # Transform on transform
@@ -371,7 +371,7 @@ class SE3Type(LieType):
         else:
             out = SE3_Act4.apply(*input)
         dim = -1 if out.nelement() != 0 else p.shape[-1]
-        return out.view(out_shape + (dim,))
+        return out.contiguous().view(out_shape + (dim,))
 
     def Mul(self, X, Y):
         # Transform on transform
@@ -512,7 +512,7 @@ class Sim3Type(LieType):
         else:
             out = Sim3_Act4.apply(*input)
         dim = -1 if out.nelement() != 0 else p.shape[-1]
-        return out.view(out_shape + (dim,))
+        return out.contiguous().view(out_shape + (dim,))
 
     def Mul(self, X, Y):
         # Transform on transform
@@ -657,7 +657,7 @@ class RxSO3Type(LieType):
         else:
             out = RxSO3_Act4.apply(*input)
         dim = -1 if out.nelement() != 0 else p.shape[-1]
-        return out.view(out_shape + (dim,))
+        return out.contiguous().view(out_shape + (dim,))
 
     def Mul(self, X, Y):
         # Transform on transform
