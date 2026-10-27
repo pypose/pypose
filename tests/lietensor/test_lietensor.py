@@ -4,6 +4,7 @@ import torch
 import random
 import warnings
 import torch.linalg
+import pytest
 import pypose as pp
 from torch import nn
 import pypose.optim.solver as ppos
@@ -283,6 +284,247 @@ def test_parameter_dispatch(monkeypatch):
         assert(torch.all(m[:, 0:3, 0:3] == s.view(-1, 1, 1) * r.matrix()))
 
     print('Done')
+
+
+def test_addcdiv():
+    for group_fn, dim in [
+        (pp.randn_SO3, 3),
+        (pp.randn_SE3, 6),
+        (pp.randn_Sim3, 7),
+        (pp.randn_RxSO3, 4),
+    ]:
+        x = group_fn(5)
+        t1 = torch.randn(5, dim)
+        t2 = torch.rand(5, dim) + 0.5
+        val = 0.3
+
+        # Functional out-of-place
+        res1 = pp.addcdiv(x, t1, t2, value=val)
+        assert isinstance(res1, pp.LieTensor)
+        assert res1.ltype == x.ltype
+
+        # Method out-of-place
+        res2 = x.addcdiv(t1, t2, value=val)
+        assert isinstance(res2, pp.LieTensor)
+        assert res2.ltype == x.ltype
+        torch.testing.assert_close(res1.tensor(), res2.tensor())
+
+        # Mathematical correctness: compare with add(x, val * (t1 / t2))
+        expected = pp.add(x, val * (t1 / t2))
+        torch.testing.assert_close(res1.tensor(), expected.tensor())
+
+        # Method in-place
+        x_copy = x.clone()
+        x_copy.addcdiv_(t1, t2, value=val)
+        torch.testing.assert_close(x_copy.tensor(), expected.tensor())
+
+        # Functional in-place
+        x_copy2 = x.clone()
+        pp.addcdiv_(x_copy2, t1, t2, value=val)
+        torch.testing.assert_close(x_copy2.tensor(), expected.tensor())
+
+        # Positional value
+        res_pos = x.addcdiv(t1, t2, val)
+        torch.testing.assert_close(res_pos.tensor(), expected.tensor())
+
+        # Default value=1
+        res_def = x.addcdiv(t1, t2)
+        torch.testing.assert_close(res_def.tensor(), pp.add(x, t1 / t2).tensor())
+
+    for algebra_fn, dim in [
+        (pp.randn_so3, 3),
+        (pp.randn_se3, 6),
+        (pp.randn_sim3, 7),
+        (pp.randn_rxso3, 4),
+    ]:
+        x = algebra_fn(5)
+        t1 = torch.randn(5, dim)
+        t2 = torch.rand(5, dim) + 0.5
+        val = 0.3
+
+        res1 = pp.addcdiv(x, t1, t2, value=val)
+        assert isinstance(res1, pp.LieTensor)
+        assert res1.ltype == x.ltype
+
+        res2 = x.addcdiv(t1, t2, value=val)
+        torch.testing.assert_close(res1.tensor(), res2.tensor())
+
+        expected = x + val * (t1 / t2)
+        torch.testing.assert_close(res1.tensor(), expected.tensor())
+
+        x_copy = x.clone()
+        x_copy.addcdiv_(t1, t2, value=val)
+        torch.testing.assert_close(x_copy.tensor(), expected.tensor())
+
+
+def test_adam_parameter():
+    torch.manual_seed(42)
+    rot_to_fit = pp.randn_SO3(5)
+    rot_to_optimize = pp.Parameter(pp.identity_SO3(5))
+    optimizer = torch.optim.Adam([rot_to_optimize], lr=0.01)
+
+    init_loss = (rot_to_optimize.Inv() * rot_to_fit).Log().norm(dim=-1).mean().item()
+    for _ in range(300):
+        optimizer.zero_grad()
+        loss = (rot_to_optimize.Inv() * rot_to_fit).Log().norm(dim=-1).mean()
+        loss.backward()
+        optimizer.step()
+
+    final_loss = loss.item()
+    assert final_loss < init_loss * 0.05, f"Adam failed to converge: init={init_loss}, final={final_loss}"
+    torch.testing.assert_close(
+        torch.linalg.vector_norm(rot_to_optimize.tensor(), dim=-1),
+        torch.ones(5),
+        atol=1e-5,
+        rtol=1e-5,
+    )
+
+
+def test_torch_addcdiv_function():
+    x = pp.randn_SO3(4)
+    t1 = torch.randn(4, 3)
+    t2 = torch.rand(4, 3) + 0.5
+    val = 0.25
+
+    # Test torch.addcdiv routing through __torch_function__
+    res = torch.addcdiv(x, t1, t2, value=val)
+    assert isinstance(res, pp.LieTensor)
+    assert res.ltype == x.ltype
+    expected = pp.add(x, val * (t1 / t2))
+    torch.testing.assert_close(res.tensor(), expected.tensor())
+
+    # Test torch.Tensor.addcdiv_ routing through __torch_function__
+    x_copy = x.clone()
+    torch.Tensor.addcdiv_(x_copy, t1, t2, value=val)
+    torch.testing.assert_close(x_copy.tensor(), expected.tensor())
+
+    # Test torch._foreach_addcdiv_
+    p1 = pp.randn_SO3(2)
+    p2 = pp.randn_SE3(2)
+    m1_1, m2_1 = torch.randn(2, 3), torch.rand(2, 3) + 0.5
+    m1_2, m2_2 = torch.randn(2, 6), torch.rand(2, 6) + 0.5
+    torch._foreach_addcdiv_([p1, p2], [m1_1, m1_2], [m2_1, m2_2], 0.2)
+    torch.testing.assert_close(
+        torch.linalg.vector_norm(p1.tensor(), dim=-1),
+        torch.ones(2),
+        atol=1e-5,
+        rtol=1e-5,
+    )
+
+    # Test torch._foreach_addcdiv out-of-place
+    out = torch._foreach_addcdiv([p1], [m1_1], [m2_1], 0.1)
+    assert isinstance(out, (list, tuple))
+    assert isinstance(out[0], pp.LieTensor)
+    assert out[0].ltype == p1.ltype
+
+
+@pytest.mark.parametrize("mismatch", ["params", "tensor1", "tensor2", "scalars"])
+@pytest.mark.parametrize("inplace", [True, False])
+def test_torch_foreach_addcdiv_rejects_mismatched_lengths(mismatch, inplace):
+    params = [pp.randn_SO3(2), pp.randn_SO3(2)]
+    original = [param.clone() for param in params]
+    tensor1 = [torch.randn(2, 3), torch.randn(2, 3)]
+    tensor2 = [torch.rand(2, 3) + 0.5, torch.rand(2, 3) + 0.5]
+    scalars = [0.2, 0.2]
+    if mismatch == "params":
+        params.pop()
+    elif mismatch == "tensor1":
+        tensor1.pop()
+    elif mismatch == "tensor2":
+        tensor2.pop()
+    else:
+        scalars.pop()
+
+    operation = torch._foreach_addcdiv_ if inplace else torch._foreach_addcdiv
+    with pytest.raises(ValueError, match="equal lengths"):
+        operation(params, tensor1, tensor2, scalars)
+
+    for param, expected in zip(params, original):
+        torch.testing.assert_close(param.tensor(), expected.tensor())
+
+
+def test_adam_foreach():
+    torch.manual_seed(42)
+    rot_to_fit = pp.randn_SO3(5)
+    rot_to_optimize = pp.Parameter(pp.identity_SO3(5))
+    optimizer = torch.optim.Adam([rot_to_optimize], lr=0.01, foreach=True)
+
+    init_loss = (rot_to_optimize.Inv() * rot_to_fit).Log().norm(dim=-1).mean().item()
+    for _ in range(300):
+        optimizer.zero_grad()
+        loss = (rot_to_optimize.Inv() * rot_to_fit).Log().norm(dim=-1).mean()
+        loss.backward()
+        optimizer.step()
+
+    final_loss = loss.item()
+    assert final_loss < init_loss * 0.05, f"Adam foreach failed to converge: init={init_loss}, final={final_loss}"
+    torch.testing.assert_close(
+        torch.linalg.vector_norm(rot_to_optimize.tensor(), dim=-1),
+        torch.ones(5),
+        atol=1e-5,
+        rtol=1e-5,
+    )
+
+
+def test_adam_fused():
+    torch.manual_seed(42)
+    rot_to_fit = pp.randn_SO3(5)
+    rot_to_optimize = pp.Parameter(pp.identity_SO3(5))
+    optimizer = torch.optim.Adam([rot_to_optimize], lr=0.01, fused=True)
+
+    init_loss = (rot_to_optimize.Inv() * rot_to_fit).Log().norm(dim=-1).mean().item()
+    for _ in range(300):
+        optimizer.zero_grad()
+        loss = (rot_to_optimize.Inv() * rot_to_fit).Log().norm(dim=-1).mean()
+        loss.backward()
+        optimizer.step()
+
+    final_loss = loss.item()
+    assert final_loss < init_loss * 0.05, f"Adam fused failed to converge: init={init_loss}, final={final_loss}"
+    torch.testing.assert_close(
+        torch.linalg.vector_norm(rot_to_optimize.tensor(), dim=-1),
+        torch.ones(5),
+        atol=1e-5,
+        rtol=1e-5,
+    )
+
+    # Test with amsgrad=True
+    rot_param_ams = pp.Parameter(pp.identity_SO3(5))
+    opt_ams = torch.optim.Adam([rot_param_ams], lr=0.01, fused=True, amsgrad=True)
+    for _ in range(50):
+        opt_ams.zero_grad()
+        loss = (rot_param_ams.Inv() * rot_to_fit).Log().norm(dim=-1).mean()
+        loss.backward()
+        opt_ams.step()
+    torch.testing.assert_close(
+        torch.linalg.vector_norm(rot_param_ams.tensor(), dim=-1),
+        torch.ones(5),
+        atol=1e-5,
+        rtol=1e-5,
+    )
+
+
+def test_adam_mixed_parameters():
+    for mode_kwargs in [{'foreach': True}, {'fused': True}]:
+        torch.manual_seed(42)
+        rot_to_fit = pp.randn_SO3(3)
+        p_lie = pp.Parameter(pp.identity_SO3(3))
+        p_euc = torch.nn.Parameter(torch.zeros(3))
+        optimizer = torch.optim.Adam([p_lie, p_euc], lr=0.01, **mode_kwargs)
+
+        for _ in range(50):
+            optimizer.zero_grad()
+            loss = (p_lie.Inv() * rot_to_fit).Log().norm().sum() + (p_euc - torch.ones(3)).pow(2).sum()
+            loss.backward()
+            optimizer.step()
+
+        torch.testing.assert_close(
+            torch.linalg.vector_norm(p_lie.tensor(), dim=-1),
+            torch.ones(3),
+            atol=1e-5,
+            rtol=1e-5,
+        )
+        assert p_euc.sum().item() > 0.5
 
 
 if __name__ == '__main__':
