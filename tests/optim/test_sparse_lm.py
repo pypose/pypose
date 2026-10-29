@@ -147,3 +147,43 @@ class TestSparseLM:
             rtol=1e-4,
             atol=2e-4,
         )
+
+
+class _SparseDomainModel(nn.Module):
+    def __init__(self, kind):
+        super().__init__()
+        self.kind = kind
+        self.x = pp.Parameter(torch.tensor([[0.0 if kind == "exp" else 1.0]],
+                                           device="cuda", dtype=torch.float64), sjac=True)
+
+    @psjac
+    def sqrt_residual(x):
+        return x.sqrt() - 0.1
+
+    @psjac
+    def exp_residual(x):
+        return x.exp() - 1000.0
+
+    def forward(self):
+        return getattr(_SparseDomainModel, self.kind + "_residual")(self.x)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="sparse LM backend requires CUDA")
+@pytest.mark.parametrize("kind", ["sqrt", "exp"])
+@pytest.mark.parametrize("reject", [0, 2])
+def test_sparse_lm_nonfinite_trials_restore_state(kind, reject):
+    pytest.importorskip("bae.autograd.graph")
+    model = _SparseDomainModel(kind)
+    parameter = model.x
+    before = parameter.detach().clone()
+    optimizer = pp.optim.LM(model, solver=ppos.PCG(tol=1e-12), sparse=True,
+                            strategy=pp.optim.strategy.Constant(damping=1e-6), reject=reject)
+    initial_loss = optimizer.model.loss((), None).detach().clone()
+    for _ in range(2):
+        loss = optimizer.step(())
+        assert torch.isfinite(loss)
+        assert optimizer.reject_count == reject
+        assert model.x is parameter
+        torch.testing.assert_close(model.x, before, rtol=0, atol=0)
+        torch.testing.assert_close(loss, initial_loss, rtol=0, atol=0)
+        torch.testing.assert_close(optimizer.model.loss((), None), loss, rtol=0, atol=0)
