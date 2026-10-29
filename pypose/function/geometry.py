@@ -222,7 +222,7 @@ def reprojerr(points, pixels, intrinsics, extrinsics=None, reduction='none'):
     if reduction == 'norm':
         return (img_repj - pixels).norm(dim=-1)
     elif reduction == 'sum':
-        return (img_repj - pixels).sum(dim=-1)
+        return (img_repj - pixels).abs().sum(dim=-1)
     return img_repj - pixels
 
 
