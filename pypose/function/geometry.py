@@ -657,10 +657,10 @@ def knn_filter(points:torch.Tensor, k:int, pdim:int=None, radius:float=None, ord
     if radius is not None:
         count = torch.sum(dist <= radius, dim=-1) - 1
         rmask = count >= k
-        points, dist = points[rmask], dist[rmask]
+        dist = dist[rmask]
 
     _, idx = dist.topk(k+1, dim=-1, largest=False, sorted=True)
     shape = points.size() + torch.Size([k+1])
-    idx = idx.unsqueeze(-2).expand(shape) # expand to [B, D, K+1]
+    idx = idx.unsqueeze(-2).expand(idx.shape[:-1] + (points.size(-1), k + 1))
     points = points.unsqueeze(-1).expand(shape) # expand to [B, D, K+1]
     return torch.gather(points, -3, idx).mean(dim=-1)
