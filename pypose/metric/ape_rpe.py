@@ -525,8 +525,8 @@ def ape(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
 
     if align or scale:
         nposes = etraj.num_poses if nposes == -1 else nposes
-        est_trans = etraj.translation()[..., :nposes]
-        ref_trans = rtraj.translation()[..., :nposes]
+        est_trans = etraj.translation()[:nposes]
+        ref_trans = rtraj.translation()[:nposes]
         trans_mat = svdstf(est_trans, ref_trans, scale)
     elif origin:
         trans_mat[..., :7] = (rtraj.first_pose @ etraj.first_pose.Inv()).data
@@ -673,8 +673,8 @@ def rpe(rstamp, rpose, estamp, epose, etype: str = "translation", diff: float = 
 
     if align or scale:
         nposes = etraj.num_poses if nposes == -1 else nposes
-        est_trans = etraj.translation()[:,:nposes]
-        ref_trans = rtraj.translation()[:,:nposes]
+        est_trans = etraj.translation()[:nposes]
+        ref_trans = rtraj.translation()[:nposes]
         trans_mat = svdstf(est_trans, ref_trans, scale)
     elif origin:
         trans_mat[...,:7] = (rtraj.first_pose @ etraj.first_pose.Inv()).data
