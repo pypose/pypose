@@ -12,3 +12,11 @@ pypose/module/pnp.py @zitongzhan
 pypose/func/jac.py @zitongzhan
 
 pypose/metric/ape_rpe.py @ericzzj1989
+
+# Batched UFK and PF- #352
+examples/module/filter/ekf.py @FuTaimeng
+examples/module/filter/bicycle.py @FuTaimeng
+pypose/module/pf.py @FuTaimeng
+pypose/module/ukf.py @FuTaimeng
+tests/module/test_pf.py @FuTaimeng
+tests/module/test_ukf.py @FuTaimeng
