@@ -2,6 +2,8 @@ import torch
 from .. import bmv
 from torch import nn
 from torch.linalg import pinv
+from torch.autograd.functional import jacobian
+from .dynamics import NLS
 
 
 class EKF(nn.Module):
@@ -15,6 +17,13 @@ class EKF(nn.Module):
             Ignored if provided during each iteration. Default: ``None``
         R (:obj:`Tensor`, optional): The covariance matrices of system observation noise.
             Ignored if provided during each iteration. Default: ``None``
+
+    Batch dimensions identify independent systems, not time steps. States have
+    shape ``(*B, n)`` and observations ``(*B, m)``. Inputs and covariance matrices
+    may be shared or broadcast over ``B``. The model must preserve these batch
+    dimensions and must not couple different batch entries. Automatic NLS
+    Jacobians are evaluated per system inside EKF; the general NLS A/B/C/D
+    properties and user-supplied analytic Jacobians are unchanged.
 
     A non-linear system can be described as
 
@@ -156,7 +165,7 @@ class EKF(nn.Module):
         # Upper cases are matrices, lower cases are vectors
         self.model.set_refpoint(state=x, input=u, t=t)
         I = torch.eye(P.shape[-1], device=P.device, dtype=P.dtype)
-        A = self.model.A
+        A = self._jacobian('A')
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
 
@@ -164,12 +173,34 @@ class EKF(nn.Module):
 
         P = A @ P @ A.mT + Q                 # 2. Covariance predict
         self.model.set_refpoint(state=xm, input=u, t=t)
-        C = self.model.C
+        C = self._jacobian('C')
         K = P @ C.mT @ pinv(C @ P @ C.mT + R) # 3. Kalman gain
         e = y - self.model.observation(xm, u, t=t)   #    predicted observation error
         xp = xm + bmv(K, e)                     # 4. Posteriori state
         P = (I - K @ C) @ P                   # 5. Posteriori covariance
         return xp, P
+
+    def _jacobian(self, name):
+        # Preserve analytic overrides (including LTI/LTV) and the unbatched path.
+        if getattr(type(self.model), name, None) is not getattr(NLS, name) or \
+                self.model._ref_state.ndim == 1:
+            return getattr(self.model, name)
+
+        state = self.model._ref_state
+        function = self.model.state_transition if name == 'A' else self.model.observation
+
+        def batch_sum(x):
+            output = function(x, self.model._ref_input, self.model._ref_t)
+            if output.shape[:-1] != x.shape[:-1]:
+                raise ValueError('EKF models must preserve the state batch dimensions.')
+            return output.sum(dim=tuple(range(x.ndim - 1)))
+
+        # For independent systems, d(sum_b f_b)/dx_b = df_b/dx_b. Differentiate
+        # only the output coordinates, not the full cross-batch Jacobian. Calling
+        # the batched model also preserves shared inputs and batched parameters,
+        # buffers and timestamps. Keep NLS's differentiation options.
+        jac = jacobian(batch_sum, state, **self.model.jacargs)
+        return jac.movedim(0, -2)
 
     @property
     def Q(self):
