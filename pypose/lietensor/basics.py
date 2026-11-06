@@ -82,8 +82,8 @@ def add(input, other, alpha=1):
         the elements in the last dimension of the ``other`` Tensor (treated as a Lie Algebra
         in this function) beyond the expected shape of the Lie Algebra are ignored. This is
         because the gradient of a Lie Group is computed as a left perturbation (a Lie Algebra)
-        in its tangent space and is stored in the LieGroup's :obj:`LieTensor.grad`, which has
-        the same storage space with the LieGroup.
+        in its tangent space and is exposed via :obj:`LieTensor.grad` as a manifold-sized,
+        zero-copy view over the LieGroup's embedded-storage autograd gradient.
 
         .. math::
             \begin{align*}
@@ -99,10 +99,12 @@ def add(input, other, alpha=1):
         See Eq.(44) in `Micro Lie theory <https://arxiv.org/abs/1812.01537>`_ for more details of
         the gradient for a Lie Group.
 
-        This provides convenience to work with PyTorch optimizers like :obj:`torch.optim.SGD`,
-        which calls function :meth:`.add_` of a Lie Group to adjust parameters by gradients
-        (:obj:`LieTensor.grad`, where the last element is often zero since tangent vector requires
-        smaller storage space).
+        A LieGroup :class:`pypose.Parameter` keeps the same embedded storage as a
+        raw :class:`LieTensor`, so this padded coordinate stays internal to autograd
+        and never reaches ``.grad``. Native PyTorch optimizers (e.g.
+        :obj:`torch.optim.Adam`) are not supported on a LieGroup ``Parameter`` for
+        this reason; use :obj:`pypose.optim.GaussNewton` or
+        :obj:`pypose.optim.LevenbergMarquardt` instead.
 
     See :meth:`LieTensor` for types of Lie Algebra and Lie Group.
 

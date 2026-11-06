@@ -77,7 +77,11 @@ class Adaptive(object):
        \end{aligned}
 
     Args:
-        damping (float, optional): initial damping factor of LM optimizer. Default: 1e-6.
+        damping (float, optional): initial damping factor of LM optimizer.
+            Default: 1e-3, matching Ceres's LM default initial lambda.  Starting
+            near 1e-6 (near pure Gauss-Newton) with an accurate linear solver
+            makes the first step overshoot on noisy pose-graph problems and
+            derail the LM trajectory into a different local minimum.
         high (float, optional): high threshold for scaling down the damping factor.
             Default: 0.5.
         low (float, optional): low threshold for scaling up the damping factor.
@@ -131,7 +135,7 @@ class Adaptive(object):
         Early Stoping!
         Optimization Early Done with loss: 9.236661990819073e-10
     '''
-    def __init__(self, damping=1e-6, high=0.5, low=1e-3, up=2., down=.5, min=1e-6, max=1e16):
+    def __init__(self, damping=1e-3, high=0.5, low=1e-3, up=2., down=.5, min=1e-6, max=1e16):
         assert damping > 0, ValueError("damping has to be positive: {}".format(damping))
         assert high > 0, ValueError("high has to be positive: {}".format(high))
         assert low > 0, ValueError("low for decrease has to be positive: {}".format(low))
@@ -141,7 +145,9 @@ class Adaptive(object):
         self.min, self.max = min, max
 
     def update(self, pg, last, loss, J, D, R, *args, **kwargs):
-        quality = (last - loss) / -((J @ D).mT @ (2 * R + J @ D)).squeeze()
+        JD = _jacobian_matvec(J, D)
+        residual = torch.Tensor(R).reshape_as(JD)
+        quality = (last - loss) / -((JD).mT @ (2 * residual + JD)).squeeze()
         if quality > pg['high']:
             pg['damping'] = pg['damping'] * pg['down']
         elif quality > pg['low']:
@@ -258,7 +264,9 @@ class TrustRegion(object):
                          'up':up, 'down': down, 'factor':factor}
 
     def update(self, pg, last, loss, J, D, R, *args, **kwargs):
-        quality = (last - loss) / -((J @ D).mT @ (2 * R + J @ D)).squeeze()
+        JD = _jacobian_matvec(J, D)
+        residual = torch.Tensor(R).reshape_as(JD)
+        quality = (last - loss) / -((JD).mT @ (2 * residual + JD)).squeeze()
         pg['radius'] = 1. / pg['damping']
         if quality > pg['high']:
             pg['radius'] = pg['up'] * pg['radius']
@@ -272,3 +280,20 @@ class TrustRegion(object):
         pg['down'] = max(self.min, min(pg['down'], self.max))
         pg['radius'] = max(self.min, min(pg['radius'], self.max))
         pg['damping'] = 1. / pg['radius']
+def _jacobian_matvec(J, D):
+    r"""Multiply a possibly compressed sparse Jacobian by a dense step.
+
+    Torch does not reliably dispatch ``J @ D`` when ``J`` is a compressed
+    sparse tensor and ``D`` is a tensor subclass; kept at the strategy
+    boundary so sparse LM callers retain the sparse Jacobian instead of
+    densifying it.
+    """
+    if getattr(J, "layout", None) in (
+        torch.sparse_coo,
+        torch.sparse_csr,
+        torch.sparse_csc,
+        torch.sparse_bsr,
+        torch.sparse_bsc,
+    ):
+        return torch.sparse.mm(J, torch.Tensor(D).reshape(-1, 1))
+    return J @ D

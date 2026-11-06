@@ -129,10 +129,11 @@ class TestSparseLM:
 
         loss = loss0
         try:
-            for _ in range(5):
+            # A small residual can still leave the pose parameters slightly
+            # off the optimum. Run enough LM steps to validate both residual
+            # reduction and parameter convergence across CUDA backends.
+            for _ in range(10):
                 loss = optimizer.step(input=(edges, relposes)).item()
-                if loss < 1e-5:
-                    break
         except Exception as e:
             msg = str(e).lower()
             if "cuda" in msg or "cusparse" in msg:
