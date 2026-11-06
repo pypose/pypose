@@ -1,4 +1,4 @@
-import math, torch
+import torch
 
 
 def pm(input):
@@ -30,9 +30,11 @@ def cumops_(input, dim, ops):
     '''
     L, v = input.shape[dim], input
     assert dim != -1 or dim != v.shape[-1], "Invalid dim"
-    for i in torch.pow(2, torch.arange(math.log2(L)+1, device=v.device, dtype=torch.int64)):
+    i = 1
+    while i < L:
         index = torch.arange(i, L, device=v.device, dtype=torch.int64)
         v.index_copy_(dim, index, ops(v.index_select(dim, index-i), v.index_select(dim, index)))
+        i *= 2
     return v
 
 
