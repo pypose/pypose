@@ -13,6 +13,8 @@ Functions
     hasnan
     add
     add_
+    addcdiv
+    addcdiv_
     mul
     bvv
     bmv
