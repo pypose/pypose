@@ -1,0 +1,9 @@
+.devcontainer @zitongzhan
+.readthedocs.yaml @zitongzhan
+pypose/sparse/* @zitongzhan
+tests/sparse/test_bsr.py @zitongzhan
+examples/module/ba @zitongzhan
+examples/module/pgo @zitongzhan
+pypose/module/pnp.py @zitongzhan
+pypose/autograd/function.py @zitongzhan
+pypose/func/jac.py @zitongzhan
