@@ -34,7 +34,7 @@ class _Scheduler(object):
         self.optimizer, self.verbose = optimizer, verbose
         self.max_steps, self.steps = max_steps, 0
         self.continual = self.Continual(self)
-        self._continual = True
+        self._continual = max_steps > 0
 
     def iscontinual(self):
         '''
@@ -49,7 +49,8 @@ class _Scheduler(object):
         It contains an entry for every variable in self.__dict__ which
         is not the optimizer.
         """
-        return {key: value for key, value in self.__dict__.items() if key != 'optimizer'}
+        return {key: value for key, value in self.__dict__.items()
+                if key not in ('optimizer', 'continual')}
 
     def load_state_dict(self, state_dict):
         """Loads the schedulers state.
@@ -58,7 +59,9 @@ class _Scheduler(object):
             state_dict (dict): scheduler state. Should be an object returned
                 from a call to :meth:`state_dict`.
         """
-        self.__dict__.update(state_dict)
+        # Older checkpoints include a callable bound to the source scheduler.
+        self.__dict__.update({key: value for key, value in state_dict.items()
+                              if key not in ('optimizer', 'continual')})
 
 
 class StopOnPlateau(_Scheduler):
