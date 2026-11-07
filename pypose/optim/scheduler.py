@@ -47,7 +47,7 @@ class _Scheduler(object):
         """Returns the state of the scheduler as a :class:`dict`.
 
         It contains an entry for every variable in self.__dict__ which
-        is not the optimizer.
+        is not a runtime binding to the optimizer or scheduler.
         """
         return {key: value for key, value in self.__dict__.items()
                 if key not in ('optimizer', 'continual')}
@@ -66,17 +66,17 @@ class _Scheduler(object):
 
 class StopOnPlateau(_Scheduler):
     r'''
-    A scheduler to stop an optimizer when no relative loss 'decreasing' is seen for a 'patience'
-    number of steps.
+    A scheduler to stop an optimizer when the absolute decrease in loss stays below a threshold
+    for successive steps.
 
     Args:
         optimizer (Optimizer): Wrapped optimizer.
         steps (int): Maximum number of interations optimizer will step.
-        patience (int): Number of steps with no loss 'decreasing' is seen. For example, if
-            ``patience = 2``, then it ignores the first 2 steps with no improvement, and stop
-            the optimizer after the 3rd step if the loss has no decerasing. Default: 5.
-        decreasing (float): relative loss decreasing used to count the number of patience steps.
-            Default: 1e-3.
+        patience (int): Stop after this many consecutive steps below the threshold.
+            A value of zero stops on the first such step. Default: 5.
+        decreasing (float): Minimum absolute improvement (previous loss minus current
+            loss) that resets the patience counter. For example, dropping from 100
+            to 99.5 is an improvement of 0.5. Default: 1e-3.
         verbose (bool): if ``True``, prints a message to stdout for each step. Default: ``False``.
 
     Note:
@@ -148,7 +148,7 @@ class StopOnPlateau(_Scheduler):
         else:
             self.patience_count = 0
 
-        if self.patience_count >= self.patience:
+        if self.patience_count and self.patience_count >= self.patience:
             self._continual = False
             if self.verbose:
                 print("StopOnPlateau: Maximum patience steps reached, Quitting..")
@@ -204,3 +204,4 @@ class StopOnPlateau(_Scheduler):
         while self.continual():
             loss = self.optimizer.step(input, target, weight)
             self.step(loss)
+

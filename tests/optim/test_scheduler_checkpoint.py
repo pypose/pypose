@@ -25,3 +25,15 @@ def test_zero_step_budget():
     assert not scheduler.continual()
     scheduler.optimize(input=None)
     optimizer.step.assert_not_called()
+
+
+
+def test_zero_patience_stops_only_when_improvement_is_below_threshold():
+    optimizer = Mock(spec=_Optimizer)
+    scheduler = StopOnPlateau(optimizer, steps=4, patience=0, decreasing=0.25)
+    optimizer.last, optimizer.loss = 100.0, 99.5
+    scheduler.step(optimizer.loss)
+    assert scheduler.continual()
+    optimizer.last, optimizer.loss = 99.5, 99.4
+    scheduler.step(optimizer.loss)
+    assert not scheduler.continual()
