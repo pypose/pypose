@@ -1,5 +1,6 @@
 import math
 import pypose as pp
+import pytest
 import torch as torch
 
 
@@ -65,6 +66,65 @@ class TestEKF:
 
         assert torch.allclose(xp, torch.tensor([2 + 16 / 65], dtype=torch.float64))
         assert torch.allclose(Pp, torch.tensor([[4 / 65]], dtype=torch.float64))
+
+    @pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+    def test_small_measurement_noise_does_not_freeze_later_updates(self, dtype):
+        class Identity(pp.module.NLS):
+            def state_transition(self, state, input, t=None):
+                return state
+
+            def observation(self, state, input, t=None):
+                return state
+
+        ekf = pp.module.EKF(Identity(), Q=torch.zeros(1, 1, dtype=dtype),
+                           R=torch.tensor([[0.01]], dtype=dtype))
+        state = torch.zeros(1, dtype=dtype)
+        covariance = torch.tensor([[1e6]], dtype=dtype)
+        precision = 1e-6
+        information = 0.0
+        for measurement in (1.0, 2.0, -1.0):
+            state, covariance = ekf(state, torch.tensor([measurement], dtype=dtype),
+                                    torch.zeros_like(state), covariance)
+            precision += 100.0
+            information += 100.0 * measurement
+            torch.testing.assert_close(covariance, torch.tensor([[1 / precision]], dtype=dtype))
+            torch.testing.assert_close(state, torch.tensor([information / precision], dtype=dtype))
+
+    @pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+    @pytest.mark.parametrize('batch_shape', [(), (2,)])
+    def test_correlated_covariance_matches_information_form(self, dtype, batch_shape):
+        class Identity(pp.module.NLS):
+            def state_transition(self, state, input, t=None):
+                return state
+
+            def observation(self, state, input, t=None):
+                return state
+
+            @property
+            def A(self):
+                return torch.eye(2, dtype=dtype)
+
+            @property
+            def C(self):
+                return torch.eye(2, dtype=dtype)
+
+        covariance = 1e6 * torch.tensor([[2.0, 0.3], [0.3, 1.0]], dtype=dtype)
+        covariance = covariance.expand(batch_shape + (2, 2)).clone()
+        noise = torch.tensor([[0.04, 0.01], [0.01, 0.09]], dtype=dtype)
+        observation = torch.tensor([1.0, -2.0], dtype=dtype).expand(batch_shape + (2,))
+        prior = torch.zeros_like(observation)
+        ekf = pp.module.EKF(Identity(), Q=torch.zeros(2, 2, dtype=dtype), R=noise)
+
+        state, actual = ekf(prior, observation, torch.zeros_like(prior), covariance)
+
+        prior_precision = torch.linalg.inv(covariance.double())
+        noise_precision = torch.linalg.inv(noise.double())
+        expected = torch.linalg.inv(prior_precision + noise_precision)
+        expected_state = (expected @ noise_precision @ observation.double().unsqueeze(-1)).squeeze(-1)
+        torch.testing.assert_close(actual, expected.to(dtype))
+        torch.testing.assert_close(state, expected_state.to(dtype))
+        torch.testing.assert_close(actual, actual.mT)
+        assert torch.all(torch.linalg.eigvalsh(actual) > 0)
 
 
 if __name__ == '__main__':

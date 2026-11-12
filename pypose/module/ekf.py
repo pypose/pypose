@@ -65,6 +65,10 @@ class EKF(nn.Module):
 
         .. math::
             \mathbf{P}^{+} = (\mathbf{I} - \mathbf{K}\mathbf{C}) \mathbf{P}^{-}
+                (\mathbf{I} - \mathbf{K}\mathbf{C})^{T} + \mathbf{K}\mathbf{R}\mathbf{K}^{T}
+
+        The Joseph form retains the measurement-noise contribution when the
+        Kalman gain is close to one and subtractive cancellation is significant.
 
     where superscript :math:`\cdot^{-}` and :math:`\cdot^{+}` denote the priori and
     posteriori estimation, respectively.
@@ -168,7 +172,8 @@ class EKF(nn.Module):
         K = P @ C.mT @ pinv(C @ P @ C.mT + R) # 3. Kalman gain
         e = y - self.model.observation(xm, u, t=t)   #    predicted observation error
         xp = xm + bmv(K, e)                     # 4. Posteriori state
-        P = (I - K @ C) @ P                   # 5. Posteriori covariance
+        IKC = I - K @ C
+        P = IKC @ P @ IKC.mT + K @ R @ K.mT  # 5. Posteriori covariance
         return xp, P
 
     @property
