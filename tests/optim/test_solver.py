@@ -1,4 +1,5 @@
 import torch
+import pytest
 from pypose.optim.solver import CG
 
 class TestSolver:
@@ -39,6 +40,41 @@ class TestSolver:
         cg = CG()
         A_csr = A.to_sparse_csr()
         torch.testing.assert_close(x, cg(A_csr, b), atol=1e-5, rtol=1e-4)
+
+    @pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+    @pytest.mark.parametrize('initial', ['zero', 'partly_solved', 'zero_rhs'])
+    @pytest.mark.parametrize('preconditioned', [False, True])
+    def test_cg_independent_batch_convergence(self, dtype, initial, preconditioned):
+        A = torch.stack([torch.eye(3), torch.diag(torch.tensor([2., 3., 7.]))]).to(dtype)
+        b = torch.ones(2, 3, 1, dtype=dtype)
+        x = torch.zeros_like(b)
+        if initial == 'partly_solved':
+            x[0] = 1
+        elif initial == 'zero_rhs':
+            b[0] = 0
+        M = torch.diag(torch.tensor([1., .5, .25], dtype=dtype)) if preconditioned else None
+        expected = torch.linalg.solve(A, b)
+
+        actual = CG(tol=1e-6)(A, b, x=x, M=M)
+
+        torch.testing.assert_close(actual, expected, atol=1e-6, rtol=1e-5)
+        torch.testing.assert_close(A @ actual, b, atol=1e-6, rtol=1e-5)
+
+    def test_cg_multiple_batch_axes_and_rhs_scales(self):
+        diagonal = torch.tensor([
+            [[1., 1., 1.], [2., 3., 5.]],
+            [[3., 3., 3.], [1., 4., 7.]],
+        ], dtype=torch.float64)
+        A = torch.diag_embed(diagonal)
+        b = torch.tensor([[1e-9, 1e9], [1e9, 1e-9]], dtype=torch.float64)[..., None, None]
+        b = b.expand(2, 2, 3, 1).clone()
+        actual = CG(tol=1e-10)(A, b)
+
+        torch.testing.assert_close(actual, b / diagonal.unsqueeze(-1), atol=0, rtol=1e-9)
+        for i in range(2):
+            for j in range(2):
+                separate = CG(tol=1e-10)(A[i, j], b[i, j])
+                torch.testing.assert_close(actual[i, j], separate, atol=0, rtol=1e-9)
 
 if __name__ == '__main__':
     # for dev purpose, will not be executed in CI
