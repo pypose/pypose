@@ -233,7 +233,14 @@ class MPC(nn.Module):
                 x, u, cost = self.lqr(x_init, dt, u)
                 self.stepper.step(cost)
 
-                if best['cost'] == None or cost < best['cost']:
+                if best['cost'] is None:
                     best = {'x': x, 'u': u, 'cost': cost}
+                else:
+                    better = cost < best['cost']
+                    best = {
+                        'x': torch.where(better[..., None, None], x, best['x']),
+                        'u': torch.where(better[..., None, None], u, best['u']),
+                        'cost': torch.where(better, cost, best['cost']),
+                    }
 
         return self.lqr(x_init, dt, u_traj=best['u'])
