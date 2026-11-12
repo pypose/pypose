@@ -1,8 +1,35 @@
 import torch
+import pytest
 import pypose as pp
 from torchvision.datasets.utils import download_and_extract_archive
 
 class TestICP:
+
+    @pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+    @pytest.mark.parametrize('init_in_forward', [False, True])
+    @pytest.mark.parametrize('target_batch', [False, True])
+    def test_icp_initial_transform_batch(self, dtype, init_in_forward, target_batch):
+        source = torch.tensor([[0., 0., 0.], [2., 0., 0.], [0., 3., 0.],
+                               [0., 0., 4.], [1., 2., 3.]], dtype=dtype)
+        twists = torch.tensor([[0.1, 0.2, 0.3, 0.01, -0.02, 0.03],
+                               [-0.1, 0.1, 0.2, -0.02, 0.01, 0.02],
+                               [0.2, -0.1, 0.1, 0.03, 0.01, -0.01]], dtype=dtype)
+        expected = pp.se3(twists if target_batch else twists[0]).Exp()
+        target = expected.unsqueeze(-2) @ source
+        init = pp.se3(torch.tensor([[0.02, 0., 0., 0., 0.01, 0.],
+                                   [-0.02, 0., 0., 0., -0.01, 0.]], dtype=dtype)).Exp()
+        if target_batch:
+            init = init.unsqueeze(-2)
+        stepper = pp.utils.ReduceToBason(steps=4)
+        icp = pp.module.ICP(init=None if init_in_forward else init, stepper=stepper)
+        result = icp(source, target, init=init if init_in_forward else None)
+
+        batch = (2, 3) if target_batch else (2,)
+        assert result.shape == batch + (7,)
+        torch.testing.assert_close(result.matrix(), expected.matrix().expand(batch + (4, 4)),
+                                   atol=2e-5, rtol=2e-5)
+        torch.testing.assert_close(result.unsqueeze(-2) @ source,
+                                   target.expand(batch + source.shape), atol=2e-5, rtol=2e-5)
 
     def load_data(self):
         # pc1 and pc2 has different numbers of points

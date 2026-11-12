@@ -95,7 +95,7 @@ class ICP(nn.Module):
         if init is not None:
             assert is_SE3(init), "The initial transformation is not SE3Type LieTensor."
             temporal = init.unsqueeze(-2) @ temporal
-        batch = torch.broadcast_shapes(source.shape[:-2], target.shape[:-2])
+        batch = torch.broadcast_shapes(temporal.shape[:-2], target.shape[:-2])
         self.stepper.reset()
         while self.stepper.continual():
             knndist, knnidx = knn(temporal, target, k=1, ord=ord, dim=dim)
