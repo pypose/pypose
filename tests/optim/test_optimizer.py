@@ -47,6 +47,23 @@ class Timer:
 
 
 class TestOptim:
+    def test_lm_preserves_parameters_after_cholesky_failure(self):
+        class Sum(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.x = nn.Parameter(torch.ones(2))
+
+            def forward(self, input):
+                return (self.x.sum() - input).reshape(1)
+
+        model = Sum()
+        initial = model.x.detach().clone()
+        optimizer = pp.optim.LM(model, solver=ppos.Cholesky(),
+                                strategy=ppst.Constant(damping=1e-9))
+        loss = optimizer.step(torch.tensor(0.))
+        torch.testing.assert_close(model.x, initial)
+        torch.testing.assert_close(loss, torch.tensor(4.))
+
     def test_optim_liealgebra(self):
 
         class PoseInv(nn.Module):

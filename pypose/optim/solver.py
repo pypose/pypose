@@ -211,7 +211,7 @@ class Cholesky(nn.Module):
             Tensor: the solved batched tensor.
         '''
         L, info = cholesky_ex(A, upper=self.upper)
-        assert not torch.any(torch.isnan(L)), \
+        assert not torch.any(info) and not torch.any(torch.isnan(L)), \
             'Cholesky decomposition failed. Check your matrix (may not be positive-definite)'
         return b.cholesky_solve(L, upper=self.upper)
 
