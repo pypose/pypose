@@ -47,6 +47,44 @@ class Timer:
 
 
 class TestOptim:
+    @pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+    @pytest.mark.parametrize('kernel_type', ['scale', 'identity', 'trainable_scale'])
+    def test_triggs_linear_kernel(self, dtype, kernel_type):
+        class TrainableScale(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.scale = nn.Parameter(torch.tensor(0.25, dtype=dtype))
+
+            def forward(self, x):
+                return self.scale * x
+
+        kernel = {'scale': ppok.Scale(0.25), 'identity': nn.Identity(),
+                  'trainable_scale': TrainableScale()}[kernel_type]
+        R = torch.tensor([[2., -3.], [0., 0.], [0.5, -0.25]], dtype=dtype)
+        J = torch.arange(18, dtype=dtype).reshape(6, 3)
+        corrected_R, corrected_J = ppoc.Triggs(kernel)(R, J)
+        factor = 1. if kernel_type == 'identity' else 0.5
+        torch.testing.assert_close(corrected_R, factor * R)
+        torch.testing.assert_close(corrected_J, factor * J)
+
+    def test_triggs_scale_lm_update(self):
+        model = nn.Linear(1, 1, bias=False, dtype=torch.float64)
+        with torch.no_grad():
+            model.weight.fill_(2.)
+        kernel = ppok.Scale(0.25)
+        optimizer = pp.optim.LM(model, kernel=kernel, corrector=ppoc.Triggs(kernel))
+        loss = optimizer.step(torch.ones(1, 1, dtype=torch.float64),
+                              torch.zeros(1, 1, dtype=torch.float64))
+        assert loss < 1e-8
+        assert model.weight.abs().max() < 1e-4
+
+    def test_triggs_negative_curvature(self):
+        R = torch.tensor([[2., -3.], [0., 0.]], dtype=torch.float64)
+        J = torch.arange(12, dtype=R.dtype).reshape(4, 3)
+        kernel = ppok.Cauchy()
+        for actual, expected in zip(ppoc.Triggs(kernel)(R, J), ppoc.FastTriggs(kernel)(R, J)):
+            torch.testing.assert_close(actual, expected)
+
     def test_optim_liealgebra(self):
 
         class PoseInv(nn.Module):

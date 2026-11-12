@@ -138,8 +138,9 @@ class Triggs(nn.Module):
         x = R.square().sum(-1, keepdim=True).requires_grad_(True)
         y = self.kernel(x).sum()
         g1 = grad(y, x, create_graph=True)[0]
-        g2 = grad(g1.sum(), x)[0]
-        return x.detach_(), g1.detach_(), g2.detach_()
+        g2 = grad(g1.sum(), x, allow_unused=True)[0] if g1.requires_grad else None
+        g2 = torch.zeros_like(x) if g2 is None else g2
+        return x.detach(), g1.detach(), g2.detach()
 
     def forward(self, R: Tensor, J: Tensor):
         r'''
