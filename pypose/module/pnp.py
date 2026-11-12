@@ -150,7 +150,10 @@ class EPnP(nn.Module):
         assert pixels.size(-2) == points.size(-2) >= 4, \
             "Number of points/pixels cannot be smaller than 4."
         intrinsics = self.intrinsics if intrinsics is None else intrinsics
-        broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
+        batch = broadcast_shapes(points.shape[:-2], pixels.shape[:-2], intrinsics.shape[:-2])
+        points = points.expand(batch + points.shape[-2:])
+        pixels = pixels.expand(batch + pixels.shape[-2:])
+        intrinsics = intrinsics.expand(batch + intrinsics.shape[-2:])
 
         # Select naive and calculate alpha in the world coordinate
         bases = self._svd_basis(points)
