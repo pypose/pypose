@@ -1,5 +1,6 @@
 import torch
-from pypose.optim.solver import CG
+import pytest
+from pypose.optim.solver import CG, Cholesky
 
 class TestSolver:
     def sample(self,):
@@ -39,6 +40,30 @@ class TestSolver:
         cg = CG()
         A_csr = A.to_sparse_csr()
         torch.testing.assert_close(x, cg(A_csr, b), atol=1e-5, rtol=1e-4)
+
+    @pytest.mark.parametrize('dtype', [torch.float32, torch.float64,
+                                     torch.complex64, torch.complex128])
+    @pytest.mark.parametrize('upper', [False, True])
+    def test_cholesky_positive_definite(self, dtype, upper):
+        A = torch.tensor([[2., 0.5], [0.5, 1.]], dtype=dtype)
+        if A.is_complex():
+            A[0, 1] += 0.25j
+            A[1, 0] -= 0.25j
+        A = torch.stack([A, 2 * A])
+        b = torch.tensor([[1., 2.], [3., 4.]], dtype=dtype).expand(2, -1, -1)
+        torch.testing.assert_close(Cholesky(upper=upper)(A, b), torch.linalg.solve(A, b))
+
+    @pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+    @pytest.mark.parametrize('upper', [False, True])
+    @pytest.mark.parametrize('off_diagonal', [1., 2.])
+    @pytest.mark.parametrize('batched', [False, True])
+    def test_cholesky_failed_factorization(self, dtype, upper, off_diagonal, batched):
+        A = torch.tensor([[1., off_diagonal], [off_diagonal, 1.]], dtype=dtype)
+        if batched:
+            A = torch.stack([torch.eye(2, dtype=dtype), A])
+        b = A.new_ones(A.shape[:-1] + (1,))
+        with pytest.raises(AssertionError, match='Cholesky decomposition failed'):
+            Cholesky(upper=upper)(A, b)
 
 if __name__ == '__main__':
     # for dev purpose, will not be executed in CI
