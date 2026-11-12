@@ -296,7 +296,7 @@ class CG(nn.Module):
                 'The number of dimensions of A and b must be the same or one more than b'
         if x is None:
             x = torch.zeros_like(b)
-        bnrm2 = torch.linalg.norm(b, dim=0)
+        bnrm2 = torch.linalg.norm(b, dim=-2, keepdim=True)
         if (bnrm2 == 0).all():
             return b
         atol = self.tol * bnrm2
@@ -316,7 +316,8 @@ class CG(nn.Module):
             z = r.clone()
 
         for iteration in range(maxiter):
-            if (torch.linalg.norm(r, dim=0) < atol).all():
+            active = torch.linalg.norm(r, dim=-2, keepdim=True) > atol
+            if not active.any():
                 return x
 
             if M is not None:
@@ -326,13 +327,14 @@ class CG(nn.Module):
 
             rho_cur = torch.matmul(r.mT, z)
             if iteration > 0:
-                beta = rho_cur / rho_prev
+                beta = torch.where(active, rho_cur, 0) / torch.where(active, rho_prev, 1)
                 p.mul_(beta).add_(z)
             else:  # First spin
                 p = z.clone()
 
+            p = torch.where(active, p, 0)
             torch.matmul(A, p, out=q)
-            alpha = rho_cur / torch.matmul(p.mT, q)
+            alpha = torch.where(active, rho_cur, 0) / torch.where(active, torch.matmul(p.mT, q), 1)
             x += alpha * p
             r -= alpha * q
             rho_prev = rho_cur
