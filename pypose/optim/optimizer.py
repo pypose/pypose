@@ -677,8 +677,7 @@ class LevenbergMarquardt(_Optimizer):
                 A = J_T @ J
                 A.diagonal().clamp_(pg['min'], pg['max'])
 
-            self.last = self.loss = self.loss if hasattr(self, 'loss') \
-                                    else self.model.loss(input, target)
+            self.last = self.loss = self.model.loss(input, target)
             self.reject_count = 0
             while self.last <= self.loss:
                 if self.sparse:
