@@ -262,7 +262,15 @@ class LQR(nn.Module):
     def __init__(self, system, Q, p, T):
         super().__init__()
         self.system = system
-        self.Q, self.p, self.T = Q, p, T
+        self.T = T
+        if isinstance(Q, nn.Parameter):
+            self.Q = Q
+        else:
+            self.register_buffer('Q', Q, persistent=False)
+        if isinstance(p, nn.Parameter):
+            self.p = p
+        else:
+            self.register_buffer('p', p, persistent=False)
         self.x_traj = None
         self.u_traj = None
 
@@ -279,7 +287,10 @@ class LQR(nn.Module):
         assert self.Q.ndim == 4 or self.p.ndim == 3, "Shape not compatible."
         assert self.Q.device == self.p.device, "Device not compatible."
         assert self.Q.dtype == self.p.dtype, "Tensor data type not compatible."
-        self.dargs = {'dtype': self.p.dtype, 'device': self.p.device}
+
+    @property
+    def dargs(self):
+        return {'dtype': self.p.dtype, 'device': self.p.device}
 
     def forward(self, x_init, dt=1, u_traj=None, u_lower=None, u_upper=None, du=None):
         r'''
