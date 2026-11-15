@@ -395,7 +395,7 @@ def mat2Sim3(mat, check=True, rtol=1e-5, atol=1e-5):
     shape = mat.shape
     rot = mat[..., :3, :3]
 
-    s = torch.pow(torch.det(rot), 1/3).unsqueeze(-1)
+    s = torch.exp(torch.logdet(rot) / 3).unsqueeze(-1)
     zeros = torch.zeros(shape[:-2], dtype=mat.dtype, device=mat.device)
     if torch.allclose(s,  zeros, rtol=rtol, atol=atol):
         raise ValueError("Rotation matrix not full rank.")
@@ -503,7 +503,7 @@ def mat2RxSO3(mat, check=True, rtol=1e-5, atol=1e-5):
     shape = mat.shape
     rot = mat[..., :3, :3]
 
-    s = torch.pow(torch.det(rot), 1/3).unsqueeze(-1)
+    s = torch.exp(torch.logdet(rot) / 3).unsqueeze(-1)
     if torch.allclose(s,  torch.zeros(shape[:-2], dtype=mat.dtype, device=mat.device), rtol=rtol, atol=atol):
         raise ValueError("Rotation matrix not full rank.")
 
