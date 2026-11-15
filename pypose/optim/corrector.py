@@ -161,7 +161,7 @@ class Triggs(nn.Module):
         sR, sJ = se * R, sj * J.view(R.shape + (J.shape[-1],))
         M = ~((x==0)|(g2 <=0)).squeeze(-1)
         alpha = 1 - (1 + 2*x[M]*g2[M]/g1[M]).clamp(min=0).sqrt()
-        sR[M] = se[M] / (1 - alpha)
+        sR[M] = se[M] / (1 - alpha) * R[M]
         Q = torch.einsum('...d,...k,...kl->...dl', R[M], R[M], sJ[M])
         sJ[M] = sJ[M] - (alpha / x[M]).unsqueeze(-1) * Q
         return sR, sJ.view_as(J)
