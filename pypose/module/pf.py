@@ -48,12 +48,12 @@ class PF(EKF):
 
        .. math::
            \begin{aligned}
-             &\mathbf{x}_{k}=\mathbf{p}(\mathbf{x},n\cdot\mathbf{P}_{k},N)&\quad k=1,...,N \\
+             &\mathbf{x}_{k}=\mathbf{p}(\mathbf{x},\mathbf{P}_{k},N)&\quad k=1,...,N \\
              &\mathbf{P}_{k}=\mathbf{P} &\quad k=1,...,N
            \end{aligned}
 
        where :math:`N` is the number of Particles and :math:`\mathbf{p}` is the probability
-       density function (PDF), :math:`n` is the dimension of state.
+       density function (PDF). Particles are sampled with the supplied prior covariance.
 
     2. Priori State Estimation.
 
@@ -172,8 +172,7 @@ class PF(EKF):
         R = R if R is not None else self.R
         self.model.set_refpoint(state=x, input=u, t=t)
 
-        n = x.size(-1)
-        xp = self.generate_particles(x, n * P)
+        xp = self.generate_particles(x, P)
         xs, ye = self.model(xp, u)
         q = self.relative_likelihood(y, ye, R)
         xr = self.resample_particles(q, xs)
