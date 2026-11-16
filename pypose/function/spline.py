@@ -217,9 +217,10 @@ def bspline(data, interval=0.1, extrapolate=False):
     P = data[..., index, :].view(Bth + (N-3,4,1,D))
     P = (P[..., :3, :, :].Inv() * P[..., 1:, :, :]).Log()
     A = (P * w).Exp()
-    Aend = (P[..., -1, :] * ((B.sum(dim=1)).unsqueeze(-1))).Exp()
+    # Only the final segment contributes the extra right endpoint.
+    Aend = (P[..., -1, :, 0, :] * ((B.sum(dim=1)).unsqueeze(-1))).Exp()
     Aend = Aend[..., [0], :] * Aend[..., [1], :] * Aend[..., [2], :]
     A = A[..., 0, :, :] * A[..., 1, :, :] * A[..., 2, :, :]
-    ps, pend = dP * A,dP[...,-1,:,:]*Aend[...,-1,:,:]
+    ps, pend = dP * A,dP[...,-1,:,:]*Aend
     poses = torch.cat((ps.view(Bth + (-1, D)), pend), dim=-2)
     return poses
