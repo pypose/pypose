@@ -363,7 +363,6 @@ class LQR(nn.Module):
         ns, nc = self.x_traj.size(-1), self.u_traj.size(-1)
 
         u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
-        delta_u = torch.zeros(self.n_batch + (self.T, nc), **self.dargs)
         cost = torch.zeros(self.n_batch, **self.dargs)
         x = torch.zeros(self.n_batch + (self.T+1, ns), **self.dargs)
         xt = x[..., 0, :] = x_init
@@ -371,8 +370,8 @@ class LQR(nn.Module):
         for t in range(self.T):
             Kt, kt = K[...,t,:,:], k[...,t,:]
             delta_xt = xt - self.x_traj[...,t,:]
-            delta_u[..., t, :] = bmv(Kt, delta_xt) + kt
-            u[...,t,:] = ut = delta_u[..., t, :] + self.u_traj[...,t,:]
+            delta_ut = bmv(Kt, delta_xt) + kt
+            u[...,t,:] = ut = delta_ut + self.u_traj[...,t,:]
             xut = torch.cat((xt, ut), dim=-1)
             x[...,t+1,:] = xt = self.system(xt, ut)[0]
             cost += 0.5 * bvmv(xut, self.Q[...,t,:,:], xut) + vecdot(xut, self.p[...,t,:])
