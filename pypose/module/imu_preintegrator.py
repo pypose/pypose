@@ -454,16 +454,17 @@ class IMUPreintegrator(nn.Module):
         A[:, :-1, 6:9, 3:6] = torch.einsum('...xy,...t -> ...xy', \
             torch.eye(3, device=device, dtype=dtype).repeat([B, F, 1, 1]), cov_input['dt'])
 
-        # [J dt, 0, 0]^T
-        Bg[..., 0:3, 0:3] = torch.einsum('...xy,...t -> ...xy', cov_input['Rk'].Jr(), cov_input['dt'])
+        # Factor dt out of both noise Jacobians before forming their covariance.
+        # [J, 0, 0]^T
+        Bg[..., 0:3, 0:3] = cov_input['Rk'].Jr()
 
-        # [0, R_{ik}dt, 1/2R_{ik}dt^2]^T
-        Ba[..., 3:6, 0:3] = torch.einsum('...xy,...t -> ...xy', cov_input['Rij'].matrix(), cov_input['dt'])
+        # [0, R_{ik}, 1/2R_{ik}dt]^T
+        Ba[..., 3:6, 0:3] = cov_input['Rij'].matrix()
         Ba[..., 6:9, 0:3] = 0.5 * torch.einsum('...xy,...t -> ...xy',
-                                                cov_input['Rij'].matrix(), cov_input['dt']**2)
+                                                cov_input['Rij'].matrix(), cov_input['dt'])
 
         # the term of B
-        B_cov = torch.einsum('...xy,...t -> ...xy', Bg @ Cg @ Bg.mT + Ba @ Ca @ Ba.mT, 1/cov_input['dt'])
+        B_cov = torch.einsum('...xy,...t -> ...xy', Bg @ Cg @ Bg.mT + Ba @ Ca @ Ba.mT, cov_input['dt'])
         B_cov = torch.cat([init_cov[:,None,...], B_cov], dim=1)
 
         A_left_cum = cumprod(A.flip([1]), dim=1).flip([1]) # cum from An to I, then flip
