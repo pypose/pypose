@@ -352,7 +352,7 @@ def pairs_by_dist(traj, delta, tol=0.0, all=False):
             idx_1.append(candidate_index + offset)
         id_pairs = (idx_0, idx_1)
     else:
-        idx = []
+        idx = [0]
         previous_translation = traj.translation()[0]
         current_path = 0.0
         for i, current_translation in enumerate(traj.translation()):
