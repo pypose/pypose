@@ -128,7 +128,7 @@ def matching_time_indices(stamps_1, stamps_2, max_diff=0.01, offset_2=0.0):
         matching_indices_2: ``list[int]``
             Indices of timestamps_2 that match with timestamps_2.
     """
-    stamps_2 += offset_2
+    stamps_2 = stamps_2 + offset_2
     diff_mat = (stamps_1[..., None] - stamps_2[None]).abs()
     indices_1 = torch.arange(len(stamps_1), device=stamps_1.device)
     value, indices_2 = diff_mat.min(dim=-1)
