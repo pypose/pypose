@@ -47,6 +47,9 @@ def chspline(points, interval=0.1):
         The implementation is based on wiki of `Cubic Hermite spline
         <https://en.wikipedia.org/wiki/Cubic_Hermite_spline>`_.
 
+        Float16 and bfloat16 inputs use float32 working arithmetic to keep time
+        knots distinct. The result retains the input dtype.
+
     Examples:
         >>> import torch
         >>> import pypose as pp
@@ -75,6 +78,9 @@ def chspline(points, interval=0.1):
     """
     assert points.dim() >= 2, "Dimension of points should be [..., N, C]"
     assert interval < 1.0, "The interval should be smaller than 1."
+    input_dtype = points.dtype
+    if input_dtype in (torch.float16, torch.bfloat16):
+        points = points.float()
     batch, N = points.shape[:-2], points.shape[-2]
     dargs = {'device': points.device, 'dtype': points.dtype}
     intervals = torch.arange(0, 1, interval, **dargs)
@@ -100,7 +106,7 @@ def chspline(points, interval=0.1):
     interpoints += hh[..., 1:2] * m[..., idxs, :] * dx[..., None]
     interpoints += hh[..., 2:3] * points[..., idxs + 1, :]
     interpoints += hh[..., 3:4] * m[..., idxs + 1, :] * dx[..., None]
-    return interpoints
+    return interpoints.to(input_dtype)
 
 def bspline(data, interval=0.1, extrapolate=False):
     r'''
