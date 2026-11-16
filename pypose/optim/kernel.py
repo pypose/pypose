@@ -134,10 +134,13 @@ class Cauchy(nn.Module):
         dtype = input.dtype if input.is_floating_point() else torch.get_default_dtype()
         work = input.to(torch.float32 if dtype in (torch.float16, torch.bfloat16) else dtype)
         scale = torch.as_tensor(self.delta2, dtype=work.dtype, device=work.device)
-        low, high = torch.minimum(work, scale), torch.maximum(work, scale)
-        # log(1 + x / s) = log1p(min(x, s) / max(x, s)) + log(max(x, s)) - log(s).
-        # The ratio is bounded, and the log difference is exactly zero for x <= s.
-        cost = scale * ((low / high).log1p() + (high.log() - scale.log()))
+        direct = work <= scale * (torch.finfo(work.dtype).max / 2)
+        # Mask inputs before division so the inactive path cannot overflow in backward.
+        small = torch.where(direct, work, 0)
+        large = torch.where(direct, 1, work)
+        logarithm = torch.where(direct, (small / scale).log1p(),
+                                (scale / large).log1p() + large.log() - scale.log())
+        cost = scale * logarithm
         return cost.to(dtype)
 
 

@@ -55,6 +55,20 @@ def test_cauchy_retains_tensor_scale_gradient():
     torch.testing.assert_close(gradient, expected)
 
 
+@pytest.mark.parametrize('dtype,delta', [(torch.float32, 1e-20), (torch.float64, 1e-160)])
+def test_cauchy_retains_subnormal_scale_gradients(dtype, delta):
+    x = torch.tensor([0., delta**2, 2 * delta**2], dtype=dtype, requires_grad=True)
+    reference = delta**2 * torch.log1p(x / delta**2)
+    expected_gradient, = torch.autograd.grad(reference.sum(), x)
+    actual = pp.optim.kernel.Cauchy(delta)(x)
+    gradient, = torch.autograd.grad(actual.sum(), x)
+
+    assert torch.isfinite(actual).all()
+    assert torch.isfinite(gradient).all()
+    torch.testing.assert_close(actual, reference, rtol=0, atol=0)
+    torch.testing.assert_close(gradient, expected_gradient, rtol=0, atol=0)
+
+
 def test_cauchy_large_ratio_allows_gauss_newton_update():
     class ScaledFit(torch.nn.Module):
         def __init__(self):
