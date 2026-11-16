@@ -213,9 +213,10 @@ def bspline(data, interval=0.1, extrapolate=False):
                       [0, 0, 0, 1]], **dargs) / 6
     dP = data[..., 0:-3, :].unsqueeze(-2)
     w = (B @ tt).unsqueeze(-1)
-    index = (torch.arange(0, N-3).unsqueeze(-1) + torch.arange(0, 4)).view(-1)
-    P = data[..., index, :].view(Bth + (N-3,4,1,D))
-    P = (P[..., :3, :, :].Inv() * P[..., 1:, :, :]).Log()
+    increments = (data[..., :-1, :].Inv() * data[..., 1:, :]).Log()
+    index = (torch.arange(N-3, device=data.device).unsqueeze(-1)
+             + torch.arange(3, device=data.device)).view(-1)
+    P = increments[..., index, :].view(Bth + (N-3,3,1,6))
     A = (P * w).Exp()
     Aend = (P[..., -1, :] * ((B.sum(dim=1)).unsqueeze(-1))).Exp()
     Aend = Aend[..., [0], :] * Aend[..., [1], :] * Aend[..., [2], :]
