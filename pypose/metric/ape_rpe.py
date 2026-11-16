@@ -104,6 +104,25 @@ class StampedSE3(object):
         return torch.cat((zeros, torch.cumsum(norm, dim=0)))
 
 
+def _nearest_sorted_timestamps(stamps_1, stamps_2):
+    insertion = torch.searchsorted(stamps_2.contiguous(), stamps_1.contiguous())
+    left = (insertion - 1).clamp(min=0, max=len(stamps_2) - 1)
+    right = insertion.clamp(max=len(stamps_2) - 1)
+    left_distance = (stamps_1 - stamps_2[left]).abs()
+    right_distance = (stamps_1 - stamps_2[right]).abs()
+    value = torch.minimum(left_distance, right_distance)
+
+    # Find the first minimum, including equal distances caused by rounding.
+    high = torch.where(left_distance <= right_distance, left, right)
+    low = torch.zeros_like(high)
+    for _ in range(len(stamps_2).bit_length()):
+        middle = (low + high) // 2
+        farther = (stamps_1 - stamps_2[middle]).abs() > value
+        low = torch.where(farther, middle + 1, low)
+        high = torch.where(farther, high, middle)
+    return value, low
+
+
 def matching_time_indices(stamps_1, stamps_2, max_diff=0.01, offset_2=0.0):
     r"""
     Search for the best matching timestamps of two lists of timestamps.
@@ -129,9 +148,17 @@ def matching_time_indices(stamps_1, stamps_2, max_diff=0.01, offset_2=0.0):
             Indices of timestamps_2 that match with timestamps_2.
     """
     stamps_2 += offset_2
-    diff_mat = (stamps_1[..., None] - stamps_2[None]).abs()
     indices_1 = torch.arange(len(stamps_1), device=stamps_1.device)
-    value, indices_2 = diff_mat.min(dim=-1)
+    # Small matrices are faster than ordered-search setup and remain inexpensive.
+    ordered = (len(stamps_1) * len(stamps_2) > 65536 and stamps_1.is_floating_point()
+               and stamps_2.is_floating_point() and torch.isfinite(stamps_1).all()
+               and torch.isfinite(stamps_2).all()
+               and torch.all(stamps_2[1:] >= stamps_2[:-1]))
+    if ordered:
+        value, indices_2 = _nearest_sorted_timestamps(stamps_1, stamps_2)
+    else:
+        diff_mat = (stamps_1[..., None] - stamps_2[None]).abs()
+        value, indices_2 = diff_mat.min(dim=-1)
 
     matching_indices_1 = indices_1[value < max_diff].tolist()
     matching_indices_2 = indices_2[value < max_diff].tolist()
