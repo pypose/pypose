@@ -296,6 +296,8 @@ class CG(nn.Module):
                 'The number of dimensions of A and b must be the same or one more than b'
         if x is None:
             x = torch.zeros_like(b)
+        elif x.ndim == b.ndim - 1:
+            x = x.unsqueeze(-1)
         bnrm2 = torch.linalg.norm(b, dim=0)
         if (bnrm2 == 0).all():
             return b
