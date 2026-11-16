@@ -272,5 +272,9 @@ class UKF(EKF):
 
     def compute_cov(self, a, b, w, Q=0):
         '''Compute covariance of two set of variables.'''
+        if a.ndim >= 2 and a.shape[:-1] == b.shape[:-1] \
+                and w.shape == a.shape[:-1] + (1,) \
+                and a.dtype in (torch.float32, torch.float64):
+            return Q + (w * a).movedim(0, -1) @ b.movedim(0, -2)
         a, b = a.unsqueeze(-1), b.unsqueeze(-1)
         return Q + (w.unsqueeze(-1) * a @ b.mT).sum(dim=0)
