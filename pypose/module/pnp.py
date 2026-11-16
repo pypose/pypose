@@ -227,11 +227,20 @@ class EPnP(nn.Module):
                          O, a1 * fv, a1 * (v0 - v),
                          O, a2 * fv, a2 * (v0 - v),
                          O, a3 * fv, a3 * (v0 - v)], dim=-1).view(*batch, point * 2, 12)
-        eigenvalues, eigenvectors = torch.linalg.eig(M.mT @ M)
-        eigenvalues, eigenvectors = eigenvalues.real, eigenvectors.real
-        _, index = eigenvalues.topk(k=least, largest=False, sorted=True)  # (batch, 4)
+        gram = M.mT @ M
+        eigenvalues, eigenvectors = torch.linalg.eig(gram)
+        _, index = eigenvalues.real.topk(k=least, largest=False, sorted=True)
         index = index.flip(dims=[-1]).unsqueeze(-2).tile((1,) * len(batch) + (12, 1))
-        return torch.gather(eigenvectors, dim=-1, index=index).mT  # (batch, 4, 12)
+        nullv = torch.gather(eigenvectors.real, dim=-1, index=index).mT
+        complex_basis = torch.gather(eigenvectors.imag, dim=-1, index=index)
+        complex_basis = complex_basis.ne(0).any(dim=(-1, -2))
+        if complex_basis.any():
+            # Complex conjugate vectors lose independent directions in .real.
+            # Keep the original basis for real cases used by beta initialization.
+            _, real_vectors = torch.linalg.eigh(gram[complex_basis])
+            nullv = nullv.clone()
+            nullv[complex_basis] = real_vectors.narrow(-1, 0, least).flip(-1).mT
+        return nullv  # (batch, 4, 12)
 
     @staticmethod
     def _compute_lrho(nullv, bases):
