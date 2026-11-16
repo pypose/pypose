@@ -131,7 +131,17 @@ class Cauchy(nn.Module):
             input (torch.Tensor): the input tensor (non-negative).
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
-        return self.delta2 * (input/self.delta2).log1p()
+        dtype = input.dtype if input.is_floating_point() else torch.get_default_dtype()
+        work = input.to(torch.float32 if dtype in (torch.float16, torch.bfloat16) else dtype)
+        scale = torch.as_tensor(self.delta2, dtype=work.dtype, device=work.device)
+        direct = work <= scale * (torch.finfo(work.dtype).max / 2)
+        # Mask inputs before division so the inactive path cannot overflow in backward.
+        small = torch.where(direct, work, 0)
+        large = torch.where(direct, 1, work)
+        logarithm = torch.where(direct, (small / scale).log1p(),
+                                (scale / large).log1p() + large.log() - scale.log())
+        cost = scale * logarithm
+        return cost.to(dtype)
 
 
 class SoftLOne(nn.Module):
