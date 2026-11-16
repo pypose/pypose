@@ -21,7 +21,8 @@ class System(nn.Module):
         r'''
         Automatically advances the time step.
         '''
-        self._t.add_(1)
+        # Keep timestamps already used by differentiable model calls unchanged.
+        self._t = self._t + 1
 
     def reset(self, t=0):
         self._t.fill_(t)
@@ -553,7 +554,7 @@ class NLS(System):
         '''
         self._ref_state = self.state if state is None else torch.atleast_1d(state)
         self._ref_input = self.input if input is None else torch.atleast_1d(input)
-        self._ref_t = self.systime if t is None else torch.atleast_1d(t)
+        self._ref_t = (self.systime if t is None else torch.atleast_1d(t)).clone()
         self._ref_f = self.state_transition(self._ref_state, self._ref_input, self._ref_t)
         self._ref_g = self.observation(self._ref_state, self._ref_input, self._ref_t)
         return self
