@@ -650,8 +650,7 @@ def euler2SO3(euler: torch.Tensor):
     if not torch.is_tensor(euler):
         euler = torch.tensor(euler)
     assert euler.shape[-1] == 3
-    shape, euler = euler.shape, euler.view(-1, 3)
-    roll, pitch, yaw = euler[:, 0], euler[:, 1], euler[:, 2]
+    roll, pitch, yaw = euler.unbind(-1)
     cy, sy = (yaw * 0.5).cos(), (yaw * 0.5).sin()
     cp, sp = (pitch * 0.5).cos(), (pitch * 0.5).sin()
     cr, sr = (roll * 0.5).cos(), (roll * 0.5).sin()
@@ -660,7 +659,7 @@ def euler2SO3(euler: torch.Tensor):
                      cr * sp * cy + sr * cp * sy,
                      cr * cp * sy - sr * sp * cy,
                      cr * cp * cy + sr * sp * sy], dim=-1)
-    return SO3(q).lview(*shape[:-1])
+    return SO3(q)
 
 
 def tensor(inputs):
