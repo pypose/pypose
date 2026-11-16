@@ -440,6 +440,7 @@ class IMUPreintegrator(nn.Module):
 
         Cg = torch.diag_embed(gyro_cov)
         Ca = torch.diag_embed(acc_cov)
+        Rij = cov_input['Rij'].matrix()
 
         # constructing the propagate
         A = torch.eye(9, device=device, dtype=dtype).repeat([B, F+1, 1, 1])
@@ -448,9 +449,9 @@ class IMUPreintegrator(nn.Module):
 
         A[:, :-1, 0:3, 0:3] = cov_input['Rk'].matrix().mT # R_{k,k+1}^T
         A[:, :-1, 3:6, 0:3] = torch.einsum('...xy,...t -> ...xy', \
-            - cov_input['Rij'].matrix() @ cov_input['Ha'], cov_input['dt'])
+            - Rij @ cov_input['Ha'], cov_input['dt'])
         A[:, :-1, 6:9, 0:3] = torch.einsum('...xy,...t -> ...xy', \
-            - 0.5 * cov_input['Rij'].matrix() @ cov_input['Ha'], cov_input['dt']**2)
+            - 0.5 * Rij @ cov_input['Ha'], cov_input['dt']**2)
         A[:, :-1, 6:9, 3:6] = torch.einsum('...xy,...t -> ...xy', \
             torch.eye(3, device=device, dtype=dtype).repeat([B, F, 1, 1]), cov_input['dt'])
 
@@ -458,9 +459,9 @@ class IMUPreintegrator(nn.Module):
         Bg[..., 0:3, 0:3] = torch.einsum('...xy,...t -> ...xy', cov_input['Rk'].Jr(), cov_input['dt'])
 
         # [0, R_{ik}dt, 1/2R_{ik}dt^2]^T
-        Ba[..., 3:6, 0:3] = torch.einsum('...xy,...t -> ...xy', cov_input['Rij'].matrix(), cov_input['dt'])
+        Ba[..., 3:6, 0:3] = torch.einsum('...xy,...t -> ...xy', Rij, cov_input['dt'])
         Ba[..., 6:9, 0:3] = 0.5 * torch.einsum('...xy,...t -> ...xy',
-                                                cov_input['Rij'].matrix(), cov_input['dt']**2)
+                                                Rij, cov_input['dt']**2)
 
         # the term of B
         B_cov = torch.einsum('...xy,...t -> ...xy', Bg @ Cg @ Bg.mT + Ba @ Ca @ Ba.mT, 1/cov_input['dt'])
