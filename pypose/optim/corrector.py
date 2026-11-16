@@ -68,7 +68,10 @@ class FastTriggs(nn.Module):
     '''
     def __init__(self, kernel):
         super().__init__()
-        self.func = lambda x: kernel(x).sum()
+        self.kernel = kernel
+
+    def func(self, x):
+        return self.kernel(x).sum()
 
     def forward(self, R: Tensor, J: Tensor):
         r'''
