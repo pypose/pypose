@@ -158,13 +158,14 @@ def pixel2point(pixels, depth, intrinsics):
 
     fx, fy = intrinsics[..., 0, 0, None], intrinsics[..., 1, 1, None]
     cx, cy = intrinsics[..., 0, 2, None], intrinsics[..., 1, 2, None]
+    skew = intrinsics[..., 0, 1, None]
 
     assert not torch.any(fx == 0), "fx Cannot contain zero"
     assert not torch.any(fy == 0), "fy Cannot contain zero"
 
     pts3d_z = depth
-    pts3d_x = ((pixels[..., 0] - cx) * pts3d_z) / fx
     pts3d_y = ((pixels[..., 1] - cy) * pts3d_z) / fy
+    pts3d_x = ((pixels[..., 0] - cx) * pts3d_z - skew * pts3d_y) / fx
     pts3d_x, pts3d_y, pts3d_z = torch.broadcast_tensors(pts3d_x, pts3d_y, pts3d_z)
     return torch.stack([pts3d_x, pts3d_y, pts3d_z], dim=-1)
 
