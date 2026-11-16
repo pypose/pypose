@@ -1,5 +1,4 @@
 import torch, warnings
-from torch.nn.functional import normalize
 from .utils import SO3, so3, SE3, RxSO3, Sim3
 from .lietensor import LieTensor,  liegroup, liealgebra
 from .lietensor import SE3_type, SO3_type, Sim3_type, RxSO3_type
@@ -827,6 +826,14 @@ def euler(inputs, eps=2e-4):
     return inputs.euler(eps=eps)
 
 
+def _normalize_quaternion(quaternion, eps):
+    """Bound the norm reduction while preserving the original epsilon floor."""
+    scale = quaternion.abs().amax(dim=-1, keepdim=True).clamp_min(1)
+    scaled = quaternion / scale
+    norm = scaled.norm(p=2, dim=-1, keepdim=True).clamp_min(eps / scale)
+    return scaled / norm
+
+
 def quat2unit(input: LieTensor, eps=1e-12) -> LieTensor:
     r'''
     Normalize the quaternion part of a ``LieTensor``, which has to be a Lie group.
@@ -838,7 +845,9 @@ def quat2unit(input: LieTensor, eps=1e-12) -> LieTensor:
     .. math::
         v = \frac{v}{\max(\lVert v \rVert_2, \epsilon)},
 
-    where :math:`\epsilon` is a small value to avoid division by zero
+    where :math:`\epsilon` is a small value to avoid division by zero.
+    The norm is evaluated on scaled coordinates to avoid overflow for large
+    finite quaternions.
 
     Args:
         input (``LieTensor``): input LieTensor of any type and shape.
@@ -854,10 +863,10 @@ def quat2unit(input: LieTensor, eps=1e-12) -> LieTensor:
             # latter is a view of the input storage and in-place assignment
             # breaks autograd for leaf LieTensors (and can invalidate saved
             # intermediates in differentiable robot-geometry pipelines).
-            quat = normalize(data[..., :4], p=2, dim=-1, eps=eps)
+            quat = _normalize_quaternion(data[..., :4], eps)
             data = torch.cat((quat, data[..., 4:]), dim=-1)
         elif input.ltype in [SE3_type, Sim3_type]:
-            quat = normalize(data[..., 3:7], p=2, dim=-1, eps=eps)
+            quat = _normalize_quaternion(data[..., 3:7], eps)
             data = torch.cat((data[..., :3], quat, data[..., 7:]), dim=-1)
         output = LieTensor(data, ltype=input.ltype)
         if (output.rotation().norm(p=2, dim=-1) < eps).any():
