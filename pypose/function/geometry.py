@@ -5,6 +5,9 @@ from .. import mat2SE3, mat2Sim3
 from .checking import is_lietensor
 
 
+_KNN_WORKING_BYTES = 16 * 1024 * 1024
+
+
 def cart2homo(coordinates:torch.Tensor):
     r'''
     Converts batched Cartesian coordinates to Homogeneous coordinates
@@ -261,6 +264,10 @@ def knn(ref, nbr, k=1, ord=2, dim=-1, largest=False, sorted=True):
         If ``sorted`` is set to ``False``, the output will be unspecified and not
         necessarily sorted along the index of the input point cloud.
 
+        Large searches with ``dim=-1`` process reference points in blocks to limit
+        temporary distance storage. At least one complete neighbor row is retained.
+        Autograd may retain block intermediates needed for backward.
+
     Example:
         >>> import torch, pypose as pp
         >>> ref = torch.tensor([[9., 2., 2.],
@@ -309,6 +316,27 @@ def knn(ref, nbr, k=1, ord=2, dim=-1, largest=False, sorted=True):
                 [0.0000, 4.2426],
                 [4.2426, 5.0000]])
     '''
+    if dim == -1 and ref.ndim >= 2 and nbr.ndim >= 2 and ref.shape[-2] > 1:
+        min_width = max(1, min(ref.shape[-1], nbr.shape[-1]))
+        upper_bytes = (ref.numel() * nbr.numel() // min_width
+                       * (ref.element_size() + nbr.element_size()))
+        if upper_bytes > _KNN_WORKING_BYTES:
+            batch = torch.broadcast_shapes(ref.shape[:-2], nbr.shape[:-2])
+            itemsize = torch.empty((), dtype=torch.result_type(ref, nbr)).element_size()
+            row_bytes = (batch.numel() * nbr.shape[-2]
+                         * (max(ref.shape[-1], nbr.shape[-1]) + 1) * itemsize)
+            block = max(1, _KNN_WORKING_BYTES // row_bytes) if row_bytes else ref.shape[-2]
+            extra_output_bytes = batch.numel() * ref.shape[-2] * k * (itemsize + 8)
+            if block < ref.shape[-2] and extra_output_bytes < (ref.shape[-2] - block) * row_bytes:
+                results = []
+                for reference in ref.split(block, dim=-2):
+                    diff = reference.unsqueeze(-2) - nbr.unsqueeze(-3)
+                    dist = torch.linalg.norm(diff, dim=dim, ord=ord)
+                    results.append(dist.topk(k, dim=dim, largest=largest, sorted=sorted))
+                    del diff, dist
+                values = torch.cat([result.values for result in results], dim=-2)
+                indices = torch.cat([result.indices for result in results], dim=-2)
+                return type(results[0])((values, indices))
     diff = ref.unsqueeze(-2) - nbr.unsqueeze(-3)
     dist = torch.linalg.norm(diff, dim=dim, ord=ord)
     return dist.topk(k, dim=dim, largest=largest, sorted=sorted)
