@@ -576,7 +576,6 @@ def voxel_filter(points: torch.Tensor, voxel: List[float], random:bool = False):
     assert D >= vdim, "The last dimension of the pointcloud should exceed \
         the dimenson of the voxel space."
     assert all(item != 0 for item in voxel), "Voxel size should be nonzero."
-    kwargs = {'device': points.device, 'dtype': points.dtype}
 
     minp = torch.min(points[..., :vdim], dim=-2).values
     indices = ((points[..., :vdim] - minp) / torch.tensor(voxel, device=points.device)).to(torch.int64)
@@ -591,17 +590,12 @@ def voxel_filter(points: torch.Tensor, voxel: List[float], random:bool = False):
         selected_indices = (random_indices + torch.cumsum(counts, dim=0) - counts).squeeze()
         return sorted_points[..., selected_indices, :]
     else:
-        means = torch.zeros_like(unique_indices, **kwargs)
-        values = torch.zeros([len(unique_indices), D-vdim], **kwargs)
-        voxels = torch.cat([means, values], dim=-1)
-        counts = torch.zeros(unique_indices.size(0), **kwargs)
-
-        voxels.index_add_(0, inverse_indices, points)
-        _ones = torch.ones_like(inverse_indices, **kwargs)
-        counts.index_add_(0, inverse_indices, _ones)
+        dtype = torch.float32 if points.dtype in (torch.float16, torch.bfloat16) else points.dtype
+        voxels = torch.zeros((unique_indices.size(0), D), dtype=dtype, device=points.device)
+        voxels.index_add_(0, inverse_indices, points.to(dtype=dtype))
         voxels /= counts.view(-1, 1)
 
-        return voxels
+        return voxels.to(dtype=points.dtype)
 
 
 def knn_filter(points:torch.Tensor, k:int, pdim:int=None, radius:float=None, ord:int=2):
