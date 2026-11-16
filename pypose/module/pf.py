@@ -217,4 +217,7 @@ class PF(EKF):
 
     def compute_cov(self, a, b, Q=0):
         '''Compute covariance of two set of variables.'''
+        if a.ndim >= 2 and a.shape[:-1] == b.shape[:-1] \
+                and a.dtype in (torch.float32, torch.float64):
+            return Q + (a.movedim(0, -1) @ b.movedim(0, -2)) / a.shape[0]
         return Q + bvv(a, b).mean(dim=0)
