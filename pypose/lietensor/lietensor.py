@@ -29,7 +29,7 @@ HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'doub
                      'stack', 'split', 'hsplit', 'dsplit', 'vsplit', 'tensor_split',
                      'chunk', 'concat', 'column_stack', 'dstack', 'vstack', 'hstack',
                      'index_select', 'masked_select', 'movedim', 'moveaxis', 'narrow',
-                     'permute', 'reshape', 'row_stack', 'scatter', 'scatter_add', 'clone',
+                     'permute', 'reshape', 'row_stack', 'scatter', 'scatter_add', 'clone', 'contiguous',
                      'swapaxes', 'swapdims', 'take', 'take_along_dim', 'tile', 'copy',
                      'transpose', 'unbind', 'gather', 'repeat', 'expand', 'expand_as',
                      'index_select', 'masked_select', 'index_copy', 'index_copy_',
