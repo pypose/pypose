@@ -98,6 +98,17 @@ class RobustModel(nn.Module):
             assert len(R)==len(weight)
             weight_diag = []
             for w, r in zip(weight, R):
+                size = r.shape[-1]
+                if w.shape[-2:] == (size, size):
+                    try:
+                        expanded = w.expand(*r.shape[:-1], size, size)
+                    except RuntimeError:
+                        # Scalar residuals also accept weights shaped like the residual.
+                        if size != 1:
+                            raise
+                    else:
+                        weight_diag.extend(expanded.reshape(-1, size, size).unbind())
+                        continue
                 ni = r.numel() * w.shape[-1] / w.numel()
                 w = w.view(*w.shape, 1, 1) if r.shape[-1] == 1 else w
                 ws = w.view(-1, w.shape[-2], w.shape[-1]).split(1, 0)
