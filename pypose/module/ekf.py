@@ -154,6 +154,7 @@ class EKF(nn.Module):
             list of :obj:`Tensor`: posteriori state and covariance estimation
         '''
         # Upper cases are matrices, lower cases are vectors
+        t = self.model.systime.clone() if t is None else t
         self.model.set_refpoint(state=x, input=u, t=t)
         I = torch.eye(P.shape[-1], device=P.device, dtype=P.dtype)
         A = self.model.A

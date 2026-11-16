@@ -218,6 +218,7 @@ class UKF(EKF):
             ``(*B, n, n)``, where ``B`` is the broadcast batch shape.
         '''
         # Upper cases are matrices, lower cases are vectors
+        t = self.model.systime.clone() if t is None else t
         k = 3 - x.size(-1) if k is None else k
         Q = Q if Q is not None else self.Q
         R = R if R is not None else self.R
