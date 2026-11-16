@@ -37,8 +37,11 @@ class StampedSE3(object):
         if timestamps is None:
             self.timestamps = torch.arange(poses_SE3.lshape[0], dtype=torch.float64,
                                            device=poses_SE3.device)
-        else:
+        elif isinstance(timestamps, torch.Tensor):
             self.timestamps = timestamps.type(torch.float64).to(poses_SE3.device)
+        else:
+            self.timestamps = torch.tensor(timestamps, dtype=torch.float64,
+                                           device=poses_SE3.device)
 
         assert len(self.timestamps.shape) == 1, {"The timestamp should be one array"}
         assert self.timestamps.shape[0] == self.poses.lshape[0], \
