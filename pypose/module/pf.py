@@ -211,7 +211,7 @@ class PF(EKF):
         r = torch.rand(x.shape[:-1], dtype=x.dtype, device=x.device)
         # searchsorted searches the last axis; move particles there temporarily.
         cdf = torch.cumsum(q, dim=0).movedim(0, -1).contiguous()
-        index = torch.searchsorted(cdf, r.movedim(0, -1).contiguous())
+        index = torch.searchsorted(cdf, r.movedim(0, -1).contiguous(), right=True)
         index = index.movedim(-1, 0).clamp_max(x.shape[0] - 1)
         return torch.gather(x, 0, index.unsqueeze(-1).expand_as(x))
 
