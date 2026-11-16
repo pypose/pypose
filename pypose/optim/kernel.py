@@ -91,7 +91,7 @@ class PseudoHuber(nn.Module):
             input (torch.Tensor): the input tensor (non-negative).
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
-        return 2 * self.delta2 * ((input/self.delta2 + 1).sqrt() - 1)
+        return 2 * (input / ((input/self.delta2 + 1).sqrt() + 1))
 
 
 class Cauchy(nn.Module):
@@ -172,7 +172,7 @@ class SoftLOne(nn.Module):
             input (torch.Tensor): the input tensor (non-negative).
         '''
         assert torch.all(input >= 0), 'input has to be non-negative'
-        return 2 * (self.delta1 * (1 / self.delta2 + input).sqrt() - 1)
+        return 2 * self.delta1 * (input / ((1 / self.delta2 + input).sqrt() + 1 / self.delta1))
 
 
 class Arctan(nn.Module):
