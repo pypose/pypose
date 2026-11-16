@@ -267,19 +267,19 @@ def compute_error(rtraj, etraj, output: str = 'translation', mtype: str = 'ape',
     if otype not in options:
         raise ValueError(f"Unknown output metric type, select one in {options}")
     results = {}
-    if otype == 'Max' or 'All':
+    if otype in ('Max', 'All'):
         results['Max'] = torch.max(error.abs())
-    if otype == 'Min' or 'All':
+    if otype in ('Min', 'All'):
         results['Min'] = torch.min(error.abs())
-    if otype == 'Mean' or 'All':
+    if otype in ('Mean', 'All'):
         results['Mean'] = torch.mean(error.abs())
-    if otype == 'Median' or 'All':
+    if otype in ('Median', 'All'):
         results['Median'] = torch.median(error.abs())
-    if otype == 'RMSE' or 'All':
+    if otype in ('RMSE', 'All'):
         results['RMSE'] = torch.sqrt(torch.mean(torch.pow(error, 2)))
-    if otype == 'SSE' or 'All':
+    if otype in ('SSE', 'All'):
         results['SSE'] = torch.sum(torch.pow(error, 2))
-    if otype == 'STD' or 'All':
+    if otype in ('STD', 'All'):
         results['STD']  = torch.std(error.abs())
 
     if otype == 'All':
