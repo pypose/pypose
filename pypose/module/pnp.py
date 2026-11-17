@@ -219,14 +219,15 @@ class EPnP(nn.Module):
         fv, v0 = intrinsics[..., 1, 1, None], intrinsics[..., 1, 2, None]
         a0, a1, a2, a3 = alpha[..., 0], alpha[..., 1], alpha[..., 2], alpha[..., 3]
         O = torch.zeros_like(a1)
-        M = torch.stack([a0 * fu, O, a0 * (u0 - u),
-                         a1 * fu, O, a1 * (u0 - u),
-                         a2 * fu, O, a2 * (u0 - u),
-                         a3 * fu, O, a3 * (u0 - u),
-                         O, a0 * fv, a0 * (v0 - v),
-                         O, a1 * fv, a1 * (v0 - v),
-                         O, a2 * fv, a2 * (v0 - v),
-                         O, a3 * fv, a3 * (v0 - v)], dim=-1).view(*batch, point * 2, 12)
+        du, dv = u0 - u, v0 - v
+        M = torch.stack([a0 * fu, O, a0 * du,
+                         a1 * fu, O, a1 * du,
+                         a2 * fu, O, a2 * du,
+                         a3 * fu, O, a3 * du,
+                         O, a0 * fv, a0 * dv,
+                         O, a1 * fv, a1 * dv,
+                         O, a2 * fv, a2 * dv,
+                         O, a3 * fv, a3 * dv], dim=-1).view(*batch, point * 2, 12)
         eigenvalues, eigenvectors = torch.linalg.eig(M.mT @ M)
         eigenvalues, eigenvectors = eigenvalues.real, eigenvectors.real
         _, index = eigenvalues.topk(k=least, largest=False, sorted=True)  # (batch, 4)
