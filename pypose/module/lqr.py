@@ -349,8 +349,11 @@ class LQR(nn.Module):
             K[...,t,:,:] = Kt = -torch.cholesky_solve(Qux, L)
             k[...,t,:] = kt = -torch.cholesky_solve(qu.unsqueeze(-1), L).squeeze(-1)
 
-            V = Qxx + Qxu @ Kt + Kt.mT @ Qux + Kt.mT @ Quu @ Kt
-            v = qx  + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(Kt.mT @ Quu, kt)
+            # Only the next backward step consumes the value function.
+            if t > 0:
+                KtQuu = Kt.mT @ Quu
+                V = Qxx + Qxu @ Kt + Kt.mT @ Qux + KtQuu @ Kt
+                v = qx + bmv(Qxu, kt) + bmv(Kt.mT, qu) + bmv(KtQuu, kt)
 
         return K, k
 
