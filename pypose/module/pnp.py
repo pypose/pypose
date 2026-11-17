@@ -256,19 +256,23 @@ class EPnP(nn.Module):
         # dim == 2:
         L = l_mat[..., (5, 8, 9)]
         S = self.solver(L, rho)  # (b, 3)
+        # A zero sign estimate must not erase a separately estimated magnitude.
+        sign = torch.where(S == 0, 1, S.sign())
         betas[1, ..., 2] = S[..., 0].abs().sqrt()
-        betas[1, ..., 3] = S[..., 2].abs().sqrt() * S[..., 1].sign() * S[..., 0].sign()
+        betas[1, ..., 3] = S[..., 2].abs().sqrt() * sign[..., 1] * sign[..., 0]
         # dim == 3:
         L = l_mat[..., (2, 4, 7, 5, 8, 9)]
         S = self.solver(L, rho)  # (b, 6)
+        sign = torch.where(S == 0, 1, S.sign())
         betas[2, ..., 1] = S[..., 0].abs().sqrt()
-        betas[2, ..., 2] = S[..., 3].abs().sqrt() * S[..., 1].sign() * S[..., 0].sign()
-        betas[2, ..., 3] = S[..., 5].abs().sqrt() * S[..., 2].sign() * S[..., 0].sign()
+        betas[2, ..., 2] = S[..., 3].abs().sqrt() * sign[..., 1] * sign[..., 0]
+        betas[2, ..., 3] = S[..., 5].abs().sqrt() * sign[..., 2] * sign[..., 0]
         # dim == 4:
         S = self.solver(l_mat, rho)  # (b, 10)
-        betas[3, ..., 0] = S[..., 9].abs().sqrt() * S[..., 6].sign() * S[..., 0].sign()
-        betas[3, ..., 1] = S[..., 5].abs().sqrt() * S[..., 3].sign() * S[..., 0].sign()
-        betas[3, ..., 2] = S[..., 2].abs().sqrt() * S[..., 1].sign() * S[..., 0].sign()
+        sign = torch.where(S == 0, 1, S.sign())
+        betas[3, ..., 0] = S[..., 9].abs().sqrt() * sign[..., 6] * sign[..., 0]
+        betas[3, ..., 1] = S[..., 5].abs().sqrt() * sign[..., 3] * sign[..., 0]
+        betas[3, ..., 2] = S[..., 2].abs().sqrt() * sign[..., 1] * sign[..., 0]
         betas[3, ..., 3] = S[..., 0].abs().sqrt()
         return betas
 
