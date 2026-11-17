@@ -51,7 +51,10 @@ def test_epnp_projective_subspace(batch, count, dtype):
 @pytest.mark.parametrize('refine', [False, True])
 def test_epnp_recovers_camera_pose(batch, dtype, refine):
     points, pixels, intrinsics, rotation, translation = camera_problem(batch, 32, dtype)
-    pose = pp.module.EPnP(intrinsics, refine=refine)(points, pixels)
+    model = pp.module.EPnP(intrinsics, refine=refine)
+    # Isolate projection construction from pivoted-QR rounding of near-zero betas.
+    model.solver = pp.optim.solver.LSTSQ(driver='gelsd')
+    pose = model(points, pixels)
     matrix = pose.matrix()
     tolerance = 2e-3 if dtype == torch.float32 else 2e-7
     torch.testing.assert_close(matrix[..., :3, :3], rotation.expand(batch + (3, 3)),
